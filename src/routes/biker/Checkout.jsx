@@ -1,0 +1,1 @@
+export default function Checkout(){return <main className='container-max px-5 py-8'><h1 className='text-3xl font-black'>Checkout</h1></main>}

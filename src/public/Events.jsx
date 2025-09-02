@@ -1,0 +1,1 @@
+export default function Events(){return <main className='container-max px-5 py-10'><h1 className='text-3xl font-black'>Eventos</h1></main>}

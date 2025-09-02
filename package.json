@@ -1,0 +1,30 @@
+{
+  "name": "motoshots-react",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.55.0",
+    "leaflet": "1.9.x",
+    "maplibre-gl": "^3.6.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "4.x",
+    "react-router-dom": "^6.22.3",
+    "react-virtualized-auto-sizer": "^1.0.26",
+    "react-window": "^1.8.11",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.7",
+    "vite": "^5.0.12"
+  }
+}
