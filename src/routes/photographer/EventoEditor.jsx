@@ -98,6 +98,28 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [id]);
 
+  // ⚠️ Hooks siempre antes de cualquier return condicional
+  const fotosPorPunto = useMemo(() => {
+    const map = new Map();
+    const all = Array.isArray(fotos) ? fotos : [];        // si usás `fotos` en esta versión
+    const puntosList = Array.isArray(puntos) ? puntos : []; // si usás `puntos` en esta versión
+    all.forEach((f) => {
+      const key = f.hotspot_id || null;
+      const arr = map.get(key) || [];
+      arr.push(f);
+      map.set(key, arr);
+    });
+    for (const [, arr] of map) {
+      arr.sort((a, b) => new Date(a.taken_at) - new Date(b.taken_at));
+    }
+    return map;
+  }, [fotos, puntos]);
+
+  const [uploadPoint, setUploadPoint] = useState(() => {
+    // seed inicial seguro aunque ev/puntos aún no existan
+    return Array.isArray(puntos) && puntos.length ? puntos[0].id : "";
+  });
+
   if (loading) {
     return (
       <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
