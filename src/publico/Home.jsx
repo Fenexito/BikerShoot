@@ -17,7 +17,7 @@ export default function Home(){
           <div className='mt-3 text-sm font-bold'><span className='text-slate-500'>¿ERES FOTÓGRAFO?</span> <Link to='/login-fotografo' className='text-blue-600 underline'>INICIA SESIÓN AQUÍ</Link></div>
         </div>
         <div className='bg-white rounded-2xl shadow-lg overflow-hidden'>
-          <img className='h-[360px] w-full object-cover' alt='Biker' src='https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop'/>
+          <img className='md:h-[360px] h-48 w-full object-cover' alt='Biker' src='https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop'/>
         </div>
       </section>
       <div className='container-max grid grid-cols-2 md:grid-cols-4 gap-3 px-5 mt-4'>
