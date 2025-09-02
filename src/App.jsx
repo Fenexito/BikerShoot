@@ -22,7 +22,7 @@ import LoginPhotographer from './public/LoginPhotographer.jsx'
 import Signup from './public/Signup.jsx'
 import PhotographerLanding from './public/PhotographerLanding.jsx'
 import Events from './public/Events.jsx'
-import Photographers from './public/Photographers.jsx'
+import Photographers from './public/photographers.jsx'
 import Pricing from './public/Pricing.jsx'
 
 // Biker portal
