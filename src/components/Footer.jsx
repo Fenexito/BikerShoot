@@ -39,8 +39,8 @@ export default function Footer(){
                 <a href='mailto:soporte@motots.com' className='font-bold text-blue-300'>soporte@motots.com</a>
               </div>
               <div className='flex gap-3 justify-center mt-3'>
-                <a className='flex items-center gap-2 border border-white/20 rounded-xl px-3 py-2' href='#'><span className='w-6 h-6 bg-white/80 rounded'/>App Store</a>
-                <a className='flex items-center gap-2 border border-white/20 rounded-xl px-3 py-2' href='#'><span className='w-6 h-6 bg-white/80 rounded'/>Google Play</a>
+                <a className='flex items-center gap-2 border border-white/20 rounded-xl px-4 py-3' href='#'><span className='w-6 h-6 bg-white/80 rounded'/>App Store</a>
+                <a className='flex items-center gap-2 border border-white/20 rounded-xl px-4 py-3' href='#'><span className='w-6 h-6 bg-white/80 rounded'/>Google Play</a>
               </div>
             </div>
           </div>
