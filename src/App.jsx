@@ -32,7 +32,7 @@ import BikerSearch from './routes/biker/Search/Search.jsx'
 import BikerSearchSetup from './routes/biker/Search/SearchSetup.jsx';
 import SearchByPhotographer from './routes/biker/Search/SearchByPhotographer.jsx';
 import SearchByPoint from './routes/biker/Search/SearchByPoint.jsx';
-import BikerPhotographers from './routes/biker/Photographers.jsx'
+import BikerPhotographers from './routes/biker/photographers.jsx'
 import BikerPhotographerDetail from "./routes/biker/photographer"
 import BikerProfile from './routes/biker/BikerProfile.jsx'
 import Checkout from './routes/biker/Checkout.jsx'
