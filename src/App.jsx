@@ -16,14 +16,14 @@ import AdminRoutesEditor from './admin/AdminRoutesEditor.jsx'
 import AdminMagicLink from './admin/AdminMagicLink.jsx'
 
 // Pages (public)
-import Home from './public/Home.jsx'
-import Login from './public/Login.jsx'
-import LoginPhotographer from './public/LoginPhotographer.jsx'
-import Signup from './public/Signup.jsx'
-import PhotographerLanding from './public/PhotographerLanding.jsx'
-import Events from './public/Events.jsx'
-import Photographers from './public/photographers.jsx'
-import Pricing from './public/Pricing.jsx'
+import Home from './publico/Home.jsx'
+import Login from './publico/Login.jsx'
+import LoginPhotographer from './publico/LoginPhotographer.jsx'
+import Signup from './publico/Signup.jsx'
+import PhotographerLanding from './publico/PhotographerLanding.jsx'
+import Events from './publico/Events.jsx'
+import Photographers from './publico/photographers.jsx'
+import Pricing from './publico/Pricing.jsx'
 
 // Biker portal
 import BikerHome from './routes/biker/index.jsx'
