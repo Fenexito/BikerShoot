@@ -28,16 +28,18 @@ export default function HeaderUser() {
             <span className="w-8 h-8 rounded bg-blue-600 inline-block" /> MotoShots
           </Link>
 
-          <nav className={"ml-auto lg:ml-0 lg:flex-1 " + (open ? "block" : "hidden") + " lg:block"}>
-            <ul className="flex flex-col lg:flex-row lg:justify-center gap-2 lg:gap-7 font-semibold">
-              <li><Link to="/app" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Inicio</Link></li>
-              <li><Link to="/app/historial" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Historial</Link></li>
-              <li><Link to="/app/buscar/configurar" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Buscar</Link></li>
-              <li><Link to="/app/fotografos" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Fotógrafos</Link></li>
-              <li><Link to="/app/perfil" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Perfil</Link></li>
-              <li className="lg:hidden"> <AdminAccessLink /></li>
-            </ul>
-          </nav>
+          <div className={`ml-auto lg:ml-0 lg:flex-1 ${open ? 'absolute top-full left-0 w-full bg-white' : 'hidden'} lg:static lg:block lg:w-auto lg:bg-transparent`}>
+            <nav>
+              <ul className="flex flex-col lg:flex-row lg:justify-center gap-2 lg:gap-7 font-semibold">
+                <li><Link to="/app" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Inicio</Link></li>
+                <li><Link to="/app/historial" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Historial</Link></li>
+                <li><Link to="/app/buscar/configurar" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Buscar</Link></li>
+                <li><Link to="/app/fotografos" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Fotógrafos</Link></li>
+                <li><Link to="/app/perfil" className="px-2 py-2 rounded-lg text-slate-800/80 hover:text-slate-900">Perfil</Link></li>
+                <li className="lg:hidden"> <AdminAccessLink /></li>
+              </ul>
+            </nav>
+          </div>
 
           <div className="hidden lg:flex items-center gap-3">
             <AdminAccessLink />
