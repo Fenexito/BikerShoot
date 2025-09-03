@@ -87,11 +87,8 @@ export default function Home(){
           <img className='md:h-[360px] h-48 w-full object-cover' alt='Biker' src='https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop'/>
         </div>
       </section>
-<<<<<<< HEAD
 
       {/* Pills */}
-=======
->>>>>>> acdfd865856c4cf70e29c8d8b13157661142bfde
       <div className='container-max grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 px-5 mt-4'>
         {pills.map(p => <div key={p} className='bg-white border border-slate-200 rounded-full px-4 py-3 text-center font-semibold'>{p}</div>)}
       </div>
