@@ -23,7 +23,6 @@ import Signup from './publico/Signup.jsx'
 import PhotographerLanding from './publico/PhotographerLanding.jsx'
 import Events from './publico/Events.jsx'
 import Photographers from './publico/Photographers.jsx'
-import Pricing from './publico/Pricing.jsx'
 
 // Biker portal
 import BikerHome from './routes/biker/index.jsx'
@@ -108,7 +107,6 @@ export default function App(){
           <Route path='/eres-fotografo' element={<PhotographerLanding/>}/>
           <Route path='/fotografos' element={<Photographers/>}/>
           <Route path='/eventos' element={<Events/>}/>
-          <Route path='/precios' element={<Pricing/>}/>
           {/* portal biker */}
           <Route path='/app' element={<BikerHome/>}/>
           <Route path='/app/historial' element={<BikerHistory/>}/>
