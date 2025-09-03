@@ -1,5 +1,4 @@
-// src/pages/Home.jsx
-import React from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 // ===== Mock data (front-only por ahora) =====
@@ -19,7 +18,86 @@ const MOCK_FOTOGRAFOS = [
   { id: 'ph-6', nombre: 'Veloz Studio', ciudad: 'Amatitlán', rating: 4.7, avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop' },
 ];
 
-// ===== UI helpers locales (evitamos más archivos) =====
+// ====== Slider (autoplay + swipe) ======
+const SLIDES = [
+  'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=1600&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1558981806-ec527fa84c39?q=80&w=1600&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?q=80&w=1600&auto=format&fit=crop',
+];
+
+function HeroSlider() {
+  const [idx, setIdx] = useState(0);
+  const timer = useRef(null);
+  const touchStart = useRef(null);
+
+  const go = (n) => setIdx((p) => (p + n + SLIDES.length) % SLIDES.length);
+  const goTo = (n) => setIdx(((n % SLIDES.length) + SLIDES.length) % SLIDES.length);
+
+  useEffect(() => {
+    timer.current = setInterval(() => go(1), 4500);
+    return () => clearInterval(timer.current);
+  }, []);
+
+  const onTouchStart = (e) => { touchStart.current = e.touches[0].clientX; };
+  const onTouchMove = (e) => {
+    if (touchStart.current == null) return;
+    const delta = e.touches[0].clientX - touchStart.current;
+    if (Math.abs(delta) > 60) {
+      go(delta < 0 ? 1 : -1);
+      touchStart.current = null;
+    }
+  };
+
+  return (
+    <div className="relative rounded-2xl shadow-xl overflow-hidden ring-1 ring-slate-200">
+      {/* Slides */}
+      <div className="relative h-52 md:h-[380px]" onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
+        {SLIDES.map((src, i) => (
+          <img
+            key={src}
+            src={src}
+            alt={`slide-${i+1}`}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${i===idx?'opacity-100':'opacity-0'}`}
+            loading={i===0?'eager':'lazy'}
+          />
+        ))}
+      </div>
+
+      {/* Controles */}
+      <button
+        aria-label="Anterior"
+        onClick={() => go(-1)}
+        className="absolute left-3 top-1/2 -translate-y-1/2 grid place-items-center w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60"
+      >
+        {/* Heroicon: chevron-left */}
+        <svg viewBox="0 0 24 24" className="w-5 h-5"><path fill="currentColor" d="M15.5 19.5L8 12l7.5-7.5 1.5 1.5L11 12l6 6-1.5 1.5Z"/></svg>
+      </button>
+      <button
+        aria-label="Siguiente"
+        onClick={() => go(1)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 grid place-items-center w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60"
+      >
+        {/* Heroicon: chevron-right */}
+        <svg viewBox="0 0 24 24" className="w-5 h-5"><path fill="currentColor" d="m8.5 4.5 7.5 7.5-7.5 7.5L7 18l6-6-6-6 1.5-1.5Z"/></svg>
+      </button>
+
+      {/* Dots */}
+      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
+        {SLIDES.map((_, i) => (
+          <button
+            key={i}
+            className={`h-2.5 rounded-full transition-all ${i===idx?'w-7 bg-white':'w-2.5 bg-white/60 hover:bg-white'}`}
+            onClick={() => goTo(i)}
+            aria-label={`Ir al slide ${i+1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== UI helpers locales =====
 function SectionTitle({ title, subtitle, right }) {
   return (
     <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
@@ -63,37 +141,35 @@ function CardFotografo({ f }) {
   );
 }
 
-// ===== Iconos inline (ligeros, estilo lucide) =====
-const IconRide = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6"><path fill="currentColor" d="M5 18a3 3 0 1 1 2.83-4H11l2-3h-1a2 2 0 0 1 0-4h3l2 3h2a2 2 0 0 1 0 4h-1l-2 4H8.5A3 3 0 0 1 5 18Z"/></svg>
+// ===== Iconos reales (SVGs estilo Heroicons/Lucide) =====
+const IFlag = (props) => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" {...props}><path fill="currentColor" d="M6 3v18H4V3h2Zm3 2h7l1 2h3v9h-7l-1-2H9V5Z"/></svg>
 );
-const IconClock = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm1 5h-2v6l4 2 1-1-3-1.5V7Z"/></svg>
+const IClock = (props) => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" {...props}><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm1 5h-2v6l4 2 1-1-3-1.5V7Z"/></svg>
 );
-const IconMapPin = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6"><path fill="currentColor" d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7Zm0 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+const IMapPin = (props) => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" {...props}><path fill="currentColor" d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7Zm0 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
 );
-const IconAI = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6"><path fill="currentColor" d="M12 2l2.5 4.5L20 9l-3.5 3.5L18 18l-6-2.5L6 18l1.5-5.5L4 9l5.5-2.5L12 2Z"/></svg>
+const IAi = (props) => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" {...props}><path fill="currentColor" d="M12 2l2.5 4.5L20 9l-3.5 3.5L18 18l-6-2.5L6 18l1.5-5.5L4 9l5.5-2.5L12 2Z"/></svg>
 );
-const IconDownload = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6"><path fill="currentColor" d="M12 3v10l3-3 1.4 1.4L12 17.8 7.6 11.4 9 10l3 3V3h0Zm-7 14h14v2H5v-2Z"/></svg>
+const IDownload = (props) => (
+  <svg viewBox="0 0 24 24" className="w-6 h-6" {...props}><path fill="currentColor" d="M12 3v10l3-3 1.4 1.4L12 17.8 7.6 11.4 9 10l3 3V3h0Zm-7 14h14v2H5v-2Z"/></svg>
 );
 
-// ===== Home =====
 export default function Home(){
-  // Replanteo de “píldoras”: más útiles para el usuario
-  const pills = [
-    {label:'Búsqueda por placa',tip:'IA que te encuentra hasta de reojo'},
-    {label:'Galerías HD',tip:'Fotos nítidas listas para IG'},
-    {label:'Pagos seguros',tip:'Compra sin clavos'}
-  ];
+  // Píldoras compactas
+  const pills = useMemo(() => ([
+    {label:'Búsqueda por placa',tip:'IA que te encuentra al toque'},
+    {label:'Galerías HD',tip:'Listas para IG y portadas'},
+    {label:'Pagos seguros',tip:'Sin clavos y rapidito'}
+  ]), []);
 
   return (
     <main className="bg-gradient-to-b from-white to-slate-50">
-      {/* ===== HERO ===== */}
+      {/* ===== HERO con slider ===== */}
       <section className="relative">
-        {/* Fondo */}
         <div className="absolute inset-0 -z-10">
           <div className="h-[520px] bg-[radial-gradient(ellipse_at_top,rgba(37,99,235,0.18),transparent_60%)]" />
         </div>
@@ -116,14 +192,13 @@ export default function Home(){
 
             <div className="flex gap-3 mt-5 flex-wrap">
               <Link to="/eventos" className="px-5 py-3 rounded-xl bg-blue-600 text-white font-bold">
-                Ver próximos eventos
+                Ver eventos
               </Link>
               <Link to="/fotografos" className="px-5 py-3 rounded-xl bg-white border border-slate-200 font-bold">
                 Explorar fotógrafos
               </Link>
             </div>
 
-            {/* Mini métricas para pegada social */}
             <div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-600">
               <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200">+1,500 fotos por domingo</span>
               <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200">+20 fotógrafos activos</span>
@@ -131,13 +206,7 @@ export default function Home(){
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden ring-1 ring-slate-200">
-            <img
-              className="md:h-[380px] h-52 w-full object-cover"
-              alt="Biker"
-              src="https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop"
-            />
-          </div>
+          <HeroSlider />
         </div>
 
         {/* Pills / beneficios rápidos */}
@@ -151,7 +220,7 @@ export default function Home(){
         </div>
       </section>
 
-      {/* ===== ¿Cómo funciona? (5 pasos) ===== */}
+      {/* ===== ¿Cómo funciona? (5 pasos con iconos reales) ===== */}
       <section className="container-max px-5 mt-12">
         <SectionTitle
           title="¿Cómo funciona?"
@@ -162,7 +231,7 @@ export default function Home(){
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <span className="text-3xl font-black text-blue-600">1</span>
-              <IconRide />
+              <IFlag className="text-blue-600" />
             </div>
             <div className="font-bold mt-2">Salí a rodar</div>
             <div className="text-slate-600 text-sm">
@@ -173,7 +242,7 @@ export default function Home(){
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <span className="text-3xl font-black text-blue-600">2</span>
-              <IconClock />
+              <IClock className="text-blue-600" />
             </div>
             <div className="font-bold mt-2">Esperá las fotos</div>
             <div className="text-slate-600 text-sm">
@@ -184,7 +253,7 @@ export default function Home(){
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <span className="text-3xl font-black text-blue-600">3</span>
-              <IconMapPin />
+              <IMapPin className="text-blue-600" />
             </div>
             <div className="font-bold mt-2">Buscá el evento</div>
             <div className="text-slate-600 text-sm">
@@ -195,7 +264,7 @@ export default function Home(){
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <span className="text-3xl font-black text-blue-600">4</span>
-              <IconAI />
+              <IAi className="text-blue-600" />
             </div>
             <div className="font-bold mt-2">Encontrá tus fotos</div>
             <div className="text-slate-600 text-sm">
@@ -206,7 +275,7 @@ export default function Home(){
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-2">
               <span className="text-3xl font-black text-blue-600">5</span>
-              <IconDownload />
+              <IDownload className="text-blue-600" />
             </div>
             <div className="font-bold mt-2">Comprá y descargá</div>
             <div className="text-slate-600 text-sm">
@@ -219,9 +288,9 @@ export default function Home(){
       {/* ===== Próximos eventos (preview) ===== */}
       <section className="container-max px-5 mt-12">
         <SectionTitle
-          title="Próximos eventos"
+          title="Eventos"
           subtitle="Lo que se viene para dominguear rico."
-          right={<Link to="/eventos" className="text-blue-700 font-bold">Ver todos</Link>}
+          right={<Link to="/eventos" className="text-blue-700 font-bold">Ver eventos</Link>}
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           {MOCK_EVENTOS.map(e => <CardEvento key={e.id} e={e} />)}
