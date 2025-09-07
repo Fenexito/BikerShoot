@@ -1,4 +1,3 @@
-// src/pages/Events.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -16,7 +15,6 @@ const EVENTS = [
       'https://images.unsplash.com/photo-1544967082-d9e3449aa7d1?q=80&w=1600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop',
     ],
-    bg:'from-[#FDE1C8] to-[#F8B4D9]',
   },
   {
     id:'evt-2',
@@ -30,7 +28,6 @@ const EVENTS = [
       'https://images.unsplash.com/photo-1493247035880-efdf54f3fa6f?q=80&w=1600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1529665253569-6d01c0eaf7b6?q=80&w=1600&auto=format&fit=crop',
     ],
-    bg:'from-[#C7F2CF] to-[#B7E0F2]',
   },
   {
     id:'evt-3',
@@ -44,7 +41,6 @@ const EVENTS = [
       'https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=1600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1558980664-10ea0b8e62d2?q=80&w=1600&auto=format&fit=crop',
     ],
-    bg:'from-[#E4D4FF] to-[#FAD6FF]',
   },
   {
     id:'evt-4',
@@ -58,7 +54,6 @@ const EVENTS = [
       'https://images.unsplash.com/photo-1542156822-6924d1a71ace?q=80&w=1600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1558981806-ec527fa84c39?q=80&w=1600&auto=format&fit=crop',
     ],
-    bg:'from-[#FFE7C6] to-[#FFD4AE]',
   },
   {
     id:'evt-5',
@@ -72,7 +67,6 @@ const EVENTS = [
       'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1544967082-d9e3449aa7d1?q=80&w=1600&auto=format&fit=crop',
     ],
-    bg:'from-[#D5F0FF] to-[#C8F7E4]',
   },
   {
     id:'evt-6',
@@ -86,17 +80,15 @@ const EVENTS = [
       'https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=1600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?q=80&w=1600&auto=format&fit=crop',
     ],
-    bg:'from-[#FFE3E3] to-[#FFD8F0]',
   },
 ];
 
-// ===== Util =====
 function nice(dstr){
   const d = new Date(dstr + 'T00:00:00');
   return d.toLocaleDateString('es-GT', { weekday:'short', day:'2-digit', month:'short' });
 }
 
-// ===== Mini Slider para tarjetas (autoplay + swipe) =====
+// ===== Mini Slider (autoplay + swipe) =====
 function MiniSlider({ images, interval=3500, className='' }){
   const [idx, setIdx] = useState(0);
   const timer = useRef(null);
@@ -148,48 +140,45 @@ function MiniSlider({ images, interval=3500, className='' }){
   );
 }
 
-// ===== Tarjeta estilo “Beacons” =====
-function CardEventoBeacon({ ev }){
-  const photosLabel = useMemo(()=>{
-    if (!ev.fotografos?.length) return 'Fotógrafos: —';
+// ===== Tarjeta limpia (neutra) =====
+function CardEventoClean({ ev }){
+  const fotos = ev.fotos?.length ? ev.fotos : [
+    'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?q=80&w=1600&auto=format&fit=crop'
+  ];
+  const fotosLabel = useMemo(()=>{
+    if (!ev.fotografos?.length) return '—';
     const [first, ...rest] = ev.fotografos;
     return rest.length ? `${first} +${rest.length}` : first;
   }, [ev.fotografos]);
 
   return (
-    <div className={`rounded-3xl p-3 bg-gradient-to-br ${ev.bg} shadow-sm`}>
-      <div className="rounded-2xl bg-white/80 backdrop-blur-[2px] p-3">
-        {/* Slider */}
-        <MiniSlider images={ev.fotos} />
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <MiniSlider images={fotos} />
+      <div className="p-4">
+        <div className="font-bold text-lg leading-snug">{ev.nombre}</div>
+        <div className="text-slate-600 text-sm">{ev.lugar} • {nice(ev.fecha)}</div>
+        <div className="text-slate-600 text-sm">Ruta: {ev.ruta}</div>
+        <div className="text-slate-600 text-sm">Fotógrafo(s): {fotosLabel}</div>
 
-        {/* Info */}
-        <div className="mt-3">
-          <div className="font-bold text-lg leading-snug">{ev.nombre}</div>
-          <div className="text-slate-600 text-sm">{ev.lugar} • {nice(ev.fecha)}</div>
-          <div className="text-slate-600 text-sm">Ruta: {ev.ruta}</div>
-          <div className="text-slate-600 text-sm">Fotógrafo(s): {photosLabel}</div>
+        <div className="mt-3 flex items-center gap-2">
+          <span className="inline-block text-xs font-semibold px-2 py-1 rounded bg-blue-50 text-blue-700">+1,500 fotos</span>
+          <span className="inline-block text-xs font-semibold px-2 py-1 rounded bg-emerald-50 text-emerald-700">Activos: {ev.fotografos?.length || 0}</span>
+        </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <span className="inline-block text-xs font-semibold px-2 py-1 rounded bg-blue-50 text-blue-700">+1,500 fotos</span>
-            <span className="inline-block text-xs font-semibold px-2 py-1 rounded bg-emerald-50 text-emerald-700">Activos: {ev.fotografos.length}</span>
-          </div>
-
-          <div className="mt-4">
-            {/* En lo que tenemos página de detalle, mandamos al listado general o podrías usar /eventos?e=ID */}
-            <Link to="/eventos" className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-black/80">
-              Ver evento
-              <svg viewBox="0 0 24 24" className="w-4 h-4"><path fill="currentColor" d="m13 5 7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2L11.6 6.4 13 5Z"/></svg>
-            </Link>
-          </div>
+        <div className="mt-4">
+          <Link to="/eventos" className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-black/80">
+            Ver evento
+            <svg viewBox="0 0 24 24" className="w-4 h-4"><path fill="currentColor" d="m13 5 7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2L11.6 6.4 13 5Z"/></svg>
+          </Link>
         </div>
       </div>
     </div>
   )
 }
 
-// ===== Página =====
 export default function Events(){
   const [q, setQ] = useState('');
+
   const list = useMemo(()=>{
     if (!q.trim()) return EVENTS;
     const t = q.toLowerCase();
@@ -218,9 +207,9 @@ export default function Events(){
         </Link>
       </div>
 
-      {/* Grid de tarjetas estilo Beacons */}
+      {/* Grid de tarjetas limpias */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-        {list.map(ev => <CardEventoBeacon key={ev.id} ev={ev} />)}
+        {list.map(ev => <CardEventoClean key={ev.id} ev={ev} />)}
       </div>
 
       {list.length === 0 && (
