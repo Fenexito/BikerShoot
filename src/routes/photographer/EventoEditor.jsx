@@ -423,19 +423,17 @@ export default function EventoEditor() {
         
         if (!token) throw new Error("Iniciá sesión para registrar fotos");
 
-        // ✅ REGISTRO con la estructura EXACTA de tu tabla
+        // ✅ REGISTRO con la estructura EXACTA de tu tabla (SIN 'bytes')
         const assetsToInsert = assets.map((a) => ({
-          id: crypto.randomUUID(), // ✅ Required - generamos UUID
-          event_id: ev.id, // ✅ Required
-          hotspot_id: a.pointId, // ✅ Required
-          storage_path: a.path, // ✅ Required
-          taken_at: a.takenAt || new Date().toISOString(), // ✅ Required
-          bytes: a.size, // ✅ METERLO EN EL CAMPO "meta" ya que no hay columna "bytes"
-          meta: { // ✅ Campo meta con toda la info adicional
-            bytes: a.size,
+          id: crypto.randomUUID(),
+          event_id: ev.id,
+          hotspot_id: a.pointId,
+          storage_path: a.path,
+          taken_at: new Date().toISOString(),
+          meta: { 
+            bytes: a.size, // ✅ El tamaño va DENTRO de 'meta'
             filename: a.filename || '',
-            contentType: a.contentType || '',
-            originalName: a.originalName || ''
+            contentType: a.contentType || ''
           }
         }));
 
