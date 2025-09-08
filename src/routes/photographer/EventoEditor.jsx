@@ -13,15 +13,13 @@ const fmtDate = (iso) =>
     year: "numeric",
   });
 
-// Derivar una ventana por defecto desde el punto del perfil
 function windowsFromPerfilPunto(p) {
   try {
     const horarios = Array.isArray(p?.horarios) ? p.horarios : [];
-    // Preferí domingo; si no hay, el primero
     const dom = horarios.find((h) => (h?.dia ?? "").toLowerCase() === "domingo");
     const h0 = dom || horarios[0] || {};
-    const start = (h0?.inicio ?? "06:00").toString();
-    const end = (h0?.fin ?? "12:00").toString();
+    const start = String(h0?.inicio ?? "06:00");
+    const end = String(h0?.fin ?? "12:00");
     return [{ start, end }];
   } catch {
     return [{ start: "06:00", end: "12:00" }];
@@ -35,7 +33,7 @@ function mapEventRow(row) {
     fecha: row.fecha ?? row.date ?? new Date().toISOString().slice(0, 10),
     ruta: row.ruta ?? row.location ?? "",
     estado: row.estado ?? row.status ?? "borrador",
-    precioBase: row.precioBase ?? row.base_price ?? 50, // tu schema usa precioBase
+    precioBase: row.precioBase ?? row.base_price ?? 50,
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
     photographer_id: row.photographer_id ?? row.created_by ?? null,
@@ -48,7 +46,7 @@ function buildEventPatch(ev) {
     ruta: ev.ruta,
     location: ev.ruta,
     estado: ev.estado,
-    precioBase: ev.precioBase,   // 👈 en tu tabla
+    precioBase: ev.precioBase,
     notas: ev.notas,
     price_list_id: ev.price_list_id || null,
   };
@@ -56,7 +54,6 @@ function buildEventPatch(ev) {
 
 /* ===== Componente ===== */
 export default function EventoEditor() {
-  // Soporta :id / :eventId / :evId
   const routeParams = useParams();
   const [searchParams] = useSearchParams();
   const paramId = routeParams.id || routeParams.eventId || routeParams.evId || "";
@@ -70,11 +67,10 @@ export default function EventoEditor() {
   const [authReady, setAuthReady] = useState(false);
   const [noSession, setNoSession] = useState(false);
 
-  // Sesión
   const [uid, setUid] = useState(null);
 
-  // Catálogo (desde perfil del fotógrafo)
-  const [catalog, setCatalog] = useState([]); // [{id,name,route_name,lat,lng,default_windows}]
+  // Catálogo leído del perfil (JSON)
+  const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
 
   // Listas de precios (placeholder por ahora)
@@ -83,16 +79,19 @@ export default function EventoEditor() {
   // Subida
   const [uploadPoint, setUploadPoint] = useState("");
 
-  // Agrupar fotos por punto
+  // Agrupar fotos por punto (defensivo)
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
-    (Array.isArray(fotos) ? fotos : []).forEach((f) => {
-      const key = f?.hotspot_id || null;
-      const arr = map.get(key) || [];
-      arr.push(f);
-      map.set(key, arr);
-    });
-    for (const [, arr] of map) arr.sort((a, b) => new Date(a?.taken_at || 0) - new Date(b?.taken_at || 0));
+    const arr = Array.isArray(fotos) ? fotos : [];
+    for (const f of arr) {
+      const k = f?.hotspot_id || null;
+      const prev = map.get(k) || [];
+      prev.push(f);
+      map.set(k, prev);
+    }
+    for (const [, list] of map) {
+      list.sort((a, b) => new Date(a?.taken_at || 0) - new Date(b?.taken_at || 0));
+    }
     return map;
   }, [fotos]);
 
@@ -100,18 +99,18 @@ export default function EventoEditor() {
     if (!uploadPoint && puntos.length) setUploadPoint(puntos[0].id);
   }, [puntos, uploadPoint]);
 
-  /* ---- Sesión lista ---- */
+  /* ---- Sesión ---- */
   useEffect(() => {
-    let unsub = null;
+    let unsub;
     (async () => {
-      const { data: sess } = await supabase.auth.getSession();
-      const sUid = sess?.session?.user?.id || null;
+      const { data } = await supabase.auth.getSession();
+      const sUid = data?.session?.user?.id || null;
       setUid(sUid);
-      if (!sess?.session) {
+      if (!data?.session) {
         unsub = supabase.auth.onAuthStateChange((_e, session) => {
+          setUid(session?.user?.id || null);
           setAuthReady(true);
           setNoSession(!session?.user?.id);
-          setUid(session?.user?.id || null);
         }).data?.subscription;
         setAuthReady(true);
         setNoSession(true);
@@ -139,7 +138,6 @@ export default function EventoEditor() {
           .maybeSingle();
         if (error) throw error;
         if (!row) throw new Error("Evento no encontrado");
-
         if (!mounted) return;
         setEv(mapEventRow(row));
 
@@ -161,6 +159,7 @@ export default function EventoEditor() {
         if (mounted) setLoading(false);
       }
     })();
+    return () => (mounted = false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramId, authReady]);
 
@@ -182,7 +181,6 @@ export default function EventoEditor() {
           .maybeSingle();
         if (profErr) throw profErr;
 
-        // 'puntos' puede venir como json o texto json
         let puntosPerfil = [];
         const raw = profile?.puntos;
         if (Array.isArray(raw)) puntosPerfil = raw;
@@ -190,14 +188,14 @@ export default function EventoEditor() {
           try { puntosPerfil = JSON.parse(raw); } catch {}
         }
 
-        const mapped = puntosPerfil.map((p) => ({
-          id: (p?.id ?? crypto.randomUUID()).toString(),
-          name: (p?.nombre ?? "Punto").toString(),
-          route_name: (p?.ruta ?? "").toString(),
+        const mapped = (puntosPerfil || []).map((p, i) => ({
+          key: String(p?.id ?? `${p?.nombre}-${p?.ruta}-${p?.lat}-${p?.lon}-${i}`),
+          id: p?.id ?? null, // ojo: id del perfil (solo referencia)
+          name: String(p?.nombre ?? "Punto"),
+          route_name: String(p?.ruta ?? ""),
           lat: p?.lat != null ? Number(p.lat) : null,
           lng: p?.lon != null ? Number(p.lon) : null,
           default_windows: windowsFromPerfilPunto(p),
-          _raw: p,
         }));
 
         if (!mounted) return;
@@ -233,7 +231,6 @@ export default function EventoEditor() {
           horaFin: (Array.isArray(h.windows) && h.windows[0]?.end) || "12:00",
           route_id: h.route_id || null,
         }));
-
         if (!mounted) return;
         setPuntos(puntosIniciales);
       } catch (e) {
@@ -315,7 +312,7 @@ export default function EventoEditor() {
       const payload = {
         event_id: ev.id,
         route_id: routeId,
-        source_hotspot_id: typeof h.id === "string" ? h.id : null, // del perfil
+        source_hotspot_id: h.id ?? null, // referencia opcional al punto de perfil
         name: h.name || h.nombre || "Punto",
         lat: h.lat ?? 0,
         lng: h.lng ?? 0,
@@ -568,8 +565,8 @@ export default function EventoEditor() {
               <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
                 {catalogFiltered
                   .filter((h) => !puntos.some((p) => p.nombre === h.name))
-                  .map((h) => (
-                    <div key={h.id} className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between">
+                  .map((h, i) => (
+                    <div key={h.key || `${h.name}-${h.route_name}-${h.lat}-${h.lng}-${i}`} className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between">
                       <div>
                         <div className="font-medium">{h.name}</div>
                         <div className="text-xs text-slate-400">{h.route_name}</div>
