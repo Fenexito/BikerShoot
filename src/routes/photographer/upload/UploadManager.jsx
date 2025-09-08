@@ -166,16 +166,24 @@ export default function UploadManager({
 
           console.log("🔼 Subiendo a:", uploadUrl);
 
-          const res = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Authorization": `Bearer ${token}`, // ✅ TOKEN DE AUTENTICACIÓN
-              "Content-Type": fileToSend.type || "application/octet-stream",
-              ...signedHeaders // Mantener otros headers si existen
-            },
-            body: fileToSend,
-            signal: controller.signal,
-          });
+          if (data.uploaded) {
+            // El archivo ya se subió desde la edge function
+            console.log("✅ Archivo subido por edge function");
+            
+            // Marcar como completado
+            updateItem(nextItem.id, { status: "done", progress: 100, path: data.path });
+
+            // Notificar al caller
+            onUploaded?.([{
+              path: data.path,
+              size: fileToSend.size,
+              pointId,
+              takenAt: new Date().toISOString(),
+            }]);
+          } else {
+            console.error("❌ Error: El archivo no se subió");
+            updateItem(nextItem.id, { status: "error" });
+          }
 
         if (!res.ok) {
           const errorText = await res.text();
