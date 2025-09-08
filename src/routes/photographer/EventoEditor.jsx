@@ -2,11 +2,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx"; // ajustá si tu ruta es distinta
-import { supabase } from "../../lib/supabaseClient"; // 👈 FIX: antes estaba mal con ../../../
+import { supabase } from "../../lib/supabaseClient"; // ✅ cliente central
 
 /* ============ Helpers ============ */
 const fmtDate = (iso) =>
-  new Date(iso + "T00:00:00").toLocaleDateString("es-GT", {
+  new Date((iso || "") + "T00:00:00").toLocaleDateString("es-GT", {
     weekday: "long",
     day: "2-digit",
     month: "short",
@@ -23,6 +23,7 @@ function mapEventRow(row) {
     precioBase: row.precio_base ?? row.base_price ?? row.precioBase ?? 50,
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
+    photographer_id: row.photographer_id ?? row.created_by ?? null,
   };
 }
 function buildEventPatch(ev) {
@@ -30,33 +31,43 @@ function buildEventPatch(ev) {
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
-    location: ev.ruta, // guardar oficial
+    location: ev.ruta,              // 👈 oficial
     estado: ev.estado,
-    precio_base: ev.precioBase, // unificado
+    precio_base: ev.precioBase,     // 👈 unificado
     notas: ev.notas,
     price_list_id: ev.price_list_id || null,
   };
 }
 
+/* ============ Componente ============ */
 export default function EventoEditor() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const initialTab = params.get("tab") || "resumen";
 
-  const [ev, setEv] = useState(null);
-  const [fotos, setFotos] = useState([]);
-  const [puntos, setPuntos] = useState([]);
+  // ---- state base ----
+  const [ev, setEv] = useState(null);          // evento
+  const [fotos, setFotos] = useState([]);      // event_asset
+  const [puntos, setPuntos] = useState([]);    // event_hotspot mapeado a UI
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(initialTab);
+
+  // Subida
   const [uploadPoint, setUploadPoint] = useState("");
 
   // Listas de precios del fotógrafo
-  const [priceLists, setPriceLists] = useState([]);
+  const [priceLists, setPriceLists] = useState([]); // [{id, nombre, items: [...] }]
   const [loadingLists, setLoadingLists] = useState(true);
 
+  // Catálogo real del fotógrafo (photographer_hotspot + route name)
+  const [catalog, setCatalog] = useState([]);  // [{id,name,route_name,default_windows,lat,lng}]
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+
+  // Agrupar fotos x punto (event_hotspot.id)
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
-    (fotos || []).forEach((f) => {
+    const all = Array.isArray(fotos) ? fotos : [];
+    all.forEach((f) => {
       const key = f.hotspot_id || null;
       const arr = map.get(key) || [];
       arr.push(f);
@@ -66,13 +77,14 @@ export default function EventoEditor() {
     return map;
   }, [fotos]);
 
+  // default uploadPoint
   useEffect(() => {
     if (!uploadPoint && Array.isArray(puntos) && puntos.length) {
       setUploadPoint(puntos[0].id);
     }
   }, [puntos, uploadPoint]);
 
-  /* ---- cargar evento + assets + listas ---- */
+  /* ---- cargar evento + assets + listas + catálogo + puntos del evento ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -97,16 +109,7 @@ export default function EventoEditor() {
           .order("taken_at", { ascending: true });
         if (aErr) throw aErr;
 
-        // 3) (opcional) puntos del evento desde event_hotspot
-        // const { data: hs } = await supabase
-        //   .from("event_hotspot")
-        //   .select("id, nombre, meta")
-        //   .eq("event_id", id);
-        // const puntosIniciales = (hs || []).map(h => ({
-        //   id: h.id, nombre: h.nombre || "Punto", ...((h.meta || {}))
-        // }));
-
-        // 4) listas de precios del fotógrafo
+        // 3) listas de precios del fotógrafo
         setLoadingLists(true);
         let lists = [];
         const { data: sess } = await supabase.auth.getSession();
@@ -125,23 +128,94 @@ export default function EventoEditor() {
           }));
         }
 
+        // 4) catálogo del fotógrafo (hotspots + nombre de ruta)
+        setLoadingCatalog(true);
+        let cata = [];
+        if (evUI.photographer_id) {
+          const { data: hs, error: hErr } = await supabase
+            .from("photographer_hotspot")
+            .select("id, name, lat, lng, default_windows, route:photographer_route(name)")
+            .eq("photographer_id", evUI.photographer_id)
+            .order("created_at", { ascending: false });
+          if (hErr) throw hErr;
+          cata = (hs || []).map((h) => ({
+            id: h.id,
+            name: h.name,
+            lat: h.lat,
+            lng: h.lng,
+            route_name: h.route?.name || "",
+            default_windows: Array.isArray(h.default_windows) ? h.default_windows : [],
+          }));
+        }
+
+        // 5) puntos del evento (event_hotspot)
+        const { data: ehs, error: ehErr } = await supabase
+          .from("event_hotspot")
+          .select("id, name, lat, lng, time_windows, route:event_route(name)")
+          .eq("event_id", id)
+          .order("created_at", { ascending: true });
+        if (ehErr) throw ehErr;
+
+        const puntosIniciales = (ehs || []).map((h) => ({
+          id: h.id,
+          nombre: h.name || "Punto",
+          activo: true,
+          horaIni: (Array.isArray(h.time_windows) && h.time_windows[0]?.start) || "06:00",
+          horaFin: (Array.isArray(h.time_windows) && h.time_windows[0]?.end) || "12:00",
+          route_name: h.route?.name || "",
+        }));
+
         if (!mounted) return;
         setEv(evUI);
         setFotos(assets || []);
-        setPuntos([]); // reemplazá por 'puntosIniciales' si persistís event_hotspot
         setPriceLists(lists);
+        setCatalog(cata);
+        setPuntos(puntosIniciales);
       } catch (e) {
         console.error(e);
-        if (mounted) setEv(null);
+        if (mounted) {
+          setEv(null);
+          setFotos([]);
+          setPriceLists([]);
+          setCatalog([]);
+          setPuntos([]);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
           setLoadingLists(false);
+          setLoadingCatalog(false);
         }
       }
     })();
     return () => (mounted = false);
   }, [id]);
+
+  /* ---- helpers SQL: asegurar event_route y map windows ---- */
+  async function ensureEventRouteId(eventId, routeName) {
+    if (!routeName) return null;
+    // Buscar si ya existe esa ruta para el evento
+    const { data: rows, error } = await supabase
+      .from("event_route")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("name", routeName)
+      .maybeSingle();
+    if (rows?.id) return rows.id;
+    // crear
+    const { data: inserted, error: insErr } = await supabase
+      .from("event_route")
+      .insert([{ event_id: eventId, name: routeName }])
+      .select("id")
+      .single();
+    if (insErr) throw insErr;
+    return inserted.id;
+  }
+  function toTimeWindows(horaIni, horaFin) {
+    const start = (horaIni || "06:00").trim();
+    const end = (horaFin || "12:00").trim();
+    return [{ start, end }];
+  }
 
   /* ---- acciones: guardar / publicar ---- */
   async function guardarTodo() {
@@ -153,8 +227,18 @@ export default function EventoEditor() {
         .eq("id", ev.id);
       if (error) throw error;
 
+      // refrescar
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
+
+      // persistir cambios locales en puntos (horaIni/horaFin/activo → time_windows)
+      for (const p of puntos) {
+        const time_windows = toTimeWindows(p.horaIni, p.horaFin);
+        await supabase
+          .from("event_hotspot")
+          .update({ time_windows })
+          .eq("id", p.id);
+      }
 
       alert("Cambios guardados ✨");
     } catch (e) {
@@ -180,31 +264,73 @@ export default function EventoEditor() {
     setEv((old) => ({ ...old, ...localPatch }));
   }
 
-  /* ---- puntos (UI local; TODO: persistir) ---- */
-  function updatePoint(pid, patch) {
+  /* ---- puntos (persistiendo en event_hotspot) ---- */
+  function updatePointLocal(pid, patch) {
     setPuntos((arr) => arr.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
-    // TODO: update event_hotspot.meta si usás esa tabla
   }
-  function addPointFromCatalog(h) {
-    setPuntos((arr) => {
-      if (!h) return arr;
-      if (arr.some((x) => x.id === h.id)) return arr;
-      return [
+  async function addPointFromCatalog(h) {
+    try {
+      if (!h) return;
+      // si ya existe (por nombre y ruta) evitamos duplicar
+      if (puntos.some((p) => p.nombre === (h.name || h.nombre))) {
+        return alert("Ya agregaste este punto, cerote 😅");
+      }
+      // asegurar event_route
+      const routeId = await ensureEventRouteId(ev.id, ev.ruta || h.route_name || "");
+      // armar time_windows desde default_windows (o fallback)
+      const dw = Array.isArray(h.default_windows) && h.default_windows.length
+        ? h.default_windows
+        : toTimeWindows("06:00", "12:00");
+
+      // insertar en event_hotspot
+      const payload = {
+        event_id: ev.id,
+        route_id: routeId,
+        source_hotspot_id: h.id, // referencia al catálogo
+        name: h.name || h.nombre || "Punto",
+        lat: h.lat,
+        lng: h.lng,
+        time_windows: dw,
+      };
+      const { data: inserted, error } = await supabase
+        .from("event_hotspot")
+        .insert([payload])
+        .select("id, name, time_windows, route:event_route(name)")
+        .single();
+      if (error) throw error;
+
+      // poner en UI
+      const horaIni = inserted?.time_windows?.[0]?.start || "06:00";
+      const horaFin = inserted?.time_windows?.[0]?.end || "12:00";
+      setPuntos((arr) => [
         ...arr,
         {
-          id: h.id,
-          nombre: h.name || h.nombre || "Punto",
+          id: inserted.id,
+          nombre: inserted.name,
           activo: true,
-          horaIni: (h.default_windows?.[0]?.start) || "06:00",
-          horaFin: (h.default_windows?.[0]?.end) || "12:00",
+          horaIni,
+          horaFin,
+          route_name: inserted?.route?.name || "",
         },
-      ];
-    });
-    // TODO: insert en event_hotspot
+      ]);
+      if (!uploadPoint) setUploadPoint(inserted.id);
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo agregar el punto.");
+    }
   }
-  function removePoint(pid) {
-    setPuntos((arr) => arr.filter((p) => p.id !== pid));
-    // TODO: delete en event_hotspot
+  async function removePoint(pid) {
+    try {
+      // borrar en DB
+      const { error } = await supabase.from("event_hotspot").delete().eq("id", pid);
+      if (error) throw error;
+      // si habían fotos asociadas, ojo que event_asset.hotspot_id tiene FK; supongo que no hay fotos. Si las hay, primero mover o borrar assets.
+      setPuntos((arr) => arr.filter((p) => p.id !== pid));
+      if (uploadPoint === pid) setUploadPoint(puntos.find((x) => x.id !== pid)?.id || "");
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo quitar el punto (revisá si no tiene fotos asociadas).");
+    }
   }
 
   /* ---- subida de fotos ---- */
@@ -218,7 +344,7 @@ export default function EventoEditor() {
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out?.error || "No se pudo firmar la subida");
-    return out;
+    return out; // { uploadUrl, path, headers? }
   }
   async function onUploaded(assets) {
     try {
@@ -228,7 +354,7 @@ export default function EventoEditor() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          assets.map((a) => ({
+          (assets || []).map((a) => ({
             path: a.path,
             size: a.size,
             pointId: a.pointId,
@@ -270,8 +396,12 @@ export default function EventoEditor() {
     );
   }
 
-  // catálogo mock — conectalo a tu perfil cuando querrás
-  const myCatalog = []; // ej: [{id:'A-1', name:'Salida', default_windows:[{start:'06:00', end:'08:00'}]}]
+  // catálogo filtrado por la ruta del evento (si hay)
+  const catalogFiltered = useMemo(() => {
+    if (!ev.ruta) return catalog;
+    return (catalog || []).filter((h) => (h.route_name || "") === ev.ruta);
+  }, [catalog, ev?.ruta]);
+
   const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
 
   return (
@@ -386,12 +516,10 @@ export default function EventoEditor() {
             {/* Preview de la lista de precios */}
             {loadingLists ? (
               <div className="mt-4 text-sm text-slate-400">Cargando listas…</div>
-            ) : ev.price_list_id && (priceLists.find((l) => l.id === ev.price_list_id)) ? (
+            ) : ev.price_list_id && selectedList ? (
               <div className="mt-4">
                 <div className="text-xs text-slate-400 mb-1">Lista seleccionada</div>
-                <div className="text-sm font-semibold mb-2">
-                  {priceLists.find((l) => l.id === ev.price_list_id)?.nombre}
-                </div>
+                <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
                 <div className="text-xs text-white/70">
                   Nota: Si hay <strong>lista</strong>, esa manda sobre el precio base para el público.
                 </div>
@@ -411,20 +539,10 @@ export default function EventoEditor() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Puntos de foto</h3>
-              <button
-                className="h-9 px-3 rounded-xl bg-blue-500 text-white font-display font-bold border border-white/10"
-                onClick={() => {
-                  const first = myCatalog.find((h) => !puntos.some((p) => p.id === h.id));
-                  if (!first) return alert("Ya agregaste todos los puntos de tu catálogo 😅");
-                  addPointFromCatalog(first);
-                }}
-              >
-                Agregar punto
-              </button>
             </div>
 
             {puntos.length === 0 ? (
-              <div className="text-slate-300 text-sm">Aún no agregaste puntos.</div>
+              <div className="text-slate-300 text-sm">Aún no agregaste puntos al evento.</div>
             ) : (
               <div className="space-y-3">
                 {puntos.map((p) => {
@@ -438,6 +556,7 @@ export default function EventoEditor() {
                         <div className="font-semibold">{p.nombre}</div>
                         <div className="text-xs text-slate-400">
                           {p.horaIni || "—"} – {p.horaFin || "—"} · {count} foto{count === 1 ? "" : "s"}
+                          {p.route_name ? <> · Ruta: {p.route_name}</> : null}
                         </div>
                       </div>
                       <div className="sm:w-[300px] grid grid-cols-3 gap-2">
@@ -445,19 +564,19 @@ export default function EventoEditor() {
                           type="time"
                           className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-2"
                           value={p.horaIni || ""}
-                          onChange={(e) => updatePoint(p.id, { horaIni: e.target.value })}
+                          onChange={(e) => updatePointLocal(p.id, { horaIni: e.target.value })}
                         />
                         <input
                           type="time"
                           className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-2"
                           value={p.horaFin || ""}
-                          onChange={(e) => updatePoint(p.id, { horaFin: e.target.value })}
+                          onChange={(e) => updatePointLocal(p.id, { horaFin: e.target.value })}
                         />
                         <label className="inline-flex items-center gap-2 justify-center rounded-lg border border-white/15 bg-white/5">
                           <input
                             type="checkbox"
                             checked={!!p.activo}
-                            onChange={(e) => updatePoint(p.id, { activo: e.target.checked })}
+                            onChange={(e) => updatePointLocal(p.id, { activo: e.target.checked })}
                           />
                           <span className="text-sm">Activo</span>
                         </label>
@@ -477,10 +596,45 @@ export default function EventoEditor() {
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Agregar desde mi catálogo</h3>
-            <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
-              {/* cuando conectés el catálogo real, listá aquí */}
-              <div className="text-slate-300 text-sm">No tenés catálogo cargado todavía.</div>
-            </div>
+
+            {loadingCatalog ? (
+              <div className="text-slate-300 text-sm">Cargando catálogo…</div>
+            ) : (catalogFiltered || []).length === 0 ? (
+              <div className="text-slate-300 text-sm">
+                No hay puntos en tu catálogo {ev.ruta ? <>para <strong>{ev.ruta}</strong></> : ""}.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
+                {catalogFiltered
+                  .filter((h) => !puntos.some((p) => p.nombre === h.name))
+                  .map((h) => (
+                    <div
+                      key={h.id}
+                      className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-medium">{h.name}</div>
+                        {h.route_name && <div className="text-xs text-slate-400">{h.route_name}</div>}
+                        {Array.isArray(h.default_windows) && h.default_windows[0] && (
+                          <div className="text-xs text-slate-400">
+                            {h.default_windows[0].start}–{h.default_windows[0].end}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="h-8 px-3 rounded-lg bg-blue-600 text-white"
+                        onClick={() => addPointFromCatalog(h)}
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                  ))}
+                {/* Si todos ya están agregados */}
+                {catalogFiltered.every((h) => puntos.some((p) => p.nombre === h.name)) && (
+                  <div className="text-slate-300 text-sm">Ya agregaste todos los puntos de esta ruta 🙌</div>
+                )}
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -491,11 +645,11 @@ export default function EventoEditor() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Subida de fotos</h3>
             {puntos.length === 0 ? (
-              <div className="text-slate-300 text-sm">Agregá al menos un punto para habilitar la subida.</div>
+              <div className="text-slate-300 text-sm">Agregá al menos un punto del catálogo para habilitar la subida.</div>
             ) : (
               <UploadManager
                 eventId={ev.id}
-                pointId={uploadPoint || puntos[0]?.id || null}
+                pointId={uploadPoint || puntos[0]?.id || null} // 👈 usa event_hotspot.id
                 onUploaded={onUploaded}
                 getSignedUrl={getSignedUrl}
                 options={{ watermark: { src: null, scale: 0.25, opacity: 0.5, position: "br" } }}
