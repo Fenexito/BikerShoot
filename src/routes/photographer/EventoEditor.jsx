@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx";
 import { supabase } from "../../lib/supabaseClient";
 
-/* ===== Helpers ===== */
+/* ===== Utils ===== */
 const fmtDate = (iso) =>
   new Date((iso || "") + "T00:00:00").toLocaleDateString("es-GT", {
     weekday: "long",
@@ -13,6 +13,21 @@ const fmtDate = (iso) =>
     year: "numeric",
   });
 
+// Derivar una ventana por defecto desde el punto del perfil
+function windowsFromPerfilPunto(p) {
+  try {
+    const horarios = Array.isArray(p?.horarios) ? p.horarios : [];
+    // Preferí domingo; si no hay, el primero
+    const dom = horarios.find((h) => (h?.dia ?? "").toLowerCase() === "domingo");
+    const h0 = dom || horarios[0] || {};
+    const start = (h0?.inicio ?? "06:00").toString();
+    const end = (h0?.fin ?? "12:00").toString();
+    return [{ start, end }];
+  } catch {
+    return [{ start: "06:00", end: "12:00" }];
+  }
+}
+
 function mapEventRow(row) {
   return {
     id: row.id,
@@ -20,8 +35,7 @@ function mapEventRow(row) {
     fecha: row.fecha ?? row.date ?? new Date().toISOString().slice(0, 10),
     ruta: row.ruta ?? row.location ?? "",
     estado: row.estado ?? row.status ?? "borrador",
-    // 👇 en tu schema el campo es precioBase
-    precioBase: row.precioBase ?? 50,
+    precioBase: row.precioBase ?? row.base_price ?? 50, // tu schema usa precioBase
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
     photographer_id: row.photographer_id ?? row.created_by ?? null,
@@ -34,16 +48,10 @@ function buildEventPatch(ev) {
     ruta: ev.ruta,
     location: ev.ruta,
     estado: ev.estado,
-    // 👇 guardar en precioBase (no precio_base)
-    precioBase: ev.precioBase,
+    precioBase: ev.precioBase,   // 👈 en tu tabla
     notas: ev.notas,
     price_list_id: ev.price_list_id || null,
   };
-}
-function toWindows(horaIni, horaFin) {
-  const start = (horaIni || "06:00").trim();
-  const end = (horaFin || "12:00").trim();
-  return [{ start, end }];
 }
 
 /* ===== Componente ===== */
@@ -62,19 +70,20 @@ export default function EventoEditor() {
   const [authReady, setAuthReady] = useState(false);
   const [noSession, setNoSession] = useState(false);
 
-  const [priceLists, setPriceLists] = useState([]);
-  const [loadingLists, setLoadingLists] = useState(true);
-
-  const [catalog, setCatalog] = useState([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  // Sesión
   const [uid, setUid] = useState(null);
 
-  // UI subida
+  // Catálogo (desde perfil del fotógrafo)
+  const [catalog, setCatalog] = useState([]); // [{id,name,route_name,lat,lng,default_windows}]
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+
+  // Listas de precios (placeholder por ahora)
+  const [priceLists, setPriceLists] = useState([]);
+
+  // Subida
   const [uploadPoint, setUploadPoint] = useState("");
 
-  // Crear punto manual (fallback)
-  const [newPoint, setNewPoint] = useState({ nombre: "", horaIni: "06:00", horaFin: "12:00" });
-
+  // Agrupar fotos por punto
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
     (Array.isArray(fotos) ? fotos : []).forEach((f) => {
@@ -91,7 +100,7 @@ export default function EventoEditor() {
     if (!uploadPoint && puntos.length) setUploadPoint(puntos[0].id);
   }, [puntos, uploadPoint]);
 
-  /* ---- sesión lista ---- */
+  /* ---- Sesión lista ---- */
   useEffect(() => {
     let unsub = null;
     (async () => {
@@ -114,7 +123,7 @@ export default function EventoEditor() {
     return () => unsub?.unsubscribe?.();
   }, []);
 
-  /* ---- evento + assets ---- */
+  /* ---- Evento + assets ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -130,6 +139,7 @@ export default function EventoEditor() {
           .maybeSingle();
         if (error) throw error;
         if (!row) throw new Error("Evento no encontrado");
+
         if (!mounted) return;
         setEv(mapEventRow(row));
 
@@ -154,62 +164,55 @@ export default function EventoEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramId, authReady]);
 
-  /* ---- listas de precios (si existen en tu DB) ---- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoadingLists(true);
-        // En tus CSV no vi tabla de price lists; dejo vacío sin romper nada.
-        if (mounted) setPriceLists([]);
-      } finally {
-        if (mounted) setLoadingLists(false);
-      }
-    })();
-    return () => (mounted = false);
-  }, []);
-
-  /* ---- catálogo del fotógrafo ---- */
+  /* ---- Catálogo desde photographer_profile.puntos ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoadingCatalog(true);
-        if (!ev?.photographer_id) {
+        const ownerId = ev?.photographer_id || uid;
+        if (!ownerId) {
           if (mounted) setCatalog([]);
           return;
         }
-        // RLS exige photographer_id = auth.uid()
-        const { data: hs, error: hErr } = await supabase
-          .from("photographer_hotspot")
-          .select("id, name, lat, lng, default_windows, route_id")
-          .eq("photographer_id", ev.photographer_id)
-          .order("id", { ascending: true });
-        if (hErr) throw hErr;
+        const { data: profile, error: profErr } = await supabase
+          .from("photographer_profile")
+          .select("puntos")
+          .eq("user_id", ownerId)
+          .maybeSingle();
+        if (profErr) throw profErr;
+
+        // 'puntos' puede venir como json o texto json
+        let puntosPerfil = [];
+        const raw = profile?.puntos;
+        if (Array.isArray(raw)) puntosPerfil = raw;
+        else if (typeof raw === "string" && raw.trim().startsWith("[")) {
+          try { puntosPerfil = JSON.parse(raw); } catch {}
+        }
+
+        const mapped = puntosPerfil.map((p) => ({
+          id: (p?.id ?? crypto.randomUUID()).toString(),
+          name: (p?.nombre ?? "Punto").toString(),
+          route_name: (p?.ruta ?? "").toString(),
+          lat: p?.lat != null ? Number(p.lat) : null,
+          lng: p?.lon != null ? Number(p.lon) : null,
+          default_windows: windowsFromPerfilPunto(p),
+          _raw: p,
+        }));
+
         if (!mounted) return;
-        setCatalog(
-          Array.isArray(hs)
-            ? hs.map((h) => ({
-                id: h.id,
-                name: h.name,
-                lat: h.lat,
-                lng: h.lng,
-                route_id: h.route_id,
-                default_windows: Array.isArray(h.default_windows) ? h.default_windows : [],
-              }))
-            : []
-        );
+        setCatalog(mapped);
       } catch (e) {
-        console.warn("[EventoEditor] catalog error:", e?.message || e);
+        console.warn("[EventoEditor] catalog (perfil.puntos) error:", e?.message || e);
         if (mounted) setCatalog([]);
       } finally {
         if (mounted) setLoadingCatalog(false);
       }
     })();
     return () => (mounted = false);
-  }, [ev?.photographer_id]);
+  }, [ev?.photographer_id, uid]);
 
-  /* ---- puntos del evento (usa windows, no time_windows) ---- */
+  /* ---- Puntos del evento (usa windows) ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -260,7 +263,7 @@ export default function EventoEditor() {
     return inserted.id;
   }
 
-  /* ---- acciones: guardar / publicar ---- */
+  /* ---- Acciones evento ---- */
   async function guardarTodo() {
     try {
       const patch = buildEventPatch(ev);
@@ -270,9 +273,9 @@ export default function EventoEditor() {
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
 
-      // persistir ventanas de puntos
+      // Persistir ventanas de puntos
       for (const p of puntos) {
-        const windows = toWindows(p.horaIni, p.horaFin);
+        const windows = [{ start: p.horaIni || "06:00", end: p.horaFin || "12:00" }];
         await supabase.from("event_hotspot").update({ windows }).eq("id", p.id);
       }
 
@@ -293,11 +296,8 @@ export default function EventoEditor() {
       alert("No se pudo cambiar el estado del evento.");
     }
   }
-  function updateEvent(localPatch) {
-    setEv((old) => ({ ...old, ...localPatch }));
-  }
 
-  /* ---- puntos (persistiendo en event_hotspot) ---- */
+  /* ---- puntos: solo desde catálogo (perfil) ---- */
   function updatePointLocal(pid, patch) {
     setPuntos((arr) => arr.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
   }
@@ -308,20 +308,18 @@ export default function EventoEditor() {
         return alert("Ya agregaste este punto 😅");
       }
       const routeId = await ensureEventRouteId(ev.id, ev.ruta || "");
-      const dw =
-        Array.isArray(h.default_windows) && h.default_windows.length
-          ? h.default_windows
-          : toWindows("06:00", "12:00");
+      const windows = Array.isArray(h.default_windows) && h.default_windows.length
+        ? h.default_windows
+        : [{ start: "06:00", end: "12:00" }];
 
       const payload = {
         event_id: ev.id,
         route_id: routeId,
-        source_hotspot_id: h.id,
+        source_hotspot_id: typeof h.id === "string" ? h.id : null, // del perfil
         name: h.name || h.nombre || "Punto",
-        lat: h.lat,
-        lng: h.lng,
-        // 👇 en tu schema se llama windows
-        windows: dw,
+        lat: h.lat ?? 0,
+        lng: h.lng ?? 0,
+        windows,
       };
       const { data: inserted, error } = await supabase
         .from("event_hotspot")
@@ -330,16 +328,15 @@ export default function EventoEditor() {
         .single();
       if (error) throw error;
 
-      const horaIni = inserted?.windows?.[0]?.start || "06:00";
-      const horaFin = inserted?.windows?.[0]?.end || "12:00";
+      const w0 = inserted?.windows?.[0] || {};
       setPuntos((arr) => [
         ...arr,
         {
           id: inserted.id,
           nombre: inserted.name,
           activo: true,
-          horaIni,
-          horaFin,
+          horaIni: w0.start || "06:00",
+          horaFin: w0.end || "12:00",
           route_id: inserted?.route_id || null,
         },
       ]);
@@ -347,33 +344,6 @@ export default function EventoEditor() {
     } catch (e) {
       console.error(e);
       alert("No se pudo agregar el punto.");
-    }
-  }
-  async function addPointManual() {
-    try {
-      if (!newPoint.nombre.trim()) return alert("Poné un nombre al punto, vos.");
-      const routeId = await ensureEventRouteId(ev.id, ev.ruta || "");
-      const windows = toWindows(newPoint.horaIni, newPoint.horaFin);
-      const { data: inserted, error } = await supabase
-        .from("event_hotspot")
-        .insert([{ event_id: ev.id, route_id: routeId, name: newPoint.nombre.trim(), lat: 0, lng: 0, windows }])
-        .select("id, name, windows")
-        .single();
-      if (error) throw error;
-      setPuntos((arr) => [
-        ...arr,
-        {
-          id: inserted.id,
-          nombre: inserted.name,
-          activo: true,
-          horaIni: inserted?.windows?.[0]?.start || "06:00",
-          horaFin: inserted?.windows?.[0]?.end || "12:00",
-        },
-      ]);
-      setNewPoint({ nombre: "", horaIni: "06:00", horaFin: "12:00" });
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo crear el punto.");
     }
   }
   async function removePoint(pid) {
@@ -454,6 +424,12 @@ export default function EventoEditor() {
       </>
     );
 
+  // Filtrar catálogo por la ruta del evento
+  const catalogFiltered = useMemo(() => {
+    if (!ev?.ruta) return catalog;
+    return (catalog || []).filter((h) => (h.route_name || "") === ev.ruta);
+  }, [catalog, ev?.ruta]);
+
   const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
 
   return (
@@ -489,20 +465,20 @@ export default function EventoEditor() {
             <h3 className="font-semibold mb-3">Información del evento</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Nombre">
-                <input className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.nombre} onChange={(e) => updateEvent({ nombre: e.target.value })} />
+                <input className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.nombre} onChange={(e) => setEv({ ...ev, nombre: e.target.value })} />
               </Field>
               <Field label="Fecha">
-                <input type="date" className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.fecha} onChange={(e) => updateEvent({ fecha: e.target.value })} />
+                <input type="date" className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.fecha} onChange={(e) => setEv({ ...ev, fecha: e.target.value })} />
               </Field>
               <Field label="Ruta">
                 <input className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3" value={ev.ruta} readOnly />
               </Field>
 
               <Field label="Precio base (Q)">
-                <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => updateEvent({ precioBase: Number(e.target.value || 0) })} disabled={!!ev.price_list_id} />
+                <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => setEv({ ...ev, precioBase: Number(e.target.value || 0) })} disabled={!!ev.price_list_id} />
               </Field>
               <Field label="Lista de precios (opcional)">
-                <select className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.price_list_id || ""} onChange={(e) => updateEvent({ price_list_id: e.target.value || null })}>
+                <select className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.price_list_id || ""} onChange={(e) => setEv({ ...ev, price_list_id: e.target.value || null })}>
                   <option value="">— Sin lista (usa precio base)</option>
                   {priceLists.map((pl) => (
                     <option key={pl.id} value={pl.id}>{pl.nombre}</option>
@@ -511,7 +487,7 @@ export default function EventoEditor() {
               </Field>
 
               <Field label="Notas (privadas)" full>
-                <textarea rows={3} className="w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 py-2" value={ev.notas || ""} onChange={(e) => updateEvent({ notas: e.target.value })} />
+                <textarea rows={3} className="w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 py-2" value={ev.notas || ""} onChange={(e) => setEv({ ...ev, notas: e.target.value })} />
               </Field>
             </div>
           </div>
@@ -582,23 +558,21 @@ export default function EventoEditor() {
 
             {loadingCatalog ? (
               <div className="text-slate-300 text-sm">Cargando catálogo…</div>
-            ) : (catalog || []).length === 0 ? (
+            ) : (catalogFiltered || []).length === 0 ? (
               <div className="text-slate-300 text-sm">
-                No hay puntos en tu catálogo aún.
-                {uid && ev?.photographer_id && uid !== ev.photographer_id ? (
-                  <div className="mt-1 text-[11px] text-slate-400">
-                    Nota: Por políticas RLS, este catálogo solo es visible para el fotógrafo dueño del evento.
-                  </div>
-                ) : null}
+                {catalog.length === 0
+                  ? "No hay puntos en tu catálogo aún."
+                  : `No hay puntos para la ruta “${ev.ruta}”. Cambiá la ruta del evento o creá puntos en tu perfil.`}
               </div>
             ) : (
               <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
-                {(catalog || [])
+                {catalogFiltered
                   .filter((h) => !puntos.some((p) => p.nombre === h.name))
                   .map((h) => (
                     <div key={h.id} className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between">
                       <div>
                         <div className="font-medium">{h.name}</div>
+                        <div className="text-xs text-slate-400">{h.route_name}</div>
                         {Array.isArray(h.default_windows) && h.default_windows[0] && (
                           <div className="text-xs text-slate-400">
                             {h.default_windows[0].start}–{h.default_windows[0].end}
@@ -610,27 +584,12 @@ export default function EventoEditor() {
                       </button>
                     </div>
                   ))}
-                {(catalog || []).length > 0 &&
-                  (catalog || []).every((h) => puntos.some((p) => p.nombre === h.name)) && (
-                    <div className="text-slate-300 text-sm">Ya agregaste todos los puntos de tu catálogo 🙌</div>
+                {catalogFiltered.length > 0 &&
+                  catalogFiltered.every((h) => puntos.some((p) => p.nombre === h.name)) && (
+                    <div className="text-slate-300 text-sm">Ya agregaste todos los puntos de esta ruta 🙌</div>
                   )}
               </div>
             )}
-
-            {/* Fallback: crear punto manual si no hay catálogo */}
-            <div className="mt-5 border-t border-white/10 pt-4">
-              <h4 className="font-semibold mb-2">Crear punto manual</h4>
-              <div className="grid grid-cols-1 gap-2">
-                <input className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-3" placeholder="Nombre del punto" value={newPoint.nombre} onChange={(e) => setNewPoint({ ...newPoint, nombre: e.target.value })} />
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="time" className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-3" value={newPoint.horaIni} onChange={(e) => setNewPoint({ ...newPoint, horaIni: e.target.value })} />
-                  <input type="time" className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-3" value={newPoint.horaFin} onChange={(e) => setNewPoint({ ...newPoint, horaFin: e.target.value })} />
-                </div>
-                <button className="h-10 px-4 rounded-lg bg-emerald-600 text-white" onClick={addPointManual}>
-                  Agregar punto al evento
-                </button>
-              </div>
-            </div>
           </div>
         </section>
       )}
