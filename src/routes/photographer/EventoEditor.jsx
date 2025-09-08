@@ -727,7 +727,7 @@ export default function EventoEditor() {
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {list.map((f) => (
-                          <img key={f.id} src={f.public_url || f.storage_path} alt="" className="w-full h-28 object-cover rounded-lg" />
+                          <img key={f.id} src={getPublicUrl(f.storage_path)} alt="" className="w-full h-28 object-cover rounded-lg" />
                         ))}
                       </div>
                     )}
@@ -740,6 +740,49 @@ export default function EventoEditor() {
       )}
     </main>
   );
+}
+
+// Agrega esta función helper al componente (antes del return)
+function getPublicUrl(storagePath) {
+  if (!storagePath) return '';
+  if (storagePath.startsWith('http')) return storagePath;
+  
+  const { data } = supabase.storage
+    .from('event-assets') // Cambia esto por el nombre correcto de tu bucket
+    .getPublicUrl(storagePath);
+  
+  return data.publicUrl;
+}
+
+// Y en el render de las imágenes:
+{list.map((f) => (
+  <img 
+    key={f.id} 
+    src={getPublicUrl(f.storage_path)} 
+    alt="" 
+    className="w-full h-28 object-cover rounded-lg" 
+    onError={(e) => {
+      console.error('Error loading image:', f.storage_path);
+      e.target.style.display = 'none';
+    }}
+  />
+))}
+
+console.log("Fotos por punto:", Array.from(fotosPorPunto.entries()));
+console.log("Punto actual:", p.id, "Fotos:", list);
+
+function getPublicUrl(storagePath) {
+  if (!storagePath) return '';
+  
+  // Si ya es una URL completa, la devolvemos tal cual
+  if (storagePath.startsWith('http')) return storagePath;
+  
+  // Si es una ruta de Supabase Storage, construimos la URL pública
+  const { data } = supabase.storage
+    .from('event-assets') // Asegúrate de que este sea el nombre correcto de tu bucket
+    .getPublicUrl(storagePath);
+  
+  return data.publicUrl;
 }
 
 /* ===== UI helpers ===== */
