@@ -372,6 +372,7 @@ export default function EventoEditor() {
     // invoke manda automáticamente Authorization y apikey
   const { data, error } = await supabase.functions.invoke("signed-event-upload", {
     body: { eventId, pointId, filename, size, contentType },
+    headers: { Authorization: `Bearer ${token}` }, // <-- ESTE ES EL CAMBIO CLAVE
   });
   if (error) throw new Error(error.message || "No se pudo firmar la subida");
   return data;
