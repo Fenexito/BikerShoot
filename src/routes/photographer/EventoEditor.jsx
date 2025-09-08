@@ -2,17 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx"; // ajustá si tu ruta es distinta
-import { createClient } from "@supabase/supabase-js";
-
-/* ============ Supabase client ============ */
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "") || "";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-/* ============ Functions base (firmar/registrar) ============ */
-const FN_BASE =
-  (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || "").replace(/\/$/, "") ||
-  SUPABASE_URL;
+import { supabase } from "../../../lib/supabaseClient"; // 👈 usa el cliente central
 
 /* ============ Helpers ============ */
 const fmtDate = (iso) =>
@@ -28,10 +18,11 @@ function mapEventRow(row) {
     id: row.id,
     nombre: row.nombre ?? row.title ?? `Evento ${row.id}`,
     fecha: row.fecha ?? row.date ?? new Date().toISOString().slice(0, 10),
-    ruta: row.ruta ?? row.route ?? "",
+    ruta: row.ruta ?? row.location ?? "",
     estado: row.estado ?? row.status ?? "borrador",
-    precioBase: row.precioBase ?? row.base_price ?? 50,
+    precioBase: row.precio_base ?? row.base_price ?? row.precioBase ?? 50,
     notas: row.notas ?? row.notes ?? "",
+    price_list_id: row.price_list_id ?? null,
   };
 }
 function buildEventPatch(ev) {
@@ -39,9 +30,11 @@ function buildEventPatch(ev) {
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
+    location: ev.ruta, // 👈 guardar oficial en 'location'
     estado: ev.estado,
-    precioBase: ev.precioBase,
+    precio_base: ev.precioBase, // 👈 unificar aquí
     notas: ev.notas,
+    price_list_id: ev.price_list_id || null, // 👈 si hay lista, se guarda el id
   };
 }
 
@@ -51,17 +44,21 @@ export default function EventoEditor() {
   const [params] = useSearchParams();
   const initialTab = params.get("tab") || "resumen";
 
-  // ---- state base (hooks SIEMPRE antes de returns condicionales) ----
-  const [ev, setEv] = useState(null);       // evento (fila de tabla event)
-  const [fotos, setFotos] = useState([]);   // filas de event_asset
-  const [puntos, setPuntos] = useState([]); // por ahora UI local; luego persistimos
+  // ---- state base ----
+  const [ev, setEv] = useState(null);       // evento
+  const [fotos, setFotos] = useState([]);   // event_asset
+  const [puntos, setPuntos] = useState([]); // por ahora UI local (ver TODO para persistir)
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(initialTab);
 
-  // para “Subida”: punto seleccionado
+  // Subida
   const [uploadPoint, setUploadPoint] = useState("");
 
-  // agrupación de fotos por punto (seguro aunque no haya datos aún)
+  // Listas de precios del fotógrafo
+  const [priceLists, setPriceLists] = useState([]); // [{id, nombre, items: [...] }]
+  const [loadingLists, setLoadingLists] = useState(true);
+
+  // Agrupar fotos x punto
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
     const all = Array.isArray(fotos) ? fotos : [];
@@ -75,14 +72,14 @@ export default function EventoEditor() {
     return map;
   }, [fotos]);
 
-  // si cargan puntos después, setear default del select de subida
+  // default uploadPoint
   useEffect(() => {
     if (!uploadPoint && Array.isArray(puntos) && puntos.length) {
       setUploadPoint(puntos[0].id);
     }
   }, [puntos, uploadPoint]);
 
-  /* ---- cargar evento + assets ---- */
+  /* ---- cargar evento + assets + listas ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -107,18 +104,47 @@ export default function EventoEditor() {
           .order("taken_at", { ascending: true });
         if (aErr) throw aErr;
 
-        // 3) puntos (por ahora vacío; cuando quieras, cargás tu catálogo del perfil)
-        const puntosIniciales = []; // ej: [{id:'A-1', nombre:'Salida', activo:true, horaIni:'06:00', horaFin:'08:00'}]
+        // 3) puntos del evento (si tuvieras tabla event_hotspot)
+        // const { data: hs } = await supabase
+        //   .from("event_hotspot")
+        //   .select("id, nombre, meta")
+        //   .eq("event_id", id);
+        // const puntosIniciales = (hs || []).map(h => ({
+        //   id: h.id, nombre: h.nombre || "Punto", ...((h.meta || {}))
+        // }));
+
+        // 4) listas de precios del fotógrafo
+        setLoadingLists(true);
+        let lists = [];
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess?.session?.user?.id || null;
+        if (uid) {
+          const { data: lrows, error: lerr } = await supabase
+            .from("photographer_price_list")
+            .select("id, nombre, items")
+            .eq("photographer_id", uid)
+            .order("created_at", { ascending: false });
+          if (lerr) throw lerr;
+          lists = (lrows || []).map((r) => ({
+            id: r.id,
+            nombre: r.nombre,
+            items: Array.isArray(r.items) ? r.items : [],
+          }));
+        }
 
         if (!mounted) return;
         setEv(evUI);
         setFotos(assets || []);
-        setPuntos(puntosIniciales);
+        setPuntos([]); // reemplazá por 'puntosIniciales' si usás event_hotspot
+        setPriceLists(lists);
       } catch (e) {
         console.error(e);
         if (mounted) setEv(null);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setLoadingLists(false);
+        }
       }
     })();
     return () => (mounted = false);
@@ -134,7 +160,7 @@ export default function EventoEditor() {
         .eq("id", ev.id);
       if (error) throw error;
 
-      // refrescar por si algún trigger u otro proceso toca campos
+      // refrescar por si triggers tocan algo
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
 
@@ -162,12 +188,14 @@ export default function EventoEditor() {
     setEv((old) => ({ ...old, ...localPatch }));
   }
 
-  /* ---- puntos (UI local por ahora) ---- */
+  /* ---- puntos (UI local; ver TODO para persistir) ---- */
   function updatePoint(pid, patch) {
     setPuntos((arr) => arr.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
+    // TODO: si tenés event_hotspot.meta jsonb => update
   }
   function addPointFromCatalog(h) {
     setPuntos((arr) => {
+      if (!h) return arr;
       if (arr.some((x) => x.id === h.id)) return arr;
       return [
         ...arr,
@@ -180,15 +208,18 @@ export default function EventoEditor() {
         },
       ];
     });
+    // TODO: insert en event_hotspot
   }
   function removePoint(pid) {
     setPuntos((arr) => arr.filter((p) => p.id !== pid));
+    // TODO: delete en event_hotspot
   }
 
   /* ---- subida de fotos ---- */
-
-  // 1) firmar (edge function existente)
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
+    // Usamos funciones de Supabase (edge): /functions/v1/signed-event-upload
+    const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
+    const FN_BASE = (base || "").replace(/\/$/, "");
     const res = await fetch(`${FN_BASE}/functions/v1/signed-event-upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -198,10 +229,11 @@ export default function EventoEditor() {
     if (!res.ok) throw new Error(out?.error || "No se pudo firmar la subida");
     return out; // { uploadUrl, path, headers? }
   }
-
-  // 2) registrar en DB después de subir (edge function existente)
   async function onUploaded(assets) {
     try {
+      // Registrar en DB
+      const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
+      const FN_BASE = (base || "").replace(/\/$/, "");
       const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -217,7 +249,7 @@ export default function EventoEditor() {
       const out = await res.json();
       if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
 
-      // refrescar assets desde la tabla
+      // refrescar assets
       const { data: rows, error } = await supabase
         .from("event_asset")
         .select("*")
@@ -231,7 +263,6 @@ export default function EventoEditor() {
     }
   }
 
-  /* ---- renders condicionales (después de hooks) ---- */
   if (loading) {
     return (
       <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
@@ -250,8 +281,9 @@ export default function EventoEditor() {
     );
   }
 
-  // catálogo mock (lado derecho) — conectalo a tu perfil cuando querrás
+  // catálogo mock — conectalo a tu perfil cuando querrás
   const myCatalog = []; // ej: [{id:'A-1', name:'Salida', default_windows:[{start:'06:00', end:'08:00'}]}]
+  const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
 
   return (
     <main className="w-full max-w-[1100px] mx-auto px-5 py-6">
@@ -269,15 +301,6 @@ export default function EventoEditor() {
           >
             Guardar
           </button>
-
-          <Link
-            to={`/app/buscar?hotspots=${puntos.map((p) => p.id).join(",")}`}
-            className="h-10 px-4 rounded-xl border border-white/15 bg-white/5 text-white font-display font-bold inline-flex items-center justify-center"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Ver como Biker
-          </Link>
 
           <button
             className="h-10 px-4 rounded-xl bg-blue-500 text-white font-display font-bold inline-flex items-center justify-center border border-white/10"
@@ -324,6 +347,8 @@ export default function EventoEditor() {
                   readOnly
                 />
               </Field>
+
+              {/* Precio base *y* Lista de precios */}
               <Field label="Precio base (Q)">
                 <input
                   type="number"
@@ -331,8 +356,23 @@ export default function EventoEditor() {
                   className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
                   value={ev.precioBase || 50}
                   onChange={(e) => updateEvent({ precioBase: Number(e.target.value || 0) })}
+                  disabled={!!ev.price_list_id}
+                  title={ev.price_list_id ? "Este evento usa una lista de precios" : "Editar precio base"}
                 />
               </Field>
+              <Field label="Lista de precios (opcional)">
+                <select
+                  className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
+                  value={ev.price_list_id || ""}
+                  onChange={(e) => updateEvent({ price_list_id: e.target.value || null })}
+                >
+                  <option value="">— Sin lista (usa precio base)</option>
+                  {priceLists.map((pl) => (
+                    <option key={pl.id} value={pl.id}>{pl.nombre}</option>
+                  ))}
+                </select>
+              </Field>
+
               <Field label="Notas (privadas)" full>
                 <textarea
                   rows={3}
@@ -346,11 +386,53 @@ export default function EventoEditor() {
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Resumen</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <KPI label="Puntos" value={puntos.length} />
               <KPI label="Fotos" value={fotos.length} />
-              <KPI label="Estado" value={ev.estado} />
+              <div className="col-span-2">
+                <div className="text-xs text-slate-400 mb-1">Estado</div>
+                <div className="text-sm font-semibold">{ev.estado}</div>
+              </div>
             </div>
+            {/* Preview de la lista de precios */}
+            {loadingLists ? (
+              <div className="mt-4 text-sm text-slate-400">Cargando listas…</div>
+            ) : ev.price_list_id && selectedList ? (
+              <div className="mt-4">
+                <div className="text-xs text-slate-400 mb-1">Lista seleccionada</div>
+                <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
+                <div className="rounded-xl border border-white/10 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-white/10">
+                      <tr>
+                        <th className="text-left px-3 py-2">Concepto</th>
+                        <th className="text-right px-3 py-2">Precio (Q)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedList.items || []).map((it, i) => (
+                        <tr key={i} className="border-t border-white/10">
+                          <td className="px-3 py-2">{it?.nombre || it?.name || "Item"}</td>
+                          <td className="px-3 py-2 text-right">{Number(it?.precio ?? it?.price ?? 0)}</td>
+                        </tr>
+                      ))}
+                      {(!selectedList.items || selectedList.items.length === 0) && (
+                        <tr className="border-t border-white/10">
+                          <td className="px-3 py-2 text-slate-400" colSpan={2}>Sin items configurados.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-2 text-xs text-white/70">
+                  Nota: Si hay <strong>lista</strong>, esa manda sobre el precio base para mostrar precios al público.
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 text-xs text-white/70">
+                Sin lista asignada. Se usará <strong>precio base</strong> (Q{ev.precioBase || 50}).
+              </div>
+            )}
           </div>
         </section>
       )}

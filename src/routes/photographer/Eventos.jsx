@@ -30,17 +30,14 @@ function monthLabel(ym) {
 
 /* ========= Normalización lectura (tolerante) ========= */
 function normalizeEventRow(row) {
-  // nombre
   const nombre = row.nombre ?? row.title ?? row.name ?? "";
-  // fecha
   const fecha = row.fecha ?? row.date ?? row.event_date ?? todayStr();
-  // ruta ← aceptar 'ruta', 'route', 'location'
   const ruta = row.ruta ?? row.route ?? row.location ?? "";
-  // estado
   const estado = row.estado ?? row.status ?? "borrador";
-  // precio (solo UI)
   const precioBase = row.precio_base ?? row.base_price ?? row.precioBase ?? 50;
   const notas = row.notas ?? row.notes ?? "";
+  const price_list_id = row.price_list_id ?? null;
+
   return {
     id: row.id,
     created_at: row.created_at,
@@ -51,18 +48,12 @@ function normalizeEventRow(row) {
     estado,
     precioBase,
     notas,
-    puntos: row.puntos || [], // solo UI
-    fotos: row.fotos || [],   // solo UI
+    price_list_id,
   };
 }
 
 /* ========= Página ========= */
 export default function StudioEventos() {
-  // Catálogo desde perfil del fotógrafo (rutas/puntos)  :contentReference[oaicite:2]{index=2}
-  const [catalogRoutes, setCatalogRoutes] = useState([]); // [{id,name}]
-  const [catalogHotspots, setCatalogHotspots] = useState([]); // [{id,name,route_name,default_start,default_end,lat,lng}]
-  const [catalogLoading, setCatalogLoading] = useState(true);
-
   // Eventos
   const [events, setEvents] = useState([]);
 
@@ -77,71 +68,10 @@ export default function StudioEventos() {
     nombre: `Domingo ${fmtNice(todayStr())}`,
     fecha: todayStr(),
     ruta: "",
-    puntos: [],
   }));
 
-  /* ===== Cargar catálogo y eventos ===== */
   useEffect(() => {
-    (async () => {
-      try {
-        // sesión → uid
-        const { data: sess } = await supabase.auth.getSession();
-        const uid = sess?.session?.user?.id || null;
-
-        // puntos del perfil (estructura igual a tu Perfil)  :contentReference[oaicite:3]{index=3}
-        let puntos = [];
-        if (uid) {
-          const { data: profile, error: profErr } = await supabase
-            .from("photographer_profile")
-            .select("puntos")
-            .eq("user_id", uid)
-            .maybeSingle();
-          if (profErr) throw profErr;
-
-          const raw = profile?.puntos;
-          if (Array.isArray(raw)) puntos = raw;
-          else if (typeof raw === "string" && raw.trim().startsWith("[")) {
-            try { puntos = JSON.parse(raw); } catch {}
-          }
-        }
-
-        // derivar rutas & hotspots para el modal
-        const routeSet = new Map();
-        const hotspots = [];
-        for (const p of puntos) {
-          const ruta = (p?.ruta ?? "").toString().trim();
-          if (ruta && !routeSet.has(ruta)) routeSet.set(ruta, { id: crypto.randomUUID(), name: ruta });
-
-          const horarios = Array.isArray(p?.horarios) ? p.horarios : [];
-          const dom = horarios.find((h) => (h?.dia ?? "").toLowerCase() === "domingo");
-          const h0 = dom || horarios[0] || {};
-          hotspots.push({
-            id: (p?.id ?? crypto.randomUUID()).toString(),
-            name: (p?.nombre ?? "Punto").toString(),
-            route_name: ruta,
-            lat: p?.lat != null ? Number(p.lat) : null,
-            lng: p?.lon != null ? Number(p.lon) : null,
-            default_start: (h0?.inicio ?? "06:00").toString(),
-            default_end: (h0?.fin ?? "12:00").toString(),
-            raw: p,
-          });
-        }
-        const routes = Array.from(routeSet.values());
-        setCatalogRoutes(routes);
-        setCatalogHotspots(hotspots);
-        if (routes.length === 1) setForm((f) => ({ ...f, ruta: routes[0].name }));
-
-        await reloadEvents();
-      } catch (e) {
-        console.error("Error cargando perfil/eventos:", e);
-        setCatalogRoutes([]);
-        setCatalogHotspots([]);
-        setEvents([]);
-      } finally {
-        setCatalogLoading(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    reloadEvents();
   }, []);
 
   async function reloadEvents() {
@@ -159,27 +89,7 @@ export default function StudioEventos() {
     setEvents(norm);
   }
 
-  /* ===== Selectores memo ===== */
-  const routeOptions = useMemo(() => catalogRoutes.map((r) => r.name).filter(Boolean), [catalogRoutes]);
-  const hotspotsForRoute = useMemo(() => {
-    if (!form.ruta) return [];
-    return catalogHotspots.filter((h) => h.route_name === form.ruta);
-  }, [catalogHotspots, form.ruta]);
-  const mesesDisponibles = useMemo(() => {
-    const set = new Set(events.map((e) => yyyymm(e.fecha)).filter(Boolean));
-    const arr = Array.from(set);
-    arr.sort((a, b) => (a < b ? 1 : -1));
-    return ["todos", ...arr];
-  }, [events]);
-  const filtrados = useMemo(() => {
-    return events
-      .filter((e) => (estado === "todos" ? true : (e.estado || "borrador") === estado))
-      .filter((e) => (mes === "todos" ? true : yyyymm(e.fecha) === mes))
-      .filter((e) => (e.nombre || "").toLowerCase().includes(query.toLowerCase()))
-      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
-  }, [events, estado, mes, query]);
-
-  /* ===== Crear evento (payload mínimo; usa 'location' en vez de 'route') ===== */
+  /* ===== Crear evento (usa 'location' como oficial) ===== */
   async function crearEvento() {
     try {
       const { data: sess } = await supabase.auth.getSession();
@@ -189,11 +99,11 @@ export default function StudioEventos() {
       if (!form.ruta) return alert("Elegí la ruta del evento.");
 
       const payload = {
-        photographer_id: uid,                                            // NOT NULL
-        title: (form.nombre || "").trim() || `Evento ${fmtNice(form.fecha)}`, // NOT NULL
-        date: form.fecha,                                                // NOT NULL usualmente
-        location: form.ruta,                                             // 👈 tu tabla no tiene 'route'; usamos 'location'
-        status: "draft",                                                 // por si es NOT NULL
+        photographer_id: uid,
+        title: (form.nombre || "").trim() || `Evento ${fmtNice(form.fecha)}`,
+        date: form.fecha,
+        location: form.ruta, // 👈 tu tabla usa 'location'
+        status: "draft",
       };
 
       const { error } = await supabase.from("event").insert([payload], { returning: "minimal" });
@@ -208,8 +118,7 @@ export default function StudioEventos() {
       setForm({
         nombre: `Domingo ${fmtNice(todayStr())}`,
         fecha: todayStr(),
-        ruta: routeOptions[0] || "",
-        puntos: [],
+        ruta: "",
       });
     } catch (e) {
       console.error("Crear evento - excepción:", e);
@@ -244,6 +153,21 @@ export default function StudioEventos() {
     }
     alert("No se pudo cambiar el estado del evento.");
   }
+
+  /* ===== Selectores/memos ===== */
+  const mesesDisponibles = useMemo(() => {
+    const set = new Set(events.map((e) => yyyymm(e.fecha)).filter(Boolean));
+    const arr = Array.from(set);
+    arr.sort((a, b) => (a < b ? 1 : -1));
+    return ["todos", ...arr];
+  }, [events]);
+  const filtrados = useMemo(() => {
+    return events
+      .filter((e) => (estado === "todos" ? true : (e.estado || "borrador") === estado))
+      .filter((e) => (mes === "todos" ? true : yyyymm(e.fecha) === mes))
+      .filter((e) => (e.nombre || "").toLowerCase().includes(query.toLowerCase()))
+      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }, [events, estado, mes, query]);
 
   return (
     <main className="w-full max-w-[1100px] mx-auto px-5 py-6 lg:py-8">
@@ -338,51 +262,12 @@ export default function StudioEventos() {
               </div>
               <div className="sm:col-span-2">
                 <Label>Ruta</Label>
-                <select
+                <input
                   className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
                   value={form.ruta}
-                  onChange={(e) => {
-                    const newRuta = e.target.value;
-                    setForm((f) => ({ ...f, ruta: newRuta, puntos: [] }));
-                  }}
-                >
-                  <option value="">Seleccioná una ruta…</option>
-                  {routeOptions.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <Label>Puntos de foto (según tu catálogo)</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-auto rounded-xl border border-white/10 p-2">
-                {catalogLoading && <div className="text-slate-300 text-sm">Cargando catálogo…</div>}
-                {!catalogLoading && form.ruta && hotspotsForRoute.length === 0 && (
-                  <div className="text-slate-300 text-sm">No tenés puntos para esta ruta.</div>
-                )}
-                {!catalogLoading && hotspotsForRoute.map((h) => {
-                  const checked = (form.puntos || []).includes(h.id);
-                  return (
-                    <label key={h.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          setForm((f) => {
-                            const set = new Set(f.puntos || []);
-                            if (on) set.add(h.id); else set.delete(h.id);
-                            return { ...f, puntos: Array.from(set) };
-                          });
-                        }}
-                      />
-                      <span className="text-sm text-white/90">
-                        {h.name} <span className="text-white/50">· {h.default_start}–{h.default_end}</span>
-                      </span>
-                    </label>
-                  );
-                })}
+                  onChange={(e) => setForm((f) => ({ ...f, ruta: e.target.value }))}
+                  placeholder="Carretera a El Salvador"
+                />
               </div>
             </div>
 
@@ -435,6 +320,11 @@ function EventCard({ ev, onEliminar, onPublicar }) {
       </div>
       <div className="text-lg font-semibold mb-1">{ev.nombre}</div>
       <div className="text-white/70 text-sm mb-3">{ev.ruta}</div>
+      <div className="text-white/80 text-sm mb-3">
+        {ev.price_list_id
+          ? "Usa lista de precios"
+          : <>Precio base: <strong>Q{ev.precioBase}</strong></>}
+      </div>
       <div className="flex items-center gap-2">
         <Link to={`/studio/eventos/${ev.id}`} className="h-9 px-3 rounded-xl border border-white/15 bg-white/5 text-white font-display font-bold inline-flex items-center justify-center">
           Editar
