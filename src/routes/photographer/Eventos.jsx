@@ -1,4 +1,3 @@
-// src/pages/studio/Eventos.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
@@ -42,7 +41,7 @@ export default function StudioEventos() {
   const [form, setForm] = useState({
     nombre: "",
     fecha: todayStr(),
-    ruta: "",       // se llena desde select
+    ruta: "",       // select
     precioBase: 50,
     notas: "",
   });
@@ -128,9 +127,11 @@ export default function StudioEventos() {
       if (!form.ruta) return alert("Seleccioná una ruta (creá puntos en tu perfil si no aparece).");
 
       const payload = {
+        // 👇 MUY IMPORTANTE por el NOT NULL
+        title: form.nombre.trim(),
         nombre: form.nombre.trim(),
         fecha: form.fecha,
-        ruta: form.ruta,       // 👈 select
+        ruta: form.ruta,
         location: form.ruta,
         estado: "borrador",
         precioBase: Number(form.precioBase || 0),
@@ -145,7 +146,7 @@ export default function StudioEventos() {
         .single();
       if (error) throw error;
 
-      // asegurar event_route en el nuevo evento
+      // asegurar event_route
       await supabase
         .from("event_route")
         .insert([{ event_id: inserted.id, name: form.ruta }]);
@@ -164,7 +165,6 @@ export default function StudioEventos() {
       const nuevo = estado === "publicado" ? "borrador" : "publicado";
       const { error } = await supabase.from("event").update({ estado: nuevo }).eq("id", id);
       if (error) throw error;
-      // refrescar
       const { data } = await supabase
         .from("event")
         .select("*")
@@ -318,7 +318,7 @@ function CardEvento({ ev, onPublicar, onEliminar }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <div className="text-sm text-slate-400">{fmtNice(ev.fecha)} · {ev.ruta}</div>
-      <div className="text-lg font-semibold">{ev.nombre}</div>
+      <div className="text-lg font-semibold">{ev.nombre ?? ev.title}</div>
       <div className="text-xs text-slate-400 mb-3">Estado: {ev.estado}</div>
 
       <div className="flex items-center gap-2">

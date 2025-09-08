@@ -1,4 +1,3 @@
-// src/routes/photographer/EventoEditor.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx";
@@ -41,6 +40,8 @@ function mapEventRow(row) {
 }
 function buildEventPatch(ev) {
   return {
+    // IMPORTANTE: mantener title por el NOT NULL del schema
+    title: ev.nombre,
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
@@ -66,20 +67,19 @@ export default function EventoEditor() {
   const [tab, setTab] = useState(initialTab);
   const [authReady, setAuthReady] = useState(false);
   const [noSession, setNoSession] = useState(false);
-
   const [uid, setUid] = useState(null);
 
   // Catálogo leído del perfil (JSON)
   const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
 
-  // Listas de precios (placeholder por ahora)
+  // Listas de precios (placeholder)
   const [priceLists, setPriceLists] = useState([]);
 
   // Subida
   const [uploadPoint, setUploadPoint] = useState("");
 
-  // Agrupar fotos por punto (defensivo)
+  /* ==== Hooks MEMO (siempre al tope, nunca después de returns) ==== */
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
     const arr = Array.isArray(fotos) ? fotos : [];
@@ -89,11 +89,14 @@ export default function EventoEditor() {
       prev.push(f);
       map.set(k, prev);
     }
-    for (const [, list] of map) {
-      list.sort((a, b) => new Date(a?.taken_at || 0) - new Date(b?.taken_at || 0));
-    }
+    for (const [, list] of map) list.sort((a, b) => new Date(a?.taken_at || 0) - new Date(b?.taken_at || 0));
     return map;
   }, [fotos]);
+
+  const catalogFiltered = useMemo(() => {
+    if (!ev?.ruta) return Array.isArray(catalog) ? catalog : [];
+    return (Array.isArray(catalog) ? catalog : []).filter((h) => (h.route_name || "") === ev.ruta);
+  }, [catalog, ev?.ruta]);
 
   useEffect(() => {
     if (!uploadPoint && puntos.length) setUploadPoint(puntos[0].id);
@@ -190,7 +193,7 @@ export default function EventoEditor() {
 
         const mapped = (puntosPerfil || []).map((p, i) => ({
           key: String(p?.id ?? `${p?.nombre}-${p?.ruta}-${p?.lat}-${p?.lon}-${i}`),
-          id: p?.id ?? null, // ojo: id del perfil (solo referencia)
+          id: p?.id ?? null, // id del perfil (referencia)
           name: String(p?.nombre ?? "Punto"),
           route_name: String(p?.ruta ?? ""),
           lat: p?.lat != null ? Number(p.lat) : null,
@@ -293,8 +296,6 @@ export default function EventoEditor() {
       alert("No se pudo cambiar el estado del evento.");
     }
   }
-
-  /* ---- puntos: solo desde catálogo (perfil) ---- */
   function updatePointLocal(pid, patch) {
     setPuntos((arr) => arr.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
   }
@@ -420,12 +421,6 @@ export default function EventoEditor() {
         <Link to="/studio/eventos" className="text-blue-400 font-semibold">Volver a eventos</Link>
       </>
     );
-
-  // Filtrar catálogo por la ruta del evento
-  const catalogFiltered = useMemo(() => {
-    if (!ev?.ruta) return catalog;
-    return (catalog || []).filter((h) => (h.route_name || "") === ev.ruta);
-  }, [catalog, ev?.ruta]);
 
   const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
 
