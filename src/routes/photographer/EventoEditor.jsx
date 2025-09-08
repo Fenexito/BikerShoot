@@ -414,55 +414,62 @@ export default function EventoEditor() {
     }
   }
 
-  async function onUploaded(assets) {
-    try {
-      console.log("🔍 onUploaded assets:", assets);
-      
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token || null;
-      
-      if (!token) throw new Error("Iniciá sesión para registrar fotos");
-
-      // ✅ URL CORRECTA de TU función assets-register
-      const res = await fetch(`https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/events/${ev.id}/assets/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(
-          assets.map((a) => ({
-            path: a.path,
-            size: a.size,
-            pointId: a.pointId,
-            takenAt: a.takenAt,
-          }))
-        ),
-      });
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "No se pudieron registrar las fotos");
-      }
-
-      const out = await res.json();
-      console.log("✅ Assets registrados:", out);
-
-      // Actualizar lista de fotos
-      const { data: rows, error } = await supabase
-        .from("event_asset")
-        .select("*")
-        .eq("event_id", ev.id)
-        .order("taken_at", { ascending: true });
+    async function onUploaded(assets) {
+      try {
+        console.log("🔍 onUploaded assets:", assets);
         
-      if (error) throw error;
-      setFotos(Array.isArray(rows) ? rows : []);
-      
-    } catch (e) {
-      console.error("❌ Error en onUploaded:", e);
-      alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess?.session?.access_token || null;
+        
+        if (!token) throw new Error("Iniciá sesión para registrar fotos");
+
+        // ✅ REGISTRO DIRECTO - Versión mejorada
+        const assetsToInsert = assets.map((a) => ({
+          event_id: ev.id,
+          hotspot_id: a.pointId,
+          storage_path: a.path,
+          bytes: a.size,
+          taken_at: a.takenAt || new Date().toISOString(),
+          // Si tu tabla tiene public_url, si no, quita esta línea
+          public_url: `https://xpxrrlsvnhpspmcpzzvv.supabase.co/storage/v1/object/public/fotos/${a.path}`
+        }));
+
+        console.log("📝 Insertando en DB:", assetsToInsert);
+
+        const { data, error } = await supabase
+          .from("event_asset")
+          .insert(assetsToInsert)
+          .select();
+
+        if (error) {
+          console.error("❌ Error insertando en DB:", error);
+          // ⚠️ MOSTRAR ERROR DETALLADO
+          throw new Error(`Error de base de datos: ${error.code} - ${error.message}`);
+        }
+
+        console.log("✅ Assets registrados en DB:", data);
+
+        // Actualizar lista de fotos
+        const { data: rows, error: fetchError } = await supabase
+          .from("event_asset")
+          .select("*")
+          .eq("event_id", ev.id)
+          .order("taken_at", { ascending: true });
+          
+        if (fetchError) {
+          console.error("❌ Error fetching assets:", fetchError);
+          throw fetchError;
+        }
+        
+        setFotos(Array.isArray(rows) ? rows : []);
+        
+        alert("✅ Foto subida y registrada exitosamente!");
+        
+      } catch (e) {
+        console.error("❌ Error en onUploaded:", e);
+        alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
+      }
     }
-  }
 
   /* ===== Render ===== */
   if (!authReady) return uiBox("Inicializando sesión…");
