@@ -127,8 +127,11 @@ export default function StudioEventos() {
       if (!form.ruta) return alert("Seleccioná una ruta (creá puntos en tu perfil si no aparece).");
 
       const payload = {
-        // 👇 MUY IMPORTANTE por el NOT NULL
+        // NOT NULL del schema
         title: form.nombre.trim(),
+        date: form.fecha,              // 👈 REQUERIDO (NOT NULL)
+        status: "draft",               // 👈 alinear con schema (published/draft)
+        // Campos “espejo” que usa tu app
         nombre: form.nombre.trim(),
         fecha: form.fecha,
         ruta: form.ruta,

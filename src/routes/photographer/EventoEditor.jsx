@@ -31,7 +31,7 @@ function mapEventRow(row) {
     nombre: row.nombre ?? row.title ?? `Evento ${row.id}`,
     fecha: row.fecha ?? row.date ?? new Date().toISOString().slice(0, 10),
     ruta: row.ruta ?? row.location ?? "",
-    estado: row.estado ?? row.status ?? "borrador",
+    estado: row.estado ?? (row.status === "published" ? "publicado" : "borrador"),
     precioBase: row.precioBase ?? row.base_price ?? 50,
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
@@ -40,8 +40,10 @@ function mapEventRow(row) {
 }
 function buildEventPatch(ev) {
   return {
-    // IMPORTANTE: mantener title por el NOT NULL del schema
+    // Mantener NOT NULL del schema
     title: ev.nombre,
+    date: ev.fecha,
+    status: ev.estado === "publicado" ? "published" : "draft",
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
@@ -244,6 +246,9 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.id]);
 
+  // helper: validar uuid (simple y suficiente)
+  const isUuid = (v) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
   /* ---- helpers SQL ---- */
   async function ensureEventRouteId(eventId, routeName) {
     if (!routeName) return null;
@@ -288,8 +293,13 @@ export default function EventoEditor() {
   async function publicarToggle() {
     const nuevo = ev.estado === "publicado" ? "borrador" : "publicado";
     try {
-      const { error } = await supabase.from("event").update({ estado: nuevo }).eq("id", ev.id);
-      if (error) throw error;
+    const { error } = await supabase
+        .from("event")
+        .update({ 
+          estado: nuevo,
+          status: nuevo === "publicado" ? "published" : "draft",
+        })
+        .eq("id", ev.id);      if (error) throw error;
       setEv((o) => ({ ...o, estado: nuevo }));
     } catch (e) {
       console.error(e);
@@ -313,10 +323,11 @@ export default function EventoEditor() {
       const payload = {
         event_id: ev.id,
         route_id: routeId,
-        source_hotspot_id: h.id ?? null, // referencia opcional al punto de perfil
+        // SOLO si es UUID. Si viene un id corto del perfil, lo omitimos
+        ...(isUuid(h.id) ? { source_hotspot_id: h.id } : {}),
         name: h.name || h.nombre || "Punto",
-        lat: h.lat ?? 0,
-        lng: h.lng ?? 0,
+        lat: Number(h.lat ?? 0),
+        lng: Number(h.lng ?? 0),
         windows,
       };
       const { data: inserted, error } = await supabase
