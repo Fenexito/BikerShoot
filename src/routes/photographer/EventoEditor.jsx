@@ -662,7 +662,7 @@ export default function EventoEditor() {
                 eventId={ev.id}
                 pointId={uploadPoint}
                 onUploaded={onUploaded}
-                getSignedUrl={getUploadInfo}
+                getSignedUrl={getSignedUrl}
                 options={{ watermark: { src: null, scale: 0.25, opacity: 0.5, position: "br" } }}
               />
             )}
