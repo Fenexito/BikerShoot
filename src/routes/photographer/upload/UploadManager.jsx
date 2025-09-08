@@ -1,10 +1,11 @@
 // src/pages/upload/UploadManager.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "../../../lib/supabaseClient";
 
 // ============ Config ============
-const CONCURRENCY = 4;             // cuántos archivos simultáneos
-const CHUNK_SIZE = 5 * 1024 * 1024; // si luego migramos a multipart
-const ACCEPT = "image/*";          // podés ampliar a video si querés
+const CONCURRENCY = 1; // Reducido a 1 para debugging
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const ACCEPT = "image/*";
 
 // ============ Marca de agua opcional ============
 async function applyWatermarkToFile(file, watermarkImg, { scale = 0.25, opacity = 0.5, margin = 16, position = "br" } = {}) {
@@ -47,15 +48,6 @@ function loadImageFromDataUrl(url) {
   });
 }
 
-// ============ Tipos ============
-/**
- * props:
- * - eventId (string)        → evento al que pertenecen
- * - pointId (string)        → punto seleccionado (requerido)
- * - onUploaded(filesMeta)   → callback con [{path, url, size, pointId, takenAt}]
- * - getSignedUrl(payload)   → async (filename, size, contentType) => { uploadUrl, path, headers? }
- * - options: { watermark?: { src, scale, opacity, position } }
- */
 export default function UploadManager({
   eventId,
   pointId,
@@ -63,13 +55,12 @@ export default function UploadManager({
   getSignedUrl,
   options = {},
 }) {
-  const [queue, setQueue] = useState([]);  // [{file, id, name, size, status, progress}]
+  const [queue, setQueue] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const [running, setRunning] = useState(0);
   const [wmPreview, setWmPreview] = useState(null);
   const inputRef = useRef(null);
 
-  // cargar imagen de marca de agua si viene
   useEffect(() => {
     if (!options?.watermark?.src) { setWmPreview(null); return; }
     setWmPreview(options.watermark.src);
@@ -92,13 +83,12 @@ export default function UploadManager({
       file: f,
       name: f.name,
       size: f.size,
-      status: "queued", // queued | uploading | done | error | cancelled
+      status: "queued",
       progress: 0,
     }));
     setQueue((q) => [...q, ...toAdd]);
   }
 
-  // Drag & drop handlers
   function onDragOver(e) { e.preventDefault(); setDragOver(true); }
   function onDragLeave() { setDragOver(false); }
   function onDrop(e) {
@@ -119,101 +109,6 @@ export default function UploadManager({
     e.target.value = "";
   }
 
-  // loop de subida con concurrencia
-  useEffect(() => {
-    if (!queue.length) return;
-    const next = queue.find((it) => it.status === "queued");
-    if (!next) return;
-    if (running >= CONCURRENCY) return;
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    async function run(item) {
-      setRunning((n) => n + 1);
-      try {
-        // 1) Marca de agua (opcional, cliente)
-        let fileToSend = item.file;
-        if (wmPreview && options?.watermark) {
-          try {
-            const wmImg = await loadImageFromDataUrl(wmPreview);
-            fileToSend = await applyWatermarkToFile(item.file, wmImg, {
-              scale: options.watermark.scale ?? 0.25,
-              opacity: options.watermark.opacity ?? 0.5,
-              position: options.watermark.position ?? "br",
-            });
-          } catch (e) {
-            console.warn("No se aplicó marca de agua:", e);
-          }
-        }
-
-        // 2) Pedir signed URL al backend
-        console.log("🔄 Solicitando URL firmada para:", item.name);
-        const data = await getSignedUrl({
-          eventId,
-          pointId,
-          filename: fileToSend.name,
-          size: fileToSend.size,
-          contentType: fileToSend.type || "application/octet-stream",
-        });
-
-        console.log("✅ URL firmada recibida:", data);
-
-        // 3) Subir directo a storage (PUT a la URL firmada)
-        updateItem(item.id, { status: "uploading", progress: 1 });
-
-        const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
-
-        console.log("🔼 Iniciando upload a:", uploadUrl);
-        
-        const res = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: signedHeaders || { 
-            "Content-Type": fileToSend.type || "application/octet-stream",
-            "Content-Length": fileToSend.size.toString()
-          },
-          body: fileToSend,
-          signal: controller.signal,
-        });
-
-        console.log("📤 Respuesta del upload:", res.status, res.statusText);
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("❌ Error en upload:", errorText);
-          throw new Error(`Upload failed: ${res.status} - ${errorText}`);
-        }
-
-        // 4) Marcar completado
-        updateItem(item.id, { status: "done", progress: 100, path: finalPath });
-
-        // 5) Notificar al caller (para registrar en DB)
-        onUploaded?.([{
-          path: finalPath,
-          size: fileToSend.size,
-          pointId,
-          takenAt: new Date().toISOString(),
-        }]);
-
-        console.log("✅ Upload completado exitosamente");
-
-      } catch (e) {
-        if (cancelled) {
-          updateItem(item.id, { status: "cancelled" });
-        } else {
-          console.error("❌ Error en el proceso de upload:", e);
-          updateItem(item.id, { status: "error" });
-        }
-      } finally {
-        setRunning((n) => n - 1);
-      }
-    }
-
-    run(next);
-
-    return () => { cancelled = true; controller.abort(); };
-  }, [queue, running, eventId, pointId, getSignedUrl, wmPreview, options?.watermark, onUploaded]);
-
   function updateItem(id, patch) {
     setQueue((q) => q.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
@@ -224,9 +119,100 @@ export default function UploadManager({
     setQueue((q) => q.filter((it) => it.status !== "done"));
   }
 
+  // ============ SUBIDA CORREGIDA ============
+  useEffect(() => {
+    if (!queue.length || running >= CONCURRENCY) return;
+    
+    const nextItem = queue.find((it) => it.status === "queued");
+    if (!nextItem) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    // Marcar como processing INMEDIATAMENTE
+    updateItem(nextItem.id, { status: "uploading", progress: 0 });
+    setRunning((n) => n + 1);
+
+    async function run() {
+      try {
+        // 1) Marca de agua
+        let fileToSend = nextItem.file;
+        if (wmPreview && options?.watermark) {
+          try {
+            const wmImg = await loadImageFromDataUrl(wmPreview);
+            fileToSend = await applyWatermarkToFile(nextItem.file, wmImg, {
+              scale: options.watermark.scale ?? 0.25,
+              opacity: options.watermark.opacity ?? 0.5,
+              position: options.watermark.position ?? "br",
+            });
+          } catch (e) {
+            console.warn("No se aplicó marca de agua:", e);
+          }
+        }
+
+        // 2) Pedir signed URL
+        updateItem(nextItem.id, { progress: 10 });
+        const data = await getSignedUrl({
+          eventId,
+          pointId,
+          filename: fileToSend.name,
+          size: fileToSend.size,
+          contentType: fileToSend.type || "application/octet-stream",
+        });
+
+        // 3) Subir a storage
+        updateItem(nextItem.id, { progress: 30 });
+        const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
+
+        console.log("🔼 Subiendo a:", uploadUrl);
+        
+        const res = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: signedHeaders || { 
+            "Content-Type": fileToSend.type || "application/octet-stream",
+          },
+          body: fileToSend,
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Upload failed: ${res.status} - ${errorText}`);
+        }
+
+        // 4) Completado
+        updateItem(nextItem.id, { status: "done", progress: 100, path: finalPath });
+
+        // 5) Notificar
+        onUploaded?.([{
+          path: finalPath,
+          size: fileToSend.size,
+          pointId,
+          takenAt: new Date().toISOString(),
+        }]);
+
+      } catch (e) {
+        if (cancelled) {
+          updateItem(nextItem.id, { status: "cancelled" });
+        } else {
+          console.error("❌ Error en upload:", e);
+          updateItem(nextItem.id, { status: "error" });
+        }
+      } finally {
+        setRunning((n) => n - 1);
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [queue, running, eventId, pointId, getSignedUrl, wmPreview, options?.watermark, onUploaded]);
+
   return (
     <div className="space-y-3">
-      {/* Barra superior */}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -257,7 +243,6 @@ export default function UploadManager({
         </div>
       </div>
 
-      {/* Dropzone */}
       <div
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -271,11 +256,10 @@ export default function UploadManager({
           Arrastrá tus fotos aquí o <span className="underline decoration-blue-400 cursor-pointer" onClick={pickFiles}>elegí archivos</span>
         </div>
         <div className="text-xs text-white/60 mt-1">
-          Se suben directo al storage con URL firmada. Marca de agua opcional en el navegador.
+          Se suben directo al storage con URL firmada.
         </div>
       </div>
 
-      {/* Cola */}
       <div className="space-y-2">
         {queue.map((it) => (
           <div key={it.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
