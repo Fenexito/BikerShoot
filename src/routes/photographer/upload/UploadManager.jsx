@@ -166,9 +166,10 @@ export default function UploadManager({
 
         console.log("🔼 Subiendo a:", uploadUrl);
         
-        const res = await fetch(uploadUrl, {
+        const res = await fetch(data.uploadUrl, {
           method: "PUT",
-          headers: signedHeaders || { 
+          headers: {
+            "Authorization": `Bearer ${data.token}`, // ✅ TOKEN AQUÍ
             "Content-Type": fileToSend.type || "application/octet-stream",
           },
           body: fileToSend,
