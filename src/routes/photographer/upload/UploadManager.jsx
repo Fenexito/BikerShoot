@@ -103,12 +103,18 @@ export default function UploadManager({
   function onDragLeave() { setDragOver(false); }
   function onDrop(e) {
     e.preventDefault(); setDragOver(false);
-    if (!pointId) return alert("Elegí el punto para estas fotos.");
+    if (!pointId) {
+      alert("❌ Elegí el punto para estas fotos primero.");
+      return;
+    }
     addFiles(e.dataTransfer.files);
   }
 
   function onInputChange(e) {
-    if (!pointId) return alert("Elegí el punto para estas fotos.");
+    if (!pointId) {
+      alert("❌ Elegí el punto para estas fotos primero.");
+      return;
+    }
     addFiles(e.target.files);
     e.target.value = "";
   }
@@ -142,7 +148,8 @@ export default function UploadManager({
         }
 
         // 2) Pedir signed URL al backend
-        const { uploadUrl, path, headers } = await getSignedUrl({
+        console.log("🔄 Solicitando URL firmada para:", item.name);
+        const data = await getSignedUrl({
           eventId,
           pointId,
           filename: fileToSend.name,
@@ -150,31 +157,51 @@ export default function UploadManager({
           contentType: fileToSend.type || "application/octet-stream",
         });
 
+        console.log("✅ URL firmada recibida:", data);
+
         // 3) Subir directo a storage (PUT a la URL firmada)
         updateItem(item.id, { status: "uploading", progress: 1 });
+
+        const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
+
+        console.log("🔼 Iniciando upload a:", uploadUrl);
+        
         const res = await fetch(uploadUrl, {
           method: "PUT",
-          headers: headers || { "Content-Type": fileToSend.type || "application/octet-stream" },
+          headers: signedHeaders || { 
+            "Content-Type": fileToSend.type || "application/octet-stream",
+            "Content-Length": fileToSend.size.toString()
+          },
           body: fileToSend,
           signal: controller.signal,
         });
-        if (!res.ok) throw new Error("Upload failed: " + res.status);
+
+        console.log("📤 Respuesta del upload:", res.status, res.statusText);
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("❌ Error en upload:", errorText);
+          throw new Error(`Upload failed: ${res.status} - ${errorText}`);
+        }
 
         // 4) Marcar completado
-        updateItem(item.id, { status: "done", progress: 100, path });
+        updateItem(item.id, { status: "done", progress: 100, path: finalPath });
 
         // 5) Notificar al caller (para registrar en DB)
         onUploaded?.([{
-          path,
+          path: finalPath,
           size: fileToSend.size,
           pointId,
           takenAt: new Date().toISOString(),
         }]);
+
+        console.log("✅ Upload completado exitosamente");
+
       } catch (e) {
         if (cancelled) {
           updateItem(item.id, { status: "cancelled" });
         } else {
-          console.error(e);
+          console.error("❌ Error en el proceso de upload:", e);
           updateItem(item.id, { status: "error" });
         }
       } finally {
@@ -185,8 +212,7 @@ export default function UploadManager({
     run(next);
 
     return () => { cancelled = true; controller.abort(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue, running, eventId, pointId, getSignedUrl, wmPreview, options?.watermark]);
+  }, [queue, running, eventId, pointId, getSignedUrl, wmPreview, options?.watermark, onUploaded]);
 
   function updateItem(id, patch) {
     setQueue((q) => q.map((it) => (it.id === id ? { ...it, ...patch } : it)));
