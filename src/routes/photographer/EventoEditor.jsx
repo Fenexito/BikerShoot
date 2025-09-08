@@ -38,9 +38,9 @@ function mapEventRow(row) {
     photographer_id: row.photographer_id ?? row.created_by ?? null,
   };
 }
+
 function buildEventPatch(ev) {
   return {
-    // Mantener NOT NULL del schema
     title: ev.nombre,
     date: ev.fecha,
     status: ev.estado === "publicado" ? "published" : "draft",
@@ -53,6 +53,11 @@ function buildEventPatch(ev) {
     notas: ev.notas,
     price_list_id: ev.price_list_id || null,
   };
+}
+
+function isValidUuid(uuid) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
 }
 
 /* ===== Componente ===== */
@@ -80,10 +85,8 @@ export default function EventoEditor() {
 
   // Subida
   const [uploadPoint, setUploadPoint] = useState("");
-  console.log("🔍 uploadPoint value:", uploadPoint);
-  console.log("🔍 uploadPoint isValidUuid:", isValidUuid(uploadPoint));
 
-  /* ==== Hooks MEMO (siempre al tope, nunca después de returns) ==== */
+  /* ==== Hooks MEMO ==== */
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
     const arr = Array.isArray(fotos) ? fotos : [];
@@ -167,7 +170,6 @@ export default function EventoEditor() {
       }
     })();
     return () => (mounted = false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramId, authReady]);
 
   /* ---- Catálogo desde photographer_profile.puntos ---- */
@@ -197,7 +199,7 @@ export default function EventoEditor() {
 
         const mapped = (puntosPerfil || []).map((p, i) => ({
           key: String(p?.id ?? `${p?.nombre}-${p?.ruta}-${p?.lat}-${p?.lon}-${i}`),
-          id: p?.id ?? null, // id del perfil (referencia)
+          id: p?.id ?? null,
           name: String(p?.nombre ?? "Punto"),
           route_name: String(p?.ruta ?? ""),
           lat: p?.lat != null ? Number(p.lat) : null,
@@ -208,7 +210,7 @@ export default function EventoEditor() {
         if (!mounted) return;
         setCatalog(mapped);
       } catch (e) {
-        console.warn("[EventoEditor] catalog (perfil.puntos) error:", e?.message || e);
+        console.warn("[EventoEditor] catalog error:", e?.message || e);
         if (mounted) setCatalog([]);
       } finally {
         if (mounted) setLoadingCatalog(false);
@@ -217,7 +219,7 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.photographer_id, uid]);
 
-  /* ---- Puntos del evento (usa windows) ---- */
+  /* ---- Puntos del evento ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -248,9 +250,6 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.id]);
 
-  // helper: validar uuid (simple y suficiente)
-  const isUuid = (v) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
   /* ---- helpers SQL ---- */
   async function ensureEventRouteId(eventId, routeName) {
     if (!routeName) return null;
@@ -280,7 +279,6 @@ export default function EventoEditor() {
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
 
-      // Persistir ventanas de puntos
       for (const p of puntos) {
         const windows = [{ start: p.horaIni || "06:00", end: p.horaFin || "12:00" }];
         await supabase.from("event_hotspot").update({ windows }).eq("id", p.id);
@@ -292,25 +290,29 @@ export default function EventoEditor() {
       alert(e.message || "No se pudo guardar. Probá de nuevo.");
     }
   }
+
   async function publicarToggle() {
     const nuevo = ev.estado === "publicado" ? "borrador" : "publicado";
     try {
-    const { error } = await supabase
+      const { error } = await supabase
         .from("event")
         .update({ 
           estado: nuevo,
           status: nuevo === "publicado" ? "published" : "draft",
         })
-        .eq("id", ev.id);      if (error) throw error;
+        .eq("id", ev.id);
+      if (error) throw error;
       setEv((o) => ({ ...o, estado: nuevo }));
     } catch (e) {
       console.error(e);
       alert("No se pudo cambiar el estado del evento.");
     }
   }
+
   function updatePointLocal(pid, patch) {
     setPuntos((arr) => arr.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
   }
+
   async function addPointFromCatalog(h) {
     try {
       if (!h) return;
@@ -325,8 +327,7 @@ export default function EventoEditor() {
       const payload = {
         event_id: ev.id,
         route_id: routeId,
-        // SOLO si es UUID. Si viene un id corto del perfil, lo omitimos
-        ...(isUuid(h.id) ? { source_hotspot_id: h.id } : {}),
+        ...(isValidUuid(h.id) ? { source_hotspot_id: h.id } : {}),
         name: h.name || h.nombre || "Punto",
         lat: Number(h.lat ?? 0),
         lng: Number(h.lng ?? 0),
@@ -357,6 +358,7 @@ export default function EventoEditor() {
       alert("No se pudo agregar el punto.");
     }
   }
+
   async function removePoint(pid) {
     try {
       const { error } = await supabase.from("event_hotspot").delete().eq("id", pid);
@@ -370,173 +372,89 @@ export default function EventoEditor() {
   }
 
   /* ---- subida ---- */
-    // BUSCA ESTA FUNCIÓN (líneas ~380-385):
-async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
-  // invoke manda automáticamente Authorization y apikey
-  const { data, error } = await supabase.functions.invoke("signed-event-upload", {
-    body: { eventId, pointId, filename, size, contentType },
-    headers: { Authorization: `Bearer ${token}` }, // <-- ESTE ES EL CAMBIO CLAVE
-  });
-  if (error) throw new Error(error.message || "No se pudo firmar la subida");
-  return data;
-}
-
-// PEGA ESTO JUSTO ANTES de la función getSignedUrl:
-function isValidUuid(uuid) {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
-}
-
-// REEMPLÁZALA CON ESTO:
-async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
-  try {
-    console.log("🔍 Debug: UUIDs enviados a signed-event-upload:", { 
-      eventId, 
-      pointId, 
-      filename, 
-      size, 
-      contentType 
-    });
-
-    // Obtener el token de la sesión actual
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess?.session?.access_token || null;
-    
-    if (!token) {
-      throw new Error("No se pudo obtener el token de autenticación");
-    }
-
-    // Verificar que son UUIDs válidos
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    
-    if (!uuidRegex.test(eventId)) {
-      throw new Error(`eventId no es UUID válido: ${eventId}`);
-    }
-    
-    if (!uuidRegex.test(pointId)) {
-      throw new Error(`pointId no es UUID válido: ${pointId}`);
-    }
-
-    // Invocar la función edge CORRECTAMENTE
-    const { data, error } = await supabase.functions.invoke("signed-event-upload", {
-      body: { 
-        eventId, 
-        pointId, 
-        filename, 
-        size, 
-        contentType 
-      },
-      headers: { 
-        Authorization: `Bearer ${token}`
-      }
-    });
-    
-    if (error) {
-      console.error("❌ Error de Supabase:", error);
-      throw new Error(error.message || "No se pudo firmar la subida");
-    }
-
-    console.log("✅ Respuesta de signed-event-upload:", data);
-    return data;
-  } catch (error) {
-    console.error("❌ Error completo en getSignedUrl:", error);
-    throw error;
-  }
-}
-
-  function isValidUuid(uuid) {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
-}
-
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
     try {
-      // Verificar UUIDs
+      console.log("🔍 Debug: UUIDs enviados:", { eventId, pointId, filename, size, contentType });
+
+      // Validación CRÍTICA
+      if (!pointId || pointId === "") {
+        throw new Error("❌ pointId está vacío. Selecciona un punto primero.");
+      }
+
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token || null;
+      
+      if (!token) {
+        throw new Error("No se pudo obtener el token de autenticación");
+      }
+
       if (!isValidUuid(eventId)) {
-        throw new Error(`eventId no es un UUID válido: ${eventId}`);
+        throw new Error(`eventId no es UUID válido: ${eventId}`);
       }
       
       if (!isValidUuid(pointId)) {
-        throw new Error(`pointId no es un UUID válido: ${pointId}`);
+        throw new Error(`pointId no es UUID válido: ${pointId}`);
       }
 
-      // Resto del código...
+      const { data, error } = await supabase.functions.invoke("signed-event-upload", {
+        body: { eventId, pointId, filename, size, contentType },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (error) {
+        console.error("❌ Error de Supabase:", error);
+        throw new Error(error.message || "No se pudo firmar la subida");
+      }
+
+      console.log("✅ Respuesta de signed-event-upload:", data);
+      return data;
     } catch (error) {
-      console.error("Error en getSignedUrl:", error);
+      console.error("❌ Error completo en getSignedUrl:", error);
       throw error;
     }
   }
 
-  // BUSCA ESTA FUNCIÓN (líneas ~390-420):
-async function onUploaded(assets) {
-  try {
-    const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
-    const FN_BASE = (base || "").replace(/\/$/, "");
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess?.session?.access_token || null;
-    if (!token) throw new Error("Iniciá sesión para registrar fotos");
-    const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
-      method: "POST",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      body: JSON.stringify(
-        (assets || []).map((a) => ({
-          path: a.path,
-          size: a.size,
-          pointId: a.pointId,
-          takenAt: a.takenAt,
-        }))
-      ),
-    });
-    // ... resto del código
-  } catch (e) {
-    console.error(e);
-    alert("Se peló registrando las fotos.");
-  }
-}
-
-// REEMPLÁZALA CON ESTO:
-async function onUploaded(assets) {
-  try {
-    console.log("🔍 onUploaded assets:", assets);
-    
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess?.session?.access_token || null;
-    
-    if (!token) throw new Error("Iniciá sesión para registrar fotos");
-    
-    const res = await fetch(`/functions/v1/events/${ev.id}/assets/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(
-        (assets || []).map((a) => ({
-          path: a.path,
-          size: a.size,
-          pointId: a.pointId,
-          takenAt: a.takenAt,
-        }))
-      ),
-    });
-    
-    const out = await res.json();
-    if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
-
-    const { data: rows, error } = await supabase
-      .from("event_asset")
-      .select("*")
-      .eq("event_id", ev.id)
-      .order("taken_at", { ascending: true });
+  async function onUploaded(assets) {
+    try {
+      console.log("🔍 onUploaded assets:", assets);
       
-    if (error) throw error;
-    setFotos(Array.isArray(rows) ? rows : []);
-  } catch (e) {
-    console.error("❌ Error en onUploaded:", e);
-    alert("Se peló registrando las fotos.");
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token || null;
+      
+      if (!token) throw new Error("Iniciá sesión para registrar fotos");
+      
+      const res = await fetch(`/functions/v1/events/${ev.id}/assets/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(
+          (assets || []).map((a) => ({
+            path: a.path,
+            size: a.size,
+            pointId: a.pointId,
+            takenAt: a.takenAt,
+          }))
+        ),
+      });
+      
+      const out = await res.json();
+      if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
+
+      const { data: rows, error } = await supabase
+        .from("event_asset")
+        .select("*")
+        .eq("event_id", ev.id)
+        .order("taken_at", { ascending: true });
+        
+      if (error) throw error;
+      setFotos(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      console.error("❌ Error en onUploaded:", e);
+      alert("Se peló registrando las fotos.");
+    }
   }
-}
 
   /* ===== Render ===== */
   if (!authReady) return uiBox("Inicializando sesión…");
@@ -728,12 +646,21 @@ async function onUploaded(assets) {
         <section className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Subida de fotos</h3>
+            
+            {/* Validación de punto seleccionado */}
+            {!uploadPoint && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 p-3 rounded-lg mb-4">
+                <div className="text-yellow-200 font-semibold">⚠️ Selecciona un punto</div>
+                <div className="text-yellow-300 text-sm">Elige un punto de la lista antes de subir fotos</div>
+              </div>
+            )}
+            
             {puntos.length === 0 ? (
               <div className="text-slate-300 text-sm">Agregá al menos un punto para habilitar la subida.</div>
             ) : (
               <UploadManager
                 eventId={ev.id}
-                pointId={uploadPoint || puntos[0]?.id || null}
+                pointId={uploadPoint}
                 onUploaded={onUploaded}
                 getSignedUrl={getSignedUrl}
                 options={{ watermark: { src: null, scale: 0.25, opacity: 0.5, position: "br" } }}
@@ -744,13 +671,24 @@ async function onUploaded(assets) {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="mb-3">
               <div className="text-xs text-slate-400 mb-1">Asignar al punto</div>
-              <select className="h-10 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={uploadPoint} onChange={(e) => setUploadPoint(e.target.value)}>
-                {(puntos.length ? puntos : [{ id: "", nombre: "—" }]).map((p) => (
+              <select 
+                className="h-10 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" 
+                value={uploadPoint} 
+                onChange={(e) => setUploadPoint(e.target.value)}
+              >
+                <option value="">-- Selecciona un punto --</option>
+                {puntos.map((p) => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
               </select>
             </div>
-            <div className="text-xs text-slate-400">Arrastrá y soltá tus fotos. Se suben con URL firmada y luego se registran en la base.</div>
+            <div className="text-xs text-slate-400">
+              {!uploadPoint ? (
+                <span className="text-yellow-400">⚠️ Selecciona un punto antes de subir fotos</span>
+              ) : (
+                "Arrastrá y soltá tus fotos. Se suben con URL firmada y luego se registran en la base."
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -798,6 +736,7 @@ function uiBox(children) {
     </main>
   );
 }
+
 function Tab({ active, onClick, children }) {
   return (
     <button
@@ -812,6 +751,7 @@ function Tab({ active, onClick, children }) {
     </button>
   );
 }
+
 function Field({ label, full, children }) {
   return (
     <label className={"block " + (full ? "sm:col-span-2" : "")}>
@@ -820,6 +760,7 @@ function Field({ label, full, children }) {
     </label>
   );
 }
+
 function KPI({ label, value }) {
   return (
     <div className="rounded-xl border border-white/10 p-3 bg-white/5">
