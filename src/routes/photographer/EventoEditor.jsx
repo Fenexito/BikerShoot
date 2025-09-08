@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx";
 import { supabase } from "../../lib/supabaseClient";
 
-/* ============ Helpers ============ */
+/* ===== Helpers ===== */
 const fmtDate = (iso) =>
   new Date((iso || "") + "T00:00:00").toLocaleDateString("es-GT", {
     weekday: "long",
@@ -20,7 +20,8 @@ function mapEventRow(row) {
     fecha: row.fecha ?? row.date ?? new Date().toISOString().slice(0, 10),
     ruta: row.ruta ?? row.location ?? "",
     estado: row.estado ?? row.status ?? "borrador",
-    precioBase: row.precio_base ?? row.base_price ?? row.precioBase ?? 50,
+    // 👇 en tu schema el campo es precioBase
+    precioBase: row.precioBase ?? 50,
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
     photographer_id: row.photographer_id ?? row.created_by ?? null,
@@ -31,17 +32,23 @@ function buildEventPatch(ev) {
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
-    location: ev.ruta,            // oficial
+    location: ev.ruta,
     estado: ev.estado,
-    precio_base: ev.precioBase,   // unificado
+    // 👇 guardar en precioBase (no precio_base)
+    precioBase: ev.precioBase,
     notas: ev.notas,
     price_list_id: ev.price_list_id || null,
   };
 }
+function toWindows(horaIni, horaFin) {
+  const start = (horaIni || "06:00").trim();
+  const end = (horaFin || "12:00").trim();
+  return [{ start, end }];
+}
 
-/* ============ Componente ============ */
+/* ===== Componente ===== */
 export default function EventoEditor() {
-  // Param flexible por si tu route usa :id / :eventId / :evId
+  // Soporta :id / :eventId / :evId
   const routeParams = useParams();
   const [searchParams] = useSearchParams();
   const paramId = routeParams.id || routeParams.eventId || routeParams.evId || "";
@@ -55,49 +62,47 @@ export default function EventoEditor() {
   const [authReady, setAuthReady] = useState(false);
   const [noSession, setNoSession] = useState(false);
 
-  // Subida
-  const [uploadPoint, setUploadPoint] = useState("");
-
-  // Listas de precios del fotógrafo
   const [priceLists, setPriceLists] = useState([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
-  // Catálogo del fotógrafo
   const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [uid, setUid] = useState(null);
 
-  // Agrupar fotos x punto (defensivo)
+  // UI subida
+  const [uploadPoint, setUploadPoint] = useState("");
+
+  // Crear punto manual (fallback)
+  const [newPoint, setNewPoint] = useState({ nombre: "", horaIni: "06:00", horaFin: "12:00" });
+
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
-    const all = Array.isArray(fotos) ? fotos : [];
-    all.forEach((f) => {
+    (Array.isArray(fotos) ? fotos : []).forEach((f) => {
       const key = f?.hotspot_id || null;
       const arr = map.get(key) || [];
       arr.push(f);
       map.set(key, arr);
     });
-    for (const [, arr] of map) {
-      arr.sort((a, b) => new Date(a?.taken_at || 0) - new Date(b?.taken_at || 0));
-    }
+    for (const [, arr] of map) arr.sort((a, b) => new Date(a?.taken_at || 0) - new Date(b?.taken_at || 0));
     return map;
   }, [fotos]);
 
-  // default point para subida
   useEffect(() => {
-    if (!uploadPoint && Array.isArray(puntos) && puntos.length) {
-      setUploadPoint(puntos[0].id);
-    }
+    if (!uploadPoint && puntos.length) setUploadPoint(puntos[0].id);
   }, [puntos, uploadPoint]);
 
-  /* ---- Esperar sesión (evita RLS vacías) ---- */
+  /* ---- sesión lista ---- */
   useEffect(() => {
     let unsub = null;
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
+      const sUid = sess?.session?.user?.id || null;
+      setUid(sUid);
       if (!sess?.session) {
-        unsub = supabase.auth.onAuthStateChange((_event, session) => {
+        unsub = supabase.auth.onAuthStateChange((_e, session) => {
           setAuthReady(true);
           setNoSession(!session?.user?.id);
+          setUid(session?.user?.id || null);
         }).data?.subscription;
         setAuthReady(true);
         setNoSession(true);
@@ -109,7 +114,7 @@ export default function EventoEditor() {
     return () => unsub?.unsubscribe?.();
   }, []);
 
-  /* ---- Cargar evento + assets ---- */
+  /* ---- evento + assets ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -118,7 +123,6 @@ export default function EventoEditor() {
         if (!paramId) throw new Error("Falta el id del evento en la URL");
         setLoading(true);
 
-        // 1) evento
         const { data: row, error } = await supabase
           .from("event")
           .select("*")
@@ -126,16 +130,14 @@ export default function EventoEditor() {
           .maybeSingle();
         if (error) throw error;
         if (!row) throw new Error("Evento no encontrado");
-        const evUI = mapEventRow(row);
         if (!mounted) return;
-        setEv(evUI);
+        setEv(mapEventRow(row));
 
-        // 2) assets
         const { data: assets, error: aErr } = await supabase
           .from("event_asset")
           .select("*")
           .eq("event_id", paramId)
-          .order("taken_at", { ascending: true }); // esta sí existe
+          .order("taken_at", { ascending: true });
         if (aErr) console.warn("[EventoEditor] event_asset error:", aErr?.message || aErr);
         if (!mounted) return;
         setFotos(Array.isArray(assets) ? assets : []);
@@ -152,36 +154,13 @@ export default function EventoEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramId, authReady]);
 
-  /* ---- Cargar listas de precios ---- */
+  /* ---- listas de precios (si existen en tu DB) ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoadingLists(true);
-        const { data: sess } = await supabase.auth.getSession();
-        const uid = sess?.session?.user?.id || null;
-        if (!uid) {
-          if (mounted) setPriceLists([]);
-          return;
-        }
-        const { data: lrows, error: lerr } = await supabase
-          .from("photographer_price_list")
-          .select("id, nombre, items")
-          .eq("photographer_id", uid)
-          .order("id", { ascending: true }); // ✅ sin created_at
-        if (lerr) throw lerr;
-        if (!mounted) return;
-        setPriceLists(
-          Array.isArray(lrows)
-            ? lrows.map((r) => ({
-                id: r.id,
-                nombre: r.nombre,
-                items: Array.isArray(r.items) ? r.items : [],
-              }))
-            : []
-        );
-      } catch (e) {
-        console.warn("[EventoEditor] price lists error:", e?.message || e);
+        // En tus CSV no vi tabla de price lists; dejo vacío sin romper nada.
         if (mounted) setPriceLists([]);
       } finally {
         if (mounted) setLoadingLists(false);
@@ -190,7 +169,7 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, []);
 
-  /* ---- Cargar catálogo (sin join embebido, sin created_at) ---- */
+  /* ---- catálogo del fotógrafo ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -200,11 +179,12 @@ export default function EventoEditor() {
           if (mounted) setCatalog([]);
           return;
         }
+        // RLS exige photographer_id = auth.uid()
         const { data: hs, error: hErr } = await supabase
           .from("photographer_hotspot")
           .select("id, name, lat, lng, default_windows, route_id")
           .eq("photographer_id", ev.photographer_id)
-          .order("id", { ascending: true }); // ✅ sin created_at
+          .order("id", { ascending: true });
         if (hErr) throw hErr;
         if (!mounted) return;
         setCatalog(
@@ -229,7 +209,7 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.photographer_id]);
 
-  /* ---- Cargar puntos del evento (sin created_at) ---- */
+  /* ---- puntos del evento (usa windows, no time_windows) ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -237,17 +217,17 @@ export default function EventoEditor() {
         if (!ev?.id) return;
         const { data: ehs, error: ehErr } = await supabase
           .from("event_hotspot")
-          .select("id, name, lat, lng, time_windows, route_id")
+          .select("id, name, lat, lng, windows, route_id")
           .eq("event_id", ev.id)
-          .order("id", { ascending: true }); // ✅ sin created_at
+          .order("id", { ascending: true });
         if (ehErr) throw ehErr;
 
         const puntosIniciales = (Array.isArray(ehs) ? ehs : []).map((h) => ({
           id: h.id,
           nombre: h.name || "Punto",
           activo: true,
-          horaIni: (Array.isArray(h.time_windows) && h.time_windows[0]?.start) || "06:00",
-          horaFin: (Array.isArray(h.time_windows) && h.time_windows[0]?.end) || "12:00",
+          horaIni: (Array.isArray(h.windows) && h.windows[0]?.start) || "06:00",
+          horaFin: (Array.isArray(h.windows) && h.windows[0]?.end) || "12:00",
           route_id: h.route_id || null,
         }));
 
@@ -279,30 +259,21 @@ export default function EventoEditor() {
     if (insErr) throw insErr;
     return inserted.id;
   }
-  function toTimeWindows(horaIni, horaFin) {
-    const start = (horaIni || "06:00").trim();
-    const end = (horaFin || "12:00").trim();
-    return [{ start, end }];
-  }
 
   /* ---- acciones: guardar / publicar ---- */
   async function guardarTodo() {
     try {
       const patch = buildEventPatch(ev);
-      const { error } = await supabase
-        .from("event")
-        .update(patch, { returning: "minimal" })
-        .eq("id", ev.id);
+      const { error } = await supabase.from("event").update(patch).eq("id", ev.id);
       if (error) throw error;
 
-      // refrescar encabezado
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
 
-      // persistir time_windows de puntos
+      // persistir ventanas de puntos
       for (const p of puntos) {
-        const time_windows = toTimeWindows(p.horaIni, p.horaFin);
-        await supabase.from("event_hotspot").update({ time_windows }).eq("id", p.id);
+        const windows = toWindows(p.horaIni, p.horaFin);
+        await supabase.from("event_hotspot").update({ windows }).eq("id", p.id);
       }
 
       alert("Cambios guardados ✨");
@@ -314,10 +285,7 @@ export default function EventoEditor() {
   async function publicarToggle() {
     const nuevo = ev.estado === "publicado" ? "borrador" : "publicado";
     try {
-      const { error } = await supabase
-        .from("event")
-        .update({ estado: nuevo }, { returning: "minimal" })
-        .eq("id", ev.id);
+      const { error } = await supabase.from("event").update({ estado: nuevo }).eq("id", ev.id);
       if (error) throw error;
       setEv((o) => ({ ...o, estado: nuevo }));
     } catch (e) {
@@ -339,11 +307,11 @@ export default function EventoEditor() {
       if (puntos.some((p) => p.nombre === (h.name || h.nombre))) {
         return alert("Ya agregaste este punto 😅");
       }
-      // Si tu evento guarda la ruta en ev.ruta (texto), aseguramos event_route
       const routeId = await ensureEventRouteId(ev.id, ev.ruta || "");
-      const dw = Array.isArray(h.default_windows) && h.default_windows.length
-        ? h.default_windows
-        : toTimeWindows("06:00", "12:00");
+      const dw =
+        Array.isArray(h.default_windows) && h.default_windows.length
+          ? h.default_windows
+          : toWindows("06:00", "12:00");
 
       const payload = {
         event_id: ev.id,
@@ -352,17 +320,18 @@ export default function EventoEditor() {
         name: h.name || h.nombre || "Punto",
         lat: h.lat,
         lng: h.lng,
-        time_windows: dw,
+        // 👇 en tu schema se llama windows
+        windows: dw,
       };
       const { data: inserted, error } = await supabase
         .from("event_hotspot")
         .insert([payload])
-        .select("id, name, time_windows, route_id")
+        .select("id, name, windows, route_id")
         .single();
       if (error) throw error;
 
-      const horaIni = inserted?.time_windows?.[0]?.start || "06:00";
-      const horaFin = inserted?.time_windows?.[0]?.end || "12:00";
+      const horaIni = inserted?.windows?.[0]?.start || "06:00";
+      const horaFin = inserted?.windows?.[0]?.end || "12:00";
       setPuntos((arr) => [
         ...arr,
         {
@@ -380,6 +349,33 @@ export default function EventoEditor() {
       alert("No se pudo agregar el punto.");
     }
   }
+  async function addPointManual() {
+    try {
+      if (!newPoint.nombre.trim()) return alert("Poné un nombre al punto, vos.");
+      const routeId = await ensureEventRouteId(ev.id, ev.ruta || "");
+      const windows = toWindows(newPoint.horaIni, newPoint.horaFin);
+      const { data: inserted, error } = await supabase
+        .from("event_hotspot")
+        .insert([{ event_id: ev.id, route_id: routeId, name: newPoint.nombre.trim(), lat: 0, lng: 0, windows }])
+        .select("id, name, windows")
+        .single();
+      if (error) throw error;
+      setPuntos((arr) => [
+        ...arr,
+        {
+          id: inserted.id,
+          nombre: inserted.name,
+          activo: true,
+          horaIni: inserted?.windows?.[0]?.start || "06:00",
+          horaFin: inserted?.windows?.[0]?.end || "12:00",
+        },
+      ]);
+      setNewPoint({ nombre: "", horaIni: "06:00", horaFin: "12:00" });
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo crear el punto.");
+    }
+  }
   async function removePoint(pid) {
     try {
       const { error } = await supabase.from("event_hotspot").delete().eq("id", pid);
@@ -392,7 +388,7 @@ export default function EventoEditor() {
     }
   }
 
-  /* ---- subida de fotos ---- */
+  /* ---- subida ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
     const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
     const FN_BASE = (base || "").replace(/\/$/, "");
@@ -469,17 +465,10 @@ export default function EventoEditor() {
         <span className="text-slate-400">· {fmtDate(ev.fecha)} · {ev.ruta}</span>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            className="h-10 px-4 rounded-xl bg-green-600 text-white font-display font-bold inline-flex items-center justify-center border border-white/10"
-            onClick={guardarTodo}
-            title="Guardar todos los cambios del evento"
-          >
+          <button className="h-10 px-4 rounded-xl bg-green-600 text-white font-display font-bold border border-white/10" onClick={guardarTodo}>
             Guardar
           </button>
-          <button
-            className="h-10 px-4 rounded-xl bg-blue-500 text-white font-display font-bold inline-flex items-center justify-center border border-white/10"
-            onClick={publicarToggle}
-          >
+          <button className="h-10 px-4 rounded-xl bg-blue-500 text-white font-display font-bold border border-white/10" onClick={publicarToggle}>
             {ev.estado === "publicado" ? "Despublicar" : "Publicar"}
           </button>
         </div>
@@ -500,44 +489,20 @@ export default function EventoEditor() {
             <h3 className="font-semibold mb-3">Información del evento</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Nombre">
-                <input
-                  className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                  value={ev.nombre}
-                  onChange={(e) => updateEvent({ nombre: e.target.value })}
-                />
+                <input className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.nombre} onChange={(e) => updateEvent({ nombre: e.target.value })} />
               </Field>
               <Field label="Fecha">
-                <input
-                  type="date"
-                  className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                  value={ev.fecha}
-                  onChange={(e) => updateEvent({ fecha: e.target.value })}
-                />
+                <input type="date" className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.fecha} onChange={(e) => updateEvent({ fecha: e.target.value })} />
               </Field>
               <Field label="Ruta">
-                <input
-                  className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3"
-                  value={ev.ruta}
-                  readOnly
-                />
+                <input className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3" value={ev.ruta} readOnly />
               </Field>
 
               <Field label="Precio base (Q)">
-                <input
-                  type="number"
-                  min={1}
-                  className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                  value={ev.precioBase || 50}
-                  onChange={(e) => updateEvent({ precioBase: Number(e.target.value || 0) })}
-                  disabled={!!ev.price_list_id}
-                />
+                <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => updateEvent({ precioBase: Number(e.target.value || 0) })} disabled={!!ev.price_list_id} />
               </Field>
               <Field label="Lista de precios (opcional)">
-                <select
-                  className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                  value={ev.price_list_id || ""}
-                  onChange={(e) => updateEvent({ price_list_id: e.target.value || null })}
-                >
+                <select className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.price_list_id || ""} onChange={(e) => updateEvent({ price_list_id: e.target.value || null })}>
                   <option value="">— Sin lista (usa precio base)</option>
                   {priceLists.map((pl) => (
                     <option key={pl.id} value={pl.id}>{pl.nombre}</option>
@@ -546,12 +511,7 @@ export default function EventoEditor() {
               </Field>
 
               <Field label="Notas (privadas)" full>
-                <textarea
-                  rows={3}
-                  className="w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 py-2"
-                  value={ev.notas || ""}
-                  onChange={(e) => updateEvent({ notas: e.target.value })}
-                />
+                <textarea rows={3} className="w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 py-2" value={ev.notas || ""} onChange={(e) => updateEvent({ notas: e.target.value })} />
               </Field>
             </div>
           </div>
@@ -566,20 +526,14 @@ export default function EventoEditor() {
                 <div className="text-sm font-semibold">{ev.estado}</div>
               </div>
             </div>
-            {ev.price_list_id && (priceLists.find((l) => l.id === ev.price_list_id)) ? (
+            {ev.price_list_id && selectedList ? (
               <div className="mt-4">
                 <div className="text-xs text-slate-400 mb-1">Lista seleccionada</div>
-                <div className="text-sm font-semibold mb-2">
-                  {priceLists.find((l) => l.id === ev.price_list_id)?.nombre}
-                </div>
-                <div className="text-xs text-white/70">
-                  Nota: Si hay <strong>lista</strong>, esa manda sobre el precio base para el público.
-                </div>
+                <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
+                <div className="text-xs text-white/70">Si hay <strong>lista</strong>, manda sobre el precio base.</div>
               </div>
             ) : (
-              <div className="mt-4 text-xs text-white/70">
-                Sin lista asignada. Se usará <strong>precio base</strong> (Q{ev.precioBase || 50}).
-              </div>
+              <div className="mt-4 text-xs text-white/70">Sin lista asignada. Se usará <strong>precio base</strong> (Q{ev.precioBase || 50}).</div>
             )}
           </div>
         </section>
@@ -600,10 +554,7 @@ export default function EventoEditor() {
                 {puntos.map((p) => {
                   const count = (fotos || []).filter((f) => (f.hotspot_id || null) === p.id).length;
                   return (
-                    <div
-                      key={p.id}
-                      className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col sm:flex-row sm:items-center gap-3"
-                    >
+                    <div key={p.id} className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="flex-1">
                         <div className="font-semibold">{p.nombre}</div>
                         <div className="text-xs text-slate-400">
@@ -611,33 +562,14 @@ export default function EventoEditor() {
                         </div>
                       </div>
                       <div className="sm:w-[300px] grid grid-cols-3 gap-2">
-                        <input
-                          type="time"
-                          className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-2"
-                          value={p.horaIni || ""}
-                          onChange={(e) => updatePointLocal(p.id, { horaIni: e.target.value })}
-                        />
-                        <input
-                          type="time"
-                          className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-2"
-                          value={p.horaFin || ""}
-                          onChange={(e) => updatePointLocal(p.id, { horaFin: e.target.value })}
-                        />
+                        <input type="time" className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-2" value={p.horaIni || ""} onChange={(e) => updatePointLocal(p.id, { horaIni: e.target.value })} />
+                        <input type="time" className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-2" value={p.horaFin || ""} onChange={(e) => updatePointLocal(p.id, { horaFin: e.target.value })} />
                         <label className="inline-flex items-center gap-2 justify-center rounded-lg border border-white/15 bg-white/5">
-                          <input
-                            type="checkbox"
-                            checked={!!p.activo}
-                            onChange={(e) => updatePointLocal(p.id, { activo: e.target.checked })}
-                          />
+                          <input type="checkbox" checked={!!p.activo} onChange={(e) => updatePointLocal(p.id, { activo: e.target.checked })} />
                           <span className="text-sm">Activo</span>
                         </label>
                       </div>
-                      <button
-                        className="h-9 px-3 rounded-xl bg-red-600 text-white font-display font-bold"
-                        onClick={() => removePoint(p.id)}
-                      >
-                        Quitar
-                      </button>
+                      <button className="h-9 px-3 rounded-xl bg-red-600 text-white font-display font-bold" onClick={() => removePoint(p.id)}>Quitar</button>
                     </div>
                   );
                 })}
@@ -651,16 +583,20 @@ export default function EventoEditor() {
             {loadingCatalog ? (
               <div className="text-slate-300 text-sm">Cargando catálogo…</div>
             ) : (catalog || []).length === 0 ? (
-              <div className="text-slate-300 text-sm">No hay puntos en tu catálogo aún.</div>
+              <div className="text-slate-300 text-sm">
+                No hay puntos en tu catálogo aún.
+                {uid && ev?.photographer_id && uid !== ev.photographer_id ? (
+                  <div className="mt-1 text-[11px] text-slate-400">
+                    Nota: Por políticas RLS, este catálogo solo es visible para el fotógrafo dueño del evento.
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
                 {(catalog || [])
                   .filter((h) => !puntos.some((p) => p.nombre === h.name))
                   .map((h) => (
-                    <div
-                      key={h.id}
-                      className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between"
-                    >
+                    <div key={h.id} className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between">
                       <div>
                         <div className="font-medium">{h.name}</div>
                         {Array.isArray(h.default_windows) && h.default_windows[0] && (
@@ -669,10 +605,7 @@ export default function EventoEditor() {
                           </div>
                         )}
                       </div>
-                      <button
-                        className="h-8 px-3 rounded-lg bg-blue-600 text-white"
-                        onClick={() => addPointFromCatalog(h)}
-                      >
+                      <button className="h-8 px-3 rounded-lg bg-blue-600 text-white" onClick={() => addPointFromCatalog(h)}>
                         Agregar
                       </button>
                     </div>
@@ -683,6 +616,21 @@ export default function EventoEditor() {
                   )}
               </div>
             )}
+
+            {/* Fallback: crear punto manual si no hay catálogo */}
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <h4 className="font-semibold mb-2">Crear punto manual</h4>
+              <div className="grid grid-cols-1 gap-2">
+                <input className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-3" placeholder="Nombre del punto" value={newPoint.nombre} onChange={(e) => setNewPoint({ ...newPoint, nombre: e.target.value })} />
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="time" className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-3" value={newPoint.horaIni} onChange={(e) => setNewPoint({ ...newPoint, horaIni: e.target.value })} />
+                  <input type="time" className="h-10 rounded-lg border border-white/15 bg-white/5 text-white px-3" value={newPoint.horaFin} onChange={(e) => setNewPoint({ ...newPoint, horaFin: e.target.value })} />
+                </div>
+                <button className="h-10 px-4 rounded-lg bg-emerald-600 text-white" onClick={addPointManual}>
+                  Agregar punto al evento
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -693,7 +641,7 @@ export default function EventoEditor() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Subida de fotos</h3>
             {puntos.length === 0 ? (
-              <div className="text-slate-300 text-sm">Agregá al menos un punto del catálogo para habilitar la subida.</div>
+              <div className="text-slate-300 text-sm">Agregá al menos un punto para habilitar la subida.</div>
             ) : (
               <UploadManager
                 eventId={ev.id}
@@ -708,19 +656,13 @@ export default function EventoEditor() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="mb-3">
               <div className="text-xs text-slate-400 mb-1">Asignar al punto</div>
-              <select
-                className="h-10 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                value={uploadPoint}
-                onChange={(e) => setUploadPoint(e.target.value)}
-              >
+              <select className="h-10 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={uploadPoint} onChange={(e) => setUploadPoint(e.target.value)}>
                 {(puntos.length ? puntos : [{ id: "", nombre: "—" }]).map((p) => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
               </select>
             </div>
-            <div className="text-xs text-slate-400">
-              Arrastrá y soltá tus fotos. Se suben con URL firmada y luego se registran en la base.
-            </div>
+            <div className="text-xs text-slate-400">Arrastrá y soltá tus fotos. Se suben con URL firmada y luego se registran en la base.</div>
           </div>
         </section>
       )}
@@ -730,7 +672,7 @@ export default function EventoEditor() {
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <h3 className="font-semibold mb-3">Organizar por punto</h3>
           {puntos.length === 0 ? (
-            <div className="text-slate-300 text-sm">No hay puntos.</div>
+            <div className="text-slate-300 text-sm">Sin puntos aún.</div>
           ) : (
             <div className="space-y-4">
               {puntos.map((p) => {
@@ -745,12 +687,7 @@ export default function EventoEditor() {
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {list.map((f) => (
-                          <img
-                            key={f.id}
-                            src={f.public_url || f.storage_path}
-                            alt=""
-                            className="w-full h-28 object-cover rounded-lg"
-                          />
+                          <img key={f.id} src={f.public_url || f.storage_path} alt="" className="w-full h-28 object-cover rounded-lg" />
                         ))}
                       </div>
                     )}
@@ -765,7 +702,7 @@ export default function EventoEditor() {
   );
 }
 
-/* ============ UI helpers ============ */
+/* ===== UI helpers ===== */
 function uiBox(children) {
   return (
     <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
