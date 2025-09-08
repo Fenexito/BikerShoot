@@ -80,6 +80,8 @@ export default function EventoEditor() {
 
   // Subida
   const [uploadPoint, setUploadPoint] = useState("");
+  console.log("🔍 uploadPoint value:", uploadPoint);
+  console.log("🔍 uploadPoint isValidUuid:", isValidUuid(uploadPoint));
 
   /* ==== Hooks MEMO (siempre al tope, nunca después de returns) ==== */
   const fotosPorPunto = useMemo(() => {
@@ -368,42 +370,79 @@ export default function EventoEditor() {
   }
 
   /* ---- subida ---- */
-    async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
-    try {
-      // Obtener el token de la sesión actual
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token || null;
-      
-      if (!token) {
-        throw new Error("No se pudo obtener el token de autenticación");
-      }
+    // BUSCA ESTA FUNCIÓN (líneas ~380-385):
+async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
+  // invoke manda automáticamente Authorization y apikey
+  const { data, error } = await supabase.functions.invoke("signed-event-upload", {
+    body: { eventId, pointId, filename, size, contentType },
+    headers: { Authorization: `Bearer ${token}` }, // <-- ESTE ES EL CAMBIO CLAVE
+  });
+  if (error) throw new Error(error.message || "No se pudo firmar la subida");
+  return data;
+}
 
-      // Invocar la función edge CORRECTAMENTE
-      const { data, error } = await supabase.functions.invoke("signed-event-upload", {
-        body: { 
-          eventId, 
-          pointId, 
-          filename, 
-          size, 
-          contentType 
-        },
-        headers: { 
-          Authorization: `Bearer ${token}`
-          // NO incluyas "Content-Type" aquí - Supabase JS lo maneja automáticamente
-        }
-      });
-      
-      if (error) {
-        console.error("Error de Supabase:", error);
-        throw new Error(error.message || "No se pudo firmar la subida");
-      }
-      
-      return data;
-    } catch (error) {
-      console.error("Error completo en getSignedUrl:", error);
-      throw error;
+// PEGA ESTO JUSTO ANTES de la función getSignedUrl:
+function isValidUuid(uuid) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+// REEMPLÁZALA CON ESTO:
+async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
+  try {
+    console.log("🔍 Debug: UUIDs enviados a signed-event-upload:", { 
+      eventId, 
+      pointId, 
+      filename, 
+      size, 
+      contentType 
+    });
+
+    // Obtener el token de la sesión actual
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token || null;
+    
+    if (!token) {
+      throw new Error("No se pudo obtener el token de autenticación");
     }
+
+    // Verificar que son UUIDs válidos
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    
+    if (!uuidRegex.test(eventId)) {
+      throw new Error(`eventId no es UUID válido: ${eventId}`);
+    }
+    
+    if (!uuidRegex.test(pointId)) {
+      throw new Error(`pointId no es UUID válido: ${pointId}`);
+    }
+
+    // Invocar la función edge CORRECTAMENTE
+    const { data, error } = await supabase.functions.invoke("signed-event-upload", {
+      body: { 
+        eventId, 
+        pointId, 
+        filename, 
+        size, 
+        contentType 
+      },
+      headers: { 
+        Authorization: `Bearer ${token}`
+      }
+    });
+    
+    if (error) {
+      console.error("❌ Error de Supabase:", error);
+      throw new Error(error.message || "No se pudo firmar la subida");
+    }
+
+    console.log("✅ Respuesta de signed-event-upload:", data);
+    return data;
+  } catch (error) {
+    console.error("❌ Error completo en getSignedUrl:", error);
+    throw error;
   }
+}
 
   function isValidUuid(uuid) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -428,14 +467,45 @@ export default function EventoEditor() {
     }
   }
 
-  async function onUploaded(assets) {
+  // BUSCA ESTA FUNCIÓN (líneas ~390-420):
+async function onUploaded(assets) {
   try {
+    const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
+    const FN_BASE = (base || "").replace(/\/$/, "");
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token || null;
+    if (!token) throw new Error("Iniciá sesión para registrar fotos");
+    const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
+      method: "POST",
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      body: JSON.stringify(
+        (assets || []).map((a) => ({
+          path: a.path,
+          size: a.size,
+          pointId: a.pointId,
+          takenAt: a.takenAt,
+        }))
+      ),
+    });
+    // ... resto del código
+  } catch (e) {
+    console.error(e);
+    alert("Se peló registrando las fotos.");
+  }
+}
+
+// REEMPLÁZALA CON ESTO:
+async function onUploaded(assets) {
+  try {
+    console.log("🔍 onUploaded assets:", assets);
+    
     const { data: sess } = await supabase.auth.getSession();
     const token = sess?.session?.access_token || null;
     
     if (!token) throw new Error("Iniciá sesión para registrar fotos");
     
-    const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
+    const res = await fetch(`/functions/v1/events/${ev.id}/assets/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -450,9 +520,20 @@ export default function EventoEditor() {
         }))
       ),
     });
-    // ... resto del código
+    
+    const out = await res.json();
+    if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
+
+    const { data: rows, error } = await supabase
+      .from("event_asset")
+      .select("*")
+      .eq("event_id", ev.id)
+      .order("taken_at", { ascending: true });
+      
+    if (error) throw error;
+    setFotos(Array.isArray(rows) ? rows : []);
   } catch (e) {
-    console.error(e);
+    console.error("❌ Error en onUploaded:", e);
     alert("Se peló registrando las fotos.");
   }
 }
