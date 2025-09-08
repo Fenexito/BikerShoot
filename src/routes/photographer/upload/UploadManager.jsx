@@ -1,6 +1,5 @@
 // src/pages/upload/UploadManager.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../../../lib/supabaseClient"; // Ruta CORRECTA
 
 // ============ Config ============
 const CONCURRENCY = 4;             // cuántos archivos simultáneos
@@ -120,42 +119,6 @@ export default function UploadManager({
     e.target.value = "";
   }
 
-  // Función SIMPLIFICADA para obtener info de subida
-  async function getUploadInfo({ eventId, pointId, filename, size, contentType }) {
-    try {
-      console.log("🔍 Generando info para:", filename);
-      
-      // Validar que tenemos sesión
-      const { data: sess } = await supabase.auth.getSession();
-      if (!sess?.session) {
-        throw new Error("No autenticado. Iniciá sesión primero.");
-      }
-
-      // Generar path único
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const rnd = crypto.randomUUID();
-      const ext = filename.split('.').pop() || 'jpg';
-      const path = `events/${eventId}/${pointId}/${yyyy}/${mm}/${rnd}.${ext}`;
-
-      console.log("✅ Path generado:", path);
-      
-      return {
-        bucket: 'fotos',
-        path: path,
-        uploadUrl: path, // No se usa realmente pero mantengo para compatibilidad
-        headers: {
-          "Content-Type": contentType || "application/octet-stream"
-        }
-      };
-
-    } catch (error) {
-      console.error("❌ Error en getUploadInfo:", error);
-      throw error;
-    }
-  }
-
   // loop de subida con concurrencia
   useEffect(() => {
     if (!queue.length) return;
@@ -184,9 +147,9 @@ export default function UploadManager({
           }
         }
 
-        // 2) Obtener info para el upload (SIN edge function)
-        console.log("🔄 Obteniendo info para subida:", item.name);
-        const data = await getUploadInfo({
+        // 2) Pedir signed URL al backend
+        console.log("🔄 Solicitando URL firmada para:", item.name);
+        const data = await getSignedUrl({
           eventId,
           pointId,
           filename: fileToSend.name,
@@ -194,40 +157,45 @@ export default function UploadManager({
           contentType: fileToSend.type || "application/octet-stream",
         });
 
-        console.log("✅ Info obtenida:", data);
+        console.log("✅ URL firmada recibida:", data);
 
-        // 3) Subir directo a storage con Supabase
+        // 3) Subir directo a storage (PUT a la URL firmada)
         updateItem(item.id, { status: "uploading", progress: 1 });
 
-        console.log("🔼 Subiendo archivo a:", data.path);
-        
-        const { data: uploaded, error: uploadError } = await supabase.storage
-          .from(data.bucket)
-          .upload(data.path, fileToSend, {
-            contentType: fileToSend.type,
-            upsert: false,
-            cacheControl: '3600'
-          });
+        const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
 
-        if (uploadError) {
-          console.error("❌ Error subiendo archivo:", uploadError);
-          throw new Error("Upload failed: " + uploadError.message);
+        console.log("🔼 Iniciando upload a:", uploadUrl);
+        
+        const res = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: signedHeaders || { 
+            "Content-Type": fileToSend.type || "application/octet-stream",
+            "Content-Length": fileToSend.size.toString()
+          },
+          body: fileToSend,
+          signal: controller.signal,
+        });
+
+        console.log("📤 Respuesta del upload:", res.status, res.statusText);
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("❌ Error en upload:", errorText);
+          throw new Error(`Upload failed: ${res.status} - ${errorText}`);
         }
 
-        console.log("✅ Archivo subido exitosamente:", uploaded);
-
         // 4) Marcar completado
-        updateItem(item.id, { status: "done", progress: 100, path: data.path });
+        updateItem(item.id, { status: "done", progress: 100, path: finalPath });
 
         // 5) Notificar al caller (para registrar en DB)
         onUploaded?.([{
-          path: data.path,
+          path: finalPath,
           size: fileToSend.size,
           pointId,
           takenAt: new Date().toISOString(),
         }]);
 
-        console.log("✅ Proceso completado exitosamente");
+        console.log("✅ Upload completado exitosamente");
 
       } catch (e) {
         if (cancelled) {
@@ -244,7 +212,7 @@ export default function UploadManager({
     run(next);
 
     return () => { cancelled = true; controller.abort(); };
-  }, [queue, running, eventId, pointId, wmPreview, options?.watermark, onUploaded]);
+  }, [queue, running, eventId, pointId, getSignedUrl, wmPreview, options?.watermark, onUploaded]);
 
   function updateItem(id, patch) {
     setQueue((q) => q.map((it) => (it.id === id ? { ...it, ...patch } : it)));
@@ -303,7 +271,7 @@ export default function UploadManager({
           Arrastrá tus fotos aquí o <span className="underline decoration-blue-400 cursor-pointer" onClick={pickFiles}>elegí archivos</span>
         </div>
         <div className="text-xs text-white/60 mt-1">
-          Se suben directo al storage con Supabase. Marca de agua opcional en el navegador.
+          Se suben directo al storage con URL firmada. Marca de agua opcional en el navegador.
         </div>
       </div>
 
