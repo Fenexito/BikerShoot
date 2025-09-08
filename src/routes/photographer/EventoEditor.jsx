@@ -424,7 +424,7 @@ export default function EventoEditor() {
       if (!token) throw new Error("Iniciá sesión para registrar fotos");
 
       // ✅ URL CORRECTA de TU función assets-register
-      const res = await fetch(`https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/assets-register`, {
+      const res = await fetch(`https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/events/${ev.id}/assets/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
