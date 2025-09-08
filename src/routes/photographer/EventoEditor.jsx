@@ -387,9 +387,12 @@ export default function EventoEditor() {
     try {
       const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
       const FN_BASE = (base || "").replace(/\/$/, "");
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token || null;
       const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         body: JSON.stringify(
           (assets || []).map((a) => ({
             path: a.path,
