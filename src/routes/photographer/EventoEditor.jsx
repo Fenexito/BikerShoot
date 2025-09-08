@@ -1,8 +1,8 @@
 // src/routes/photographer/EventoEditor.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import UploadManager from "./upload/UploadManager.jsx"; // ajustá si tu ruta es distinta
-import { supabase } from "../../lib/supabaseClient"; // ✅ cliente central
+import UploadManager from "./upload/UploadManager.jsx";
+import { supabase } from "../../lib/supabaseClient";
 
 /* ============ Helpers ============ */
 const fmtDate = (iso) =>
@@ -31,9 +31,9 @@ function buildEventPatch(ev) {
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
-    location: ev.ruta,
+    location: ev.ruta,            // oficial
     estado: ev.estado,
-    precio_base: ev.precioBase,
+    precio_base: ev.precioBase,   // unificado
     notas: ev.notas,
     price_list_id: ev.price_list_id || null,
   };
@@ -41,16 +41,15 @@ function buildEventPatch(ev) {
 
 /* ============ Componente ============ */
 export default function EventoEditor() {
-  // ⚠️ Param flexible: soporta :id, :eventId o :evId
+  // Param flexible por si tu route usa :id / :eventId / :evId
   const routeParams = useParams();
   const [searchParams] = useSearchParams();
   const paramId = routeParams.id || routeParams.eventId || routeParams.evId || "";
   const initialTab = searchParams.get("tab") || "resumen";
 
-  // ---- state base ----
-  const [ev, setEv] = useState(null);          // evento
-  const [fotos, setFotos] = useState([]);      // event_asset
-  const [puntos, setPuntos] = useState([]);    // event_hotspot mapeado a UI
+  const [ev, setEv] = useState(null);
+  const [fotos, setFotos] = useState([]);
+  const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(initialTab);
   const [authReady, setAuthReady] = useState(false);
@@ -60,18 +59,17 @@ export default function EventoEditor() {
   const [uploadPoint, setUploadPoint] = useState("");
 
   // Listas de precios del fotógrafo
-  const [priceLists, setPriceLists] = useState([]); // [{id, nombre, items: [...] }]
+  const [priceLists, setPriceLists] = useState([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
-  // Catálogo real del fotógrafo (photographer_hotspot + route name)
-  const [catalog, setCatalog] = useState([]);  // [{id,name,route_name,default_windows,lat,lng}]
+  // Catálogo del fotógrafo (sin join embebido)
+  const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
 
-  // Agrupar fotos x punto (event_hotspot.id)
+  // Agrupar fotos x punto
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
-    const all = Array.isArray(fotos) ? fotos : [];
-    all.forEach((f) => {
+    (fotos || []).forEach((f) => {
       const key = f.hotspot_id || null;
       const arr = map.get(key) || [];
       arr.push(f);
@@ -81,20 +79,17 @@ export default function EventoEditor() {
     return map;
   }, [fotos]);
 
-  // default uploadPoint
+  // default point para subida
   useEffect(() => {
-    if (!uploadPoint && Array.isArray(puntos) && puntos.length) {
-      setUploadPoint(puntos[0].id);
-    }
+    if (!uploadPoint && puntos.length) setUploadPoint(puntos[0].id);
   }, [puntos, uploadPoint]);
 
-  /* ---- Asegurar sesión lista antes de consultar (evita RLS vacías) ---- */
+  /* ---- Esperar sesión (evita RLS vacías) ---- */
   useEffect(() => {
     let unsub = null;
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
       if (!sess?.session) {
-        // escuchar login/restore
         unsub = supabase.auth.onAuthStateChange((_event, session) => {
           setAuthReady(true);
           setNoSession(!session?.user?.id);
@@ -106,42 +101,29 @@ export default function EventoEditor() {
         setNoSession(false);
       }
     })();
-    return () => {
-      if (unsub) unsub.unsubscribe();
-    };
+    return () => unsub?.unsubscribe?.();
   }, []);
 
-  /* ---- cargar evento + assets + listas + catálogo + puntos del evento ---- */
+  /* ---- Cargar evento + assets ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        if (!authReady) return;             // esperar sesión
-        if (!paramId) {
-          console.warn("[EventoEditor] No vino paramId en la ruta. Params:", routeParams);
-          throw new Error("Falta el id del evento en la URL");
-        }
-
-        // mostrar info útil en consola
-        const { data: sess } = await supabase.auth.getSession();
-        const uid = sess?.session?.user?.id || null;
-        console.log("[EventoEditor] paramId:", paramId, "uid:", uid);
-
+        if (!authReady) return;
+        if (!paramId) throw new Error("Falta el id del evento en la URL");
         setLoading(true);
 
-        // 1) evento (si RLS bloquea sin sesión, acá daría vacío)
+        // 1) evento
         const { data: row, error } = await supabase
           .from("event")
           .select("*")
           .eq("id", paramId)
           .maybeSingle();
         if (error) throw error;
-        if (!row) {
-          // Ayuda de diagnóstico
-          console.warn("[EventoEditor] No se encontró el evento. ¿RLS? ¿ID correcto? paramId:", paramId);
-          throw new Error("Evento no encontrado");
-        }
+        if (!row) throw new Error("Evento no encontrado");
         const evUI = mapEventRow(row);
+        if (!mounted) return;
+        setEv(evUI);
 
         // 2) assets
         const { data: assets, error: aErr } = await supabase
@@ -149,51 +131,101 @@ export default function EventoEditor() {
           .select("*")
           .eq("event_id", paramId)
           .order("taken_at", { ascending: true });
-        if (aErr) throw aErr;
+        if (aErr) console.warn("[EventoEditor] event_asset error:", aErr);
+        if (!mounted) return;
+        setFotos(assets || []);
+      } catch (e) {
+        console.error(e);
+        if (mounted) {
+          setEv(null);
+          setFotos([]);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramId, authReady]);
 
-        // 3) listas de precios del fotógrafo
+  /* ---- Cargar listas de precios ---- */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
         setLoadingLists(true);
-        let lists = [];
-        if (uid) {
-          const { data: lrows, error: lerr } = await supabase
-            .from("photographer_price_list")
-            .select("id, nombre, items")
-            .eq("photographer_id", uid)
-            .order("created_at", { ascending: false });
-          if (lerr) throw lerr;
-          lists = (lrows || []).map((r) => ({
-            id: r.id,
-            nombre: r.nombre,
-            items: Array.isArray(r.items) ? r.items : [],
-          }));
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess?.session?.user?.id || null;
+        if (!uid) {
+          if (mounted) setPriceLists([]);
+          return;
         }
+        const { data: lrows, error: lerr } = await supabase
+          .from("photographer_price_list")
+          .select("id, nombre, items")
+          .eq("photographer_id", uid)
+          .order("created_at", { ascending: false });
+        if (lerr) throw lerr;
+        if (!mounted) return;
+        setPriceLists((lrows || []).map((r) => ({
+          id: r.id,
+          nombre: r.nombre,
+          items: Array.isArray(r.items) ? r.items : [],
+        })));
+      } catch (e) {
+        console.warn("[EventoEditor] price lists error:", e?.message || e);
+        if (mounted) setPriceLists([]);
+      } finally {
+        if (mounted) setLoadingLists(false);
+      }
+    })();
+    return () => (mounted = false);
+  }, []);
 
-        // 4) catálogo del fotógrafo (hotspots + nombre de ruta)
+  /* ---- Cargar catálogo (sin join embebido) ---- */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
         setLoadingCatalog(true);
-        let cata = [];
-        const ownerId = evUI.photographer_id || uid;
-        if (ownerId) {
-          const { data: hs, error: hErr } = await supabase
-            .from("photographer_hotspot")
-            .select("id, name, lat, lng, default_windows, route:photographer_route(name)")
-            .eq("photographer_id", ownerId)
-            .order("created_at", { ascending: false });
-          if (hErr) throw hErr;
-          cata = (hs || []).map((h) => ({
-            id: h.id,
-            name: h.name,
-            lat: h.lat,
-            lng: h.lng,
-            route_name: h.route?.name || "",
-            default_windows: Array.isArray(h.default_windows) ? h.default_windows : [],
-          }));
+        if (!ev?.photographer_id) {
+          if (mounted) setCatalog([]);
+          return;
         }
+        const { data: hs, error: hErr } = await supabase
+          .from("photographer_hotspot")
+          .select("id, name, lat, lng, default_windows, route_id")
+          .eq("photographer_id", ev.photographer_id)
+          .order("created_at", { ascending: false });
+        if (hErr) throw hErr;
+        if (!mounted) return;
+        setCatalog((hs || []).map((h) => ({
+          id: h.id,
+          name: h.name,
+          lat: h.lat,
+          lng: h.lng,
+          route_id: h.route_id,
+          default_windows: Array.isArray(h.default_windows) ? h.default_windows : [],
+        })));
+      } catch (e) {
+        console.warn("[EventoEditor] catalog error:", e?.message || e);
+        if (mounted) setCatalog([]);
+      } finally {
+        if (mounted) setLoadingCatalog(false);
+      }
+    })();
+    return () => (mounted = false);
+  }, [ev?.photographer_id]);
 
-        // 5) puntos del evento (event_hotspot)
+  /* ---- Cargar puntos del evento (sin join embebido) ---- */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!ev?.id) return;
         const { data: ehs, error: ehErr } = await supabase
           .from("event_hotspot")
-          .select("id, name, lat, lng, time_windows, route:event_route(name)")
-          .eq("event_id", paramId)
+          .select("id, name, lat, lng, time_windows, route_id")
+          .eq("event_id", ev.id)
           .order("created_at", { ascending: true });
         if (ehErr) throw ehErr;
 
@@ -203,38 +235,23 @@ export default function EventoEditor() {
           activo: true,
           horaIni: (Array.isArray(h.time_windows) && h.time_windows[0]?.start) || "06:00",
           horaFin: (Array.isArray(h.time_windows) && h.time_windows[0]?.end) || "12:00",
-          route_name: h.route?.name || "",
+          route_id: h.route_id || null,
         }));
 
         if (!mounted) return;
-        setEv(evUI);
-        setFotos(assets || []);
-        setPriceLists(lists);
-        setCatalog(cata);
         setPuntos(puntosIniciales);
       } catch (e) {
-        console.error(e);
-        if (mounted) {
-          setEv(null);
-          setFotos([]);
-          setPriceLists([]);
-          setCatalog([]);
-          setPuntos([]);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-          setLoadingLists(false);
-          setLoadingCatalog(false);
-        }
+        console.warn("[EventoEditor] event_hotspot error:", e?.message || e);
+        if (mounted) setPuntos([]);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramId, authReady]);
+    return () => (mounted = false);
+  }, [ev?.id]);
 
-  /* ---- helpers SQL: asegurar event_route y map windows ---- */
+  /* ---- helpers SQL ---- */
   async function ensureEventRouteId(eventId, routeName) {
     if (!routeName) return null;
+    // buscar
     const { data: rows } = await supabase
       .from("event_route")
       .select("id")
@@ -242,6 +259,7 @@ export default function EventoEditor() {
       .eq("name", routeName)
       .maybeSingle();
     if (rows?.id) return rows.id;
+    // crear
     const { data: inserted, error: insErr } = await supabase
       .from("event_route")
       .insert([{ event_id: eventId, name: routeName }])
@@ -266,11 +284,11 @@ export default function EventoEditor() {
         .eq("id", ev.id);
       if (error) throw error;
 
-      // refrescar
+      // refrescar encabezado
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
 
-      // persistir cambios locales en puntos (horaIni/horaFin/activo → time_windows)
+      // persistir time_windows de puntos
       for (const p of puntos) {
         const time_windows = toTimeWindows(p.horaIni, p.horaFin);
         await supabase.from("event_hotspot").update({ time_windows }).eq("id", p.id);
@@ -310,7 +328,7 @@ export default function EventoEditor() {
       if (puntos.some((p) => p.nombre === (h.name || h.nombre))) {
         return alert("Ya agregaste este punto 😅");
       }
-      const routeId = await ensureEventRouteId(ev.id, ev.ruta || h.route_name || "");
+      const routeId = await ensureEventRouteId(ev.id, ev.ruta || "");
       const dw = Array.isArray(h.default_windows) && h.default_windows.length
         ? h.default_windows
         : toTimeWindows("06:00", "12:00");
@@ -318,7 +336,7 @@ export default function EventoEditor() {
       const payload = {
         event_id: ev.id,
         route_id: routeId,
-        source_hotspot_id: h.id, // referencia al catálogo
+        source_hotspot_id: h.id,
         name: h.name || h.nombre || "Punto",
         lat: h.lat,
         lng: h.lng,
@@ -327,7 +345,7 @@ export default function EventoEditor() {
       const { data: inserted, error } = await supabase
         .from("event_hotspot")
         .insert([payload])
-        .select("id, name, time_windows, route:event_route(name)")
+        .select("id, name, time_windows, route_id")
         .single();
       if (error) throw error;
 
@@ -341,7 +359,7 @@ export default function EventoEditor() {
           activo: true,
           horaIni,
           horaFin,
-          route_name: inserted?.route?.name || "",
+          route_id: inserted?.route_id || null,
         },
       ]);
       if (!uploadPoint) setUploadPoint(inserted.id);
@@ -373,7 +391,7 @@ export default function EventoEditor() {
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out?.error || "No se pudo firmar la subida");
-    return out; // { uploadUrl, path, headers? }
+    return out;
   }
   async function onUploaded(assets) {
     try {
@@ -407,51 +425,36 @@ export default function EventoEditor() {
     }
   }
 
-  // ===== Render =====
+  /* ===== Render ===== */
   if (!authReady) {
-    return (
-      <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Inicializando sesión…</div>
-      </main>
-    );
+    return uiBox("Inicializando sesión…");
   }
   if (noSession) {
-    return (
-      <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          Iniciá sesión para editar tu evento.
-          <div className="mt-2 text-xs text-slate-400">Si ya iniciaste, recargá esta página.</div>
-        </div>
-      </main>
+    return uiBox(
+      <>
+        Iniciá sesión para editar tu evento.
+        <div className="mt-2 text-xs text-slate-400">Si ya iniciaste, recargá esta página.</div>
+      </>
     );
   }
   if (loading) {
-    return (
-      <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Cargando…</div>
-      </main>
-    );
+    return uiBox("Cargando…");
   }
   if (!ev) {
-    return (
-      <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="mb-3 text-lg font-semibold">Evento no encontrado</div>
-          <div className="text-xs text-slate-400 mb-3">
-            Revisá que la URL sea <code>/studio/eventos/&lt;id&gt;</code>. Param recibido: <code>{paramId || "(vacío)"}</code>
-          </div>
-          <Link to="/studio/eventos" className="text-blue-400 font-semibold">Volver a eventos</Link>
+    return uiBox(
+      <>
+        <div className="mb-3 text-lg font-semibold">Evento no encontrado</div>
+        <div className="text-xs text-slate-400 mb-3">
+          Revisá que la URL sea <code>/studio/eventos/&lt;id&gt;</code>. Param recibido:{" "}
+          <code>{paramId || "(vacío)"}</code>
         </div>
-      </main>
+        <Link to="/studio/eventos" className="text-blue-400 font-semibold">Volver a eventos</Link>
+      </>
     );
   }
 
-  // catálogo filtrado por la ruta del evento (si hay)
-  const catalogFiltered = useMemo(() => {
-    if (!ev.ruta) return catalog;
-    return (catalog || []).filter((h) => (h.route_name || "") === ev.ruta);
-  }, [catalog, ev?.ruta]);
-
+  // Filtrar catálogo por ruta (si querés)
+  const catalogFiltered = useMemo(() => catalog, [catalog]);
   const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
 
   return (
@@ -470,7 +473,6 @@ export default function EventoEditor() {
           >
             Guardar
           </button>
-
           <button
             className="h-10 px-4 rounded-xl bg-blue-500 text-white font-display font-bold inline-flex items-center justify-center border border-white/10"
             onClick={publicarToggle}
@@ -517,7 +519,6 @@ export default function EventoEditor() {
                 />
               </Field>
 
-              {/* Precio base *y* Lista de precios */}
               <Field label="Precio base (Q)">
                 <input
                   type="number"
@@ -526,7 +527,6 @@ export default function EventoEditor() {
                   value={ev.precioBase || 50}
                   onChange={(e) => updateEvent({ precioBase: Number(e.target.value || 0) })}
                   disabled={!!ev.price_list_id}
-                  title={ev.price_list_id ? "Este evento usa una lista de precios" : "Editar precio base"}
                 />
               </Field>
               <Field label="Lista de precios (opcional)">
@@ -605,7 +605,6 @@ export default function EventoEditor() {
                         <div className="font-semibold">{p.nombre}</div>
                         <div className="text-xs text-slate-400">
                           {p.horaIni || "—"} – {p.horaFin || "—"} · {count} foto{count === 1 ? "" : "s"}
-                          {p.route_name ? <> · Ruta: {p.route_name}</> : null}
                         </div>
                       </div>
                       <div className="sm:w-[300px] grid grid-cols-3 gap-2">
@@ -648,13 +647,13 @@ export default function EventoEditor() {
 
             {loadingCatalog ? (
               <div className="text-slate-300 text-sm">Cargando catálogo…</div>
-            ) : (catalogFiltered || []).length === 0 ? (
+            ) : (catalog || []).length === 0 ? (
               <div className="text-slate-300 text-sm">
-                No hay puntos en tu catálogo {ev.ruta ? <>para <strong>{ev.ruta}</strong></> : ""}.
+                No hay puntos en tu catálogo aún.
               </div>
             ) : (
               <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
-                {catalogFiltered
+                {catalog
                   .filter((h) => !puntos.some((p) => p.nombre === h.name))
                   .map((h) => (
                     <div
@@ -663,7 +662,6 @@ export default function EventoEditor() {
                     >
                       <div>
                         <div className="font-medium">{h.name}</div>
-                        {h.route_name && <div className="text-xs text-slate-400">{h.route_name}</div>}
                         {Array.isArray(h.default_windows) && h.default_windows[0] && (
                           <div className="text-xs text-slate-400">
                             {h.default_windows[0].start}–{h.default_windows[0].end}
@@ -678,8 +676,8 @@ export default function EventoEditor() {
                       </button>
                     </div>
                   ))}
-                {catalogFiltered.every((h) => puntos.some((p) => p.nombre === h.name)) && (
-                  <div className="text-slate-300 text-sm">Ya agregaste todos los puntos de esta ruta 🙌</div>
+                {catalog.length > 0 && catalog.every((h) => puntos.some((p) => p.nombre === h.name)) && (
+                  <div className="text-slate-300 text-sm">Ya agregaste todos los puntos de tu catálogo 🙌</div>
                 )}
               </div>
             )}
@@ -697,7 +695,7 @@ export default function EventoEditor() {
             ) : (
               <UploadManager
                 eventId={ev.id}
-                pointId={uploadPoint || puntos[0]?.id || null} // 👈 usa event_hotspot.id
+                pointId={uploadPoint || puntos[0]?.id || null}
                 onUploaded={onUploaded}
                 getSignedUrl={getSignedUrl}
                 options={{ watermark: { src: null, scale: 0.25, opacity: 0.5, position: "br" } }}
@@ -765,7 +763,14 @@ export default function EventoEditor() {
   );
 }
 
-/* ============ UI chilerito ============ */
+/* ============ UI helpers ============ */
+function uiBox(children) {
+  return (
+    <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6">{children}</div>
+    </main>
+  );
+}
 function Tab({ active, onClick, children }) {
   return (
     <button
