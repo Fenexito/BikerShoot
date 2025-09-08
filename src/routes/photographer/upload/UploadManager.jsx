@@ -160,46 +160,36 @@ export default function UploadManager({
           contentType: fileToSend.type || "application/octet-stream",
         });
 
-        // 3) Subir a storage
-        updateItem(nextItem.id, { progress: 30 });
-          const { uploadUrl, token, headers: signedHeaders, path: finalPath } = data;
+        // 3) Subir a storage con la URL firmada
+          updateItem(nextItem.id, { progress: 30 });
+          const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
 
           console.log("🔼 Subiendo a:", uploadUrl);
 
-          if (data.uploaded) {
-            // El archivo ya se subió desde la edge function
-            console.log("✅ Archivo subido por edge function");
-            
-            // Marcar como completado
-            updateItem(nextItem.id, { status: "done", progress: 100, path: data.path });
+          const res = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: signedHeaders || { 
+              "Content-Type": fileToSend.type || "application/octet-stream",
+            },
+            body: fileToSend, // ✅ EL ARCHIVO REAL, no vacío
+            signal: controller.signal,
+          });
 
-            // Notificar al caller
-            onUploaded?.([{
-              path: data.path,
-              size: fileToSend.size,
-              pointId,
-              takenAt: new Date().toISOString(),
-            }]);
-          } else {
-            console.error("❌ Error: El archivo no se subió");
-            updateItem(nextItem.id, { status: "error" });
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Upload failed: ${res.status} - ${errorText}`);
           }
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Upload failed: ${res.status} - ${errorText}`);
-        }
+          // 4) Marcar completado
+          updateItem(nextItem.id, { status: "done", progress: 100, path: finalPath });
 
-        // 4) Completado
-        updateItem(nextItem.id, { status: "done", progress: 100, path: finalPath });
-
-        // 5) Notificar
-        onUploaded?.([{
-          path: finalPath,
-          size: fileToSend.size,
-          pointId,
-          takenAt: new Date().toISOString(),
-        }]);
+          // 5) Notificar para registrar en DB
+          onUploaded?.([{
+            path: finalPath,
+            size: fileToSend.size,
+            pointId,
+            takenAt: new Date().toISOString(),
+          }]);
 
       } catch (e) {
         if (cancelled) {

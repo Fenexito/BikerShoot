@@ -422,16 +422,16 @@ export default function EventoEditor() {
       const token = sess?.session?.access_token || null;
       
       if (!token) throw new Error("Iniciá sesión para registrar fotos");
-      
-      // ✅ URL CORRECTA - Usa tu URL de Supabase
-      const res = await fetch(`https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/events/${ev.id}/assets/register`, {
+
+      // ✅ URL CORRECTA de TU función assets-register
+      const res = await fetch(`https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/assets-register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(
-          (assets || []).map((a) => ({
+          assets.map((a) => ({
             path: a.path,
             size: a.size,
             pointId: a.pointId,
@@ -440,8 +440,13 @@ export default function EventoEditor() {
         ),
       });
       
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "No se pudieron registrar las fotos");
+      }
+
       const out = await res.json();
-      if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
+      console.log("✅ Assets registrados:", out);
 
       // Actualizar lista de fotos
       const { data: rows, error } = await supabase
