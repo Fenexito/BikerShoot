@@ -162,19 +162,20 @@ export default function UploadManager({
 
         // 3) Subir a storage
         updateItem(nextItem.id, { progress: 30 });
-        const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
+          const { uploadUrl, token, headers: signedHeaders, path: finalPath } = data;
 
-        console.log("🔼 Subiendo a:", uploadUrl);
-        
-        const res = await fetch(data.uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Authorization": `Bearer ${data.token}`, // ✅ TOKEN AQUÍ
-            "Content-Type": fileToSend.type || "application/octet-stream",
-          },
-          body: fileToSend,
-          signal: controller.signal,
-        });
+          console.log("🔼 Subiendo a:", uploadUrl);
+
+          const res = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bearer ${token}`, // ✅ TOKEN DE AUTENTICACIÓN
+              "Content-Type": fileToSend.type || "application/octet-stream",
+              ...signedHeaders // Mantener otros headers si existen
+            },
+            body: fileToSend,
+            signal: controller.signal,
+          });
 
         if (!res.ok) {
           const errorText = await res.text();
