@@ -160,33 +160,31 @@ export default function UploadManager({
           contentType: fileToSend.type || "application/octet-stream",
         });
 
-        // 3) Subir a storage con la URL firmada (MÉTODO CORRECTO)
-          updateItem(nextItem.id, { progress: 30 });
-          const { uploadUrl, token, path: finalPath } = data;
+        // REEMPLAZA todo el bloque de upload con ESTO:
 
-          console.log("🔼 Subiendo con URL firmada:", uploadUrl);
+        // 3) Subir DIRECTAMENTE con Supabase SDK
+        updateItem(nextItem.id, { progress: 30 });
+        const { path: finalPath } = data;
 
-          // ✅ Método CORRECTO para URLs firmadas de Supabase
-          const formData = new FormData();
-          formData.append('file', fileToSend);
+        console.log("🔼 Subiendo con Supabase SDK:", finalPath);
 
-          const res = await fetch(uploadUrl, {
-            method: 'POST', // ✅ POST para uploads firmados
-            headers: {
-              'Authorization': `Bearer ${token}`, // ✅ Token de autorización
-            },
-            body: formData, // ✅ FormData con el archivo
-            signal: controller.signal,
+        const { data: uploaded, error: uploadError } = await supabase.storage
+          .from('fotos')
+          .upload(finalPath, fileToSend, {
+            contentType: fileToSend.type,
+            upsert: false,
+            cacheControl: '3600'
           });
 
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.error("❌ Error en upload:", res.status, errorText);
-            throw new Error(`Upload failed: ${res.status} - ${errorText}`);
-          }
+        if (uploadError) {
+          console.error("❌ Error subiendo con SDK:", uploadError);
+          throw new Error("Upload failed: " + uploadError.message);
+        }
 
-          // 4) Marcar completado
-          updateItem(nextItem.id, { status: "done", progress: 100, path: finalPath });
+        console.log("✅ Upload exitoso con SDK:", uploaded);
+
+        // 4) Marcar completado
+        updateItem(nextItem.id, { status: "done", progress: 100, path: finalPath });
 
           // 5) Notificar para registrar en DB
           onUploaded?.([{
