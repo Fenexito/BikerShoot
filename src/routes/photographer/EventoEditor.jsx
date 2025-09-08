@@ -423,15 +423,20 @@ export default function EventoEditor() {
         
         if (!token) throw new Error("Iniciá sesión para registrar fotos");
 
-        // ✅ REGISTRO DIRECTO - Versión mejorada
+        // ✅ REGISTRO con la estructura EXACTA de tu tabla
         const assetsToInsert = assets.map((a) => ({
-          event_id: ev.id,
-          hotspot_id: a.pointId,
-          storage_path: a.path,
-          bytes: a.size,
-          taken_at: a.takenAt || new Date().toISOString(),
-          // Si tu tabla tiene public_url, si no, quita esta línea
-          public_url: `https://xpxrrlsvnhpspmcpzzvv.supabase.co/storage/v1/object/public/fotos/${a.path}`
+          id: crypto.randomUUID(), // ✅ Required - generamos UUID
+          event_id: ev.id, // ✅ Required
+          hotspot_id: a.pointId, // ✅ Required
+          storage_path: a.path, // ✅ Required
+          taken_at: a.takenAt || new Date().toISOString(), // ✅ Required
+          bytes: a.size, // ✅ METERLO EN EL CAMPO "meta" ya que no hay columna "bytes"
+          meta: { // ✅ Campo meta con toda la info adicional
+            bytes: a.size,
+            filename: a.filename || '',
+            contentType: a.contentType || '',
+            originalName: a.originalName || ''
+          }
         }));
 
         console.log("📝 Insertando en DB:", assetsToInsert);
@@ -443,7 +448,6 @@ export default function EventoEditor() {
 
         if (error) {
           console.error("❌ Error insertando en DB:", error);
-          // ⚠️ MOSTRAR ERROR DETALLADO
           throw new Error(`Error de base de datos: ${error.code} - ${error.message}`);
         }
 
@@ -456,10 +460,7 @@ export default function EventoEditor() {
           .eq("event_id", ev.id)
           .order("taken_at", { ascending: true });
           
-        if (fetchError) {
-          console.error("❌ Error fetching assets:", fetchError);
-          throw fetchError;
-        }
+        if (fetchError) throw fetchError;
         
         setFotos(Array.isArray(rows) ? rows : []);
         
