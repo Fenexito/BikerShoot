@@ -423,7 +423,8 @@ export default function EventoEditor() {
       
       if (!token) throw new Error("Iniciá sesión para registrar fotos");
       
-      const res = await fetch(`/functions/v1/events/${ev.id}/assets/register`, {
+      // ✅ URL CORRECTA - Usa tu URL de Supabase
+      const res = await fetch(`https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/events/${ev.id}/assets/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -442,6 +443,7 @@ export default function EventoEditor() {
       const out = await res.json();
       if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
 
+      // Actualizar lista de fotos
       const { data: rows, error } = await supabase
         .from("event_asset")
         .select("*")
@@ -450,9 +452,10 @@ export default function EventoEditor() {
         
       if (error) throw error;
       setFotos(Array.isArray(rows) ? rows : []);
+      
     } catch (e) {
       console.error("❌ Error en onUploaded:", e);
-      alert("Se peló registrando las fotos.");
+      alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
     }
   }
 
