@@ -160,23 +160,28 @@ export default function UploadManager({
           contentType: fileToSend.type || "application/octet-stream",
         });
 
-        // 3) Subir a storage con la URL firmada
+        // 3) Subir a storage con la URL firmada (MÉTODO CORRECTO)
           updateItem(nextItem.id, { progress: 30 });
-          const { uploadUrl, headers: signedHeaders, path: finalPath } = data;
+          const { uploadUrl, token, path: finalPath } = data;
 
-          console.log("🔼 Subiendo a:", uploadUrl);
+          console.log("🔼 Subiendo con URL firmada:", uploadUrl);
+
+          // ✅ Método CORRECTO para URLs firmadas de Supabase
+          const formData = new FormData();
+          formData.append('file', fileToSend);
 
           const res = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: signedHeaders || { 
-              "Content-Type": fileToSend.type || "application/octet-stream",
+            method: 'POST', // ✅ POST para uploads firmados
+            headers: {
+              'Authorization': `Bearer ${token}`, // ✅ Token de autorización
             },
-            body: fileToSend, // ✅ EL ARCHIVO REAL, no vacío
+            body: formData, // ✅ FormData con el archivo
             signal: controller.signal,
           });
 
           if (!res.ok) {
             const errorText = await res.text();
+            console.error("❌ Error en upload:", res.status, errorText);
             throw new Error(`Upload failed: ${res.status} - ${errorText}`);
           }
 
