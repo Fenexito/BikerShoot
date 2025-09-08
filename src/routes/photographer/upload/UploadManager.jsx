@@ -1,6 +1,6 @@
 // src/pages/upload/UploadManager.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "./lib/supabaseClient"; // Asegúrate de importar supabase
+import { supabase } from "../../../lib/supabaseClient"; // Ruta CORRECTA
 
 // ============ Config ============
 const CONCURRENCY = 4;             // cuántos archivos simultáneos
