@@ -371,9 +371,12 @@ export default function EventoEditor() {
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
     const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
     const FN_BASE = (base || "").replace(/\/$/, "");
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token || null;
     const res = await fetch(`${FN_BASE}/functions/v1/signed-event-upload`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       body: JSON.stringify({ eventId, pointId, filename, size, contentType }),
     });
     const out = await res.json();
