@@ -1,123 +1,7 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-// --- INICIO: CORRECCIÓN DE DEPENDENCIAS ---
-
-// 1. Inicialización del cliente de Supabase
-// Se reemplaza la importación de un archivo externo.
-// ¡Recordá cambiar estas variables por las de tu proyecto!
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://tu-proyecto-url.supabase.co";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "tu-anon-key";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-
-// 2. Componente Placeholder para UploadManager
-// Como no tenemos el código original de UploadManager.jsx, creamos
-// uno básico que simula la funcionalidad para que la app no se rompa.
-function UploadManager({ eventId, pointId, onUploaded, getSignedUrl, options }) {
-  const [files, setFiles] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleFileChange = (e) => {
-    if (e.target.files) {
-      setFiles(Array.from(e.target.files));
-    }
-  };
-
-  const handleUpload = async () => {
-    if (files.length === 0 || !pointId) {
-      alert("Seleccioná un punto y al menos un archivo.");
-      return;
-    }
-
-    setIsUploading(true);
-    const uploadedAssets = [];
-
-    for (const file of files) {
-      try {
-        // 1. Obtener la URL firmada desde la Edge Function
-        const signedData = await getSignedUrl({
-          eventId,
-          pointId,
-          filename: file.name,
-          size: file.size,
-          contentType: file.type,
-        });
-
-        if (!signedData || !signedData.uploadUrl) {
-          throw new Error("No se recibió una URL de subida válida.");
-        }
-
-        // 2. Subir el archivo directamente al bucket
-        const uploadResponse = await fetch(signedData.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type },
-          body: file,
-        });
-        
-        if (!uploadResponse.ok) {
-           const errorBody = await uploadResponse.text();
-           console.error("Error al subir al bucket:", errorBody);
-           throw new Error(`Error al subir ${file.name}`);
-        }
-
-        // 3. Registrar el asset para el callback
-        uploadedAssets.push({
-          path: signedData.path,
-          size: file.size,
-          pointId: pointId,
-          takenAt: new Date().toISOString(), // O usar metadata de la imagen si se extrae
-        });
-
-      } catch (error) {
-        console.error(`Falló la subida de ${file.name}:`, error);
-        alert(`Error con ${file.name}: ${error.message}`);
-      }
-    }
-
-    setIsUploading(false);
-    if (uploadedAssets.length > 0) {
-      onUploaded(uploadedAssets);
-    }
-    setFiles([]);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  return (
-    <div className="p-4 border border-dashed border-gray-500 rounded-xl text-center">
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        onChange={handleFileChange}
-        className="mb-4 block w-full text-sm text-slate-400
-                   file:mr-4 file:py-2 file:px-4
-                   file:rounded-full file:border-0
-                   file:text-sm file:font-semibold
-                   file:bg-blue-50 file:text-blue-700
-                   hover:file:bg-blue-100"
-      />
-      {files.length > 0 && (
-        <div className="text-sm text-slate-300 mb-4">
-          {files.length} archivo{files.length > 1 ? 's' : ''} seleccionado{files.length > 1 ? 's' : ''}.
-        </div>
-      )}
-      <button
-        onClick={handleUpload}
-        disabled={isUploading || files.length === 0 || !pointId}
-        className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed"
-      >
-        {isUploading ? "Subiendo..." : "Iniciar Subida"}
-      </button>
-    </div>
-  );
-}
-// --- FIN: CORRECCIÓN DE DEPENDENCIAS ---
-
+import UploadManager from "./upload/UploadManager.jsx";
+import { supabase } from "../../lib/supabaseClient";
 
 /* ===== Utils ===== */
 const fmtDate = (iso) =>
@@ -485,12 +369,21 @@ export default function EventoEditor() {
 
   /* ---- subida ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
+    // ----> INICIO DEL CAMBIO <----
+    // La librería `supabase-js` se encarga de adjuntar el token de autenticación
+    // automáticamente cuando el usuario tiene una sesión activa.
+    // No es necesario (y en tu caso, causaba el error) adjuntar el header 'Authorization' manualmente.
+    // La variable `token` no estaba definida en este scope, por eso fallaba.
+    //
+    // Al quitar el `headers` explícito, dejamos que Supabase haga su magia.
     const { data, error } = await supabase.functions.invoke("signed-event-upload", {
       body: { eventId, pointId, filename, size, contentType },
     });
+    // ----> FIN DEL CAMBIO <----
     
     if (error) {
       console.error("Error al invocar la función 'signed-event-upload':", error);
+      // El objeto error puede tener más detalles útiles
       const errorMessage = error.context?.error?.message || error.message || "No se pudo firmar la subida";
       throw new Error(errorMessage);
     }
@@ -499,32 +392,42 @@ export default function EventoEditor() {
 
   async function onUploaded(assets) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || null;
+      const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
+      const FN_BASE = (base || "").replace(/\/$/, "");
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token || null;
       if (!token) throw new Error("Iniciá sesión para registrar fotos");
       
-      const { error } = await supabase.rpc('register_event_assets', {
-        p_event_id: ev.id,
-        assets: (assets || []).map(a => ({
-          path: a.path,
-          size: a.size,
-          point_id: a.pointId,
-          taken_at: a.takenAt,
-        }))
+      // NOTA: Para fetch() sí es necesario adjuntar el token manualmente.
+      // Para supabase.functions.invoke() no.
+      const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(
+          (assets || []).map((a) => ({
+            path: a.path,
+            size: a.size,
+            pointId: a.pointId,
+            takenAt: a.takenAt,
+          }))
+        ),
       });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
 
-      if (error) throw error;
-
-      const { data: rows, error: fetchError } = await supabase
+      const { data: rows, error } = await supabase
         .from("event_asset")
         .select("*")
         .eq("event_id", ev.id)
         .order("taken_at", { ascending: true });
-      if (fetchError) throw fetchError;
+      if (error) throw error;
       setFotos(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      console.error("Error registrando fotos:", e);
-      alert("Hubo un error al registrar las fotos.");
+      console.error(e);
+      alert("Se peló registrando las fotos.");
     }
   }
 
@@ -818,4 +721,3 @@ function KPI({ label, value }) {
     </div>
   );
 }
-
