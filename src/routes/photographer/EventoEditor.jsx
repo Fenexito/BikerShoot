@@ -368,32 +368,65 @@ export default function EventoEditor() {
   }
 
   /* ---- subida ---- */
-  async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
-  try {
-    // Obtener el token de la sesión actual
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess?.session?.access_token || null;
-    
-    if (!token) {
-      throw new Error("No se pudo obtener el token de autenticación");
-    }
-
-    // Invocar la función edge con el token en los headers
-    const { data, error } = await supabase.functions.invoke("signed-event-upload", {
-      body: { eventId, pointId, filename, size, contentType },
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+    async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
+    try {
+      // Obtener el token de la sesión actual
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token || null;
+      
+      if (!token) {
+        throw new Error("No se pudo obtener el token de autenticación");
       }
-    });
-    
-    if (error) throw new Error(error.message || "No se pudo firmar la subida");
-    return data;
-  } catch (error) {
-    console.error("Error en getSignedUrl:", error);
-    throw error;
+
+      // Invocar la función edge CORRECTAMENTE
+      const { data, error } = await supabase.functions.invoke("signed-event-upload", {
+        body: { 
+          eventId, 
+          pointId, 
+          filename, 
+          size, 
+          contentType 
+        },
+        headers: { 
+          Authorization: `Bearer ${token}`
+          // NO incluyas "Content-Type" aquí - Supabase JS lo maneja automáticamente
+        }
+      });
+      
+      if (error) {
+        console.error("Error de Supabase:", error);
+        throw new Error(error.message || "No se pudo firmar la subida");
+      }
+      
+      return data;
+    } catch (error) {
+      console.error("Error completo en getSignedUrl:", error);
+      throw error;
+    }
   }
+
+  function isValidUuid(uuid) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
 }
+
+  async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
+    try {
+      // Verificar UUIDs
+      if (!isValidUuid(eventId)) {
+        throw new Error(`eventId no es un UUID válido: ${eventId}`);
+      }
+      
+      if (!isValidUuid(pointId)) {
+        throw new Error(`pointId no es un UUID válido: ${pointId}`);
+      }
+
+      // Resto del código...
+    } catch (error) {
+      console.error("Error en getSignedUrl:", error);
+      throw error;
+    }
+  }
 
   async function onUploaded(assets) {
   try {
