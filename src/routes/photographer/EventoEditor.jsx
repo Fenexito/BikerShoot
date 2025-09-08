@@ -369,19 +369,12 @@ export default function EventoEditor() {
 
   /* ---- subida ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
-    const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
-    const FN_BASE = (base || "").replace(/\/$/, "");
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess?.session?.access_token || null;
-    const res = await fetch(`${FN_BASE}/functions/v1/signed-event-upload`, {
-      method: "POST",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      body: JSON.stringify({ eventId, pointId, filename, size, contentType }),
-    });
-    const out = await res.json();
-    if (!res.ok) throw new Error(out?.error || "No se pudo firmar la subida");
-    return out;
+    // invoke manda automáticamente Authorization y apikey
+  const { data, error } = await supabase.functions.invoke("signed-event-upload", {
+    body: { eventId, pointId, filename, size, contentType },
+  });
+  if (error) throw new Error(error.message || "No se pudo firmar la subida");
+  return data;
   }
   async function onUploaded(assets) {
     try {
@@ -389,6 +382,7 @@ export default function EventoEditor() {
       const FN_BASE = (base || "").replace(/\/$/, "");
       const { data: sess } = await supabase.auth.getSession();
       const token = sess?.session?.access_token || null;
+      if (!token) throw new Error("Iniciá sesión para registrar fotos");
       const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
         method: "POST",
         "Content-Type": "application/json",
