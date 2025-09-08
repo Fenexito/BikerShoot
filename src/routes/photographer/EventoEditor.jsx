@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx"; // ajustá si tu ruta es distinta
-import { supabase } from "../../../lib/supabaseClient"; // 👈 usa el cliente central
+import { supabase } from "../../lib/supabaseClient"; // 👈 FIX: antes estaba mal con ../../../
 
 /* ============ Helpers ============ */
 const fmtDate = (iso) =>
@@ -30,39 +30,33 @@ function buildEventPatch(ev) {
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
-    location: ev.ruta, // 👈 guardar oficial en 'location'
+    location: ev.ruta, // guardar oficial
     estado: ev.estado,
-    precio_base: ev.precioBase, // 👈 unificar aquí
+    precio_base: ev.precioBase, // unificado
     notas: ev.notas,
-    price_list_id: ev.price_list_id || null, // 👈 si hay lista, se guarda el id
+    price_list_id: ev.price_list_id || null,
   };
 }
 
-/* ============ Componente ============ */
 export default function EventoEditor() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const initialTab = params.get("tab") || "resumen";
 
-  // ---- state base ----
-  const [ev, setEv] = useState(null);       // evento
-  const [fotos, setFotos] = useState([]);   // event_asset
-  const [puntos, setPuntos] = useState([]); // por ahora UI local (ver TODO para persistir)
+  const [ev, setEv] = useState(null);
+  const [fotos, setFotos] = useState([]);
+  const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(initialTab);
-
-  // Subida
   const [uploadPoint, setUploadPoint] = useState("");
 
   // Listas de precios del fotógrafo
-  const [priceLists, setPriceLists] = useState([]); // [{id, nombre, items: [...] }]
+  const [priceLists, setPriceLists] = useState([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
-  // Agrupar fotos x punto
   const fotosPorPunto = useMemo(() => {
     const map = new Map();
-    const all = Array.isArray(fotos) ? fotos : [];
-    all.forEach((f) => {
+    (fotos || []).forEach((f) => {
       const key = f.hotspot_id || null;
       const arr = map.get(key) || [];
       arr.push(f);
@@ -72,7 +66,6 @@ export default function EventoEditor() {
     return map;
   }, [fotos]);
 
-  // default uploadPoint
   useEffect(() => {
     if (!uploadPoint && Array.isArray(puntos) && puntos.length) {
       setUploadPoint(puntos[0].id);
@@ -104,7 +97,7 @@ export default function EventoEditor() {
           .order("taken_at", { ascending: true });
         if (aErr) throw aErr;
 
-        // 3) puntos del evento (si tuvieras tabla event_hotspot)
+        // 3) (opcional) puntos del evento desde event_hotspot
         // const { data: hs } = await supabase
         //   .from("event_hotspot")
         //   .select("id, nombre, meta")
@@ -135,7 +128,7 @@ export default function EventoEditor() {
         if (!mounted) return;
         setEv(evUI);
         setFotos(assets || []);
-        setPuntos([]); // reemplazá por 'puntosIniciales' si usás event_hotspot
+        setPuntos([]); // reemplazá por 'puntosIniciales' si persistís event_hotspot
         setPriceLists(lists);
       } catch (e) {
         console.error(e);
@@ -160,7 +153,6 @@ export default function EventoEditor() {
         .eq("id", ev.id);
       if (error) throw error;
 
-      // refrescar por si triggers tocan algo
       const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
       if (row) setEv(mapEventRow(row));
 
@@ -188,10 +180,10 @@ export default function EventoEditor() {
     setEv((old) => ({ ...old, ...localPatch }));
   }
 
-  /* ---- puntos (UI local; ver TODO para persistir) ---- */
+  /* ---- puntos (UI local; TODO: persistir) ---- */
   function updatePoint(pid, patch) {
     setPuntos((arr) => arr.map((p) => (p.id === pid ? { ...p, ...patch } : p)));
-    // TODO: si tenés event_hotspot.meta jsonb => update
+    // TODO: update event_hotspot.meta si usás esa tabla
   }
   function addPointFromCatalog(h) {
     setPuntos((arr) => {
@@ -217,7 +209,6 @@ export default function EventoEditor() {
 
   /* ---- subida de fotos ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
-    // Usamos funciones de Supabase (edge): /functions/v1/signed-event-upload
     const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
     const FN_BASE = (base || "").replace(/\/$/, "");
     const res = await fetch(`${FN_BASE}/functions/v1/signed-event-upload`, {
@@ -227,11 +218,10 @@ export default function EventoEditor() {
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out?.error || "No se pudo firmar la subida");
-    return out; // { uploadUrl, path, headers? }
+    return out;
   }
   async function onUploaded(assets) {
     try {
-      // Registrar en DB
       const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || supabase?.supabaseUrl || "";
       const FN_BASE = (base || "").replace(/\/$/, "");
       const res = await fetch(`${FN_BASE}/functions/v1/events/${ev.id}/assets/register`, {
@@ -249,7 +239,6 @@ export default function EventoEditor() {
       const out = await res.json();
       if (!res.ok) throw new Error(out?.error || "No se pudieron registrar las fotos");
 
-      // refrescar assets
       const { data: rows, error } = await supabase
         .from("event_asset")
         .select("*")
@@ -397,35 +386,14 @@ export default function EventoEditor() {
             {/* Preview de la lista de precios */}
             {loadingLists ? (
               <div className="mt-4 text-sm text-slate-400">Cargando listas…</div>
-            ) : ev.price_list_id && selectedList ? (
+            ) : ev.price_list_id && (priceLists.find((l) => l.id === ev.price_list_id)) ? (
               <div className="mt-4">
                 <div className="text-xs text-slate-400 mb-1">Lista seleccionada</div>
-                <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
-                <div className="rounded-xl border border-white/10 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-white/10">
-                      <tr>
-                        <th className="text-left px-3 py-2">Concepto</th>
-                        <th className="text-right px-3 py-2">Precio (Q)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedList.items || []).map((it, i) => (
-                        <tr key={i} className="border-t border-white/10">
-                          <td className="px-3 py-2">{it?.nombre || it?.name || "Item"}</td>
-                          <td className="px-3 py-2 text-right">{Number(it?.precio ?? it?.price ?? 0)}</td>
-                        </tr>
-                      ))}
-                      {(!selectedList.items || selectedList.items.length === 0) && (
-                        <tr className="border-t border-white/10">
-                          <td className="px-3 py-2 text-slate-400" colSpan={2}>Sin items configurados.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <div className="text-sm font-semibold mb-2">
+                  {priceLists.find((l) => l.id === ev.price_list_id)?.nombre}
                 </div>
-                <div className="mt-2 text-xs text-white/70">
-                  Nota: Si hay <strong>lista</strong>, esa manda sobre el precio base para mostrar precios al público.
+                <div className="text-xs text-white/70">
+                  Nota: Si hay <strong>lista</strong>, esa manda sobre el precio base para el público.
                 </div>
               </div>
             ) : (
@@ -510,28 +478,8 @@ export default function EventoEditor() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Agregar desde mi catálogo</h3>
             <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
-              {myCatalog
-                .filter((h) => !puntos.some((p) => p.id === h.id))
-                .map((h) => (
-                  <div
-                    key={h.id}
-                    className="rounded-lg border border-white/10 bg-white/5 p-3 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-medium">{h.name || h.nombre}</div>
-                      {h.route_name && <div className="text-xs text-slate-400">{h.route_name}</div>}
-                    </div>
-                    <button
-                      className="h-8 px-3 rounded-lg bg-blue-600 text-white"
-                      onClick={() => addPointFromCatalog(h)}
-                    >
-                      Agregar
-                    </button>
-                  </div>
-                ))}
-              {myCatalog.length === 0 && (
-                <div className="text-slate-300 text-sm">No tenés catálogo cargado todavía.</div>
-              )}
+              {/* cuando conectés el catálogo real, listá aquí */}
+              <div className="text-slate-300 text-sm">No tenés catálogo cargado todavía.</div>
             </div>
           </div>
         </section>
