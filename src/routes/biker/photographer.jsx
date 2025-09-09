@@ -428,8 +428,8 @@ export default function BikerPhotographerDetail() {
                       <div className="text-sm text-slate-500 truncate">Ruta: {ev.ruta}</div>
                     )}
                     <button
-                      className="mt-3 w-full h-10 rounded-xl bg-blue-600 text-white font-display font-bold"
-                      onClick={() => nav(`/app/buscar?evento=${encodeURIComponent(ev.id)}`)}
+                      className="mt-3 w-full h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                      onClick={() => nav(`/app/eventos/${encodeURIComponent(ev.id)}`)}
                       title="Ver evento"
                     >
                       VER EVENTO
