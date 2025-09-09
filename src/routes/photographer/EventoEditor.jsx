@@ -429,8 +429,10 @@ export default function EventoEditor() {
     }
   }
 
-  // Agrega esta función para eliminar fotos
+  // Agrega esta función DENTRO del componente EventoEditor, antes del return
   async function eliminarFoto(fotoId, storagePath) {
+    if (!confirm('¿Seguro que querés eliminar esta foto?')) return;
+    
     try {
       // 1. Eliminar del storage
       const { error: storageError } = await supabase.storage
@@ -439,7 +441,7 @@ export default function EventoEditor() {
 
       if (storageError) {
         console.warn('Error eliminando del storage:', storageError);
-        // Continuamos aunque falle el storage para intentar eliminar de la DB
+        // Continuamos aunque falle el storage
       }
 
       // 2. Eliminar de la base de datos
@@ -451,7 +453,7 @@ export default function EventoEditor() {
       if (dbError) throw dbError;
 
       // 3. Actualizar el estado local
-      setFotos(fotos.filter(f => f.id !== fotoId));
+      setFotos(prevFotos => prevFotos.filter(f => f.id !== fotoId));
       
       alert('Foto eliminada ✅');
     } catch (error) {
