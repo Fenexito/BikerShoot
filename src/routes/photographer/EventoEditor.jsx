@@ -429,64 +429,6 @@ export default function EventoEditor() {
     }
   }
 
-  // Agrega esta función DENTRO del componente EventoEditor, antes del return
-  async function eliminarFoto(fotoId, storagePath) {
-    if (!confirm('¿Seguro que querés eliminar esta foto?')) return;
-    
-    try {
-      // 1. Eliminar del storage
-      const { error: storageError } = await supabase.storage
-        .from('fotos')
-        .remove([storagePath]);
-
-      if (storageError) console.warn('Error eliminando del storage:', storageError);
-
-      // 2. Eliminar de la base de datos
-      const { error: dbError } = await supabase
-        .from('event_asset')
-        .delete()
-        .eq('id', fotoId);
-
-      if (dbError) throw dbError;
-
-      // 3. Actualizar el estado local
-      setFotos(prevFotos => prevFotos.filter(f => f.id !== fotoId));
-      
-      alert('Foto eliminada ✅');
-    } catch (error) {
-      console.error('Error eliminando foto:', error);
-      alert('Error al eliminar la foto: ' + error.message);
-    }
-  }
-
-  // Y en la sección "Organizar", modifica el render de las fotos:
-  {list.map((f) => {
-    const imageUrl = getPublicUrl(f.storage_path);
-    return (
-      <div key={f.id} className="relative group">
-        <img 
-          src={imageUrl} 
-          alt="" 
-          className="w-full h-28 object-cover rounded-lg" 
-          onError={(e) => {
-            console.error('Error loading image:', f.storage_path);
-            e.target.style.display = 'none';
-          }}
-        />
-        {/* Botón de eliminar */}
-        <button
-          onClick={() => eliminarFoto(f.id, f.storage_path)}
-          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Eliminar foto"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    );
-  })}
-
   async function onUploaded(assets) {
     try {
       console.log("🔍 onUploaded assets:", assets);
