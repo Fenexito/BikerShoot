@@ -1,74 +1,191 @@
-// src/routes/biker/photographer.jsx
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import PhotoLightbox from "../../components/PhotoLightbox";
 import MapHotspots from "../../components/MapHotspots";
 
-/* Pequeños helpers */
-function formatDate(d) {
-  const dt = new Date(d);
-  if (isNaN(dt)) return "—";
-  return dt.toLocaleDateString("es-GT", { year: "numeric", month: "short", day: "2-digit" });
+/* ========== Iconos ========== */
+function FacebookIcon({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M22 12.06C22 6.48 17.52 2 11.94 2S2 6.48 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.41c0-2.5 1.49-3.88 3.77-3.88 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.87h2.78l-.44 2.91h-2.34v7.03C18.34 21.24 22 17.08 22 12.06z" />
+    </svg>
+  );
 }
-function formatHora(d) {
-  const dt = new Date(d);
-  if (isNaN(dt)) return "";
-  return dt.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit", hour12: true });
+function InstagramIcon({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M12 2.2c3.2 0 3.584.012 4.85.07 1.17.054 1.97.24 2.67.51.72.28 1.33.66 1.92 1.25.59.59.97 1.2 1.25 1.92.27.7.46 1.5.51 2.67.06 1.27.07 1.65.07 4.85s-.012 3.584-.07 4.85c-.054 1.17-.24 1.97-.51 2.67a5.1 5.1 0 0 1-1.25 1.92 5.1 5.1 0 0 1-1.92 1.25c-.7.27-1.5.46-2.67.51-1.27.06-1.65.07-4.85.07s-3.584-.012-4.85-.07c-1.17-.054-1.97-.24-2.67-.51a5.1 5.1 0 0 1-1.92-1.25 5.1 5.1 0 0 1-1.25-1.92c-.27-.7-.46-1.5-.51-2.67C2.212 15.584 2.2 15.2 2.2 12s.012-3.584.07-4.85c.054-1.17.24-1.97.51-2.67.28-.72.66-1.33 1.25-1.92.59-.59 1.2-.97 1.92-1.25.7-.27 1.5-.46 2.67-.51C8.416 2.212 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.53.012-4.77.07-1.03.047-1.59.22-1.96.36-.49.19-.84.42-1.2.78-.36.36-.59.71-.78 1.2-.14.37-.31.93-.36 1.96-.06 1.24-.07 1.61-.07 4.77s.012 3.53.07 4.77c.047 1.03.22 1.59.36 1.96.19.49.42.84.78 1.2.36.36.71.59 1.2.78.37.14.93.31 1.96.36 1.24.06 1.61.07 4.77.07s3.53-.012 4.77-.07c1.03-.047 1.59-.22 1.96-.36.49-.19.84-.42 1.2-.78.36-.36.59-.71.78-1.2.14-.37.31-.93.36-1.96.06-1.24.07-1.61.07-4.77s-.012-3.53-.07-4.77c-.047-1.03-.22-1.59-.36-1.96-.19-.49-.42-.84-.78-1.2-.36-.36-.71-.59-1.2-.78-.37-.14-.93-.31-1.96-.36-1.24-.06-1.61-.07-4.77-.07Zm0 3.6a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6Zm0 1.8a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm6.9-2a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
+    </svg>
+  );
 }
-function priceFromOf(price_lists, preciosLegacy) {
-  const numfy = (v) => Number(String(v ?? "").replace(/[^\d.]/g, ""));
-  const fromLists = Array.isArray(price_lists)
-    ? price_lists
-        .filter((pl) => pl?.visible_publico)
-        .flatMap((pl) => (Array.isArray(pl.items) ? pl.items : []))
-        .map((it) => numfy(it?.precio))
-        .filter((n) => isFinite(n))
-    : [];
-  if (fromLists.length) return Math.min(...fromLists);
-  const fromLegacy = Array.isArray(preciosLegacy)
-    ? preciosLegacy.map((x) => numfy(x?.precio)).filter((n) => isFinite(n))
-    : [];
-  return fromLegacy.length ? Math.min(...fromLegacy) : null;
+
+/* ============================
+   Galería columnas (fotos completas, alto natural)
+   ============================ */
+function ColumnMarqueeGallery({ items, onOpen, columnHeightSm = 560, columnHeightMd = 760 }) {
+  const [cols, setCols] = React.useState(3);
+
+  React.useEffect(() => {
+    const calc = () => setCols(window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 3 : 2);
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
+
+  // repartir items por columnas (módulo)
+  const columns = React.useMemo(() => {
+    const c = Math.max(1, Math.min(4, cols));
+    const arr = Array.from({ length: c }, () => []);
+    (items || []).forEach((it, i) => arr[i % c].push({ ...it, _idx: i }));
+    return arr;
+  }, [items, cols]);
+
+  return (
+    <div className="group relative rounded-2xl overflow-hidden border border-white/10 bg-white p-3">
+      <style>{`
+        @keyframes scrollY { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+        .marquee-col { animation: scrollY var(--dur, 36s) linear infinite; will-change: transform; }
+        .marquee-col.reverse { animation-direction: reverse; }
+        .group:hover .marquee-col { animation-play-state: paused; }
+        .marquee-item img { width:100%; height:auto; max-height:none; object-fit:contain; display:block; }
+      `}</style>
+
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, cols))}, minmax(0,1fr))` }}
+      >
+        {columns.map((col, i) => {
+          const dur = 28 + i * 6;
+          const reverse = i % 2 === 1;
+          return (
+            <div
+              key={i}
+              className="relative rounded-xl overflow-hidden"
+              style={{ height: cols >= 3 ? columnHeightMd : columnHeightSm }}
+            >
+              {/* máscara arriba/abajo para suavizar loop */}
+              <div
+                className="pointer-events-none absolute inset-0 z-10"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, rgba(248,249,251,1), rgba(248,249,251,0) 10%, rgba(248,249,251,0) 90%, rgba(248,249,251,1))",
+                }}
+              />
+              <div
+                className={`absolute inset-0 marquee-col ${reverse ? "reverse" : ""}`}
+                style={{ ["--dur"]: `${dur}s` }}
+              >
+                {/* primera copia */}
+                <div className="flex flex-col gap-3">
+                  {col.map((it, k) => (
+                    <div key={k} className="marquee-item">
+                      <button
+                        type="button"
+                        onClick={() => onOpen?.(it._idx)}
+                        className="w-full text-left rounded-xl bg-black/30 border border-black/10 overflow-hidden"
+                        style={{ padding: 0 }}
+                        title="Ver grande"
+                      >
+                        <img src={it.url} alt="" loading="lazy" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {/* segunda copia para loop infinito */}
+                <div className="flex flex-col gap-3 mt-3">
+                  {col.map((it, k) => (
+                    <div key={`dup-${k}`} className="marquee-item">
+                      <button
+                        type="button"
+                        onClick={() => onOpen?.(it._idx)}
+                        className="w-full text-left rounded-xl bg-black/30 border border-black/10 overflow-hidden"
+                        style={{ padding: 0 }}
+                        title="Ver grande"
+                      >
+                        <img src={it.url} alt="" loading="lazy" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================
+   Utils
+   ============================ */
+function formatQ(val) {
+  if (val === null || val === undefined) return "—";
+  const n = Number(String(val).replace(/[^\d.]/g, ""));
+  if (!isFinite(n)) return "—";
+  return `Q${Number.isInteger(n) ? n : n.toFixed(2)}`;
+}
+function toTime12(hhmm) {
+  if (!hhmm) return "—";
+  const [h, m] = String(hhmm).split(":").map((x) => parseInt(x || "0", 10));
+  const d = new Date();
+  d.setHours(h, m || 0, 0, 0);
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const mins = String(d.getMinutes()).padStart(2, "0");
+  return `${hours}:${mins} ${ampm}`;
+}
+function buildWhatsAppLink(phoneRaw, estudio, username) {
+  if (!phoneRaw) return null;
+  const digits = String(phoneRaw).replace(/\D/g, "");
+  const gua = digits.startsWith("502") ? digits : `502${digits}`;
+  const msg = `¡Hola ${estudio || (username ? '@' + username : 'fotógrafo/a')}! Te escribo desde MotoShots. Me interesa tu trabajo y quisiera más info 😊`;
+  return `https://wa.me/${gua}?text=${encodeURIComponent(msg)}`;
+}
+function normalizeProfileUrl(url, platform) {
+  if (!url) return null;
+  let u = String(url).trim();
+  if (!/^https?:\/\//i.test(u)) {
+    if (platform === "facebook") u = `https://www.facebook.com/${u.replace(/^@/, "")}`;
+    else if (platform === "instagram") u = `https://www.instagram.com/${u.replace(/^@/, "")}`;
+    else u = `https://${u}`;
+  }
+  return u;
 }
 
 export default function BikerPhotographerDetail() {
-  const { id } = useParams(); // /app/fotografos/:id  → OJO: acá se usa user_id
+  const { id } = useParams(); // /app/fotografos/:id
   const nav = useNavigate();
 
-  // Perfil
   const [p, setP] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState("");
-
+  const [lbOpen, setLbOpen] = React.useState(false);
+  const [lbIndex, setLbIndex] = React.useState(0);
   // Eventos publicados del fotógrafo
   const [events, setEvents] = React.useState([]);
-  const [evLoading, setEvLoading] = React.useState(true);
-  const [evErr, setEvErr] = React.useState("");
-
-  // ⚠️ Importante: NO hay ningún estado/lightbox acá.
-  // Eliminamos cualquier overlay que pudiera bloquear la UI.
+  const [eventsLoading, setEventsLoading] = React.useState(false);
+  const [eventsErr, setEventsErr] = React.useState("");
 
   React.useEffect(() => {
     let alive = true;
-
-    async function loadProfile() {
+    async function load() {
       try {
         setErr("");
         setLoading(true);
-        // PERFIL por user_id (así está en tu código actual)
         const { data, error } = await supabase
           .from("photographer_profile")
           .select("*")
           .eq("user_id", id)
           .maybeSingle();
         if (error) throw error;
-
-        if (!alive) return;
         if (!data) {
-          setP(null);
+          if (alive) setP(null);
           return;
         }
-
         const toUrls = (arr) =>
           (Array.isArray(arr) ? arr : [])
             .map((x) => (typeof x === "string" ? x : x?.url))
@@ -89,269 +206,368 @@ export default function BikerPhotographerDetail() {
           website: data.website || "",
           facebook: data.facebook || "",
           instagram: data.instagram || "",
-          precios: Array.isArray(data.precios) ? data.precios : [],           // legacy
-          price_lists: Array.isArray(data.price_lists) ? data.price_lists : [], // nuevo
+          precios: Array.isArray(data.precios) ? data.precios : [],         // fallback (legacy)
+          price_lists: Array.isArray(data.price_lists) ? data.price_lists : [], // NUEVO
           portafolio: toUrls(data.portafolio),
-          puntos: Array.isArray(data.puntos)
-            ? data.puntos.map((p) => ({
-                ...p,
-                hora_inicio: p.hora_inicio || null,
-                hora_fin: p.hora_fin || null,
-              }))
-            : [],
-          rutas: Array.isArray(data.rutas) ? data.rutas : [],
+          puntos: Array.isArray(data.puntos) ? data.puntos : [],
         };
-        setP(mapped);
+        if (alive) setP(mapped);
       } catch (e) {
-        if (!alive) return;
-        setErr(e.message || "No se pudo cargar el perfil");
+        if (alive) setErr(e.message || "No se pudo cargar el perfil");
       } finally {
         if (alive) setLoading(false);
       }
     }
-
+    if (id) load();
+    return () => { alive = false; };
+  }, [id]);
+  // Cargar SOLO eventos PUBLICADOS del fotógrafo (más recientes primero)
+  React.useEffect(() => {
+    let alive = true;
     async function loadEvents() {
+      if (!id) return;
       try {
-        setEvErr("");
-        setEvLoading(true);
-
-        // 🔎 Ajustá acá si tu tabla/columnas son distintas:
-        // Tabla sugerida: 'events'
-        // Columnas: photographer_id (user_id del fotógrafo), estado ('PUBLICADO'), fecha (date/datetime)
+        setEventsLoading(true);
+        setEventsErr("");
+        // 👇 Ajustá el nombre de la tabla/columnas si tu esquema difiere:
+        // Tabla: 'events' | Columnas: photographer_id, estado ('PUBLICADO'), fecha, portada/cover_url
         const { data, error } = await supabase
           .from("events")
-          .select("id, nombre, ruta, fecha, portada, estado, photographer_id")
+          .select("id, nombre, fecha, ruta, portada, cover_url, estado, photographer_id")
           .eq("photographer_id", id)
           .eq("estado", "PUBLICADO")
           .order("fecha", { ascending: false });
-
         if (error) throw error;
         if (!alive) return;
-
-        setEvents((data || []).map((e) => ({
+        const mapped = (data || []).map(e => ({
           id: e.id,
           nombre: e.nombre || "Evento",
-          ruta: e.ruta || "",
           fecha: e.fecha || null,
-          portada: e.portada || "",
-          estado: e.estado,
-        })));
+          ruta: e.ruta || "",
+          portada: e.portada || e.cover_url || "",
+        }));
+        setEvents(mapped);
       } catch (e) {
         if (!alive) return;
-        setEvErr(e.message || "No se pudieron cargar los eventos");
+        setEventsErr(e.message || "No se pudieron cargar los eventos");
       } finally {
-        if (alive) setEvLoading(false);
+        if (alive) setEventsLoading(false);
       }
     }
-
-    loadProfile();
     loadEvents();
     return () => { alive = false; };
   }, [id]);
 
-  const priceFrom = React.useMemo(
-    () => priceFromOf(p?.price_lists, p?.precios),
-    [p?.price_lists, p?.precios]
-  );
-
   if (loading) {
     return (
-      <main className="max-w-6xl mx-auto p-4">
-        <div className="h-40 rounded-xl bg-slate-200 animate-pulse" />
-        <div className="mt-4 h-20 rounded-xl bg-slate-200 animate-pulse" />
+      <main className="max-w-5xl mx-auto px-5 py-8">
+        <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-card bg-white">
+          <div className="aspect-[16/9] bg-slate-200 animate-pulse" />
+          <div className="p-5 space-y-3">
+            <div className="h-6 w-2/3 bg-slate-200 rounded animate-pulse" />
+            <div className="h-4 w-1/3 bg-slate-200 rounded animate-pulse" />
+            <div className="h-20 w-full bg-slate-200 rounded animate-pulse" />
+          </div>
+        </div>
       </main>
     );
   }
 
   if (err || !p) {
     return (
-      <main className="max-w-4xl mx-auto p-6">
-        <h1 className="text-2xl font-black mb-2">Fotógrafo</h1>
-        <p className="text-red-600">{err || "No encontramos este perfil."}</p>
+      <main className="max-w-5xl mx-auto px-5 py-8">
+        <p className="text-slate-500">{err ? `Error: ${err}` : "No se encontró el fotógrafo."}</p>
+        <button
+          className="mt-4 h-10 px-4 rounded-xl bg-blue-600 text-white font-display font-bold"
+          onClick={() => nav("/app/fotografos")}
+        >
+          Ir al listado
+        </button>
       </main>
     );
   }
 
-  return (
-    <main className="max-w-6xl mx-auto p-4 md:p-6">
-      {/* Portada más baja */}
-      <div className="relative w-full overflow-hidden rounded-2xl border bg-white">
-        <div className="h-48 md:h-56 w-full overflow-hidden">
-          {p.portada ? (
-            <img
-              src={p.portada}
-              alt=""
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full bg-slate-200" />
-          )}
-        </div>
+  const wa = buildWhatsAppLink(p.telefono, p.estudio, p.username);
+  const fbUrl = normalizeProfileUrl(p.facebook, "facebook");
+  const igUrl = normalizeProfileUrl(p.instagram, "instagram");
+  const lbItems = p.portafolio.map((url) => ({ url }));
 
-        {/* Cabecera compacta */}
-        <div className="p-4 md:p-5 flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden border bg-slate-100 shrink-0">
-            {p.avatar ? (
-              <img src={p.avatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-slate-200" />
-            )}
+  // ===== NUEVO: ordenar listas públicas: Domingo primero, luego el resto visibles
+  const allLists = Array.isArray(p.price_lists) ? p.price_lists : [];
+  const domingo = allLists.find((pl) => /domingo/i.test(pl?.nombre || ""));
+  const visibles = allLists.filter((pl) => pl?.visible_publico);
+  const others = visibles.filter((pl) => !/domingo/i.test(pl?.nombre || ""));
+
+  return (
+    <main className="max-w-5xl mx-auto px-5 py-8">
+      {/* Header */}
+      <div className="mb-6">
+        <button className="mb-4 text-sm text-blue-600 hover:underline" onClick={() => nav(-1)}>
+          ← Regresar
+        </button>
+
+        <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-card bg-white">
+          <div className="h-56 sm:h-60 md:h-64 overflow-hidden">
+            <img src={p.portada} alt={p.estudio} className="w-full h-full object-cover" />
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-black truncate">
-              {p.estudio || `@${p.username}`}
-            </h1>
-            <div className="text-sm text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
-              {p.ubicacion && <span>📍 {p.ubicacion}</span>}
-              {!!p.rutas?.length && (
-                <span>🏁 Rutas: {p.rutas.slice(0, 3).join(", ")}{p.rutas.length > 3 ? "…" : ""}</span>
+          <div className="p-5">
+            <div className="flex items-start gap-4">
+              <img
+                src={p.avatar}
+                alt={p.estudio}
+                className="w-16 h-16 rounded-full border-4 border-white -mt-12 shadow"
+              />
+              <div className="flex-1">
+                <h1 className="text-2xl font-display font-bold">{p.estudio}</h1>
+                <div className="text-slate-500">
+                  {p.username ? `@${p.username}` : "—"} · {p.ubicacion}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-yellow-500 font-semibold">★ {p.rating.toFixed(1)}</div>
+                <div className="text-xs text-slate-400">calificación</div>
+              </div>
+            </div>
+
+            {p.descripcion && <p className="mt-4 text-slate-700">{p.descripcion}</p>}
+
+            {/* Redes a la izquierda + WhatsApp a la derecha */}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                {fbUrl && (
+                  <a
+                    className="px-3 py-2 rounded-lg text-white text-sm inline-flex items-center gap-2 hover:brightness-95"
+                    href={fbUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ backgroundColor: "#1877F2" }}
+                  >
+                    <FacebookIcon className="w-4 h-4" /> Facebook
+                  </a>
+                )}
+                {igUrl && (
+                  <a
+                    className="px-3 py-2 rounded-lg text-white text-sm inline-flex items-center gap-2 hover:brightness-95 bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#515BD4]"
+                    href={igUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <InstagramIcon className="w-4 h-4" /> Instagram
+                  </a>
+                )}
+                {p.website && (
+                  <a
+                    className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm"
+                    href={p.website}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Sitio web
+                  </a>
+                )}
+              </div>
+
+              {wa && (
+                <a
+                  href={wa}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-auto h-10 px-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-display font-bold inline-flex items-center justify-center"
+                  title="Contactar por WhatsApp"
+                >
+                  Contactar por WhatsApp
+                </a>
               )}
-              {priceFrom != null && <span>💵 Desde Q{Number(priceFrom).toFixed(0)}</span>}
             </div>
           </div>
-          {p.instagram && (
-            <a
-              href={
-                /^https?:\/\//i.test(p.instagram)
-                  ? p.instagram
-                  : `https://www.instagram.com/${String(p.instagram).replace(/^@/, "")}`
-              }
-              target="_blank"
-              rel="noreferrer"
-              className="hidden md:inline-flex h-10 px-4 rounded-xl border bg-white hover:bg-slate-50"
-            >
-              Instagram
-            </a>
-          )}
         </div>
       </div>
 
-      {/* Cinta de eventos publicados */}
-      <section className="mt-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg md:text-xl font-black">Eventos publicados</h2>
-          {evLoading && <span className="text-sm text-slate-500">Cargando…</span>}
+      {/* ===== Cinta horizontal de EVENTOS PUBLICADOS ===== */}
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold">Eventos publicados</h2>
+          {eventsLoading && <span className="text-sm text-slate-500">Cargando…</span>}
         </div>
 
-        {!evLoading && evErr && (
-          <div className="mt-2 text-sm text-red-600">{evErr}</div>
+        {eventsErr && (
+          <div className="text-sm text-red-600 mb-2">{eventsErr}</div>
         )}
 
-        {!evLoading && !evErr && events.length === 0 && (
-          <div className="mt-2 text-sm text-slate-500">
+        {(!eventsLoading && events.length === 0) ? (
+          <div className="text-sm text-slate-500">
             Este fotógrafo no tiene eventos publicados visibles.
           </div>
-        )}
-
-        {events.length > 0 && (
-          <div className="mt-3 overflow-x-auto">
-            <div className="flex gap-3 min-w-full">
-              {events.map((ev) => (
-                <div
+        ) : (
+          <div className="overflow-x-auto no-scrollbar">
+            <div className="flex gap-4 pr-2">
+              {events.map(ev => (
+                <article
                   key={ev.id}
-                  className="w-[280px] shrink-0 rounded-xl border bg-white hover:shadow-md transition-shadow"
+                  className="shrink-0 w-[280px] rounded-2xl shadow-card bg-white overflow-hidden border border-slate-100"
                 >
-                  <div className="h-40 w-full overflow-hidden rounded-t-xl bg-slate-200">
+                  <div className="aspect-[16/9] overflow-hidden bg-slate-100">
                     {ev.portada ? (
-                      <img
-                        src={ev.portada}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      <img src={ev.portada} alt={ev.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-slate-100" />
+                      <div className="w-full h-full grid place-items-center text-slate-400 text-sm">
+                        Sin portada
+                      </div>
                     )}
                   </div>
-                  <div className="p-3">
+                  <div className="p-4">
                     <div className="text-xs text-slate-500">
-                      {formatDate(ev.fecha)} {formatHora(ev.fecha)}
+                      {ev.fecha ? new Date(ev.fecha).toLocaleDateString("es-GT", { day:"2-digit", month:"short", year:"numeric" }) : "—"}
                     </div>
-                    <div className="font-bold leading-tight truncate">{ev.nombre}</div>
+                    <h3 className="font-semibold leading-tight truncate">{ev.nombre}</h3>
                     {ev.ruta && (
-                      <div className="text-sm text-slate-600 truncate">🏁 {ev.ruta}</div>
+                      <div className="text-sm text-slate-500 truncate">Ruta: {ev.ruta}</div>
                     )}
-
                     <button
-                      className="mt-3 w-full h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                      className="mt-3 w-full h-10 rounded-xl bg-blue-600 text-white font-display font-bold"
                       onClick={() => nav(`/app/buscar?evento=${encodeURIComponent(ev.id)}`)}
                       title="Ver evento"
                     >
                       VER EVENTO
                     </button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           </div>
         )}
       </section>
 
-      {/* Resto del perfil tal cual (descripción, portafolio, mapa, etc.) */}
-      <section className="mt-8 grid gap-6 md:grid-cols-3">
-        <div className="md:col-span-2 space-y-4">
-          <div className="rounded-2xl border bg-white p-4">
-            <h3 className="font-bold mb-1">Sobre mí</h3>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">
-              {p.descripcion || "Este fotógrafo aún no agregó una descripción."}
-            </p>
-          </div>
+      {/* Contacto / Portafolio / Lista de Precios */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <div className="md:col-span-2 rounded-2xl border border-slate-100 p-5 bg-white">
+          <h2 className="text-lg font-semibold mb-3">Contacto</h2>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-slate-500">Teléfono</dt>
+              <dd className="font-medium">{p.telefono || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Correo</dt>
+              <dd className="font-medium">{p.correo || "—"}</dd>
+            </div>
+          </dl>
 
-          {/* Portafolio en mosaico simple (sin lightbox automático) */}
-          {Array.isArray(p.portafolio) && p.portafolio.length > 0 && (
-            <div className="rounded-2xl border bg-white p-4">
-              <h3 className="font-bold mb-3">Portafolio</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {p.portafolio.slice(0, 12).map((url, i) => (
-                  <div key={i} className="aspect-[4/3] rounded-lg overflow-hidden bg-slate-100">
-                    <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <h2 className="text-lg font-semibold mt-6 mb-3">Portafolio</h2>
+          <ColumnMarqueeGallery
+            items={p.portafolio.map((url) => ({ url }))}
+            onOpen={(idx) => {
+              setLbIndex(idx);
+              setLbOpen(true);
+            }}
+          />
+        </div>
+
+        {/* **** Lista de precios (pública) – version compacta **** */}
+        <aside className="md:col-span-1 rounded-2xl border border-slate-100 p-4 h-fit bg-white">
+          <h3 className="text-base font-semibold mb-2">Lista de precios</h3>
+
+          {domingo && domingo.visible_publico && (
+            <div className="mb-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
+              <div className="flex items-center mb-1.5">
+                <h4 className="text-sm font-display font-bold">{domingo.nombre}</h4>
+              </div>
+              {domingo.notas ? (
+                <p className="text-xs text-slate-600 mb-2">{domingo.notas}</p>
+              ) : null}
+              <div className="grid grid-cols-1 gap-1.5">
+                {(domingo.items || []).map((it, idx) => (
+                  <div key={idx} className="rounded-lg border border-slate-200 p-2 bg-white">
+                    <div className="text-sm font-medium">{it.nombre}</div>
+                    <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
                   </div>
                 ))}
               </div>
-              {p.portafolio.length > 12 && (
-                <div className="mt-2 text-sm text-slate-500">
-                  +{p.portafolio.length - 12} fotos más
-                </div>
-              )}
             </div>
           )}
-        </div>
 
-        {/* Panel lateral: datos rápidos y mapa */}
-        <aside className="space-y-4">
-          <div className="rounded-2xl border bg-white p-4">
-            <h3 className="font-bold mb-2">Contacto</h3>
-            <div className="space-y-1 text-sm">
-              {p.telefono && <div>📱 {p.telefono}</div>}
-              {p.correo && <div>✉️ {p.correo}</div>}
-              {p.website && (
-                <a className="text-blue-600" href={/^https?:\/\//i.test(p.website) ? p.website : `https://${p.website}`} target="_blank" rel="noreferrer">
-                  🌐 Sitio web
-                </a>
-              )}
-              {p.instagram && (
-                <a
-                  className="block text-blue-600"
-                  href={
-                    /^https?:\/\//i.test(p.instagram)
-                      ? p.instagram
-                      : `https://www.instagram.com/${String(p.instagram).replace(/^@/, "")}`
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  📸 Instagram
-                </a>
-              )}
+          {others?.length ? (
+            <div className="space-y-3">
+              {others.map((pl) => (
+                <div key={pl.id || pl.nombre} className="rounded-xl border border-slate-200 p-3 bg-white">
+                  <h4 className="text-sm font-display font-bold mb-1">{pl.nombre}</h4>
+                  {pl.notas ? <p className="text-xs text-slate-600 mb-2">{pl.notas}</p> : null}
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {(pl.items || []).map((it, idx) => (
+                      <div key={idx} className="rounded-lg border border-slate-200 p-2 bg-slate-50">
+                        <div className="text-sm font-medium">{it.nombre}</div>
+                        <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-2">
-            <MapHotspots puntos={p.puntos || []} />
-          </div>
+          ) : (
+            !domingo && <div className="text-slate-500 text-sm">Sin listas de precios públicas.</div>
+          )}
         </aside>
       </section>
+
+      {/* Puntos de fotografía (tarjetas + mini mapa único) */}
+      <section className="rounded-2xl border border-slate-100 p-5 bg-white">
+        <h2 className="text-lg font-semibold mb-3">Puntos donde suele tomar fotos</h2>
+
+        {(!p.puntos || p.puntos.length === 0) ? (
+          <div className="text-slate-500">Aún no hay puntos publicados por este fotógrafo.</div>
+        ) : (
+          <>
+            <div
+              className={`grid grid-cols-1 ${p.puntos.length === 3 ? "md:grid-cols-3" : "md:grid-cols-4"} gap-4`}
+            >
+              {p.puntos.map((pt, idx) => (
+                <div key={idx} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{pt.ruta || "Ruta"}</div>
+                    <div className="text-xs text-slate-500">#{idx + 1}</div>
+                  </div>
+                  {pt.descripcion && (
+                    <div className="mt-1 text-sm text-slate-600">{pt.descripcion}</div>
+                  )}
+                  {Array.isArray(pt.horarios) && pt.horarios.length > 0 && (
+                    <div className="mt-2 text-sm">
+                      <div className="text-slate-500">Horario</div>
+                      <ul className="mt-1 space-y-1">
+                        {pt.horarios.map((h, i) => (
+                          <li key={i} className="flex items-center justify-between">
+                            <span className="text-slate-700">
+                              {toTime12(h.inicio)} – {toTime12(h.fin)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                    <div><span className="text-slate-500">Lat:</span> {pt.lat ?? "—"}</div>
+                    <div><span className="text-slate-500">Lon:</span> {pt.lon ?? "—"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Mini mapa único con TODOS los puntos */}
+            <div className="mt-4">
+              <MapHotspots points={p.puntos} mode="view" height={300} />
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* Lightbox */}
+      {lbOpen && (
+        <PhotoLightbox
+          isOpen={lbOpen}
+          startIndex={lbIndex}
+          items={lbItems}
+          onClose={() => setLbOpen(false)}
+        />
+      )}
     </main>
   );
 }
