@@ -15,6 +15,12 @@ function fmtNice(dateStr) {
   }
 }
 
+// ✅ Helper: validar UUID (para no mandar "pl_xxx" a una columna UUID)
+function isValidUuid(uuid) {
+  const r = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return r.test(String(uuid || ""));
+}
+
 /* Mapeo visual del estado */
 const estadoStyle = (estado) => {
   const st = (estado || "").toLowerCase();
@@ -187,7 +193,8 @@ export default function StudioEventos() {
         estado: "borrador",
         precioBase: Number(form.precioBase || 0),
         notas: form.notas || "",
-        price_list_id: form.price_list_id || null,  // 👈 NUEVO
+        // ✅ SOLO si es UUID válido; si es "pl_xxx" → null para no petar el INSERT
+        price_list_id: isValidUuid(form.price_list_id) ? form.price_list_id : null,
         photographer_id: uid,
       };
 

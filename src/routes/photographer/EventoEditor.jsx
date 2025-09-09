@@ -179,7 +179,7 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [paramId, authReady]);
 
-  /* ---- Catálogo desde photographer_profile.puntos ---- */
+  /* ---- Catálogo desde photographer_profile.puntos + price_lists ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -192,7 +192,7 @@ export default function EventoEditor() {
         }
         const { data: profile, error: profErr } = await supabase
           .from("photographer_profile")
-          .select("puntos")
+          .select("puntos, price_lists")
           .eq("user_id", ownerId)
           .maybeSingle();
         if (profErr) throw profErr;
@@ -214,8 +214,17 @@ export default function EventoEditor() {
           default_windows: windowsFromPerfilPunto(p),
         }));
 
+        // Listas de precios del perfil (pueden venir como JSON o string)
+        let pls = [];
+        const rawPls = profile?.price_lists;
+        if (Array.isArray(rawPls)) pls = rawPls;
+        else if (typeof rawPls === "string" && rawPls.trim().startsWith("[")) {
+          try { pls = JSON.parse(rawPls); } catch {}
+        }
+
         if (!mounted) return;
         setCatalog(mapped);
+        setPriceLists(Array.isArray(pls) ? pls : []);
       } catch (e) {
         console.warn("[EventoEditor] catalog error:", e?.message || e);
         if (mounted) setCatalog([]);
