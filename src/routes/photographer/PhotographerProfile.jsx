@@ -722,66 +722,6 @@ export default function PhotographerProfile() {
             )}
           </section>
 
-          {/* ===== (Legacy) Precios por tramo simple ===== */}
-          <section className="mb-10">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-semibold">Precios (tramos base)</h2>
-              {editMode && (
-                <div className="flex items-center gap-2">
-                  <button
-                    className="h-9 px-3 rounded-lg bg-blue-600 text-white font-display font-bold disabled:opacity-50"
-                    onClick={addTier}
-                    type="button"
-                    disabled={!canAddTier(data.precios.length)}
-                    title="Agregar tramo"
-                  >
-                    Agregar tramo
-                  </button>
-                  <span className="text-xs text-white/60">(mínimo 3)</span>
-                </div>
-              )}
-            </div>
-
-            {editMode ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {data.precios.map((p, i) => (
-                  <div key={i} className="rounded-xl border border-white/10 p-4 bg-white/5 relative">
-                    {data.precios.length > 3 && (
-                      <button
-                        className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-red-600 text-white"
-                        type="button"
-                        onClick={() => remTier(i)}
-                        title="Eliminar este tramo"
-                      >
-                        ✕
-                      </button>
-                    )}
-                    <input
-                      className="w-full mb-2 border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
-                      value={p.nombre}
-                      onChange={onPrecioNombre(i)}
-                    />
-                    <input
-                      className="w-full border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
-                      value={p.precio}
-                      onChange={onPrecioValor(i)}
-                      placeholder="Q0.00"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {data.precios.slice(0, Math.max(3, data.precios.length)).map((p, i) => (
-                  <div key={i} className="rounded-xl border border-white/10 p-4 bg-white/5">
-                    <h4 className="font-display font-bold mb-1">{p.nombre}</h4>
-                    <p className="text-2xl font-display font-bold">{p.precio || "—"}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
           {/* ===== NUEVO: Listas de Precios ===== */}
           <section className="mb-10">
             <div className="flex items-center justify-between mb-3">

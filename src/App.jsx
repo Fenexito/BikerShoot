@@ -49,8 +49,8 @@ import StudioEstadisticas from './routes/photographer/Estadisticas.jsx'
 import StudioPerfil from './routes/photographer/PhotographerProfile.jsx'
 import StudioCargaRapida from './routes/photographer/CargaRapida.jsx'
 
-// 🧩 IMPORTA TU TOAST STORE PARA DISPARAR DESDE AQUÍ
-import { useToast } from './state/ui.jsx' // <- ya lo usa tu Toaster.jsx internamente (mismo store) :contentReference[oaicite:3]{index=3}
+// 🧩 store del toaster para disparar desde acá (mismo que usa tu Toaster.jsx)
+import { useToast } from './state/ui.jsx'
 
 function LayoutShell(){
   const loc = useLocation()
@@ -65,7 +65,7 @@ function LayoutShell(){
 
   // Acceso al store del toaster (mismo que renderiza <Toaster/>)
   const toastApi = useToast()
-  // tratamos de detectar la función correcta (push/add/show/success) para no romper tu API
+  // detectar método disponible en tu store (push/add/show/success)
   const emitToast = (payload) => {
     const { push, add, show, success } = toastApi || {}
     if (payload?.type === 'success' && typeof success === 'function' && !payload.description) {
@@ -76,7 +76,7 @@ function LayoutShell(){
     fn?.(payload)
   }
 
-  // 🧠 Lee ?logout=1 y ?login=1 y dispara toasts con tu Toaster global
+  // Lee ?logout=1 y ?login=1 y dispara toasts con tu Toaster global
   useEffect(() => {
     const sp = new URLSearchParams(loc.search)
     let changed = false

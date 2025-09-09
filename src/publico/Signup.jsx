@@ -37,7 +37,29 @@ export default function Signup() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10 bg-white">
+    <main className="min-h-screen flex items-center justify-center px-4 py-10 bg-black text-slate-100 relative">
+      {/* Ir al inicio – arriba-izquierda */}
+      <div className="absolute left-4 top-4 sm:left-6 sm:top-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-1.5 bg-white/10 text-slate-100 shadow hover:bg-white/15"
+          title="Volver al inicio"
+        >
+          <span className="text-lg leading-none">←</span>
+          <span className="font-semibold">Volver al inicio</span>
+        </Link>
+      </div>
+      {/* Ir al inicio – arriba-izquierda */}
+      <div className="absolute left-4 top-4 sm:left-6 sm:top-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 bg-white text-slate-700 shadow hover:bg-slate-50"
+          title="Volver al inicio"
+        >
+          <span className="text-lg leading-none">←</span>
+          <span className="font-semibold">Volver al inicio</span>
+        </Link>
+      </div>
       <div className="w-full max-w-[460px] bg-white shadow rounded-2xl p-6">
         <div className="flex flex-col items-center gap-2">
           <div className="w-8 h-8 bg-blue-600 rounded" />
