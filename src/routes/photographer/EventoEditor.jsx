@@ -250,6 +250,26 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.id]);
 
+  /* ---- Realtime sobre event_asset (inserts/updates/deletes) ---- */
+  useEffect(() => {
+    if (!ev?.id) return;
+    const channel = supabase
+      .channel(`event_asset:${ev.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'event_asset', filter: `event_id=eq.${ev.id}` },
+        (_payload) => {
+          // refrescamos simple para mantener sincronía
+          refreshAssets();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+    };
+  }, [ev?.id]);
+
   /* ---- helpers SQL ---- */
   async function ensureEventRouteId(eventId, routeName) {
     if (!routeName) return null;
@@ -482,6 +502,36 @@ export default function EventoEditor() {
     } catch (e) {
       console.error("❌ Error en onUploaded:", e);
       alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
+    }
+  }
+
+  // Refrescar assets del evento
+  async function refreshAssets() {
+    const { data: rows, error } = await supabase
+      .from("event_asset")
+      .select("*")
+      .eq("event_id", ev.id)
+      .order("taken_at", { ascending: true });
+    if (!error) setFotos(Array.isArray(rows) ? rows : []);
+  }
+
+  // Si la imagen ya no existe en el bucket, ofrecer limpiar el registro en DB
+  async function handleMissingAsset(asset) {
+    try {
+      const ok = window.confirm(
+        "Esta foto ya no existe en el bucket.\n¿Querés quitar también su registro del evento?"
+      );
+      if (!ok) return;
+      const { error } = await supabase
+        .from("event_asset")
+        .delete()
+        .eq("id", asset.id);
+      if (error) throw error;
+      // Actualizar UI sin otro fetch
+      setFotos((prev) => prev.filter((x) => x.id !== asset.id));
+    } catch (e) {
+      console.error("No se pudo limpiar el registro:", e);
+      alert("No se pudo limpiar el registro en la base.");
     }
   }
 
@@ -725,7 +775,16 @@ export default function EventoEditor() {
       {/* ===== Organizar ===== */}
       {tab === "organizar" && (
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h3 className="font-semibold mb-3">Organizar por punto</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Organizar por punto</h3>
+            <button
+              className="h-9 px-3 rounded-lg bg-white/10 border border-white/15"
+              onClick={refreshAssets}
+              title="Refrescar fotos del evento"
+            >
+              Refrescar
+            </button>
+          </div>
           {puntos.length === 0 ? (
             <div className="text-slate-300 text-sm">Sin puntos aún.</div>
           ) : (
@@ -748,8 +807,9 @@ export default function EventoEditor() {
                             alt="" 
                             className="w-full h-28 object-cover rounded-lg" 
                             onError={(e) => {
-                              console.error('Error loading image:', f.storage_path);
-                              e.target.style.display = 'none';
+                              console.warn('Imagen no existe en bucket:', f.storage_path);
+                              e.currentTarget.style.display = 'none';
+                              handleMissingAsset(f);
                             }}
                           />
                         ))}
