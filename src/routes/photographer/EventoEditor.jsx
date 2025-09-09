@@ -373,35 +373,27 @@ export default function EventoEditor() {
 
   /* ---- Función para obtener URL pública ---- */
   function getPublicUrl(storagePath) {
-    if (!storagePath) return '';
+    if (!storagePath) {
+      console.warn('Storage path está vacío');
+      return '';
+    }
     
     // Si ya es una URL completa, la devolvemos tal cual
-    if (storagePath.startsWith('http')) return storagePath;
+    if (storagePath.startsWith('http')) {
+      console.log('Ya es URL completa:', storagePath);
+      return storagePath;
+    }
     
-    // El bucket se llama 'events' según la ruta en el error
+    console.log('Construyendo URL para:', storagePath);
+    
+    // Si es una ruta de Supabase Storage, construimos la URL pública
     const { data } = supabase.storage
-      .from('events')
+      .from('events') // ← Este es el nombre correcto del bucket
       .getPublicUrl(storagePath);
     
+    console.log('URL generada:', data.publicUrl);
     return data.publicUrl;
   }
-
-  // Y en el render de las imágenes:
-  {list.map((f) => {
-    const imageUrl = getPublicUrl(f.storage_path);
-    return (
-      <img 
-        key={f.id} 
-        src={imageUrl} 
-        alt="" 
-        className="w-full h-28 object-cover rounded-lg" 
-        onError={(e) => {
-          console.error('Error loading image:', f.storage_path, 'URL:', imageUrl);
-          e.target.style.display = 'none';
-        }}
-      />
-    );
-  })}
 
   /* ---- subida ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
