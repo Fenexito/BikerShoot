@@ -374,11 +374,8 @@ export default function BikerPhotographerDetail() {
 
           {domingo && domingo.visible_publico && (
             <div className="mb-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center mb-1.5">
                 <h4 className="text-sm font-display font-bold">{domingo.nombre}</h4>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
-                  Siempre visible
-                </span>
               </div>
               {domingo.notas ? (
                 <p className="text-xs text-slate-600 mb-2">{domingo.notas}</p>
