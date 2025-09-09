@@ -6,6 +6,8 @@ import HeaderStudio from './components/HeaderStudio.jsx'
 import Footer from './components/Footer.jsx'
 import { CartProvider, useCart } from './state/CartContext.jsx'
 import Drawer from './components/ui/Drawer.jsx'
+import ModalHost from './components/ui/Modal.jsx'
+import Toaster from './components/ui/Toaster.jsx'
 import { isAuthPath, isUserPortal, isStudioPortal, isDarkRoute } from './lib/utils.js'
 import ApprovePhotographer from './admin/ApprovePhotographer.jsx';
 import SetPassword from './auth/SetPassword.jsx';
@@ -63,6 +65,8 @@ function LayoutShell(){
       <Outlet />
       {!hideChrome && !userPortal && !studioPortal && !adminPortal && <Footer/>}
       {userPortal && <CartDrawer/>}
+      <ModalHost dark={dark} />
+      <Toaster dark={dark} />
     </div>
   )
 }

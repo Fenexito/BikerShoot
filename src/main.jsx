@@ -4,12 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import './index.css'
 import { AuthProvider } from './state/auth.jsx'
+import { UIProvider } from './state/ui.jsx'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <UIProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </UIProvider>
   </BrowserRouter>
 )
