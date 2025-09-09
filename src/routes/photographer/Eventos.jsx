@@ -1,3 +1,4 @@
+// src/routes/photographer/Eventos.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
@@ -13,6 +14,23 @@ function fmtNice(dateStr) {
     return dateStr || "";
   }
 }
+
+/* Mapeo visual del estado */
+const estadoStyle = (estado) => {
+  const st = (estado || "").toLowerCase();
+  if (st === "publicado") {
+    return {
+      label: "Publicado",
+      text: "text-emerald-200",
+      dot: "bg-emerald-400",
+    };
+  }
+  return {
+    label: "Borrador",
+    text: "text-amber-200",
+    dot: "bg-amber-400",
+  };
+};
 
 /* ========= Página ========= */
 export default function StudioEventos() {
@@ -190,15 +208,6 @@ export default function StudioEventos() {
     }
   }
 
-  /* ---- Render ---- */
-  if (!authReady) {
-    return (
-      <main className="w-full max-w-[1100px] mx-auto px-5 py-8">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Inicializando…</div>
-      </main>
-    );
-  }
-
   return (
     <main className="w-full max-w-[1100px] mx-auto px-5 py-6">
       <div className="mb-5 flex items-center justify-between">
@@ -211,14 +220,16 @@ export default function StudioEventos() {
         </button>
       </div>
 
-      {loading ? (
+      {!authReady ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Inicializando…</div>
+      ) : loading ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Cargando eventos…</div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
           No tenés eventos aún. Creá uno para empezar.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {items.map((ev) => (
             <CardEvento
               key={ev.id}
@@ -318,32 +329,126 @@ export default function StudioEventos() {
 
 /* ========= Tarjeta ========= */
 function CardEvento({ ev, onPublicar, onEliminar }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="text-sm text-slate-400">{fmtNice(ev.fecha)} · {ev.ruta}</div>
-      <div className="text-lg font-semibold">{ev.nombre ?? ev.title}</div>
-      <div className="text-xs text-slate-400 mb-3">Estado: {ev.estado}</div>
+  const est = estadoStyle(ev.estado);
+  const portada =
+    ev.cover_url || ev.portada_url || ev.portada || ev.cover || null;
 
-      <div className="flex items-center gap-2">
-        <Link
-          to={`/studio/eventos/${ev.id}`}
-          className="h-9 px-3 rounded-xl bg-white/10 text-white border border-white/10 inline-flex items-center justify-center"
-        >
-          Editar
-        </Link>
-        <button
-          className="h-9 px-3 rounded-xl bg-blue-500 text-white border border-white/10"
-          onClick={onPublicar}
-        >
-          {ev.estado === "publicado" ? "Despublicar" : "Publicar"}
-        </button>
-        <button
-          className="h-9 px-3 rounded-xl bg-red-600 text-white border border-white/10 ml-auto"
-          onClick={onEliminar}
-        >
-          Eliminar
-        </button>
+  return (
+    <div className="relative rounded-2xl border border-white/10 bg-white/[0.04] overflow-hidden shadow-card">
+      {/* Portada / Placeholder */}
+      <div className="relative aspect-video w-full bg-gradient-to-br from-slate-800 to-slate-900">
+        {portada ? (
+          <img
+            src={portada}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center text-slate-400 text-sm">
+            Sin portada
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+        {/* Estado arriba a la derecha: texto grande + dot de color */}
+        <div className="absolute top-2 right-3 flex items-center gap-2">
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${est.dot}`} />
+          <span className={`text-xs md:text-sm font-bold drop-shadow ${est.text}`}>
+            {est.label}
+          </span>
+        </div>
       </div>
+
+      {/* Contenido */}
+      <div className="p-4">
+        <div className="text-sm text-slate-400">{fmtNice(ev.fecha)} · {ev.ruta}</div>
+        <div className="text-lg font-semibold mb-1">{ev.nombre ?? ev.title}</div>
+
+        {/* Contador de fotos */}
+        <PhotoCount eventId={ev.id} />
+
+        {/* Acciones */}
+        <div className="mt-3 flex items-center gap-2">
+          <Link
+            to={`/studio/eventos/${ev.id}`}
+            className="h-9 px-3 rounded-xl bg-white/10 text-white border border-white/10 inline-flex items-center justify-center"
+          >
+            Editar
+          </Link>
+
+          {/* Publicar / Despublicar con color dinámico */}
+          <button
+            className={`h-9 px-3 rounded-xl text-white border border-white/10 ${
+              ev.estado === "publicado" ? "bg-red-600" : "bg-blue-600"
+            }`}
+            onClick={onPublicar}
+          >
+            {ev.estado === "publicado" ? "Despublicar" : "Publicar"}
+          </button>
+
+          <button
+            className="h-9 px-3 rounded-xl bg-transparent text-red-300 border border-red-500/40 hover:bg-red-500/10 ml-auto"
+            onClick={onEliminar}
+          >
+            Eliminar
+          </button>
+        </div>
+
+        {/* Link para setear portada desde el editor */}
+        <div className="mt-2 text-xs">
+          <Link
+            to={`/studio/eventos/${ev.id}?tab=fotos`}
+            className="text-slate-300 hover:text-white underline underline-offset-4"
+            title="Cambiar portada del evento"
+          >
+            Cambiar portada
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========= Contador de fotos (intenta dos tablas comunes) ========= */
+function PhotoCount({ eventId }) {
+  const [count, setCount] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // 1) event_photo
+        let { count: c1, error: e1 } = await supabase
+          .from("event_photo")
+          .select("id", { count: "exact", head: true })
+          .eq("event_id", eventId);
+
+        if (!e1 && typeof c1 === "number") {
+          if (mounted) setCount(c1);
+          return;
+        }
+
+        // 2) photo (fallback)
+        let { count: c2, error: e2 } = await supabase
+          .from("photo")
+          .select("id", { count: "exact", head: true })
+          .eq("event_id", eventId);
+
+        if (!e2 && typeof c2 === "number") {
+          if (mounted) setCount(c2);
+          return;
+        }
+
+        if (mounted) setCount(0);
+      } catch {
+        if (mounted) setCount(0);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [eventId]);
+
+  return (
+    <div className="text-sm text-slate-400">
+      {count === null ? "Cargando fotos…" : `Fotos: ${count}`}
     </div>
   );
 }
