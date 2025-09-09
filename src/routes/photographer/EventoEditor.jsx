@@ -372,16 +372,16 @@ export default function EventoEditor() {
   }
 
   /* ---- Función para obtener URL pública ---- */
-  function getPublicUrl(storagePath) {
+    function getPublicUrl(storagePath) {
     if (!storagePath) return '';
+    
+    // Si ya es una URL completa, la devolvemos tal cual
     if (storagePath.startsWith('http')) return storagePath;
     
-    // Si el path ya incluye "events/", lo removemos
-    const pathWithoutBucket = storagePath.replace(/^events\//, '');
-    
+    // La ruta YA incluye "events/", así que usamos el bucket correcto pero sin agregar "events/" otra vez
     const { data } = supabase.storage
-      .from('events')
-      .getPublicUrl(pathWithoutBucket);
+      .from('events')  // El bucket se llama "events"
+      .getPublicUrl(storagePath);  // Pero el path YA incluye "events/" al inicio
     
     return data.publicUrl;
   }
