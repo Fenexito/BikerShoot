@@ -1,5 +1,5 @@
-import React from 'react'
-import { Routes, Route, Outlet, useLocation } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { Routes, Route, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import HeaderPublic from './components/HeaderPublic.jsx'
 import HeaderUser from './components/HeaderUser.jsx'
 import HeaderStudio from './components/HeaderStudio.jsx'
@@ -49,8 +49,12 @@ import StudioEstadisticas from './routes/photographer/Estadisticas.jsx'
 import StudioPerfil from './routes/photographer/PhotographerProfile.jsx'
 import StudioCargaRapida from './routes/photographer/CargaRapida.jsx'
 
+// 🧩 IMPORTA TU TOAST STORE PARA DISPARAR DESDE AQUÍ
+import { useToast } from './state/ui.jsx' // <- ya lo usa tu Toaster.jsx internamente (mismo store) :contentReference[oaicite:3]{index=3}
+
 function LayoutShell(){
   const loc = useLocation()
+  const navigate = useNavigate()
   const path = loc.pathname
   const dark = isDarkRoute(path)
   const hideChrome = isAuthPath(path)
@@ -58,6 +62,53 @@ function LayoutShell(){
   const studioPortal = isStudioPortal(path)
   const adminPortal = path.startsWith('/admin')
   const bg = dark ? 'bg-studio-bg text-slate-100' : 'bg-slate-50'
+
+  // Acceso al store del toaster (mismo que renderiza <Toaster/>)
+  const toastApi = useToast()
+  // tratamos de detectar la función correcta (push/add/show/success) para no romper tu API
+  const emitToast = (payload) => {
+    const { push, add, show, success } = toastApi || {}
+    if (payload?.type === 'success' && typeof success === 'function' && !payload.description) {
+      success(payload.title || 'Operación exitosa')
+      return
+    }
+    const fn = push || add || show
+    fn?.(payload)
+  }
+
+  // 🧠 Lee ?logout=1 y ?login=1 y dispara toasts con tu Toaster global
+  useEffect(() => {
+    const sp = new URLSearchParams(loc.search)
+    let changed = false
+
+    if (sp.get('logout') === '1') {
+      emitToast({
+        id: 'auth-logout',
+        type: 'success',
+        title: 'Sesión cerrada con éxito',
+        description: '¡Nos miramos pronto!',
+        position: 'top' // tu Toaster pinta todo lo que no sea "bottom" arriba-derecha
+      })
+      sp.delete('logout')
+      changed = true
+    }
+
+    if (sp.get('login') === '1') {
+      emitToast({
+        id: 'auth-login',
+        type: 'success',
+        title: '¡Bienvenido de vuelta!',
+        description: 'Sesión iniciada correctamente.',
+        position: 'top'
+      })
+      sp.delete('login')
+      changed = true
+    }
+
+    if (changed) {
+      navigate({ pathname: loc.pathname, search: sp.toString() }, { replace: true })
+    }
+  }, [loc.pathname, loc.search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={'min-h-screen ' + bg}>

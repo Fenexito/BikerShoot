@@ -60,7 +60,9 @@ export default function LoginPhotographer() {
       const user = data?.user || (await supabase.auth.getUser()).data?.user;
       const roles = getRoles(user);
       if (roles.includes("fotografo")) {
-        nav("/studio", { replace: true });
+        const url = new URL("/studio", window.location.origin);
+        url.searchParams.set("login", "1");
+        nav(url.pathname + url.search, { replace: true });
         return;
       }
       setNeedsRole(true);
@@ -81,7 +83,11 @@ export default function LoginPhotographer() {
       const { error } = await supabase.auth.updateUser({ data: { roles: newRoles } });
       if (error) throw error;
       setMsg("Perfil de Fotógrafo activado. Entrando...");
-      nav("/studio", { replace: true });
+      {
+        const url = new URL("/studio", window.location.origin);
+        url.searchParams.set("login", "1");
+        nav(url.pathname + url.search, { replace: true });
+      }
     } catch (e) {
       setMsg(e.message || "No se pudo activar el perfil de Fotógrafo");
     } finally {
@@ -90,7 +96,18 @@ export default function LoginPhotographer() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10 bg-black text-slate-100">
+    <main className="min-h-screen flex items-center justify-center px-4 py-10 bg-black text-slate-100 relative">
+      {/* Ir al inicio – arriba-izquierda (oscuro) */}
+      <div className="absolute left-4 top-4 sm:left-6 sm:top-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-1.5 bg-white/10 text-slate-100 shadow hover:bg-white/15"
+          title="Volver al inicio"
+        >
+          <span className="text-lg leading-none">←</span>
+          <span className="font-semibold">Volver al inicio</span>
+        </Link>
+      </div>
       <div className="w-full max-w-[460px] rounded-2xl shadow-lg p-6 bg-studio-panel border border-white/10">
         <div className="text-center">
           <h1 className="text-2xl font-black font-display">Bienvenido al Studio</h1>
@@ -151,11 +168,6 @@ export default function LoginPhotographer() {
             <img src={InstagramLogo} alt="Instagram" className="w-5 h-5" /> Iniciar con Instagram
           </button>
         </div>
-      </div>
-    <div className="mt-6 text-center">
-        <Link to="/" className="text-sm text-slate-400 hover:text-white/90 underline">
-          ← Ir al inicio
-        </Link>
       </div>
     </main>
   );

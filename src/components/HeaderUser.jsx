@@ -24,7 +24,7 @@ export default function HeaderUser() {
     // const { clear } = useCart();  <-- ya existe en este header
     clear?.();
   } catch {}
-  nav("/", { replace: true });
+  nav("/?logout=1", { replace: true });
   }
 
   return (

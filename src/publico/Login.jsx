@@ -54,7 +54,9 @@ export default function Login() {
       const user = data?.user || (await supabase.auth.getUser()).data?.user;
       const roles = getRoles(user);
       if (roles.includes("biker")) {
-        nav("/app", { replace: true });
+        const url = new URL("/app", window.location.origin);
+        url.searchParams.set("login", "1");
+        nav(url.pathname + url.search, { replace: true });
         return;
       }
       setNeedsRole(true);
@@ -75,7 +77,11 @@ export default function Login() {
       const { error } = await supabase.auth.updateUser({ data: { roles: newRoles } });
       if (error) throw error;
       setMsg("Perfil de Biker activado. Entrando...");
-      nav("/app", { replace: true });
+      {
+        const url = new URL("/app", window.location.origin);
+        url.searchParams.set("login", "1");
+        nav(url.pathname + url.search, { replace: true });
+      }
     } catch (e) {
       setMsg(e.message || "No se pudo activar el perfil de Biker");
     } finally {
@@ -84,7 +90,18 @@ export default function Login() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10">
+    <main className="min-h-screen flex items-center justify-center px-4 py-10 relative">
+      {/* Ir al inicio – arriba-izquierda */}
+      <div className="absolute left-4 top-4 sm:left-6 sm:top-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 bg-white text-slate-700 shadow hover:bg-slate-50"
+          title="Volver al inicio"
+        >
+          <span className="text-lg leading-none">←</span>
+          <span className="font-semibold">Volver al inicio</span>
+        </Link>
+      </div>
       <div className="w-full max-w-[460px] bg-white rounded-2xl shadow-lg p-6">
         <div className="text-center">
           <h1 className="text-2xl font-black font-display">Bienvenido de vuelta</h1>
@@ -145,11 +162,6 @@ export default function Login() {
             <img src={InstagramLogo} alt="Instagram" className="w-5 h-5" /> Iniciar con Instagram
           </button>
         </div>
-      </div>
-    <div className="mt-6 text-center">
-        <Link to="/" className="text-sm text-slate-500 hover:text-slate-700 underline">
-          ← Ir al inicio
-        </Link>
       </div>
     </main>
   );

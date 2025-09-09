@@ -14,7 +14,7 @@ export default function HeaderStudio() {
       localStorage.removeItem("intendedRole");
       localStorage.removeItem("lastRole");
     } catch {}
-    nav("/", { replace: true });
+    nav("/?logout=1", { replace: true });
   }
 
   return (

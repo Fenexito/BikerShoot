@@ -1,9 +1,11 @@
+// src/routes/photographer/PhotographerProfile.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DefaultAvatar from "../../assets/profile/default-avatar.png";
 import { supabase } from "../../lib/supabaseClient";
 import PhotoLightbox from "../../components/PhotoLightbox.jsx";
 import MapHotspots from "../../components/MapHotspots";
-// ⬇️ rutas maestras desde Supabase
+
+// Rutas maestras desde Supabase (ya existente)
 const GT_CENTER = { lat: 14.62, lon: -90.52 };
 
 const SIGNED_AVATAR_FN = "https://xpxrrlsvnhpspmcpzzvv.supabase.co/functions/v1/signed-avatar-upload";
@@ -21,7 +23,7 @@ const RUTAS = [
   "RN-10 (Cañas)",
 ];
 
-// ===== Helpers =====
+/* ================= Helpers existentes ================= */
 function templatePreciosBase3() {
   return [
     { nombre: "1 foto", precio: "" },
@@ -38,10 +40,12 @@ function canAddTier(len) {
 }
 function normalizePortafolio(pf) {
   if (!Array.isArray(pf)) return [];
-  return pf.map((it) => (typeof it === "string" ? { url: it, path: null } : it)).filter(Boolean);
+  return pf
+    .map((it) => (typeof it === "string" ? { url: it, path: null } : it))
+    .filter(Boolean);
 }
 
-// Time helpers (4:00–14:00)
+/* ====== Helpers de tiempo (ya presentes) ====== */
 const MIN_STEP = 4 * 4;
 const MAX_STEP = 14 * 4;
 function clampStep(s) {
@@ -64,7 +68,7 @@ function to12h(time24) {
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-// 🔧 Header flotante offset
+/* ===== Header flotante offset ===== */
 function useFloatingHeaderOffset(defaultPx = 88) {
   const [offset, setOffset] = React.useState(defaultPx);
   React.useEffect(() => {
@@ -83,6 +87,20 @@ function useFloatingHeaderOffset(defaultPx = 88) {
     };
   }, []);
   return offset;
+}
+
+/* ========== NUEVO: helpers para Listas de Precios ========== */
+const makeId = () => "pl_" + Math.random().toString(36).slice(2, 9);
+const isDomingoList = (nombre = "") => /domingo/i.test(nombre || "");
+function newPriceList(nombre = "Fotos de Domingo") {
+  return {
+    id: makeId(),
+    nombre,
+    visible_publico: true,          // Domingo por defecto visible
+    lock_public: isDomingoList(nombre), // Domingo: no editable el toggle
+    notas: "",
+    items: templatePreciosBase3(),  // tramos (1 foto, 2 fotos, 3 fotos)
+  };
 }
 
 export default function PhotographerProfile() {
@@ -107,6 +125,7 @@ export default function PhotographerProfile() {
   const fileRefAvatar = useRef(null);
   const fileRefPortfolio = useRef(null);
 
+  /* ====================== STATE principal ====================== */
   const [data, setData] = useState({
     username: "",
     estudio: "",
@@ -117,20 +136,21 @@ export default function PhotographerProfile() {
     instagram: "",
     avatar_url: "",
     portafolio: [],
-    precios: templatePreciosBase3(),
+    precios: templatePreciosBase3(),    // tramos “legacy” (se mantiene para compatibilidad)
+    price_lists: [],                    // NUEVO: listas de precios por tipo de evento
     cuentas: [],
   });
 
   const [puntos, setPuntos] = useState([]);
   const [mapEdit, setMapEdit] = useState(false);
-  const [routeOverlays, setRouteOverlays] = useState([]); // rutas maestras (GeoJSON)
+  const [routeOverlays, setRouteOverlays] = useState([]);
 
   // Lightbox
   const [lbOpen, setLbOpen] = useState(false);
   const [lbIndex, setLbIndex] = useState(0);
   const lbItems = (data.portafolio || []).map((it, i) => ({ src: it.url, alt: `Foto ${i + 1}` }));
 
-  // Handlers
+  // Handlers de campos
   const onField = (k) => (e) => setData((d) => ({ ...d, [k]: e.target.value }));
   const onPrecioNombre = (i) => (e) =>
     setData((d) => {
@@ -161,7 +181,89 @@ export default function PhotographerProfile() {
     });
   }
 
-  // Cargar perfil
+  /* ======== NUEVO: CRUD de price_lists ======== */
+  function addPriceList(nombre = "") {
+    setData((d) => {
+      const baseName = nombre || "Lista sin nombre";
+      const pl = newPriceList(baseName);
+      return { ...d, price_lists: [...(d.price_lists || []), pl] };
+    });
+  }
+  function removePriceList(id) {
+    setData((d) => {
+      const arr = (d.price_lists || []).slice();
+      const idx = arr.findIndex((x) => x.id === id);
+      if (idx >= 0) arr.splice(idx, 1);
+      return { ...d, price_lists: arr };
+    });
+  }
+  const onPLField = (id, key) => (e) =>
+    setData((d) => {
+      const arr = (d.price_lists || []).map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              [key]: key === "visible_publico"
+                ? (x.lock_public ? true : !!e.target.checked) // si está bloqueado (Domingo), siempre true
+                : e.target.value,
+              // si cambian el nombre a algo que matchee “domingo”, bloqueamos el toggle
+              ...(key === "nombre"
+                ? {
+                    lock_public: isDomingoList(e.target.value),
+                    visible_publico: isDomingoList(e.target.value) ? true : x.visible_publico,
+                  }
+                : {}),
+            }
+          : x
+      );
+      return { ...d, price_lists: arr };
+    });
+
+  const onPLTierName = (id, idx) => (e) =>
+    setData((d) => {
+      const arr = (d.price_lists || []).map((x) => {
+        if (x.id !== id) return x;
+        const items = x.items.slice();
+        items[idx] = { ...items[idx], nombre: e.target.value };
+        return { ...x, items };
+      });
+      return { ...d, price_lists: arr };
+    });
+
+  const onPLTierPrice = (id, idx) => (e) =>
+    setData((d) => {
+      const arr = (d.price_lists || []).map((x) => {
+        if (x.id !== id) return x;
+        const items = x.items.slice();
+        items[idx] = { ...items[idx], precio: e.target.value };
+        return { ...x, items };
+      });
+      return { ...d, price_lists: arr };
+    });
+
+  const addPLTier = (id) =>
+    setData((d) => {
+      const arr = (d.price_lists || []).map((x) => {
+        if (x.id !== id) return x;
+        const len = x.items.length;
+        if (!canAddTier(len)) return x;
+        return { ...x, items: [...x.items, { nombre: nextTierName(len), precio: "" }] };
+      });
+      return { ...d, price_lists: arr };
+    });
+
+  const remPLTier = (id, idx) =>
+    setData((d) => {
+      const arr = (d.price_lists || []).map((x) => {
+        if (x.id !== id) return x;
+        const items = x.items.slice();
+        if (items.length > 3) items.splice(idx, 1);
+        return { ...x, items };
+      });
+      return { ...d, price_lists: arr };
+    });
+
+  /* =================== Cargar perfil =================== */
   useEffect(() => {
     let alive = true;
     async function init() {
@@ -181,6 +283,17 @@ export default function PhotographerProfile() {
         if (!alive) return;
 
         const cuentas = Array.isArray(prof?.pagos?.cuentas) ? prof.pagos.cuentas : [];
+        const price_lists = Array.isArray(prof?.price_lists) ? prof.price_lists : [];
+
+        // Si no hay price_lists todavía, sembramos “Fotos de Domingo” por defecto
+        const ensured = price_lists.length
+          ? price_lists.map((pl) => ({
+              ...pl,
+              visible_publico: isDomingoList(pl.nombre) ? true : !!pl.visible_publico,
+              lock_public: isDomingoList(pl.nombre),
+              items: Array.isArray(pl.items) && pl.items.length ? pl.items : templatePreciosBase3(),
+            }))
+          : [newPriceList("Fotos de Domingo")];
 
         setData((d) => ({
           ...d,
@@ -194,10 +307,14 @@ export default function PhotographerProfile() {
           avatar_url: prof?.avatar_url || "",
           portafolio: normalizePortafolio(prof?.portafolio),
           precios: Array.isArray(prof?.precios) && prof.precios.length ? prof.precios : d.precios,
+          price_lists: ensured,
           cuentas,
         }));
+
+        // Puntos
         setPuntos(Array.isArray(prof?.puntos) ? prof.puntos : []);
-        // cargar rutas maestras (activas)
+
+        // Rutas maestras
         try {
           const { data: routes, error: rErr } = await supabase
             .from("photo_routes")
@@ -234,6 +351,7 @@ export default function PhotographerProfile() {
         correo: u.email || "",
         portafolio: [],
         precios: templatePreciosBase3(),
+        price_lists: [newPriceList("Fotos de Domingo")], // sembrado inicial
         pagos: { cuentas: [] },
         puntos: [],
       };
@@ -247,11 +365,21 @@ export default function PhotographerProfile() {
     return row;
   }
 
+  /* =================== Guardar =================== */
   async function guardar() {
     if (!user) return;
     try {
       setSaving(true);
       setError("");
+
+      // Enforce: listas “Domingo” siempre visibles
+      const hardenedLists = (data.price_lists || []).map((pl) => ({
+        ...pl,
+        visible_publico: isDomingoList(pl.nombre) ? true : !!pl.visible_publico,
+        lock_public: isDomingoList(pl.nombre),
+        items: Array.isArray(pl.items) && pl.items.length ? pl.items : templatePreciosBase3(),
+      }));
+
       const payload = {
         username: data.username?.trim() || null,
         estudio: data.estudio?.trim() || null,
@@ -263,11 +391,17 @@ export default function PhotographerProfile() {
         avatar_url: data.avatar_url || null,
         portafolio: Array.isArray(data.portafolio) ? data.portafolio : [],
         precios: Array.isArray(data.precios) ? data.precios : [],
+        price_lists: hardenedLists, // NUEVO
         pagos: { cuentas: Array.isArray(data.cuentas) ? data.cuentas : [] },
         puntos: Array.isArray(puntos) ? puntos : [],
       };
-      const { error } = await supabase.from("photographer_profile").update(payload).eq("user_id", user.id);
+
+      const { error } = await supabase
+        .from("photographer_profile")
+        .update(payload)
+        .eq("user_id", user.id);
       if (error) throw error;
+
       setEditMode(false);
       setMapEdit(false);
     } catch (e) {
@@ -282,19 +416,16 @@ export default function PhotographerProfile() {
     setMapEdit(false);
   }
 
-  // Avatar upload
+  /* ============= Avatar upload (igual) ============= */
   async function onPickAvatar(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       setSaving(true);
       setError("");
-
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess?.session?.user?.id;
       if (!uid) throw new Error("Tu sesión expiró. Volvé a iniciar sesión.");
-
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
       const res = await fetch(SIGNED_AVATAR_FN, {
         method: "POST",
@@ -330,15 +461,13 @@ export default function PhotographerProfile() {
     }
   }
 
-  // Portfolio upload
+  /* ============= Portfolio upload (igual) ============= */
   function pickPortfolio() {
     fileRefPortfolio.current?.click();
   }
-
   async function onPickPortfolio(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-
     try {
       setSaving(true);
       setError("");
@@ -401,9 +530,7 @@ export default function PhotographerProfile() {
     }
   }
 
-  // Puntos
-  // Centro GT por defecto (si no hay lat/lon aún)
-  const GT_CENTER = { lat: 14.62, lon: -90.52 };
+  /* ==================== Puntos (igual) ==================== */
   function addPoint() {
     const id = "pt" + Math.random().toString(36).slice(2, 7);
     const nuevo = {
@@ -450,7 +577,7 @@ export default function PhotographerProfile() {
     );
   }
 
-  // Render
+  /* ===================== Render ===================== */
   return (
     <main
       className="max-w-6xl mx-auto px-5 pb-10 text-slate-100"
@@ -533,7 +660,7 @@ export default function PhotographerProfile() {
         <div className="mt-6 text-red-400">{error}</div>
       ) : (
         <>
-          {/* Contacto y redes */}
+          {/* ===== Contacto y redes ===== */}
           <section className="mt-2 mb-8">
             <h2 className="text-xl font-semibold mb-3">Contacto</h2>
             {editMode ? (
@@ -560,7 +687,7 @@ export default function PhotographerProfile() {
             )}
           </section>
 
-          {/* Portafolio – Columnas verticales animadas */}
+          {/* ===== Portafolio ===== */}
           <section className="mb-10">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-semibold">Portafolio</h2>
@@ -595,13 +722,19 @@ export default function PhotographerProfile() {
             )}
           </section>
 
-          {/* Precios */}
+          {/* ===== (Legacy) Precios por tramo simple ===== */}
           <section className="mb-10">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-semibold">Precios</h2>
+              <h2 className="text-xl font-semibold">Precios (tramos base)</h2>
               {editMode && (
                 <div className="flex items-center gap-2">
-                  <button className="h-9 px-3 rounded-lg bg-blue-600 text-white font-display font-bold disabled:opacity-50" onClick={addTier} type="button" disabled={!canAddTier(data.precios.length)} title="Agregar tramo">
+                  <button
+                    className="h-9 px-3 rounded-lg bg-blue-600 text-white font-display font-bold disabled:opacity-50"
+                    onClick={addTier}
+                    type="button"
+                    disabled={!canAddTier(data.precios.length)}
+                    title="Agregar tramo"
+                  >
                     Agregar tramo
                   </button>
                   <span className="text-xs text-white/60">(mínimo 3)</span>
@@ -614,12 +747,26 @@ export default function PhotographerProfile() {
                 {data.precios.map((p, i) => (
                   <div key={i} className="rounded-xl border border-white/10 p-4 bg-white/5 relative">
                     {data.precios.length > 3 && (
-                      <button className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-red-600 text-white" type="button" onClick={() => remTier(i)} title="Eliminar este tramo">
+                      <button
+                        className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-red-600 text-white"
+                        type="button"
+                        onClick={() => remTier(i)}
+                        title="Eliminar este tramo"
+                      >
                         ✕
                       </button>
                     )}
-                    <input className="w-full mb-2 border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60" value={p.nombre} onChange={onPrecioNombre(i)} />
-                    <input className="w-full border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60" value={p.precio} onChange={onPrecioValor(i)} placeholder="Q0.00" />
+                    <input
+                      className="w-full mb-2 border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
+                      value={p.nombre}
+                      onChange={onPrecioNombre(i)}
+                    />
+                    <input
+                      className="w-full border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
+                      value={p.precio}
+                      onChange={onPrecioValor(i)}
+                      placeholder="Q0.00"
+                    />
                   </div>
                 ))}
               </div>
@@ -635,7 +782,144 @@ export default function PhotographerProfile() {
             )}
           </section>
 
-          {/* Puntos + Mini mapa */}
+          {/* ===== NUEVO: Listas de Precios ===== */}
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-semibold">Listas de Precios (por tipo de evento)</h2>
+              {editMode && (
+                <div className="flex items-center gap-2">
+                  <button
+                    className="h-9 px-3 rounded-lg bg-blue-600 text-white font-display font-bold"
+                    type="button"
+                    onClick={() => addPriceList("Nuevo tipo de evento")}
+                  >
+                    Agregar lista
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {data.price_lists?.length ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {data.price_lists.map((pl) => {
+                  const locked = !!pl.lock_public;
+                  return (
+                    <div key={pl.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      {/* Header de la lista */}
+                      <div className="flex items-start gap-3">
+                        {editMode ? (
+                          <input
+                            className="flex-1 border border-white/15 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60 font-display font-semibold"
+                            value={pl.nombre}
+                            onChange={onPLField(pl.id, "nombre")}
+                            placeholder="Nombre de la lista (p.ej. Fotos Nocturnas)"
+                          />
+                        ) : (
+                          <h3 className="flex-1 font-display font-bold text-lg">{pl.nombre}</h3>
+                        )}
+
+                        {/* Visible al público */}
+                        <div className="shrink-0 text-sm flex items-center gap-2">
+                          <label className="text-white/80">Visible</label>
+                          <input
+                            type="checkbox"
+                            checked={!!pl.visible_publico}
+                            onChange={onPLField(pl.id, "visible_publico")}
+                            disabled={!editMode || locked}
+                            className="w-5 h-5 accent-blue-600"
+                            title={locked ? "La lista de Domingo siempre es pública" : "Mostrar/ocultar públicamente"}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Notas de la lista */}
+                      <div className="mt-2">
+                        {editMode ? (
+                          <textarea
+                            rows={2}
+                            className="w-full border border-white/15 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
+                            placeholder="Notas (opcional)"
+                            value={pl.notas || ""}
+                            onChange={onPLField(pl.id, "notas")}
+                          />
+                        ) : pl.notas ? (
+                          <p className="text-sm text-white/80">{pl.notas}</p>
+                        ) : null}
+                      </div>
+
+                      {/* Tramos (items) */}
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {(pl.items || []).map((it, idx) => (
+                          <div key={idx} className="rounded-xl border border-white/10 p-3 bg-black/20 relative">
+                            {editMode && (pl.items?.length || 0) > 3 && (
+                              <button
+                                className="absolute top-2 right-2 w-6 h-6 grid place-items-center rounded-full bg-red-600 text-white"
+                                type="button"
+                                onClick={() => remPLTier(pl.id, idx)}
+                                title="Eliminar tramo"
+                              >
+                                ✕
+                              </button>
+                            )}
+                            {editMode ? (
+                              <>
+                                <input
+                                  className="w-full mb-2 border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
+                                  value={it.nombre}
+                                  onChange={onPLTierName(pl.id, idx)}
+                                />
+                                <input
+                                  className="w-full border border-white/10 rounded-lg px-3 py-2 bg-transparent text-white placeholder-white/60"
+                                  value={it.precio}
+                                  onChange={onPLTierPrice(pl.id, idx)}
+                                  placeholder="Q0.00"
+                                />
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-semibold">{it.nombre}</div>
+                                <div className="text-xl font-display font-bold">{it.precio || "—"}</div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Acciones de la lista */}
+                      {editMode && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            className="h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
+                            type="button"
+                            onClick={() => addPLTier(pl.id)}
+                            disabled={(pl.items?.length || 0) >= 7}
+                          >
+                            Agregar tramo
+                          </button>
+
+                          {!isDomingoList(pl.nombre) && (
+                            <button
+                              className="h-9 px-3 rounded-lg bg-red-600 text-white border border-red-500/50 ml-auto"
+                              type="button"
+                              onClick={() => removePriceList(pl.id)}
+                            >
+                              Eliminar lista
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-slate-300">
+                Aún no tenés listas. Creá una nueva para empezar.
+              </div>
+            )}
+          </section>
+
+          {/* ===== Puntos + Mapa (igual) ===== */}
           <section className="mb-10">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-semibold">Puntos de fotografía</h2>
@@ -772,15 +1056,13 @@ export default function PhotographerProfile() {
               ))}
             </div>
 
-            {/* Mapa real (OpenStreetMap/Leaflet) con todos los puntos + rutas maestras */}
+            {/* Mapa real */}
             {(() => {
-              // Normaliza: si no hay lat/lon, usa centro GT para arrastrar
               const mapPts = (puntos || []).map((pt) => ({
                 ...pt,
                 lat: Number.isFinite(pt?.lat) ? pt.lat : GT_CENTER.lat,
                 lon: Number.isFinite(pt?.lon) ? pt.lon : GT_CENTER.lon,
               }));
-              // Solo mostrar rutas relacionadas a los puntos del fotógrafo:
               const visibleNames = Array.from(new Set(mapPts.map((x) => x.ruta).filter(Boolean)));
               return (
                 <div className="mt-5">
@@ -796,8 +1078,8 @@ export default function PhotographerProfile() {
                     filterRouteNames
                     fitToMarkers
                     fitPaddingTop={160}
-                    markerPx={22}                 // pines más grandes
-                    showTooltips={true}           // overlay visible siempre
+                    markerPx={22}
+                    showTooltips={true}
                     onChange={editMode && mapEdit ? (arr) => setPuntos(arr) : undefined}
                   />
                   {editMode && mapEdit && (
@@ -858,23 +1140,15 @@ function FieldDark({ label, value, isLink }) {
   );
 }
 
-/* ======= Galería: columnas con carrusel vertical infinito
-   → FOTO COMPLETA (sin límite de alto en tiles) ======= */
-function ColumnMarqueeGallery({
-  items,
-  onOpen,
-  columnHeightSm = 560, // alto del viewport por columna (solo esto es fijo)
-  columnHeightMd = 760,
-}) {
+/* ======= Galería (igual) ======= */
+function ColumnMarqueeGallery({ items, onOpen, columnHeightSm = 560, columnHeightMd = 760 }) {
   const [cols, setCols] = React.useState(3);
-
   React.useEffect(() => {
     const calc = () => setCols(window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 3 : 2);
     calc();
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
   }, []);
-
   const columns = React.useMemo(() => {
     const c = Math.max(1, Math.min(4, cols));
     const arr = Array.from({ length: c }, () => []);
@@ -889,64 +1163,30 @@ function ColumnMarqueeGallery({
         .marquee-col { animation: scrollY var(--dur, 36s) linear infinite; will-change: transform; }
         .marquee-col.reverse { animation-direction: reverse; }
         .group:hover .marquee-col { animation-play-state: paused; }
-        /* ⚠️ Sin límites: que ninguna regla global ponga max-height a imgs */
         .marquee-item img { width:100%; height:auto; max-height:none; object-fit:contain; display:block; }
       `}</style>
 
-      <div
-        className="grid gap-3"
-        style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, cols))}, minmax(0,1fr))` }}
-      >
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, cols))}, minmax(0,1fr))` }}>
         {columns.map((col, i) => {
           const dur = 28 + i * 6;
           const reverse = i % 2 === 1;
-          const looped = [...col, ...col]; // loop perfecto
           return (
-            <div
-              key={i}
-              className="relative rounded-xl overflow-hidden"
-              style={{ height: cols >= 3 ? columnHeightMd : columnHeightSm }}
-            >
-              {/* máscara para uniones */}
-              <div
-                className="pointer-events-none absolute inset-0 z-10"
-                style={{
-                  background:
-                    "linear-gradient(to bottom, rgba(9,10,15,0.85), transparent 10%, transparent 90%, rgba(9,10,15,0.85))",
-                }}
-              />
-
-              <div
-                className={`absolute inset-0 marquee-col ${reverse ? "reverse" : ""}`}
-                style={{ ["--dur"]: `${dur}s` }}
-              >
-                {/* Contenido real de la columna (una copia) */}
+            <div key={i} className="relative rounded-xl overflow-hidden" style={{ height: cols >= 3 ? columnHeightMd : columnHeightSm }}>
+              <div className="pointer-events-none absolute inset-0 z-10" style={{ background: "linear-gradient(to bottom, rgba(9,10,15,0.85), transparent 10%, transparent 90%, rgba(9,10,15,0.85))" }} />
+              <div className={`absolute inset-0 marquee-col ${reverse ? "reverse" : ""}`} style={{ ["--dur"]: `${dur}s` }}>
                 <div className="flex flex-col gap-3">
                   {col.map((it, k) => (
                     <div key={k} className="marquee-item">
-                      <button
-                        type="button"
-                        onClick={() => onOpen?.(it._idx)}
-                        className="w-full text-left rounded-xl bg-black/30 border border-white/10"
-                        title="Ver grande"
-                        style={{ padding: 0 }}
-                      >
+                      <button type="button" onClick={() => onOpen?.(it._idx)} className="w-full text-left rounded-xl bg-black/30 border border-white/10" style={{ padding: 0 }} title="Ver grande">
                         <img src={it.url} alt="" loading="lazy" />
                       </button>
                     </div>
                   ))}
                 </div>
-                {/* Segunda copia para loop infinito (sin NINGÚN alto fijo) */}
                 <div className="flex flex-col gap-3 mt-3">
                   {col.map((it, k) => (
                     <div key={`dup-${k}`} className="marquee-item">
-                      <button
-                        type="button"
-                        onClick={() => onOpen?.(it._idx)}
-                        className="w-full text-left rounded-xl bg-black/30 border border-white/10"
-                        style={{ padding: 0 }}
-                        title="Ver grande"
-                      >
+                      <button type="button" onClick={() => onOpen?.(it._idx)} className="w-full text-left rounded-xl bg-black/30 border border-white/10" style={{ padding: 0 }} title="Ver grande">
                         <img src={it.url} alt="" loading="lazy" />
                       </button>
                     </div>
@@ -961,7 +1201,7 @@ function ColumnMarqueeGallery({
   );
 }
 
-/* ======= Dual Slider (inicio/fin) ======= */
+/* ======= Dual Slider (igual) ======= */
 function DualSlider({ min, max, a, b, onChangeA, onChangeB }) {
   const ref = React.useRef(null);
   const dragging = React.useRef(null);
@@ -1000,26 +1240,9 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB }) {
   return (
     <div ref={ref} className="relative h-8 select-none">
       <div className="absolute inset-0 rounded-full bg-white/10" />
-      <div
-        className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full bg-blue-500"
-        style={{ left: `${toPct(a)}%`, width: `${toPct(b) - toPct(a)}%` }}
-      />
-      <button
-        type="button"
-        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-white/50 bg-white shadow"
-        style={{ left: `${toPct(a)}%` }}
-        onMouseDown={startDrag("a")}
-        aria-label="Hora inicio"
-        title="Mover hora de inicio"
-      />
-      <button
-        type="button"
-        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-white/50 bg-white shadow"
-        style={{ left: `${toPct(b)}%` }}
-        onMouseDown={startDrag("b")}
-        aria-label="Hora fin"
-        title="Mover hora final"
-      />
+      <div className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full bg-blue-500" style={{ left: `${toPct(a)}%`, width: `${toPct(b) - toPct(a)}%` }} />
+      <button type="button" className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-white/50 bg-white shadow" style={{ left: `${toPct(a)}%` }} onMouseDown={startDrag("a")} aria-label="Hora inicio" title="Mover hora de inicio" />
+      <button type="button" className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-white/50 bg-white shadow" style={{ left: `${toPct(b)}%` }} onMouseDown={startDrag("b")} aria-label="Hora fin" title="Mover hora final" />
     </div>
   );
 }
