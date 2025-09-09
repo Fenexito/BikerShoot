@@ -371,6 +371,21 @@ export default function EventoEditor() {
     }
   }
 
+  /* ---- Función para obtener URL pública ---- */
+  function getPublicUrl(storagePath) {
+    if (!storagePath) return '';
+    
+    // Si ya es una URL completa, la devolvemos tal cual
+    if (storagePath.startsWith('http')) return storagePath;
+    
+    // Si es una ruta de Supabase Storage, construimos la URL pública
+    const { data } = supabase.storage
+      .from('event-assets') // Asegúrate de que este sea el nombre correcto de tu bucket
+      .getPublicUrl(storagePath);
+    
+    return data.publicUrl;
+  }
+
   /* ---- subida ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
     try {
@@ -414,61 +429,61 @@ export default function EventoEditor() {
     }
   }
 
-    async function onUploaded(assets) {
-      try {
-        console.log("🔍 onUploaded assets:", assets);
-        
-        const { data: sess } = await supabase.auth.getSession();
-        const token = sess?.session?.access_token || null;
-        
-        if (!token) throw new Error("Iniciá sesión para registrar fotos");
+  async function onUploaded(assets) {
+    try {
+      console.log("🔍 onUploaded assets:", assets);
+      
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token || null;
+      
+      if (!token) throw new Error("Iniciá sesión para registrar fotos");
 
-        // ✅ REGISTRO con la estructura EXACTA de tu tabla (SIN 'bytes')
-        const assetsToInsert = assets.map((a) => ({
-          id: crypto.randomUUID(),
-          event_id: ev.id,
-          hotspot_id: a.pointId,
-          storage_path: a.path,
-          taken_at: new Date().toISOString(),
-          meta: { 
-            bytes: a.size, // ✅ El tamaño va DENTRO de 'meta'
-            filename: a.filename || '',
-            contentType: a.contentType || ''
-          }
-        }));
-
-        console.log("📝 Insertando en DB:", assetsToInsert);
-
-        const { data, error } = await supabase
-          .from("event_asset")
-          .insert(assetsToInsert)
-          .select();
-
-        if (error) {
-          console.error("❌ Error insertando en DB:", error);
-          throw new Error(`Error de base de datos: ${error.code} - ${error.message}`);
+      // ✅ REGISTRO con la estructura EXACTA de tu tabla (SIN 'bytes')
+      const assetsToInsert = assets.map((a) => ({
+        id: crypto.randomUUID(),
+        event_id: ev.id,
+        hotspot_id: a.pointId,
+        storage_path: a.path,
+        taken_at: new Date().toISOString(),
+        meta: { 
+          bytes: a.size, // ✅ El tamaño va DENTRO de 'meta'
+          filename: a.filename || '',
+          contentType: a.contentType || ''
         }
+      }));
 
-        console.log("✅ Assets registrados en DB:", data);
+      console.log("📝 Insertando en DB:", assetsToInsert);
 
-        // Actualizar lista de fotos
-        const { data: rows, error: fetchError } = await supabase
-          .from("event_asset")
-          .select("*")
-          .eq("event_id", ev.id)
-          .order("taken_at", { ascending: true });
-          
-        if (fetchError) throw fetchError;
-        
-        setFotos(Array.isArray(rows) ? rows : []);
-        
-        alert("✅ Foto subida y registrada exitosamente!");
-        
-      } catch (e) {
-        console.error("❌ Error en onUploaded:", e);
-        alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
+      const { data, error } = await supabase
+        .from("event_asset")
+        .insert(assetsToInsert)
+        .select();
+
+      if (error) {
+        console.error("❌ Error insertando en DB:", error);
+        throw new Error(`Error de base de datos: ${error.code} - ${error.message}`);
       }
+
+      console.log("✅ Assets registrados en DB:", data);
+
+      // Actualizar lista de fotos
+      const { data: rows, error: fetchError } = await supabase
+        .from("event_asset")
+        .select("*")
+        .eq("event_id", ev.id)
+        .order("taken_at", { ascending: true });
+        
+      if (fetchError) throw fetchError;
+      
+      setFotos(Array.isArray(rows) ? rows : []);
+      
+      alert("✅ Foto subida y registrada exitosamente!");
+      
+    } catch (e) {
+      console.error("❌ Error en onUploaded:", e);
+      alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
     }
+  }
 
   /* ===== Render ===== */
   if (!authReady) return uiBox("Inicializando sesión…");
@@ -727,7 +742,16 @@ export default function EventoEditor() {
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {list.map((f) => (
-                          <img key={f.id} src={getPublicUrl(f.storage_path)} alt="" className="w-full h-28 object-cover rounded-lg" />
+                          <img 
+                            key={f.id} 
+                            src={getPublicUrl(f.storage_path)} 
+                            alt="" 
+                            className="w-full h-28 object-cover rounded-lg" 
+                            onError={(e) => {
+                              console.error('Error loading image:', f.storage_path);
+                              e.target.style.display = 'none';
+                            }}
+                          />
                         ))}
                       </div>
                     )}
