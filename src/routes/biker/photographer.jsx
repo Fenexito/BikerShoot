@@ -327,27 +327,52 @@ export default function BikerPhotographerDetail() {
         </div>
       </div>
 
-      {/* **** Lista de precios (pública) **** */}
-        <aside className="rounded-2xl border border-slate-100 p-5 bg-white">
+      {/* Contacto / Portafolio / Lista de Precios */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <div className="md:col-span-2 rounded-2xl border border-slate-100 p-5 bg-white">
+          <h2 className="text-lg font-semibold mb-3">Contacto</h2>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-slate-500">Teléfono</dt>
+              <dd className="font-medium">{p.telefono || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Correo</dt>
+              <dd className="font-medium">{p.correo || "—"}</dd>
+            </div>
+          </dl>
+
+          <h2 className="text-lg font-semibold mt-6 mb-3">Portafolio</h2>
+          <ColumnMarqueeGallery
+            items={p.portafolio.map((url) => ({ url }))}
+            onOpen={(idx) => {
+              setLbIndex(idx);
+              setLbOpen(true);
+            }}
+          />
+        </div>
+
+        {/* **** NUEVO: Lista de precios (pública) **** */}
+        <aside className="md:col-span-1 rounded-2xl border border-slate-100 p-5 h-fit bg-white">
           <div className="flex items-start justify-between gap-3 mb-3">
-            <h2 className="text-lg font-semibold">Lista de precios</h2>
-            {wa && (
+            <h3 className="text-lg font-semibold">Lista de precios</h3>
+            {wa ? (
               <a
                 href={wa}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center h-10 px-3 rounded-xl bg-green-600 text-white font-display font-bold"
+                className="h-10 px-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-display font-bold flex items-center justify-center"
                 title="Contactar por WhatsApp"
               >
-                Contactar por WhatsApp
+                WhatsApp
               </a>
-            )}
+            ) : null}
           </div>
 
           {domingo && domingo.visible_publico && (
             <div className="mb-4 rounded-2xl border border-slate-200 p-4 bg-slate-50">
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-base font-display font-bold">{domingo.nombre}</h3>
+                <h4 className="text-base font-display font-bold">{domingo.nombre}</h4>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
                   Siempre visible
                 </span>
@@ -370,7 +395,7 @@ export default function BikerPhotographerDetail() {
             <div className="space-y-4">
               {others.map((pl) => (
                 <div key={pl.id || pl.nombre} className="rounded-2xl border border-slate-200 p-4 bg-white">
-                  <h3 className="text-base font-display font-bold mb-1">{pl.nombre}</h3>
+                  <h4 className="text-base font-display font-bold mb-1">{pl.nombre}</h4>
                   {pl.notas ? <p className="text-sm text-slate-600 mb-2">{pl.notas}</p> : null}
                   <div className="grid grid-cols-1 gap-2">
                     {(pl.items || []).map((it, idx) => (
@@ -387,6 +412,7 @@ export default function BikerPhotographerDetail() {
             !domingo && <div className="text-slate-500 text-sm">Sin listas de precios públicas.</div>
           )}
         </aside>
+      </section>
 
       {/* Puntos de fotografía (tarjetas + mini mapa único) */}
       <section className="rounded-2xl border border-slate-100 p-5 bg-white">
