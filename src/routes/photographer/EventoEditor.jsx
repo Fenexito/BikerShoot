@@ -802,18 +802,32 @@ export default function EventoEditor() {
                       <div className="text-slate-300 text-sm">Sin fotos aún.</div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {list.map((f) => (
-                          <img 
-                            key={f.id} 
-                            src={getPublicUrl(f.storage_path)} 
-                            alt="" 
-                            className="w-full h-28 object-cover rounded-lg" 
-                            onError={(e) => {
-                              console.error('Error loading image:', f.storage_path);
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        ))}
+                        {list.map((f) => {
+                          const imageUrl = getPublicUrl(f.storage_path);
+                          return (
+                            <div key={f.id} className="relative group">
+                              <img 
+                                src={imageUrl} 
+                                alt="" 
+                                className="w-full h-28 object-cover rounded-lg" 
+                                onError={(e) => {
+                                  console.error('Error loading image:', f.storage_path);
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                              {/* Botón de eliminar */}
+                              <button
+                                onClick={() => eliminarFoto(f.id, f.storage_path)}
+                                className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Eliminar foto"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
