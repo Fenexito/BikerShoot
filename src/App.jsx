@@ -35,6 +35,7 @@ import SearchByPhotographer from './routes/biker/Search/SearchByPhotographer.jsx
 import SearchByPoint from './routes/biker/Search/SearchByPoint.jsx';
 import BikerPhotographers from './routes/biker/photographers.jsx'
 import BikerPhotographerDetail from "./routes/biker/photographer"
+import BikerEvent from "./routes/biker/Event.jsx"
 import BikerProfile from './routes/biker/BikerProfile.jsx'
 import Checkout from './routes/biker/Checkout.jsx'
 import BikerOrderDetail from './routes/biker/order.jsx' // ← NUEVO
@@ -166,6 +167,7 @@ export default function App(){
           <Route path='/app' element={<BikerHome/>}/>
           <Route path='/app/historial' element={<BikerHistory/>}/>
           <Route path='/app/historial/:id' element={<BikerOrderDetail/>}/> {/* ← NUEVA */}
+          <Route path='/app/eventos/:id' element={<BikerEvent/>}/> {/* ← NUEVA (placeholder evento) */}
           <Route path='/app/buscar/configurar' element={<BikerSearchSetup/>}/>
           <Route path='/app/buscar' element={<BikerSearch/>}/>
           <Route path='/app/buscar/por-fotografo' element={<SearchByPhotographer/>}/>

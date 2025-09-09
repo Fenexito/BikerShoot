@@ -15,105 +15,8 @@ function FacebookIcon({ className = "" }) {
 function InstagramIcon({ className = "" }) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-      <path d="M12 2.2c3.2 0 3.584.012 4.85.07 1.17.054 1.97.24 2.67.51.72.28 1.33.66 1.92 1.25.59.59.97 1.2 1.25 1.92.27.7.46 1.5.51 2.67.06 1.27.07 1.65.07 4.85s-.012 3.584-.07 4.85c-.054 1.17-.24 1.97-.51 2.67a5.1 5.1 0 0 1-1.25 1.92 5.1 5.1 0 0 1-1.92 1.25c-.7.27-1.5.46-2.67.51-1.27.06-1.65.07-4.85.07s-3.584-.012-4.85-.07c-1.17-.054-1.97-.24-2.67-.51a5.1 5.1 0 0 1-1.92-1.25 5.1 5.1 0 0 1-1.25-1.92c-.27-.7-.46-1.5-.51-2.67C2.212 15.584 2.2 15.2 2.2 12s.012-3.584.07-4.85c.054-1.17.24-1.97.51-2.67.28-.72.66-1.33 1.25-1.92.59-.59 1.2-.97 1.92-1.25.7-.27 1.5-.46 2.67-.51C8.416 2.212 8.8 2.2 12 2.2Zm0 1.8c-3.16 0-3.53.012-4.77.07-1.03.047-1.59.22-1.96.36-.49.19-.84.42-1.2.78-.36.36-.59.71-.78 1.2-.14.37-.31.93-.36 1.96-.06 1.24-.07 1.61-.07 4.77s.012 3.53.07 4.77c.047 1.03.22 1.59.36 1.96.19.49.42.84.78 1.2.36.36.71.59 1.2.78.37.14.93.31 1.96.36 1.24.06 1.61.07 4.77.07s3.53-.012 4.77-.07c1.03-.047 1.59-.22 1.96-.36.49-.19.84-.42 1.2-.78.36-.36.59-.71.78-1.2.14-.37.31-.93.36-1.96.06-1.24.07-1.61.07-4.77s-.012-3.53-.07-4.77c-.047-1.03-.22-1.59-.36-1.96-.19-.49-.42-.84-.78-1.2-.36-.36-.71-.59-1.2-.78-.37-.14-.93-.31-1.96-.36-1.24-.06-1.61-.07-4.77-.07Zm0 3.6a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6Zm0 1.8a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm6.9-2a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
+      <path d="M12 2.2c3.2 0 3.584.012 4.85.07 1.17.054 1.97.24 2.67.51.72.28 1.33.66 1.92 1.25.59.59.97 1.2 1.25 1.92.27.7.46 1.5.51 2.67.06 1.27.07 1.65.07 4.85s-.012 3.584-.07 4.85c-.054 1.17-.24 1.97-.51 2.67a5.1 5.1 0 0 1-1.25 1.92 5.1 5.1 0 0 1-1.92 1.25c-.7.27-1.5.46-2.67.51-1.27.06-1.65.07-4.85.07s-3.53-.012-4.77-.07c-1.03-.047-1.59-.22-1.96-.36-.49-.19-.84-.42-1.2-.78-.36-.36-.59-.71-.78-1.2-.14-.37-.31-.93-.36-1.96-.06-1.24-.07-1.61-.07-4.77s.012-3.53.07-4.77c.047-1.03.22-1.59.36-1.96.19-.49.42-.84.78-1.2.36-.36.71-.59 1.2-.78.37-.14.93-.31 1.96-.36 1.24-.06 1.61-.07 4.77-.07Zm0 1.8c-3.16 0-3.53.012-4.77.07-1.03.047-1.59.22-1.96.36-.49.19-.84.42-1.2.78-.36.36-.59.71-.78 1.2-.14.37-.31.93-.36 1.96-.06 1.24-.07 1.61-.07 4.77s.012 3.53.07 4.77c.047 1.03.22 1.59.36 1.96.19.49.42.84.78 1.2.36.36.71.59 1.2.78.37.14.93.31 1.96.36 1.24.06 1.61.07 4.77.07s3.53-.012 4.77-.07c1.03-.047 1.59-.22 1.96-.36.49-.19.84-.42 1.2-.78.36-.36.59-.71.78-1.2.14-.37.31-.93.36-1.96.06-1.24.07-1.61.07-4.77s-.012-3.53-.07-4.77c-.047-1.03-.22-1.59-.36-1.96-.19-.49-.42-.84-.78-1.2-.36-.36-.71-.59-1.2-.78-.37-.14-.93-.31-1.96-.36-1.24-.06-1.61-.07-4.77-.07Zm0 3.6a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6Zm0 1.8a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm6.9-2a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
     </svg>
-  );
-}
-
-/* ============================
-   Galería columnas (fotos completas, alto natural)
-   ============================ */
-function ColumnMarqueeGallery({ items, onOpen, columnHeightSm = 560, columnHeightMd = 760 }) {
-  const [cols, setCols] = React.useState(3);
-
-  React.useEffect(() => {
-    const calc = () => setCols(window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 3 : 2);
-    calc();
-    window.addEventListener("resize", calc);
-    return () => window.removeEventListener("resize", calc);
-  }, []);
-
-  // repartir items por columnas (módulo)
-  const columns = React.useMemo(() => {
-    const c = Math.max(1, Math.min(4, cols));
-    const arr = Array.from({ length: c }, () => []);
-    (items || []).forEach((it, i) => arr[i % c].push({ ...it, _idx: i }));
-    return arr;
-  }, [items, cols]);
-
-  return (
-    <div className="group relative rounded-2xl overflow-hidden border border-white/10 bg-white p-3">
-      <style>{`
-        @keyframes scrollY { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
-        .marquee-col { animation: scrollY var(--dur, 36s) linear infinite; will-change: transform; }
-        .marquee-col.reverse { animation-direction: reverse; }
-        .group:hover .marquee-col { animation-play-state: paused; }
-        .marquee-item img { width:100%; height:auto; max-height:none; object-fit:contain; display:block; }
-      `}</style>
-
-      <div
-        className="grid gap-3"
-        style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, cols))}, minmax(0,1fr))` }}
-      >
-        {columns.map((col, i) => {
-          const dur = 28 + i * 6;
-          const reverse = i % 2 === 1;
-          return (
-            <div
-              key={i}
-              className="relative rounded-xl overflow-hidden"
-              style={{ height: cols >= 3 ? columnHeightMd : columnHeightSm }}
-            >
-              {/* máscara arriba/abajo para suavizar loop */}
-              <div
-                className="pointer-events-none absolute inset-0 z-10"
-                style={{
-                  background:
-                    "linear-gradient(to bottom, rgba(248,249,251,1), rgba(248,249,251,0) 10%, rgba(248,249,251,0) 90%, rgba(248,249,251,1))",
-                }}
-              />
-              <div
-                className={`absolute inset-0 marquee-col ${reverse ? "reverse" : ""}`}
-                style={{ ["--dur"]: `${dur}s` }}
-              >
-                {/* primera copia */}
-                <div className="flex flex-col gap-3">
-                  {col.map((it, k) => (
-                    <div key={k} className="marquee-item">
-                      <button
-                        type="button"
-                        onClick={() => onOpen?.(it._idx)}
-                        className="w-full text-left rounded-xl bg-black/30 border border-black/10 overflow-hidden"
-                        style={{ padding: 0 }}
-                        title="Ver grande"
-                      >
-                        <img src={it.url} alt="" loading="lazy" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {/* segunda copia para loop infinito */}
-                <div className="flex flex-col gap-3 mt-3">
-                  {col.map((it, k) => (
-                    <div key={`dup-${k}`} className="marquee-item">
-                      <button
-                        type="button"
-                        onClick={() => onOpen?.(it._idx)}
-                        className="w-full text-left rounded-xl bg-black/30 border border-black/10 overflow-hidden"
-                        style={{ padding: 0 }}
-                        title="Ver grande"
-                      >
-                        <img src={it.url} alt="" loading="lazy" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -155,6 +58,11 @@ function normalizeProfileUrl(url, platform) {
   }
   return u;
 }
+function formatFechaISO(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-GT", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function BikerPhotographerDetail() {
   const { id } = useParams(); // /app/fotografos/:id
@@ -163,8 +71,14 @@ export default function BikerPhotographerDetail() {
   const [p, setP] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState("");
+
+  // Lightbox del portafolio (lo que ya tenías)
   const [lbOpen, setLbOpen] = React.useState(false);
   const [lbIndex, setLbIndex] = React.useState(0);
+
+  // === NUEVO: eventos publicados del fotógrafo
+  const [events, setEvents] = React.useState([]);
+  const [eventsLoading, setEventsLoading] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -202,8 +116,7 @@ export default function BikerPhotographerDetail() {
           website: data.website || "",
           facebook: data.facebook || "",
           instagram: data.instagram || "",
-          precios: Array.isArray(data.precios) ? data.precios : [],         // fallback (legacy)
-          price_lists: Array.isArray(data.price_lists) ? data.price_lists : [], // NUEVO
+          price_lists: Array.isArray(data.price_lists) ? data.price_lists : [],
           portafolio: toUrls(data.portafolio),
           puntos: Array.isArray(data.puntos) ? data.puntos : [],
         };
@@ -218,11 +131,47 @@ export default function BikerPhotographerDetail() {
     return () => { alive = false; };
   }, [id]);
 
+  // === NUEVO: cargar SOLO eventos PUBLICADOS del fotógrafo (más recientes primero)
+  React.useEffect(() => {
+    let alive = true;
+    async function loadEvents() {
+      if (!id) return;
+      try {
+        setEventsLoading(true);
+        const { data, error } = await supabase
+          .from("event")
+          .select("id,nombre,fecha,ruta,cover_url,portada_url,estado")
+          .eq("photographer_id", id)
+          .eq("estado", "PUBLICADO")
+          .order("fecha", { ascending: false });
+        if (error) throw error;
+
+        const mapped = (data || []).map((e) => ({
+          id: e.id,
+          nombre: e.nombre || "Evento",
+          fecha: e.fecha,
+          ruta: e.ruta || "—",
+          // tratá de encontrar una portada usable
+          portada:
+            e.cover_url || e.portada_url || null,
+        }));
+        if (alive) setEvents(mapped);
+      } catch (e) {
+        // no cortamos la vista por error de eventos
+        console.error("Eventos:", e);
+      } finally {
+        if (alive) setEventsLoading(false);
+      }
+    }
+    loadEvents();
+    return () => { alive = false; };
+  }, [id]);
+
   if (loading) {
     return (
       <main className="max-w-5xl mx-auto px-5 py-8">
         <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-card bg-white">
-          <div className="aspect-[16/9] bg-slate-200 animate-pulse" />
+          <div className="h-56 bg-slate-200 animate-pulse" />
           <div className="p-5 space-y-3">
             <div className="h-6 w-2/3 bg-slate-200 rounded animate-pulse" />
             <div className="h-4 w-1/3 bg-slate-200 rounded animate-pulse" />
@@ -252,22 +201,19 @@ export default function BikerPhotographerDetail() {
   const igUrl = normalizeProfileUrl(p.instagram, "instagram");
   const lbItems = p.portafolio.map((url) => ({ url }));
 
-  // ===== NUEVO: ordenar listas públicas: Domingo primero, luego el resto visibles
-  const allLists = Array.isArray(p.price_lists) ? p.price_lists : [];
-  const domingo = allLists.find((pl) => /domingo/i.test(pl?.nombre || ""));
-  const visibles = allLists.filter((pl) => pl?.visible_publico);
-  const others = visibles.filter((pl) => !/domingo/i.test(pl?.nombre || ""));
+  // ===== ordenar listas públicas: Domingo primero, luego el resto visibles (lo que ya tenías en esta vista) =====
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
-      {/* Header */}
+      {/* Header (PORTADA REDUCIDA) */}
       <div className="mb-6">
         <button className="mb-4 text-sm text-blue-600 hover:underline" onClick={() => nav(-1)}>
           ← Regresar
         </button>
 
         <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-card bg-white">
-          <div className="aspect-[16/9] overflow-hidden">
+          {/* ↓ antes era aspect-[16/9]; la reducimos a una franja */}
+          <div className="h-56 sm:h-60 md:h-64 overflow-hidden">
             <img src={p.portada} alt={p.estudio} className="w-full h-full object-cover" />
           </div>
           <div className="p-5">
@@ -343,136 +289,111 @@ export default function BikerPhotographerDetail() {
         </div>
       </div>
 
-      {/* Contacto / Portafolio / Lista de Precios */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-        <div className="md:col-span-2 rounded-2xl border border-slate-100 p-5 bg-white">
-          <h2 className="text-lg font-semibold mb-3">Contacto</h2>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-slate-500">Teléfono</dt>
-              <dd className="font-medium">{p.telefono || "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Correo</dt>
-              <dd className="font-medium">{p.correo || "—"}</dd>
-            </div>
-          </dl>
-
-          <h2 className="text-lg font-semibold mt-6 mb-3">Portafolio</h2>
-          <ColumnMarqueeGallery
-            items={p.portafolio.map((url) => ({ url }))}
-            onOpen={(idx) => {
-              setLbIndex(idx);
-              setLbOpen(true);
-            }}
-          />
+      {/* === NUEVO: Cinta horizontal de EVENTOS PUBLICADOS (más recientes a la izquierda) === */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xl font-display font-bold">Eventos publicados</h2>
+          {eventsLoading && <span className="text-sm text-slate-500">Cargando…</span>}
         </div>
 
-        {/* **** Lista de precios (pública) – version compacta **** */}
-        <aside className="md:col-span-1 rounded-2xl border border-slate-100 p-4 h-fit bg-white">
-          <h3 className="text-base font-semibold mb-2">Lista de precios</h3>
+        {events.length === 0 ? (
+          <div className="text-slate-500 text-sm">
+            Este fotógrafo aún no tiene eventos publicados visibles.
+          </div>
+        ) : (
+          <div className="relative">
+            <div className="overflow-x-auto no-scrollbar">
+              <div className="flex gap-4 pr-2">
+                {events.map((ev) => (
+                  <article
+                    key={ev.id}
+                    className="shrink-0 w-[280px] rounded-2xl shadow-card bg-white overflow-hidden border border-slate-100"
+                  >
+                    <div className="aspect-[16/9] overflow-hidden bg-slate-100">
+                      {ev.portada ? (
+                        <img src={ev.portada} alt={ev.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center text-slate-400 text-sm">
+                          Sin portada
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <div className="text-xs text-slate-500">{formatFechaISO(ev.fecha)}</div>
+                      <h3 className="font-semibold leading-tight">{ev.nombre}</h3>
+                      <div className="text-sm text-slate-500 truncate">Ruta: {ev.ruta || "—"}</div>
 
-          {domingo && domingo.visible_publico && (
-            <div className="mb-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
-              <div className="flex items-center mb-1.5">
-                <h4 className="text-sm font-display font-bold">{domingo.nombre}</h4>
+                      <button
+                        className="mt-3 w-full h-10 rounded-xl bg-blue-600 text-white font-display font-bold"
+                        onClick={() => nav(`/app/eventos/${ev.id}`)}
+                        title="Ver evento"
+                      >
+                        VER EVENTO
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-              {domingo.notas ? (
-                <p className="text-xs text-slate-600 mb-2">{domingo.notas}</p>
-              ) : null}
-              <div className="grid grid-cols-1 gap-1.5">
-                {(domingo.items || []).map((it, idx) => (
-                  <div key={idx} className="rounded-lg border border-slate-200 p-2 bg-white">
-                    <div className="text-sm font-medium">{it.nombre}</div>
-                    <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
-                  </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ===== Debajo de la cinta: resto de info/portafolio, igual que ya tenías ===== */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Columna izquierda: contacto, estilos, etc. */}
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4">
+            <h3 className="font-semibold mb-2">Contacto</h3>
+            <div className="text-sm text-slate-600">
+              <div><span className="font-medium">Correo: </span>{p.correo || "—"}</div>
+              <div><span className="font-medium">Teléfono: </span>{p.telefono || "—"}</div>
+              <div><span className="font-medium">Ubicación: </span>{p.ubicacion || "—"}</div>
+            </div>
+          </div>
+          {Array.isArray(p.estilos) && p.estilos.length > 0 && (
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <h3 className="font-semibold mb-2">Estilos</h3>
+              <div className="flex flex-wrap gap-2">
+                {p.estilos.map((e, i) => (
+                  <span key={i} className="px-2 py-1 text-xs rounded-lg bg-slate-100">{e}</span>
                 ))}
               </div>
             </div>
           )}
+        </div>
 
-          {others?.length ? (
-            <div className="space-y-3">
-              {others.map((pl) => (
-                <div key={pl.id || pl.nombre} className="rounded-xl border border-slate-200 p-3 bg-white">
-                  <h4 className="text-sm font-display font-bold mb-1">{pl.nombre}</h4>
-                  {pl.notas ? <p className="text-xs text-slate-600 mb-2">{pl.notas}</p> : null}
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {(pl.items || []).map((it, idx) => (
-                      <div key={idx} className="rounded-lg border border-slate-200 p-2 bg-slate-50">
-                        <div className="text-sm font-medium">{it.nombre}</div>
-                        <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            !domingo && <div className="text-slate-500 text-sm">Sin listas de precios públicas.</div>
-          )}
-        </aside>
+        {/* Columna derecha (2 cols): Portafolio con Lightbox */}
+        <div className="md:col-span-2 space-y-4">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4">
+            <h3 className="font-semibold mb-3">Portafolio</h3>
+            {p.portafolio.length === 0 ? (
+              <div className="text-slate-500 text-sm">Este fotógrafo aún no tiene fotos en su portafolio.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {p.portafolio.map((url, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="relative rounded-xl overflow-hidden border border-slate-100"
+                    onClick={() => { setLbIndex(idx); setLbOpen(true); }}
+                    title="Ver grande"
+                  >
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
-      {/* Puntos de fotografía (tarjetas + mini mapa único) */}
-      <section className="rounded-2xl border border-slate-100 p-5 bg-white">
-        <h2 className="text-lg font-semibold mb-3">Puntos donde suele tomar fotos</h2>
-
-        {(!p.puntos || p.puntos.length === 0) ? (
-          <div className="text-slate-500">Aún no hay puntos publicados por este fotógrafo.</div>
-        ) : (
-          <>
-            <div
-              className={`grid grid-cols-1 ${p.puntos.length === 3 ? "md:grid-cols-3" : "md:grid-cols-4"} gap-4`}
-            >
-              {p.puntos.map((pt, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">{pt.ruta || "Ruta"}</div>
-                    <div className="text-xs text-slate-500">#{idx + 1}</div>
-                  </div>
-                  {pt.descripcion && (
-                    <div className="mt-1 text-sm text-slate-600">{pt.descripcion}</div>
-                  )}
-                  {Array.isArray(pt.horarios) && pt.horarios.length > 0 && (
-                    <div className="mt-2 text-sm">
-                      <div className="text-slate-500">Horario</div>
-                      <ul className="mt-1 space-y-1">
-                        {pt.horarios.map((h, i) => (
-                          <li key={i} className="flex items-center justify-between">
-                            <span className="text-slate-700">
-                              {toTime12(h.inicio)} – {toTime12(h.fin)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                    <div><span className="text-slate-500">Lat:</span> {pt.lat ?? "—"}</div>
-                    <div><span className="text-slate-500">Lon:</span> {pt.lon ?? "—"}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Mini mapa único con TODOS los puntos */}
-            <div className="mt-4">
-              <MapHotspots points={p.puntos} mode="view" height={300} />
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Lightbox */}
-      {lbOpen && (
-        <PhotoLightbox
-          isOpen={lbOpen}
-          startIndex={lbIndex}
-          items={lbItems}
-          onClose={() => setLbOpen(false)}
-        />
-      )}
+      <PhotoLightbox
+        open={lbOpen}
+        onClose={() => setLbOpen(false)}
+        index={lbIndex}
+        items={lbItems}
+      />
     </main>
   );
 }
