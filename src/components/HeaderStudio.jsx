@@ -14,7 +14,7 @@ export default function HeaderStudio() {
       localStorage.removeItem("intendedRole");
       localStorage.removeItem("lastRole");
     } catch {}
-    nav("/login-fotografo", { replace: true });
+    nav("/", { replace: true });
   }
 
   return (

@@ -152,6 +152,11 @@ export default function LoginPhotographer() {
           </button>
         </div>
       </div>
+    <div className="mt-6 text-center">
+        <Link to="/" className="text-sm text-slate-400 hover:text-white/90 underline">
+          ← Ir al inicio
+        </Link>
+      </div>
     </main>
   );
 }

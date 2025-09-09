@@ -7,7 +7,7 @@ import AdminAccessLink from "./AdminAccessLink.jsx";
 export default function HeaderUser() {
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
-  const { count, setOpen: openCart } = useCart();
+  const { count, setOpen: openCart, clear } = useCart();
 
   async function handleLogout() {
     try {
@@ -17,7 +17,14 @@ export default function HeaderUser() {
       localStorage.removeItem("intendedRole");
       localStorage.removeItem("lastRole");
     } catch {}
-    nav("/login", { replace: true });
+    // opcional: limpiar carrito al salir (mejor UX para no dejar basura)
+  try { 
+    // si ya estás usando useCart arriba, solo llama clear()
+    // (ya lo tenés importado y en uso por el badge del carrito)
+    // const { clear } = useCart();  <-- ya existe en este header
+    clear?.();
+  } catch {}
+  nav("/", { replace: true });
   }
 
   return (

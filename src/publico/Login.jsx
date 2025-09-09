@@ -146,6 +146,11 @@ export default function Login() {
           </button>
         </div>
       </div>
+    <div className="mt-6 text-center">
+        <Link to="/" className="text-sm text-slate-500 hover:text-slate-700 underline">
+          ← Ir al inicio
+        </Link>
+      </div>
     </main>
   );
 }

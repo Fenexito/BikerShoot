@@ -16,3 +16,42 @@ body { @apply font-sans; }
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ===== Fix selects/inputs en páginas oscuras (Studio) ===== */
+@layer base {
+  /* Controles de formulario dentro del layout oscuro */
+  .bg-studio-bg select,
+  .bg-studio-bg textarea,
+  .bg-studio-bg input[type="text"],
+  .bg-studio-bg input[type="email"],
+  .bg-studio-bg input[type="password"],
+  .bg-studio-bg input[type="number"],
+  .bg-studio-bg input[type="search"],
+  .bg-studio-bg input[type="url"],
+  .bg-studio-bg input[type="tel"],
+  .bg-studio-bg input[type="date"],
+  .bg-studio-bg input[type="time"] {
+    @apply bg-[#111319] text-slate-100 placeholder:text-slate-400 border-white/10;
+  }
+
+  /* Opciones del <select> (el menú desplegable) */
+  .bg-studio-bg option {
+    @apply bg-[#111319] text-slate-100;
+  }
+
+  /* Focus/hover con mejor contraste */
+  .bg-studio-bg select:focus,
+  .bg-studio-bg textarea:focus,
+  .bg-studio-bg input:focus {
+    @apply outline-none ring-2 ring-blue-500/40 border-blue-500/50;
+  }
+
+  /* Quitar el autofill amarillo de Chrome en oscuro */
+  .bg-studio-bg input:-webkit-autofill,
+  .bg-studio-bg input:-webkit-autofill:hover,
+  .bg-studio-bg input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #e5e7eb;
+    -webkit-box-shadow: 0 0 0px 1000px #111319 inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+}
