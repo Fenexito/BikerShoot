@@ -52,7 +52,10 @@ function buildEventPatch(ev) {
     estado: ev.estado,
     precioBase: ev.precioBase,
     notas: ev.notas,
-    price_list_id: ev.price_list_id || null,
+    // Solo guardar si es un UUID válido (la columna en DB es UUID).
+    // Si viene un "pl_abc123" (local), NO lo mandamos para evitar:
+    // "invalid input syntax for type uuid".
+    price_list_id: isValidUuid(ev.price_list_id) ? ev.price_list_id : null,
   };
 }
 
