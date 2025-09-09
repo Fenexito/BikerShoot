@@ -221,7 +221,7 @@ export default function BikerPhotographerDetail() {
     if (id) load();
     return () => { alive = false; };
   }, [id]);
-  // Cargar SOLO eventos PUBLICADOS del fotógrafo (más recientes primero)
+  // Cargar SOLO eventos PUBLICADOS/PUBLISHED del fotógrafo (más recientes primero)
   React.useEffect(() => {
     let alive = true;
     async function loadEvents() {
@@ -229,23 +229,27 @@ export default function BikerPhotographerDetail() {
       try {
         setEventsLoading(true);
         setEventsErr("");
-        // 👇 Ajustá el nombre de la tabla/columnas si tu esquema difiere:
-        // Tabla: 'events' | Columnas: photographer_id, estado ('PUBLICADO'), fecha, portada/cover_url
+        // Tabla real: public.event (singular)
+        // Filtramos por cualquiera de los dos campos de estado que tengas:
+        //   - estado = 'publicado'  (legacy)
+        //   - status = 'published'  (nuevo / política pública)
         const { data, error } = await supabase
-          .from("events")
-          .select("id, nombre, fecha, ruta, portada, cover_url, estado, photographer_id")
+          .from("event")
+          .select("id, nombre, title, fecha, date, ruta, location, cover_url, estado, status, photographer_id")
           .eq("photographer_id", id)
-          .eq("estado", "PUBLICADO")
-          .order("fecha", { ascending: false });
+          .or("estado.eq.publicado,status.eq.published")
+          // Ordena por fecha (si no hay, cae a date)
+          .order("fecha", { ascending: false })
+          .order("date", { ascending: false });
         if (error) throw error;
         if (!alive) return;
-        const mapped = (data || []).map(e => ({
-          id: e.id,
-          nombre: e.nombre || "Evento",
-          fecha: e.fecha || null,
-          ruta: e.ruta || "",
-          portada: e.portada || e.cover_url || "",
-        }));
+        const mapped = (data || []).map(e => {
+          const nombre = e.nombre || e.title || "Evento";
+          const fecha = e.fecha || e.date || null;
+          const ruta = e.ruta || e.location || "";
+          const portada = e.cover_url || ""; // tu tabla expone cover_url
+          return { id: e.id, nombre, fecha, ruta, portada };
+        });
         setEvents(mapped);
       } catch (e) {
         if (!alive) return;
