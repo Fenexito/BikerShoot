@@ -202,7 +202,8 @@ export default function BikerPhotographerDetail() {
           website: data.website || "",
           facebook: data.facebook || "",
           instagram: data.instagram || "",
-          precios: Array.isArray(data.precios) ? data.precios : [],
+          precios: Array.isArray(data.precios) ? data.precios : [],         // fallback (legacy)
+          price_lists: Array.isArray(data.price_lists) ? data.price_lists : [], // NUEVO
           portafolio: toUrls(data.portafolio),
           puntos: Array.isArray(data.puntos) ? data.puntos : [],
         };
@@ -250,6 +251,11 @@ export default function BikerPhotographerDetail() {
   const fbUrl = normalizeProfileUrl(p.facebook, "facebook");
   const igUrl = normalizeProfileUrl(p.instagram, "instagram");
   const lbItems = p.portafolio.map((url) => ({ url }));
+  // ===== NUEVO: ordenar listas públicas: Domingo primero, luego el resto visibles
+  const allLists = Array.isArray(p.price_lists) ? p.price_lists : [];
+  const domingo = allLists.find((pl) => /domingo/i.test(pl?.nombre || ""));
+  const visibles = allLists.filter((pl) => pl?.visible_publico);
+  const others = visibles.filter((pl) => !/domingo/i.test(pl?.nombre || ""));
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-8">
@@ -321,58 +327,66 @@ export default function BikerPhotographerDetail() {
         </div>
       </div>
 
-      {/* Contacto / Portafolio / Precios */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-        <div className="md:col-span-2 rounded-2xl border border-slate-100 p-5 bg-white">
-          <h2 className="text-lg font-semibold mb-3">Contacto</h2>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-slate-500">Teléfono</dt>
-              <dd className="font-medium">{p.telefono || "—"}</dd>
+      {/* **** Lista de precios (pública) **** */}
+        <aside className="rounded-2xl border border-slate-100 p-5 bg-white">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h2 className="text-lg font-semibold">Lista de precios</h2>
+            {wa && (
+              <a
+                href={wa}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center h-10 px-3 rounded-xl bg-green-600 text-white font-display font-bold"
+                title="Contactar por WhatsApp"
+              >
+                Contactar por WhatsApp
+              </a>
+            )}
+          </div>
+
+          {domingo && domingo.visible_publico && (
+            <div className="mb-4 rounded-2xl border border-slate-200 p-4 bg-slate-50">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-base font-display font-bold">{domingo.nombre}</h3>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
+                  Siempre visible
+                </span>
+              </div>
+              {domingo.notas ? (
+                <p className="text-sm text-slate-600 mb-2">{domingo.notas}</p>
+              ) : null}
+              <div className="grid grid-cols-1 gap-2">
+                {(domingo.items || []).map((it, idx) => (
+                  <div key={idx} className="rounded-xl border border-slate-200 p-3 bg-white">
+                    <div className="font-semibold">{it.nombre}</div>
+                    <div className="text-xl font-display font-bold">{formatQ(it.precio)}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <dt className="text-slate-500">Correo</dt>
-              <dd className="font-medium">{p.correo || "—"}</dd>
+          )}
+
+          {others?.length ? (
+            <div className="space-y-4">
+              {others.map((pl) => (
+                <div key={pl.id || pl.nombre} className="rounded-2xl border border-slate-200 p-4 bg-white">
+                  <h3 className="text-base font-display font-bold mb-1">{pl.nombre}</h3>
+                  {pl.notas ? <p className="text-sm text-slate-600 mb-2">{pl.notas}</p> : null}
+                  <div className="grid grid-cols-1 gap-2">
+                    {(pl.items || []).map((it, idx) => (
+                      <div key={idx} className="rounded-xl border border-slate-200 p-3 bg-slate-50">
+                        <div className="font-semibold">{it.nombre}</div>
+                        <div className="text-xl font-display font-bold">{formatQ(it.precio)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          </dl>
-
-          <h2 className="text-lg font-semibold mt-6 mb-3">Portafolio</h2>
-          <ColumnMarqueeGallery
-            items={p.portafolio.map((url) => ({ url }))}
-            onOpen={(idx) => {
-              setLbIndex(idx);
-              setLbOpen(true);
-            }}
-          />
-        </div>
-
-        <aside className="md:col-span-1 rounded-2xl border border-slate-100 p-5 h-fit bg-white">
-          <h3 className="text-lg font-semibold mb-3">Precios</h3>
-          <ul className="space-y-2">
-            {(p.precios || []).map((x, i) => (
-              <li key={i} className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span>{x.nombre}</span>
-                <span className="font-display font-bold">{formatQ(x.precio)}</span>
-              </li>
-            ))}
-          </ul>
-
-          {wa ? (
-            <a
-              href={wa}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 w-full h-11 rounded-xl bg-green-600 hover:bg-green-700 text-white font-display font-bold flex items-center justify-center"
-            >
-              Contactar por WhatsApp
-            </a>
           ) : (
-            <button className="mt-4 w-full h-11 rounded-xl bg-slate-300 text-white font-display font-bold" disabled>
-              Sin teléfono
-            </button>
+            !domingo && <div className="text-slate-500 text-sm">Sin listas de precios públicas.</div>
           )}
         </aside>
-      </section>
 
       {/* Puntos de fotografía (tarjetas + mini mapa único) */}
       <section className="rounded-2xl border border-slate-100 p-5 bg-white">

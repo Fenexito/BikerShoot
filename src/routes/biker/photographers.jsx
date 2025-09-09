@@ -12,12 +12,22 @@ export default function BikerPhotographers() {
     if (!isFinite(n)) return "—";
     return `Q${Number.isInteger(n) ? n : n.toFixed(2)}`;
   };
-  const priceFromOf = (precios) => {
-    if (!Array.isArray(precios)) return null;
-    const nums = precios
-      .map((x) => Number(String(x?.precio ?? "").replace(/[^\d.]/g, "")))
-      .filter((n) => isFinite(n));
-    return nums.length ? Math.min(...nums) : null;
+  // Saca el mínimo precio de listas públicas; si no hay, cae a "precios" (legacy).
+  const priceFromOf = (price_lists, preciosLegacy) => {
+    const numfy = (v) => Number(String(v ?? "").replace(/[^\d.]/g, ""));
+    const fromLists = Array.isArray(price_lists)
+      ? price_lists
+          .filter((pl) => pl?.visible_publico)
+          .flatMap((pl) => (Array.isArray(pl.items) ? pl.items : []))
+          .map((it) => numfy(it?.precio))
+          .filter((n) => isFinite(n))
+      : [];
+    if (fromLists.length) return Math.min(...fromLists);
+    // fallback: precios (legacy)
+    const fromLegacy = Array.isArray(preciosLegacy)
+      ? preciosLegacy.map((x) => numfy(x?.precio)).filter((n) => isFinite(n))
+      : [];
+    return fromLegacy.length ? Math.min(...fromLegacy) : null;
   };
 
   // Estado UI
@@ -56,8 +66,9 @@ export default function BikerPhotographers() {
           ubicacion: r.ubicacion || "",
           estilos: r.estilos || [],
           rating: Number(r.rating || 0),
-          precios: r.precios || [],
-          priceFrom: priceFromOf(r.precios || []),
+          precios: r.precios || [],                 // legacy
+          price_lists: r.price_lists || null,       // NUEVO (si el RPC lo devuelve)
+          priceFrom: priceFromOf(r.price_lists || null, r.precios || []),
           portada: r.portada,
           avatar: r.avatar,
           rutas: r.rutas || [],
