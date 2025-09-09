@@ -406,6 +406,16 @@ export default function EventoEditor() {
     return data.publicUrl;
   }
 
+  // === Helpers para paths de Supabase Storage ===
+  function splitStoragePath(storagePath) {
+    // storagePath típico: "eventos/<eventId>/<pointId>/archivo.jpg"
+    const clean = String(storagePath || "").replace(/^\/+/, "");
+    const parts = clean.split("/").filter(Boolean);
+    const name = parts.pop() || "";
+    const folder = parts.join("/");
+    return { folder, name };
+  }
+
   /* ---- subida ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
     try {
@@ -533,6 +543,69 @@ export default function EventoEditor() {
       console.error("No se pudo limpiar el registro:", e);
       alert("No se pudo limpiar el registro en la base.");
     }
+  }
+
+  // Lista archivos reales en el bucket por carpeta y devuelve un Set con los nombres existentes
+  async function listExistingInBucketByFolder(folder) {
+    // Si folder == "", lista raíz del bucket
+    const { data, error } = await supabase.storage.from("fotos").list(folder || "", { limit: 1000 });
+    if (error) throw error;
+    const set = new Set((data || []).map((f) => f.name));
+    return set;
+  }
+
+  // Reconciliar: compara event_asset vs objetos reales en bucket
+  async function reconcileAssetsWithBucket({ strict = true } = {}) {
+    if (!ev?.id) return;
+    // 1) Agrupar por carpeta de storage
+    const byFolder = new Map();
+    for (const a of fotos) {
+      const { folder, name } = splitStoragePath(a.storage_path);
+      if (!byFolder.has(folder)) byFolder.set(folder, []);
+      byFolder.get(folder).push({ id: a.id, name, storage_path: a.storage_path });
+    }
+    // 2) Listar existentes por carpeta y detectar faltantes
+    const missing = [];
+    for (const [folder, arr] of byFolder.entries()) {
+      let existingSet;
+      try {
+        existingSet = await listExistingInBucketByFolder(folder);
+      } catch (e) {
+        console.warn("No se pudo listar folder:", folder, e?.message || e);
+        continue;
+      }
+      for (const item of arr) {
+        if (!existingSet.has(item.name)) {
+          missing.push(item);
+        }
+      }
+    }
+
+    if (missing.length === 0) {
+      // Si no hay huérfanos, igual refrescamos assets por si cambió algo
+      await refreshAssets();
+      return;
+    }
+
+    // 3) Quitar de la DB los registros huérfanos (opcionalmente con confirm)
+    if (!strict) {
+      // Solo limpiar UI sin tocar DB
+      setFotos((prev) => prev.filter((x) => !missing.some((m) => m.id === x.id)));
+      return;
+    }
+
+    const ok = window.confirm(
+      `Se detectaron ${missing.length} registro(s) sin archivo en el bucket.\n¿Querés eliminarlos también de la base?`
+    );
+    if (!ok) return;
+
+    const ids = missing.map((m) => m.id);
+    const { error } = await supabase.from("event_asset").delete().in("id", ids);
+    if (error) {
+      console.error("No se pudo limpiar huérfanos:", error);
+      alert("No se pudieron eliminar algunos registros huérfanos.");
+    }
+    await refreshAssets();
   }
 
   /* ===== Render ===== */
@@ -779,7 +852,7 @@ export default function EventoEditor() {
             <h3 className="font-semibold">Organizar por punto</h3>
             <button
               className="h-9 px-3 rounded-lg bg-white/10 border border-white/15"
-              onClick={refreshAssets}
+              onClick={() => reconcileAssetsWithBucket({ strict: true })}
               title="Refrescar fotos del evento"
             >
               Refrescar
