@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx";
 import { supabase } from "../../lib/supabaseClient";
+import { useModal, useToast } from "../../state/ui.jsx";
 
 /* ===== Utils ===== */
 const fmtDate = (iso) =>
@@ -85,6 +86,9 @@ export default function EventoEditor() {
 
   // Subida
   const [uploadPoint, setUploadPoint] = useState("");
+  // UI (modal + toasts)
+  const { openModal } = useModal();
+  const { toast } = useToast();
 
   /* ==== Hooks MEMO ==== */
   const fotosPorPunto = useMemo(() => {
@@ -291,24 +295,29 @@ export default function EventoEditor() {
 
   /* ---- Acciones evento ---- */
   async function guardarTodo() {
-    try {
-      const patch = buildEventPatch(ev);
-      const { error } = await supabase.from("event").update(patch).eq("id", ev.id);
-      if (error) throw error;
+    await openModal({
+      variant: "confirm",
+      title: "¿Guardar cambios del evento?",
+      description: "Se actualizará la info del evento y los horarios de cada punto.",
+      confirmText: "Guardar",
+      cancelText: "Cancelar",
+      async: true,
+      onConfirm: async () => {
+        const patch = buildEventPatch(ev);
+        const { error } = await supabase.from("event").update(patch).eq("id", ev.id);
+        if (error) throw error;
 
-      const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
-      if (row) setEv(mapEventRow(row));
+        const { data: row } = await supabase.from("event").select("*").eq("id", ev.id).maybeSingle();
+        if (row) setEv(mapEventRow(row));
 
-      for (const p of puntos) {
-        const windows = [{ start: p.horaIni || "06:00", end: p.horaFin || "12:00" }];
-        await supabase.from("event_hotspot").update({ windows }).eq("id", p.id);
-      }
-
-      alert("Cambios guardados ✨");
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "No se pudo guardar. Probá de nuevo.");
-    }
+        for (const p of puntos) {
+          const windows = [{ start: p.horaIni || "06:00", end: p.horaFin || "12:00" }];
+          await supabase.from("event_hotspot").update({ windows }).eq("id", p.id);
+        }
+        // opcional: brindá feedback extra
+        toast({ type: "success", title: "Cambios guardados", description: "Todo quedó al 100." });
+      },
+    });
   }
 
   async function publicarToggle() {
@@ -507,11 +516,19 @@ export default function EventoEditor() {
       
       setFotos(Array.isArray(rows) ? rows : []);
       
-      alert("✅ Foto subida y registrada exitosamente!");
+      toast({
+        type: "success",
+        title: "Foto subida",
+        description: "Se registró en el evento.",
+      });
       
     } catch (e) {
       console.error("❌ Error en onUploaded:", e);
-      alert("Se subió la foto pero no se pudo registrar en la base. Error: " + e.message);
+      toast({
+        type: "error",
+        title: "Error registrando foto",
+        description: e.message || "Se subió la foto pero no se pudo registrar en la base.",
+      });
     }
   }
 
