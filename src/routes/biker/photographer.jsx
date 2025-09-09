@@ -251,6 +251,7 @@ export default function BikerPhotographerDetail() {
   const fbUrl = normalizeProfileUrl(p.facebook, "facebook");
   const igUrl = normalizeProfileUrl(p.instagram, "instagram");
   const lbItems = p.portafolio.map((url) => ({ url }));
+
   // ===== NUEVO: ordenar listas públicas: Domingo primero, luego el resto visibles
   const allLists = Array.isArray(p.price_lists) ? p.price_lists : [];
   const domingo = allLists.find((pl) => /domingo/i.test(pl?.nombre || ""));
@@ -290,36 +291,51 @@ export default function BikerPhotographerDetail() {
 
             {p.descripcion && <p className="mt-4 text-slate-700">{p.descripcion}</p>}
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              {fbUrl && (
+            {/* Redes a la izquierda + WhatsApp a la derecha */}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                {fbUrl && (
+                  <a
+                    className="px-3 py-2 rounded-lg text-white text-sm inline-flex items-center gap-2 hover:brightness-95"
+                    href={fbUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ backgroundColor: "#1877F2" }}
+                  >
+                    <FacebookIcon className="w-4 h-4" /> Facebook
+                  </a>
+                )}
+                {igUrl && (
+                  <a
+                    className="px-3 py-2 rounded-lg text-white text-sm inline-flex items-center gap-2 hover:brightness-95 bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#515BD4]"
+                    href={igUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <InstagramIcon className="w-4 h-4" /> Instagram
+                  </a>
+                )}
+                {p.website && (
+                  <a
+                    className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm"
+                    href={p.website}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Sitio web
+                  </a>
+                )}
+              </div>
+
+              {wa && (
                 <a
-                  className="px-3 py-2 rounded-lg text-white text-sm inline-flex items-center gap-2 hover:brightness-95"
-                  href={fbUrl}
+                  href={wa}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ backgroundColor: "#1877F2" }}
+                  className="ml-auto h-10 px-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-display font-bold inline-flex items-center justify-center"
+                  title="Contactar por WhatsApp"
                 >
-                  <FacebookIcon className="w-4 h-4" /> Facebook
-                </a>
-              )}
-              {igUrl && (
-                <a
-                  className="px-3 py-2 rounded-lg text-white text-sm inline-flex items-center gap-2 hover:brightness-95 bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#515BD4]"
-                  href={igUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <InstagramIcon className="w-4 h-4" /> Instagram
-                </a>
-              )}
-              {p.website && (
-                <a
-                  className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm"
-                  href={p.website}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Sitio web
+                  Contactar por WhatsApp
                 </a>
               )}
             </div>
@@ -352,39 +368,26 @@ export default function BikerPhotographerDetail() {
           />
         </div>
 
-        {/* **** NUEVO: Lista de precios (pública) **** */}
-        <aside className="md:col-span-1 rounded-2xl border border-slate-100 p-5 h-fit bg-white">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <h3 className="text-lg font-semibold">Lista de precios</h3>
-            {wa ? (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noreferrer"
-                className="h-10 px-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-display font-bold flex items-center justify-center"
-                title="Contactar por WhatsApp"
-              >
-                WhatsApp
-              </a>
-            ) : null}
-          </div>
+        {/* **** Lista de precios (pública) – version compacta **** */}
+        <aside className="md:col-span-1 rounded-2xl border border-slate-100 p-4 h-fit bg-white">
+          <h3 className="text-base font-semibold mb-2">Lista de precios</h3>
 
           {domingo && domingo.visible_publico && (
-            <div className="mb-4 rounded-2xl border border-slate-200 p-4 bg-slate-50">
-              <div className="flex items-center gap-2 mb-2">
-                <h4 className="text-base font-display font-bold">{domingo.nombre}</h4>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
+            <div className="mb-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
+              <div className="flex items-center gap-2 mb-1.5">
+                <h4 className="text-sm font-display font-bold">{domingo.nombre}</h4>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
                   Siempre visible
                 </span>
               </div>
               {domingo.notas ? (
-                <p className="text-sm text-slate-600 mb-2">{domingo.notas}</p>
+                <p className="text-xs text-slate-600 mb-2">{domingo.notas}</p>
               ) : null}
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-1.5">
                 {(domingo.items || []).map((it, idx) => (
-                  <div key={idx} className="rounded-xl border border-slate-200 p-3 bg-white">
-                    <div className="font-semibold">{it.nombre}</div>
-                    <div className="text-xl font-display font-bold">{formatQ(it.precio)}</div>
+                  <div key={idx} className="rounded-lg border border-slate-200 p-2 bg-white">
+                    <div className="text-sm font-medium">{it.nombre}</div>
+                    <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
                   </div>
                 ))}
               </div>
@@ -392,16 +395,16 @@ export default function BikerPhotographerDetail() {
           )}
 
           {others?.length ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {others.map((pl) => (
-                <div key={pl.id || pl.nombre} className="rounded-2xl border border-slate-200 p-4 bg-white">
-                  <h4 className="text-base font-display font-bold mb-1">{pl.nombre}</h4>
-                  {pl.notas ? <p className="text-sm text-slate-600 mb-2">{pl.notas}</p> : null}
-                  <div className="grid grid-cols-1 gap-2">
+                <div key={pl.id || pl.nombre} className="rounded-xl border border-slate-200 p-3 bg-white">
+                  <h4 className="text-sm font-display font-bold mb-1">{pl.nombre}</h4>
+                  {pl.notas ? <p className="text-xs text-slate-600 mb-2">{pl.notas}</p> : null}
+                  <div className="grid grid-cols-1 gap-1.5">
                     {(pl.items || []).map((it, idx) => (
-                      <div key={idx} className="rounded-xl border border-slate-200 p-3 bg-slate-50">
-                        <div className="font-semibold">{it.nombre}</div>
-                        <div className="text-xl font-display font-bold">{formatQ(it.precio)}</div>
+                      <div key={idx} className="rounded-lg border border-slate-200 p-2 bg-slate-50">
+                        <div className="text-sm font-medium">{it.nombre}</div>
+                        <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
                       </div>
                     ))}
                   </div>
