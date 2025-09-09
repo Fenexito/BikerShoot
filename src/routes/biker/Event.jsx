@@ -23,6 +23,13 @@ function shuffle(arr) {
   }
   return a;
 }
+/** Obtener URL pública desde Supabase Storage (bucket 'fotos') */
+function getPublicUrl(storagePath) {
+  if (!storagePath) return "";
+  if (String(storagePath).startsWith("http")) return storagePath;
+  const { data } = supabase.storage.from("fotos").getPublicUrl(storagePath);
+  return data?.publicUrl || "";
+}
 
 /** Mini carrusel (scroll horizontal suave) */
 function MiniCarousel({ images = [] }) {
@@ -113,7 +120,7 @@ export default function BikerEvent() {
     };
   }, [id]);
 
-  /** Carga puntos del evento + assets del evento (una sola consulta) */
+  /** Carga puntos del evento + assets del evento (siguiendo el schema real) */
   React.useEffect(() => {
     let alive = true;
     async function loadHotspotsAndAssets() {
@@ -121,48 +128,41 @@ export default function BikerEvent() {
       try {
         setLoadingPts(true);
 
-        // 1) Puntos del evento (ajustá nombres si difieren)
-        // Sugeridos en tu esquema: public.event_hotspot
-        // Posibles columnas: id, event_id, nombre/name, ruta/location, lat, lon,
-        // start_time/end_time o un JSON horarios
+        // 1) Puntos del evento (schema: event_hotspot con name, windows, lat/lng, route_id)
         const { data: pts, error: errPts } = await supabase
           .from("event_hotspot")
-          .select(
-            "id, event_id, nombre, name, ruta, location, lat, lon, start_time, end_time, horarios"
-          )
+          .select("id, event_id, name, lat, lng, windows, route_id")
           .eq("event_id", id)
-          .order("start_time", { ascending: true });
+          .order("id", { ascending: true });
         if (errPts) throw errPts;
 
-        const mappedPts =
-          (pts || []).map((p) => ({
+        const mappedPts = (pts || []).map((p) => {
+          const w0 = Array.isArray(p.windows) && p.windows[0] ? p.windows[0] : null;
+          return {
             id: p.id,
-            nombre: p.nombre || p.name || "Punto",
-            ruta: p.ruta || p.location || "",
+            nombre: p.name || "Punto",
             lat: p.lat ?? null,
-            lon: p.lon ?? null,
-            start_time: p.start_time || null,
-            end_time: p.end_time || null,
-            horarios: Array.isArray(p.horarios) ? p.horarios : null,
-          })) || [];
+            lng: p.lng ?? null,
+            route_id: p.route_id || null,
+            horaIni: w0?.start || null,
+            horaFin:  w0?.end   || null,
+          };
+        });
 
-        // 2) Todas las fotos del evento (para muestrarios)
-        // Tabla sugerida: public.event_asset
-        // Posibles columnas: id, event_id, hotspot_id, url/asset_url/thumb_url/preview_url, created_at
+        // 2) Fotos del evento: event_asset con storage_path (resolvemos a URL pública)
         const { data: assets, error: errAssets } = await supabase
           .from("event_asset")
-          .select("id, event_id, hotspot_id, url, asset_url, thumb_url, preview_url, created_at")
+          .select("id, event_id, hotspot_id, storage_path, taken_at")
           .eq("event_id", id)
-          .order("created_at", { ascending: false })
+          .order("taken_at", { ascending: false })
           .limit(500);
         if (errAssets) throw errAssets;
 
-        // Normalizar URL de imagen
         const allAssets = (assets || []).map((a) => ({
           id: a.id,
           event_id: a.event_id,
           hotspot_id: a.hotspot_id || null,
-          url: a.thumb_url || a.preview_url || a.url || a.asset_url || "",
+          url: getPublicUrl(a.storage_path),
         }));
 
         // Agrupar por hotspot_id (si existe)
@@ -285,30 +285,18 @@ export default function BikerEvent() {
                   <div>
                     <h3 className="font-semibold leading-tight">{pt.nombre}</h3>
                     <div className="text-sm text-slate-500">
-                      {pt.ruta ? `Ruta: ${pt.ruta}` : ""}
-                      {(pt.lat ?? null) !== null && (pt.lon ?? null) !== null
-                        ? ` · [${pt.lat}, ${pt.lon}]`
+                      {(pt.lat ?? null) !== null && (pt.lng ?? null) !== null
+                        ? `Coordenadas: [${pt.lat}, ${pt.lng}]`
                         : ""}
                     </div>
                   </div>
                   <div className="text-right text-xs text-slate-500">
-                    {/* Horarios: si viene start/end, los mostramos; si viene arreglo horarios, listamos */}
-                    {pt.start_time && (
+                    {pt.horaIni || pt.horaFin ? (
                       <div>
-                        {fmtHora(pt.start_time)}
-                        {pt.end_time ? ` – ${fmtHora(pt.end_time)}` : ""}
+                        {pt.horaIni ? fmtHora(pt.horaIni) : "—"}
+                        {pt.horaFin ? ` – ${fmtHora(pt.horaFin)}` : ""}
                       </div>
-                    )}
-                    {!pt.start_time && Array.isArray(pt.horarios) && pt.horarios.length > 0 && (
-                      <div className="space-y-0.5">
-                        {pt.horarios.slice(0, 2).map((h, i) => (
-                          <div key={i}>
-                            {fmtHora(h.inicio)} {h.fin ? `– ${fmtHora(h.fin)}` : ""}
-                          </div>
-                        ))}
-                        {pt.horarios.length > 2 && <div>+{pt.horarios.length - 2} más</div>}
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 

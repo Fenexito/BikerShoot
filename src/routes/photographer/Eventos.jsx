@@ -49,6 +49,15 @@ export default function StudioEventos() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Ordenar por fecha (más reciente primero) por si acaso
+  const itemsSorted = useMemo(() => {
+    return [...(items || [])].sort((a, b) => {
+      const da = new Date((a?.fecha || "") + "T00:00:00");
+      const db = new Date((b?.fecha || "") + "T00:00:00");
+      return db - da; // descendente
+    });
+  }, [items]);
+
   // perfil -> puntos y listas de precios
   const [profilePoints, setProfilePoints] = useState([]);
   const [priceLists, setPriceLists] = useState([]);
@@ -270,8 +279,8 @@ export default function StudioEventos() {
           No tenés eventos aún. Creá uno para empezar.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {items.map((ev) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {itemsSorted.map((ev) => (
             <CardEvento
               key={ev.id}
               ev={ev}
