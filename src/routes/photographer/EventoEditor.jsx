@@ -373,25 +373,24 @@ export default function EventoEditor() {
 
   /* ---- Función para obtener URL pública ---- */
   function getPublicUrl(storagePath) {
-    if (!storagePath) {
-      console.warn('Storage path está vacío');
-      return '';
-    }
+    if (!storagePath) return '';
     
     // Si ya es una URL completa, la devolvemos tal cual
-    if (storagePath.startsWith('http')) {
-      console.log('Ya es URL completa:', storagePath);
-      return storagePath;
+    if (storagePath.startsWith('http')) return storagePath;
+    
+    // Remover "events/" del inicio si está presente
+    let cleanPath = storagePath;
+    if (storagePath.startsWith('events/')) {
+      cleanPath = storagePath.substring(7); // Remover los primeros 7 caracteres "events/"
     }
     
-    console.log('Construyendo URL para:', storagePath);
+    console.log('Path limpio:', cleanPath);
     
-    // Si es una ruta de Supabase Storage, construimos la URL pública
     const { data } = supabase.storage
-      .from('events') // ← Este es el nombre correcto del bucket
-      .getPublicUrl(storagePath);
+      .from('events')
+      .getPublicUrl(cleanPath);
     
-    console.log('URL generada:', data.publicUrl);
+    console.log('URL final:', data.publicUrl);
     return data.publicUrl;
   }
 
