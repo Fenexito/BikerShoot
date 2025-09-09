@@ -43,8 +43,10 @@ export default function StudioEventos() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // perfil -> puntos -> rutas únicas
+  // perfil -> puntos y listas de precios
   const [profilePoints, setProfilePoints] = useState([]);
+  const [priceLists, setPriceLists] = useState([]);
+
   const rutasDisponibles = useMemo(() => {
     const set = new Set(
       (profilePoints || [])
@@ -54,12 +56,25 @@ export default function StudioEventos() {
     return Array.from(set).sort();
   }, [profilePoints]);
 
+  const listasOrdenadas = useMemo(() => {
+    const arr = Array.isArray(priceLists) ? [...priceLists] : [];
+    // Domingo primero, luego alfabético
+    arr.sort((a, b) => {
+      const A = /domingo/i.test(a?.nombre || "") ? 0 : 1;
+      const B = /domingo/i.test(b?.nombre || "") ? 0 : 1;
+      if (A !== B) return A - B;
+      return String(a?.nombre || "").localeCompare(String(b?.nombre || ""));
+    });
+    return arr;
+  }, [priceLists]);
+
   // modal crear
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({
     nombre: "",
     fecha: todayStr(),
     ruta: "",       // select
+    price_list_id: "",
     precioBase: 50,
     notas: "",
   });
@@ -109,7 +124,7 @@ export default function StudioEventos() {
     return () => (mounted = false);
   }, [authReady, uid]);
 
-  /* ---- cargar puntos del perfil (para rutas) ---- */
+  /* ---- cargar puntos del perfil + listas de precios ---- */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -117,21 +132,36 @@ export default function StudioEventos() {
         if (!authReady || !uid) return;
         const { data, error } = await supabase
           .from("photographer_profile")
-          .select("puntos")
+          .select("puntos, price_lists")
           .eq("user_id", uid)
           .maybeSingle();
         if (error) throw error;
+
+        // puntos
         let pts = [];
-        const raw = data?.puntos;
-        if (Array.isArray(raw)) pts = raw;
-        else if (typeof raw === "string" && raw.trim().startsWith("[")) {
-          try { pts = JSON.parse(raw); } catch {}
+        const rawPts = data?.puntos;
+        if (Array.isArray(rawPts)) pts = rawPts;
+        else if (typeof rawPts === "string" && rawPts.trim().startsWith("[")) {
+          try { pts = JSON.parse(rawPts); } catch {}
         }
+
+        // listas
+        let pls = [];
+        const rawPls = data?.price_lists;
+        if (Array.isArray(rawPls)) pls = rawPls;
+        else if (typeof rawPls === "string" && rawPls.trim().startsWith("[")) {
+          try { pls = JSON.parse(rawPls); } catch {}
+        }
+
         if (!mounted) return;
         setProfilePoints(Array.isArray(pts) ? pts : []);
+        setPriceLists(Array.isArray(pls) ? pls : []);
       } catch (e) {
-        console.warn("perfil puntos error:", e?.message || e);
-        if (mounted) setProfilePoints([]);
+        console.warn("perfil puntos/listas error:", e?.message || e);
+        if (mounted) {
+          setProfilePoints([]);
+          setPriceLists([]);
+        }
       }
     })();
     return () => (mounted = false);
@@ -157,6 +187,7 @@ export default function StudioEventos() {
         estado: "borrador",
         precioBase: Number(form.precioBase || 0),
         notas: form.notas || "",
+        price_list_id: form.price_list_id || null,  // 👈 NUEVO
         photographer_id: uid,
       };
 
@@ -173,7 +204,7 @@ export default function StudioEventos() {
         .insert([{ event_id: inserted.id, name: form.ruta }]);
 
       setOpenNew(false);
-      setForm({ nombre: "", fecha: todayStr(), ruta: "", precioBase: 50, notas: "" });
+      setForm({ nombre: "", fecha: todayStr(), ruta: "", price_list_id: "", precioBase: 50, notas: "" });
       nav(`/studio/eventos/${inserted.id}?tab=puntos`);
     } catch (e) {
       console.error(e);
@@ -184,7 +215,10 @@ export default function StudioEventos() {
   async function togglePublicar(id, estado) {
     try {
       const nuevo = estado === "publicado" ? "borrador" : "publicado";
-      const { error } = await supabase.from("event").update({ estado: nuevo }).eq("id", id);
+      const { error } = await supabase.from("event").update({
+        estado: nuevo,
+        status: nuevo === "publicado" ? "published" : "draft",
+      }).eq("id", id);
       if (error) throw error;
       const { data } = await supabase
         .from("event")
@@ -293,7 +327,28 @@ export default function StudioEventos() {
                   className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
                   value={form.precioBase}
                   onChange={(e) => setForm({ ...form, precioBase: Number(e.target.value || 0) })}
+                  disabled={!!form.price_list_id}
+                  title={form.price_list_id ? "Usando lista de precios" : ""}
                 />
+              </label>
+
+              <label className="block">
+                <div className="text-sm text-slate-300 mb-1">Lista de precios (opcional)</div>
+                <select
+                  className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
+                  value={form.price_list_id || ""}
+                  onChange={(e) => setForm({ ...form, price_list_id: e.target.value || "" })}
+                >
+                  <option value="">— Sin lista (usa precio base) —</option>
+                  {listasOrdenadas.map((pl) => (
+                    <option key={pl.id || pl.nombre} value={pl.id || ""}>{pl.nombre}</option>
+                  ))}
+                </select>
+                {priceLists.length === 0 && (
+                  <div className="text-[12px] text-slate-400 mt-1">
+                    Podés crear listas en tu Perfil &rarr; “Listas de precios”.
+                  </div>
+                )}
               </label>
 
               <label className="block sm:col-span-2">
