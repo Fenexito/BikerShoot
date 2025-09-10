@@ -37,42 +37,46 @@ async function getPublicUrl(storagePath) {
   return signed?.data?.signedUrl || "";
 }
 
-/** Lista todos los assets en 'fotos/eventos/<eventId>/**' y devuelve {hotspot_id,url}[] */
+/** Lista recursivamente en 'fotos/events/<eventId>/**' y devuelve {hotspot_id,url}[] */
 async function listAssetsFromStorage(eventId) {
-  const prefix = `eventos/${eventId}`;
-  const { data: level1, error: e1 } = await supabase.storage.from("fotos").list(prefix, { limit: 1000 });
-  if (e1) return [];
-  const out = [];
-  for (const entry of level1 || []) {
-    if (entry?.id || entry?.name) {
-      const folder = `${prefix}/${entry.name}`;
-      const { data: files, error: e2 } = await supabase.storage.from("fotos").list(folder, { limit: 1000 });
-      if (e2) continue;
-      for (const f of files || []) {
-        if (f?.name) {
-          out.push({
-            hotspot_id: entry.name,
-            storage_path: `${folder}/${f.name}`,
-          });
+  const root = `events/${eventId}`;
+
+  // Lista todos los archivos recursivamente bajo una carpeta dada.
+  async function listAllFiles(folder) {
+    const acc = [];
+    const stack = [folder]; // DFS iterativa
+    while (stack.length) {
+      const cur = stack.pop();
+      const { data, error } = await supabase.storage.from("fotos").list(cur, { limit: 1000 });
+      if (error) continue;
+      for (const entry of data || []) {
+        // Heurística: si tiene extensión, tratamos como archivo; si no, tratamos como subcarpeta.
+        if (entry.name && /\.[a-z0-9]{2,4}$/i.test(entry.name)) {
+          acc.push(`${cur}/${entry.name}`);
+        } else if (entry.name) {
+          stack.push(`${cur}/${entry.name}`);
         }
       }
     }
+    return acc;
   }
-  const { data: directFiles } = await supabase.storage.from("fotos").list(prefix, { limit: 1000 });
-  for (const f of directFiles || []) {
-    if (f?.name) {
-      out.push({
-        hotspot_id: null,
-        storage_path: `${prefix}/${f.name}`,
-      });
-    }
+
+  // Archivos bajo events/<eventId> (pueden estar directo o bajo <hotspotId>/YYYY/MM/...)
+  const allPaths = await listAllFiles(root); // array de 'events/<eventId>/.../archivo.jpg'
+
+  // Derivar hotspot_id de la ruta: events/<eventId>/<hotspotId>/...
+  const result = [];
+  for (const p of allPaths) {
+    const parts = p.split("/").filter(Boolean);
+    // parts: ['events', '<eventId>', '<hotspotId>', ...]
+    const idxEvents = parts.indexOf("events");
+    const evId = parts[idxEvents + 1];
+    const hsId = parts[idxEvents + 2] || null;
+    if (evId !== String(eventId)) continue; // seguridad
+    const url = await getPublicUrl(p);
+    if (url) result.push({ hotspot_id: hsId, storage_path: p, url });
   }
-  const resolved = [];
-  for (const a of out) {
-    const url = await getPublicUrl(a.storage_path);
-    if (url) resolved.push({ ...a, url });
-  }
-  return resolved;
+  return result;
 }
 
 /** Mini carrusel (scroll horizontal suave) */
