@@ -105,7 +105,7 @@ function MiniCarousel({ images = [], intervalMs = 3500, fadeMs = 700 }) {
 
   if (!pics.length) {
     return (
-      <div className="h-40 rounded-xl bg-slate-50 grid place-items-center text-slate-400 text-sm">
+      <div className="h-72 md:h-80 rounded-xl bg-slate-50 grid place-items-center text-slate-400 text-sm">
         Sin fotos de muestra
       </div>
     );
@@ -113,7 +113,7 @@ function MiniCarousel({ images = [], intervalMs = 3500, fadeMs = 700 }) {
 
   return (
     <div
-      className="relative h-40 rounded-xl overflow-hidden border border-slate-100 bg-slate-200"
+      className="relative h-72 md:h-80 rounded-xl overflow-hidden border border-slate-100 bg-slate-200"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
@@ -138,7 +138,7 @@ function MiniCarousel({ images = [], intervalMs = 3500, fadeMs = 700 }) {
           <img
             src={url}
             alt=""
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain" 
             loading="lazy"
             draggable={false}
           />
@@ -351,8 +351,8 @@ export default function BikerEvent() {
         </button>
 
         <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-card bg-white">
-          {/* Portada reducida (misma lógica que usamos en el perfil de fotógrafo) */}
-          <div className="h-56 sm:h-60 md:h-64 overflow-hidden">
+          {/* Portada un poco más grande */}
+          <div className="h-72 md:h-80 lg:h-96 overflow-hidden">
             <img src={evt.portada} alt={evt.nombre} className="w-full h-full object-cover" />
           </div>
           <div className="p-5">
@@ -390,7 +390,7 @@ export default function BikerEvent() {
           <div className="text-slate-500 text-sm">Este evento no tiene puntos configurados.</div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {hotspots.map((pt, idx) => (
             <article
               key={pt.id || idx}
@@ -400,11 +400,6 @@ export default function BikerEvent() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold leading-tight">{pt.nombre}</h3>
-                    <div className="text-sm text-slate-500">
-                      {(pt.lat ?? null) !== null && (pt.lng ?? null) !== null
-                        ? `Coordenadas: [${pt.lat}, ${pt.lng}]`
-                        : ""}
-                    </div>
                   </div>
                   <div className="text-right text-xs text-slate-500">
                     {pt.horaIni || pt.horaFin ? (

@@ -741,10 +741,16 @@ export default function EventoEditor() {
                 <input className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3" value={ev.ruta} readOnly />
               </Field>
 
-              {/* Si hay lista (uuid o key), NO mostramos precio base */}
-              {!(ev.price_list_id || ev.price_list_key) && (
+              {/* Si hay lista seleccionada, no mostramos precio base */}
+              {!ev.price_list_id && (
                 <Field label="Precio base (Q)">
-                  <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => setEv({ ...ev, precioBase: Number(e.target.value || 0) })} />
+                  <input
+                    type="number"
+                    min={1}
+                    className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
+                    value={ev.precioBase || 50}
+                    onChange={(e) => setEv({ ...ev, precioBase: Number(e.target.value || 0) })}
+                  />
                 </Field>
               )}
 
