@@ -101,6 +101,9 @@ export default function EventoEditor() {
   const { openModal } = useModal();
   const { toast } = useToast();
 
+  // Handlers de portada (upload/cambiar/eliminar)
+  const { handleCoverPick, removeCover } = useCoverHandlers(ev, setEv, toast, setLbOpen);
+
   // Lightbox de portada
   const [lbOpen, setLbOpen] = useState(false);
 
@@ -1050,14 +1053,56 @@ async function setCoverUrl(eventId, url) {
   if (error) throw error;
 }
 
-/* NOTA: Estos handlers usan `this`? No; el compilador de React
-   moverá las referencias arriba. Los consumimos vía `handleCoverPick/removeCover`
-   que tienen acceso a `ev`, `setEv`, `toast` en el scope del componente. */
-function bindCoverHandlers(ctx) {
-  return {
-    handleCoverPick: async (e) => {
-    },
-    removeCover: async () => {
-    },
+// ==== Bind handlers de portada al scope del componente ====
+export function useCoverHandlers(ev, setEv, toast, setLbOpen) {
+  const handleCoverPick = async (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!ev?.id) throw new Error("Evento inválido");
+      const publicUrl = await uploadCoverToStorage(file, ev.id);
+      await setCoverUrl(ev.id, publicUrl);
+      setEv((o) => ({ ...o, cover_url: publicUrl }));
+      toast({
+        type: "success",
+        title: "Portada actualizada",
+        description: "Se cambió la imagen de portada.",
+        position: "bottom-right"
+      });
+      // reset input
+      e.target.value = "";
+    } catch (err) {
+      console.error(err);
+      toast({
+        type: "error",
+        title: "No se pudo subir la portada",
+        description: err.message || "Error subiendo imagen.",
+        position: "bottom-right"
+      });
+    }
   };
+
+  const removeCover = async () => {
+    try {
+      if (!ev?.id) return;
+      await setCoverUrl(ev.id, null);
+      setEv((o) => ({ ...o, cover_url: null }));
+      toast({
+        type: "success",
+        title: "Portada eliminada",
+        description: "Se quitó la portada del evento.",
+        position: "bottom-right"
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        type: "error",
+        title: "No se pudo eliminar la portada",
+        description: err.message || "Error actualizando evento.",
+        position: "bottom-right"
+      });
+    }
+  };
+
+  return { handleCoverPick, removeCover };
 }
