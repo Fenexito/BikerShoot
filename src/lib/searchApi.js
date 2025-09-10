@@ -111,13 +111,11 @@ export async function fetchPhotographers(ids = []) {
  * - fin?: 'HH:MM'
  * - photographer_ids?: string[]
  */
+
 export async function fetchPhotos(params = {}) {
   const {
     event_id,
     hotspot_ids = [],
-    fecha = "",
-    inicio = "",
-    fin = "",
     photographer_ids = [],
   } = params;
 
@@ -130,18 +128,11 @@ export async function fetchPhotos(params = {}) {
   if (Array.isArray(hotspot_ids) && hotspot_ids.length > 0) q = q.in("hotspot_id", hotspot_ids);
   if (Array.isArray(photographer_ids) && photographer_ids.length > 0) q = q.in("photographer_id", photographer_ids);
 
-  // Filtrado por hora si viene fecha + rango
-  if (fecha && (inicio || fin)) {
-    // Construimos ISO aproximado local (sin TZ server): YYYY-MM-DDTHH:MM:SS
-    const iniIso = `${fecha}T${(inicio || "00:00").slice(0,5)}:00`;
-    const finIso = `${fecha}T${(fin || "23:59").slice(0,5)}:59`;
-    q = q.gte("taken_at", iniIso).lte("taken_at", finIso);
-  }
+  // NOTA: ya NO filtramos por hora en SQL; eso se hace en el front para evitar líos de TZ.
 
   const { data, error } = await q;
   if (error) throw error;
 
-  // Resolver URLs
   const out = [];
   for (const row of data || []) {
     const url = await getPublicUrl(row.storage_path);
@@ -152,15 +143,10 @@ export async function fetchPhotos(params = {}) {
       hotspotId: row.hotspot_id || null,
       photographerId: row.photographer_id || null,
       timestamp: row.taken_at || null,
-      // Campos que tu UI actual usa:
-      route: "",            // lo resolvemos afuera si hace falta
-      aiConfidence: 0,      // inicial 0; si luego agregas IA real, aquí se rellena
-      riders: 1,            // placeholder (tu UI lo soporta)
-      areas: {              // placeholder para filtros de color
-        moto: [],
-        casco: [],
-        chaqueta: [],
-      },
+      route: "",
+      aiConfidence: 0,
+      riders: 1,
+      areas: { moto: [], casco: [], chaqueta: [] },
     });
   }
   return out;
