@@ -44,13 +44,14 @@ function mapEventRow(row) {
     precioBase: row.precioBase ?? row.base_price ?? 50,
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
+    price_list_key: row.price_list_key ?? null,
     photographer_id: row.photographer_id ?? row.created_by ?? null,
     cover_url: row.cover_url || row.portada_url || row.portada || row.cover || null, // ← portada
   };
 }
 
 function buildEventPatch(ev) {
-  return {
+  const patchBase = {
     title: ev.nombre,
     date: ev.fecha,
     status: ev.estado === "publicado" ? "published" : "draft",
@@ -62,10 +63,22 @@ function buildEventPatch(ev) {
     precioBase: ev.precioBase,
     notas: ev.notas,
     cover_url: ev.cover_url || null, // ← portada
-    // Solo guardar si es un UUID válido (la columna en DB es UUID).
-    price_list_id: isValidUuid(ev.price_list_id) ? ev.price_list_id : null,
   };
-}
+    // Persistir selección de lista:
+    // - Si es UUID => price_list_id
+    // - Si es "pl_xxx" u otra clave => price_list_key
+    if (isValidUuid(ev.price_list_id)) {
+      patchBase.price_list_id = ev.price_list_id;
+      patchBase.price_list_key = null;
+    } else if (ev.price_list_key) {
+      patchBase.price_list_id = null;
+      patchBase.price_list_key = ev.price_list_key;
+    } else {
+      patchBase.price_list_id = null;
+      patchBase.price_list_key = null;
+    }
+    return patchBase;
+    };
 
 function isValidUuid(uuid) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -655,7 +668,9 @@ export default function EventoEditor() {
       </>
     );
 
-  const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
+  const plKeyOf = (pl) => String(pl?.id ?? pl?.key ?? pl?.nombre ?? "");
+  const currentPlKey = String(ev.price_list_id || ev.price_list_key || "");
+  const selectedList = priceLists.find((pl) => plKeyOf(pl) === currentPlKey) || null;
   const estadoTag = ev.estado === "publicado"
     ? { text: "Publicado", bg: "bg-emerald-600", ring: "ring-emerald-400/30" }
     : { text: "Borrador",  bg: "bg-amber-600",   ring: "ring-amber-400/30" };
@@ -726,21 +741,34 @@ export default function EventoEditor() {
                 <input className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3" value={ev.ruta} readOnly />
               </Field>
 
-              {/* Si hay lista, NO mostramos precio base */}
-              {!ev.price_list_id && (
+              {/* Si hay lista (uuid o key), NO mostramos precio base */}
+              {!(ev.price_list_id || ev.price_list_key) && (
                 <Field label="Precio base (Q)">
                   <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => setEv({ ...ev, precioBase: Number(e.target.value || 0) })} />
                 </Field>
               )}
 
-              <Field label="Lista de precios (opcional)">
-                <select className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.price_list_id || ""} onChange={(e) => setEv({ ...ev, price_list_id: e.target.value || null })}>
-                  <option value="">— Sin lista (usa precio base)</option>
-                  {priceLists.map((pl) => (
-                    <option key={pl.id} value={pl.id}>{pl.nombre}</option>
-                  ))}
-                </select>
-              </Field>
+              <Field label="Lista de precios">
+              <select
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
+                value={ev.price_list_id || ev.price_list_key || ""}
+                onChange={(e) => {
+                  const val = e.target.value || "";
+                  if (isValidUuid(val)) {
+                    setEv({ ...ev, price_list_id: val, price_list_key: null });
+                  } else {
+                    setEv({ ...ev, price_list_id: null, price_list_key: val || null });
+                  }
+                }}
+              >
+                <option value="">— Sin lista (usa precio base)</option>
+                {priceLists.map((pl) => (
+                  <option key={pl.id ?? pl.key ?? pl.nombre} value={pl.id ?? pl.key ?? pl.nombre}>
+                    {pl.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
               <Field label="Notas (privadas)" full>
                 <textarea rows={3} className="w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 py-2" value={ev.notas || ""} onChange={(e) => setEv({ ...ev, notas: e.target.value })} />
@@ -756,7 +784,7 @@ export default function EventoEditor() {
                     <img
                       src={ev.cover_url}
                       alt="Portada del evento"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover object-center"
                       onClick={() => setLbOpen(true)}
                       title="Ver grande"
                     />
@@ -793,7 +821,7 @@ export default function EventoEditor() {
                     )}
                   </div>
                   <p className="mt-2 text-xs text-slate-400">
-                    Recomendado 16:9 (ej. 1600×900). Se guardará en el bucket <code>fotos</code>.
+                    Recomendado 16:9 (ej. 1600×900).
                   </p>
                 </div>
               </div>
@@ -817,7 +845,7 @@ export default function EventoEditor() {
             </div>
 
             {/* Lista de precios seleccionada (vista pública) */}
-            {ev.price_list_id && selectedList ? (
+            {(ev.price_list_id || ev.price_list_key) && selectedList ? (
               <div className="mt-4 rounded-xl border border-white/10 p-3 bg-white/5">
                 <div className="text-xs text-slate-400 mb-1">Lista de precios</div>
                 <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
