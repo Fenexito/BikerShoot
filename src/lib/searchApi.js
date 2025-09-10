@@ -216,8 +216,7 @@ export async function fetchPhotos(params = {}) {
     photographer_ids = [],
   } = params;
 
-  // 1) Si hay fotógrafos seleccionados y NO tenemos event_id fijo,
-  //    mapeamos fotógrafos -> eventos y filtramos por event_id (en vez de photographer_id en assets)
+  // Mapear fotógrafos -> eventos (si no vino un event_id fijo)
   let eventIdsFromPhotogs = [];
   if (!event_id && Array.isArray(photographer_ids) && photographer_ids.length > 0) {
     try {
@@ -232,7 +231,7 @@ export async function fetchPhotos(params = {}) {
     }
   }
 
-  // 2) Query principal contra event_asset
+  // Query principal contra event_asset
   let q = supabase
     .from("event_asset")
     .select("id, event_id, hotspot_id, storage_path, taken_at")
@@ -248,81 +247,25 @@ export async function fetchPhotos(params = {}) {
     q = q.in("hotspot_id", hotspot_ids);
   }
 
-  let { data, error } = await q;
-  if (error) {
-    console.warn("event_asset fail:", error.message);
+  const { data, error } = await q;
+  if (error) throw error;
+
+  const out = [];
+  for (const row of data || []) {
+    const url = await getPublicUrl(row.storage_path);
+    if (!url) continue;
+    out.push({
+      id: row.id,
+      url,
+      eventId: row.event_id || null,
+      hotspotId: row.hotspot_id || null,
+      photographerId: null,
+      timestamp: row.taken_at || null,
+      route: "",
+      aiConfidence: 0,
+      riders: 1,
+      areas: { moto: [], casco: [], chaqueta: [] },
+    });
   }
-
-  // 3) Normalizar filas a tu UI
-  const normalize = async (rows) => {
-    const out = [];
-    for (const row of rows || []) {
-      const url = await getPublicUrl(row.storage_path);
-      if (!url) continue;
-      out.push({
-        id: row.id,
-        url,
-        eventId: row.event_id || null,
-        hotspotId: row.hotspot_id || null,
-        photographerId: null, // no confiamos en esta col
-        timestamp: row.taken_at || null,
-        route: "",
-        aiConfidence: 0,
-        riders: 1,
-        areas: { moto: [], casco: [], chaqueta: [] },
-      });
-    }
-    return out;
-  };
-
-  let list = await normalize(data);
-
-  // 4) Fallback a tabla `foto` (por si tu proyecto usa esa legacy)
-  if (!list || list.length === 0) {
-    try {
-      let q2 = supabase
-        .from("foto")
-        .select("id, event_id, hotspot_id, storage_path, path, url, taken_at, created_at")
-        .order("created_at", { ascending: false });
-
-      if (event_id) {
-        q2 = q2.eq("event_id", event_id);
-      } else if (eventIdsFromPhotogs.length > 0) {
-        q2 = q2.in("event_id", eventIdsFromPhotogs);
-      }
-
-      if (Array.isArray(hotspot_ids) && hotspot_ids.length > 0) {
-        q2 = q2.in("hotspot_id", hotspot_ids);
-      }
-
-      const { data: d2, error: e2 } = await q2;
-      if (e2) throw e2;
-
-      const out = [];
-      for (const row of d2 || []) {
-        const path =
-          row.storage_path || row.path || row.url || null;
-        if (!path) continue;
-        const url = await getPublicUrl(path);
-        if (!url) continue;
-        out.push({
-          id: row.id,
-          url,
-          eventId: row.event_id || null,
-          hotspotId: row.hotspot_id || null,
-          photographerId: null,
-          timestamp: row.taken_at || row.created_at || null,
-          route: "",
-          aiConfidence: 0,
-          riders: 1,
-          areas: { moto: [], casco: [], chaqueta: [] },
-        });
-      }
-      list = out;
-    } catch (e) {
-      console.warn("fallback foto fail:", e.message);
-    }
-  }
-
-  return list || [];
+  return out;
 }

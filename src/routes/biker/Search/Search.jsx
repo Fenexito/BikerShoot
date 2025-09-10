@@ -166,22 +166,25 @@ export default function BikerSearch() {
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
   });
 
-  const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs"))); // ids
+  // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
+  const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
   const [selHotspots, setSelHotspots] = useState(() => {
-    const unique = params.get("hotspot") || params.get("hotspots");
-    return csvToArr(unique); // nombres de punto
+    // Soportamos ?punto=<nombre> además de ?hotspot=<id> (el id lo traducimos a nombre abajo)
+    const fromPunto = params.get("punto");
+    return fromPunto ? [fromPunto] : [];
   });
 
-  const forcedFromEvent = !!(params.get("evento") || params.get("hotspot"));
+  const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
   const [confIA, setConfIA] = useState(() =>
     params.has("conf") ? Number(params.get("conf")) : forcedFromEvent ? 0 : 70
   );
 
-  // catálogos (desde RPC get_photographers_cards)
-  const [rows, setRows] = useState([]);         // fotógrafos + rutas + puntos (strings)
+  // catálogos (RPC)
+  const [rows, setRows] = useState([]);         // {id, rutas[], puntos[]}
   const [loading, setLoading] = useState(false);
+  const [catalogReady, setCatalogReady] = useState(false);
 
-  // resolutores para mostrar nombres en resultados
+  // resolutores
   const [resolver, setResolver] = useState({
     photographerById: new Map(),   // id -> {label}
     hotspotById: new Map(),        // hotspot_id -> {name}
@@ -190,55 +193,50 @@ export default function BikerSearch() {
   // fotos
   const [allPhotos, setAllPhotos] = useState([]);
 
-  /* ---------- si venís de ?evento/?hotspot ---------- */
+  /* ---------- si venís de ?evento/?hotspot: prefills ---------- */
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const evento = params.get("evento");
-        const hotspotParam = params.get("hotspot");
-        let photographer_id = null;
-
-        if (evento) {
-          const ev = await fetchEvent(evento);
-          if (ev) {
-            const r = ev.ruta && RUTAS_FIJAS.includes(ev.ruta) ? ev.ruta : null;
-            if (!params.get("ruta") && r) setRuta(r);
-            if (!params.get("fecha") && ev.fecha) setFecha(ev.fecha.slice(0, 10));
-            if (ev.photographer_id) photographer_id = String(ev.photographer_id);
-
-            const pts = await fetchHotspotsByEvent(evento);
-            if (!alive) return;
-            const hsMap = new Map(pts.map((p) => [String(p.id), { name: p.name }]));
-            setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          }
-        }
-
+        const hotspotParam = params.get("hotspot"); // UUID real
         if (hotspotParam) {
           const hs = await fetchHotspot(hotspotParam);
           if (hs) {
-            if (!params.get("inicio") && hs.horaIni) setIniStep(clampStep(timeToStep(hs.horaIni)));
-            if (!params.get("fin") && hs.horaFin) setFinStep(clampStep(timeToStep(hs.horaFin)));
+            // ruta por route_id del hotspot
             if (!params.get("ruta") && hs.route_id) {
               const name = await getRouteName(hs.route_id);
               if (name && RUTAS_FIJAS.includes(name)) setRuta(name);
             }
-            if (!selHotspots.length) setSelHotspots([String(hs.name)]); // nombre de punto
-
-            // === NUEVO: preseleccionar FOTÓGRAFO dueñ@ del evento del hotspot ===
-           if (!selPhotogs.length && hs.event_id) {
-             const evOfHotspot = await fetchEvent(hs.event_id);
-             if (evOfHotspot?.photographer_id) {
-               setSelPhotogs([String(evOfHotspot.photographer_id)]);
-             }
-           }
+            // horas
+            if (!params.get("inicio") && hs.horaIni) setIniStep(clampStep(timeToStep(hs.horaIni)));
+            if (!params.get("fin") && hs.horaFin) setFinStep(clampStep(timeToStep(hs.horaFin)));
+            // punto por NOMBRE (lo convierte a opción del multi)
+            if (!params.get("punto") && hs.name) {
+              setSelHotspots([String(hs.name)]);
+            }
+            // fotógrafo dueño del evento del hotspot
+            if (!selPhotogs.length && hs.event_id) {
+              const evOfHotspot = await fetchEvent(hs.event_id);
+              if (evOfHotspot?.photographer_id) {
+                setSelPhotogs([String(evOfHotspot.photographer_id)]);
+              }
+            }
           }
         }
+        // Si vino explícito ?photogs=
+        const photogsCsv = params.get("photogs");
+        if (photogsCsv && !selPhotogs.length) {
+          setSelPhotogs(csvToArr(photogsCsv));
+        }
 
-        // si venía fotógrafo amarrado
-        const photogsCsv = params.get("photogs") || (photographer_id ? photographer_id : "");
-        const photogIds = csvToArr(photogsCsv);
-        if (!selPhotogs.length && photogIds.length) setSelPhotogs(photogIds);
+        // Resolver del evento (si vino ?evento=) para nombres de hotspots directos
+        const evento = params.get("evento");
+        if (evento) {
+          const pts = await fetchHotspotsByEvent(evento);
+          if (!alive) return;
+          const hsMap = new Map(pts.map((p) => [String(p.id), { name: p.name }]));
+          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+        }
       } catch (e) {
         console.error("Preconfig buscar:", e);
       }
@@ -247,21 +245,23 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- cargar fotógrafos y puntos vía RPC (igual a photographers.jsx) ---------- */
+  /* ---------- cargar fotógrafos y puntos vía RPC (igual photographers.jsx) ---------- */
   useEffect(() => {
     let alive = true;
+    setCatalogReady(false);
     (async () => {
       try {
         if (ruta === "Todos") {
           setRows([]);
           setResolver((prev) => ({ ...prev, photographerById: new Map() }));
+          setCatalogReady(true);
           return;
         }
         setLoading(true);
         const { data, error } = await supabase.rpc("get_photographers_cards", {
           q: null,
-          ruta,          // filtra por la ruta seleccionada
-          punto: null,   // acá no filtramos por nombre de punto (queremos TODOS los de esa ruta)
+          ruta,
+          punto: null,
           orden: "nombre",
           limit_n: 500,
           offset_n: 0,
@@ -274,7 +274,7 @@ export default function BikerSearch() {
           estudio: r.estudio,
           username: (r.username || "").replace(/^@/, ""),
           rutas: Array.isArray(r.rutas) ? r.rutas : [],
-          puntos: Array.isArray(r.puntos) ? r.puntos : [], // asumimos strings
+          puntos: Array.isArray(r.puntos) ? r.puntos : [], // strings (nombres)
         }));
         setRows(mapped);
 
@@ -289,7 +289,10 @@ export default function BikerSearch() {
       } catch (e) {
         console.error("RPC get_photographers_cards:", e);
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+          setCatalogReady(true);
+        }
       }
     })();
     return () => { alive = false; };
@@ -297,16 +300,13 @@ export default function BikerSearch() {
 
   /* ---------- opciones para selects (multi) ---------- */
   const photogOptions = useMemo(() => {
-    // fotógrafos que SÍ tienen la ruta (por si el RPC trae alguno sin esa ruta)
     const list = rows.filter((r) => (r.rutas || []).includes(ruta));
-    // si hay selección previa que no exista, se limpia abajo
     return list
       .map((p) => ({ value: p.id, label: resolver.photographerById.get(p.id)?.label || p.id }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [rows, ruta, resolver.photographerById]);
 
   const hotspotOptions = useMemo(() => {
-    // puntos según ruta y (opcional) fotógrafos seleccionados
     const base = rows.filter((r) => (r.rutas || []).includes(ruta));
     const filteredByPhotog =
       selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
@@ -321,8 +321,32 @@ export default function BikerSearch() {
       .map((name) => ({ value: name, label: name }));
   }, [rows, ruta, arrToCsv(selPhotogs)]);
 
-  // depurar selecciones inválidas al cambiar opciones
+  /* ---------- aplicar prefill SOLO cuando ya hay catálogo ---------- */
   useEffect(() => {
+    if (!catalogReady) return;
+
+    // Si venís con ?punto= o lo seteamos desde ?hotspot= → ya está en selHotspots.
+    // Si ese punto no existe en opciones (por timing), ahora sí quedará.
+    const puntoParam = params.get("punto");
+    if (puntoParam && !selHotspots.length) {
+      const ok = hotspotOptions.some((o) => o.value === puntoParam);
+      if (ok) setSelHotspots([puntoParam]);
+    }
+
+    // Si venís con ?photogs= y no existía al inicio, ahora sí está en opciones
+    const photogsCsv = params.get("photogs");
+    if (photogsCsv && !selPhotogs.length) {
+      const ids = csvToArr(photogsCsv);
+      const validIds = new Set(photogOptions.map((o) => String(o.value)));
+      const keep = ids.filter((id) => validIds.has(id));
+      if (keep.length) setSelPhotogs(keep);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogReady, photogOptions.length, hotspotOptions.length]);
+
+  /* ---------- NO limpiar selecciones hasta que el catálogo esté listo ---------- */
+  useEffect(() => {
+    if (!catalogReady) return;
     const validPhotogIds = new Set(photogOptions.map((o) => String(o.value)));
     const cleanedPhotogs = selPhotogs.filter((id) => validPhotogIds.has(String(id)));
     if (cleanedPhotogs.length !== selPhotogs.length) setSelPhotogs(cleanedPhotogs);
@@ -331,7 +355,7 @@ export default function BikerSearch() {
     const cleanedHotspots = selHotspots.filter((nm) => validHotspotNames.has(String(nm)));
     if (cleanedHotspots.length !== selHotspots.length) setSelHotspots(cleanedHotspots);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photogOptions.length, hotspotOptions.length]);
+  }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
   /* ---------- cargar fotos (mapear nombres de punto -> hotspot_id reales) ---------- */
   useEffect(() => {
@@ -348,7 +372,6 @@ export default function BikerSearch() {
           } else {
             const allHs = await getAllHotspotsForRoute(ruta);
             hotspot_ids = allHs.map((h) => String(h.id));
-            // resolver nombres
             const hsMap = new Map(allHs.map((h) => [String(h.id), { name: h.name }]));
             if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
           }
@@ -362,8 +385,8 @@ export default function BikerSearch() {
 
         if (!alive) return;
 
-        // si no teníamos resolver de hotspot, construirlo con lo que vino (por si faltó algún nombre)
-        if (fotos.length && resolver.hotspotById.size === 0) {
+        // Resolver de hotspot si faltó algo
+        if (fotos.length && resolver.hotspotById.size === 0 && ruta !== "Todos") {
           const ids = Array.from(new Set(fotos.map((f) => String(f.hotspotId)).filter(Boolean)));
           if (ids.length) {
             const routeId = await getRouteIdByName(ruta);
@@ -503,9 +526,7 @@ export default function BikerSearch() {
           <div className="min-w-[220px]">
             <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
             <MultiSelectCheckbox
-              options={
-                photogOptions
-              }
+              options={photogOptions}
               value={selPhotogs}
               onChange={setSelPhotogs}
               placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
@@ -516,9 +537,7 @@ export default function BikerSearch() {
           <div className="min-w-[220px]">
             <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
             <MultiSelectCheckbox
-              options={
-                hotspotOptions
-              }
+              options={hotspotOptions}
               value={selHotspots}
               onChange={setSelHotspots}
               placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
