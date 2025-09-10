@@ -367,7 +367,10 @@ export default function BikerSearch() {
 
         // mapear nombres de punto a ids reales (event_hotspot)
         let hotspot_ids = [];
+        let route_id = null;
         if (ruta !== "Todos") {
+          // resolvemos el route_id para filtrar eventos del fotógrafo
+          route_id = await getRouteIdByName(ruta);
           if (selHotspots.length > 0) {
             hotspot_ids = await mapPointNamesToHotspotIds(ruta, selHotspots);
           } else {
@@ -382,6 +385,7 @@ export default function BikerSearch() {
           event_id: params.get("evento") || undefined,
           hotspot_ids: hotspot_ids.length ? hotspot_ids : undefined,
           photographer_ids: selPhotogs.length ? selPhotogs : undefined,
+          route_id: route_id || undefined,
         });
 
         if (!alive) return;
