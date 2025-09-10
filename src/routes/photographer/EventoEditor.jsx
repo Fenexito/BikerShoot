@@ -662,9 +662,12 @@ export default function EventoEditor() {
       </>
     );
 
-  const selectedList = isValidUuid(ev.price_list_id)
-    ? priceLists.find((pl) => String(pl?.id || "") === String(ev.price_list_id))
-    : null;
+  const selectedList = (uiSelectedPl
+    ? priceLists.find((pl) => String(pl?.id ?? pl?.key ?? pl?.nombre ?? "") === String(uiSelectedPl))
+    : (isValidUuid(ev.price_list_id)
+        ? priceLists.find((pl) => String(pl?.id || "") === String(ev.price_list_id))
+        : null)
+  );
 
   const estadoTag = ev.estado === "publicado"
     ? { text: "Publicado", bg: "bg-emerald-600", ring: "ring-emerald-400/30" }
@@ -736,8 +739,8 @@ export default function EventoEditor() {
                 <input className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3" value={ev.ruta} readOnly />
               </Field>
 
-              {/* Si hay lista seleccionada, no mostramos precio base */}
-              {!ev.price_list_id && (
+              {/* Si hay lista seleccionada (UI o guardada), no mostramos precio base */}
+              {!(ev.price_list_id || uiSelectedPl) && (
                 <Field label="Precio base (Q)">
                   <input
                     type="number"
@@ -767,12 +770,6 @@ export default function EventoEditor() {
                     </option>
                   ))}
                 </select>
-                {/* Aviso si la opción elegida no es UUID (no se guardará en la DB) */}
-                {uiSelectedPl && !isValidUuid(uiSelectedPl) && (
-                  <div className="mt-1 text-xs text-amber-300">
-                    Esta lista no tiene ID válido (UUID). No se podrá asignar al evento hasta que tenga un UUID.
-                  </div>
-                )}
               </Field>
 
               <Field label="Notas (privadas)" full>
