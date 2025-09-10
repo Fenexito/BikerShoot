@@ -385,7 +385,7 @@ export default function BikerSearch() {
           event_id: params.get("evento") || undefined,
           hotspot_ids: hotspot_ids.length ? hotspot_ids : undefined,
           photographer_ids: selPhotogs.length ? selPhotogs : undefined,
-          route_id: route_id || undefined,
+          route_id: route_id || undefined, // 👈 importante
         });
 
         if (!alive) return;

@@ -129,61 +129,77 @@ export async function fetchPhotos(params = {}) {
     event_id,
     hotspot_ids = [],
     photographer_ids = [],
-    route_id, // opcional para filtrar eventos por ruta
+    route_id, // OJO: acá sí lo aceptamos, pero NO tocamos event.route_id
   } = params;
 
-  // 1) Resolver event_ids a consultar
+  // ========== 1) Resolver eventIds ==========
   let eventIds = [];
+
   if (event_id) {
     eventIds = [String(event_id)];
   } else if (Array.isArray(photographer_ids) && photographer_ids.length > 0) {
-    let qEv = supabase.from("event").select("id");
-    qEv = qEv.in("photographer_id", photographer_ids.map(String));
-    if (route_id) qEv = qEv.eq("route_id", route_id);
-    const { data: evs, error: eEv } = await qEv;
-    if (eEv) console.warn("fetchPhotos map photogs->events:", eEv.message);
+    // Traer eventos del/los fotógrafo(s) (SIN filtrar por ruta acá)
+    const { data: evs, error: eEv } = await supabase
+      .from("event")
+      .select("id")
+      .in("photographer_id", photographer_ids.map(String));
+    if (eEv) {
+      console.warn("fetchPhotos map photogs->events:", eEv.message);
+    }
     eventIds = (evs || []).map((r) => String(r.id));
   }
 
-  // si no hay eventos, nada que traer
-  if (!eventIds.length) return [];
+  // Si hay route_id, reducimos/obtenemos events por la ruta usando event_hotspot
+  if (route_id) {
+    const { data: evHs, error: eHs } = await supabase
+      .from("event_hotspot")
+      .select("event_id")
+      .eq("route_id", route_id);
 
-  // 2) Helper para consultar event_asset
-  const selectCols = "id, event_id, hotspot_id, storage_path, url, path, taken_at";
-  async function queryAssets({ onlyHotspots = false, onlyGenerals = false }) {
-    let q = supabase.from("event_asset").select(selectCols).in("event_id", eventIds);
-    if (onlyHotspots && Array.isArray(hotspot_ids) && hotspot_ids.length > 0) {
-      q = q.in("hotspot_id", hotspot_ids.map(String));
+    if (!eHs) {
+      const idsFromRoute = Array.from(new Set((evHs || []).map((r) => String(r.event_id))));
+      if (eventIds.length > 0) {
+        // intersección: eventos del/los fotógrafo(s) que además tengan hotspots en esa ruta
+        const setRoute = new Set(idsFromRoute);
+        eventIds = eventIds.filter((id) => setRoute.has(id));
+      } else {
+        // si no teníamos eventos aún (p. ej. no hay fotógrafo), usamos los de la ruta
+        eventIds = idsFromRoute;
+      }
     }
-    if (onlyGenerals) {
-      q = q.is("hotspot_id", null);
-    }
-    q = q.order("taken_at", { ascending: false }).limit(2000);
-    const { data, error } = await q;
-    if (error) {
-      console.warn("event_asset query fail:", error.message);
-      return [];
-    }
-    return data || [];
   }
 
-  // 3) Intentos de fetch:
-  let rows = [];
+  // ========== 2) Query principal a event_asset ==========
+  const cols = "id, event_id, hotspot_id, storage_path, url, path, taken_at";
+  let q = supabase.from("event_asset").select(cols).order("taken_at", { ascending: false }).limit(2000);
+
+  // Nota: ahora NO exigimos tener eventIds; se puede buscar por hotspot/ruta
+  if (eventIds.length > 0) q = q.in("event_id", eventIds);
   if (Array.isArray(hotspot_ids) && hotspot_ids.length > 0) {
-    // A: por hotspot exacto
-    rows = await queryAssets({ onlyHotspots: true });
-    // B: si no hay, traer generales del evento
-    if (!rows.length) {
-      rows = await queryAssets({ onlyGenerals: true });
-    }
-  } else {
-    // Sin puntos → todo lo del/los evento(s)
-    rows = await queryAssets({ onlyHotspots: false });
+    q = q.in("hotspot_id", hotspot_ids.map(String));
   }
 
-  // 4) Normalizar URLs
+  let { data: rows, error } = await q;
+  if (error) {
+    console.warn("event_asset query fail:", error.message);
+    rows = [];
+  }
+
+  // ========== 3) Fallback: si pediste por punto(s) y salió vacío, traé generales del/los evento(s) ==========
+  if ((!rows || rows.length === 0) && hotspot_ids.length > 0 && eventIds.length > 0) {
+    const { data: gen, error: eGen } = await supabase
+      .from("event_asset")
+      .select(cols)
+      .in("event_id", eventIds)
+      .is("hotspot_id", null)
+      .order("taken_at", { ascending: false })
+      .limit(2000);
+    if (!eGen) rows = gen || [];
+  }
+
+  // ========== 4) Normalizar a tu UI + URL pública ==========
   const out = [];
-  for (const r of rows) {
+  for (const r of rows || []) {
     const raw = r.storage_path || r.url || r.path || "";
     const finalUrl = await getPublicUrl(raw);
     if (!finalUrl) continue;
@@ -201,8 +217,8 @@ export async function fetchPhotos(params = {}) {
     });
   }
 
-  // 5) Plan C: si sigue vacío, leer del Storage (events/<event_id>/...)
-  if (!out.length) {
+  // ========== 5) Plan C: si sigue vacío, leemos del Storage por cada event_id ==========
+  if (!out.length && eventIds.length > 0) {
     let fromStorage = [];
     for (const ev of eventIds) {
       const listed = await listAssetsFromStorage(ev);
