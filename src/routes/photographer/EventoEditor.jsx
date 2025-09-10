@@ -92,9 +92,9 @@ export default function EventoEditor() {
   const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
 
-  // Listas de precios
+  // Listas de precios (del perfil)
   const [priceLists, setPriceLists] = useState([]);
-  // Valor seleccionado en el select (puede ser UUID o un id tipo "pl_xxx")
+  // Valor de selección en UI (puede no ser UUID)
   const [uiSelectedPl, setUiSelectedPl] = useState("");
 
   // Subida
