@@ -377,12 +377,6 @@ export default function BikerEvent() {
           <h2 className="text-xl font-display font-bold">Puntos del evento</h2>
           <div className="flex items-center gap-3">
             {loadingPts && <span className="text-sm text-slate-500">Cargando…</span>}
-            <button
-              className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-display font-bold"
-              onClick={() => nav(`/app/buscar?evento=${encodeURIComponent(evt.id)}`)}
-            >
-              BUSCAR FOTOS DEL EVENTO
-            </button>
           </div>
         </div>
 
@@ -416,14 +410,32 @@ export default function BikerEvent() {
 
                 <button
                   className="mt-4 h-10 px-4 rounded-xl bg-blue-600 text-white font-display font-bold mx-auto block"
-                  onClick={() =>
-                    nav(
-                      `/app/buscar?evento=${encodeURIComponent(
-                        evt.id
-                      )}&hotspot=${encodeURIComponent(pt.id)}&punto=${encodeURIComponent(pt.nombre)}`
-                    )
-                  }
-                >
+                  onClick={() => {
+                    if (!evt) return;
+                    const puntoNombre = pt?.nombre || "";
+                    const fecha = (evt.fecha || "").slice(0, 10);
+                    const inicio = (pt.horaIni || "06:00").slice(0, 5);
+                    const fin = (pt.horaFin || "12:00").slice(0, 5);
+                    const rutaPreferida = (pt.route_id && pt.route_name) ? pt.route_name : (evt.ruta || "Todos");
+                    const photogs = evt.photographer_id ? String(evt.photographer_id) : "";
+
+                    const url = new URL(window.location.origin + "/app/buscar");
+                    url.searchParams.set("evento", String(evt.id));
+                    url.searchParams.set("hotspot", String(pt.id));
+                    url.searchParams.set("punto", puntoNombre);
+                    if (fecha) url.searchParams.set("fecha", fecha);
+                    if (inicio) url.searchParams.set("inicio", inicio);
+                    if (fin) url.searchParams.set("fin", fin);
+                    if (rutaPreferida) url.searchParams.set("ruta", rutaPreferida);
+                    if (photogs) url.searchParams.set("photogs", photogs);
+                    // Forzar filtros:
+                    url.searchParams.set("conf", "0");
+                    url.searchParams.set("cmoto", "");
+                    url.searchParams.set("cchaq", "");
+                    url.searchParams.set("ccasco", "");
+                    nav(url.pathname + url.search);
+                    }}
+                    >
                   BUSCAR EN ESTE PUNTO
                 </button>
               </div>
