@@ -10,7 +10,7 @@ import {
   fetchPhotographers,
   fetchPhotos,
   getRouteName,
-} from "../../lib/searchApi";
+} from "../../../lib/searchApi";
 
 import SearchResults from "./SearchResults";
 
