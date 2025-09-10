@@ -164,7 +164,7 @@ export default function BikerSearch() {
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
 
-  // 🔥 NUEVO: ignorar hora (por defecto, activado si NO venís de evento/hotspot)
+  // 🔥 Ignorar fecha y hora (por defecto, activado si NO venís de evento/hotspot)
   const [ignorarHora, setIgnorarHora] = useState(() => !forcedFromEvent);
 
   const [ruta, setRuta] = useState(() => {
@@ -178,10 +178,6 @@ export default function BikerSearch() {
     const fromPunto = params.get("punto");
     return fromPunto ? [fromPunto] : [];
   });
-
-  const [confIA, setConfIA] = useState(() =>
-    params.has("conf") ? Number(params.get("conf")) : forcedFromEvent ? 0 : 70
-  );
 
   // catálogos (RPC)
   const [rows, setRows] = useState([]);         // {id, rutas[], puntos[]}
@@ -214,7 +210,7 @@ export default function BikerSearch() {
             // horas
             if (!params.get("inicio") && hs.horaIni) setIniStep(clampStep(timeToStep(hs.horaIni)));
             if (!params.get("fin") && hs.horaFin) setFinStep(clampStep(timeToStep(hs.horaFin)));
-            // punto por NOMBRE (lo convierte a opción del multi)
+            // punto por NOMBRE
             if (!params.get("punto") && hs.name) {
               setSelHotspots([String(hs.name)]);
             }
@@ -331,14 +327,14 @@ export default function BikerSearch() {
   useEffect(() => {
     if (!catalogReady) return;
 
-    // Si venís con ?punto= o lo seteamos desde ?hotspot= → ya está en selHotspots.
+    // Punto
     const puntoParam = params.get("punto");
     if (puntoParam && !selHotspots.length) {
       const ok = hotspotOptions.some((o) => o.value === puntoParam);
       if (ok) setSelHotspots([puntoParam]);
     }
 
-    // Si venís con ?photogs= y no existía al inicio, ahora sí está en opciones
+    // Photogs
     const photogsCsv = params.get("photogs");
     if (photogsCsv && !selPhotogs.length) {
       const ids = csvToArr(photogsCsv);
@@ -420,8 +416,16 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ruta, arrToCsv(selHotspots), arrToCsv(selPhotogs)]);
 
-  /* ---------- filtro front: fecha + (opcional) horario + IA ---------- */
+  /* ---------- filtro front: SIN IA / SIN COLORES ----------
+     - Si ignorarHora === true, NO filtramos por fecha ni hora.
+     - Si ignorarHora === false, filtramos por fecha (día) y por rango horario.
+     - Si una foto NO tiene timestamp, la mostramos cuando ignorarHora === true. */
   const filtered = useMemo(() => {
+    if (ignorarHora) {
+      // sin filtros de fecha/hora (para depurar)
+      return allPhotos.slice();
+    }
+
     const dayStart = new Date(fecha + "T00:00:00");
     const dayEnd = new Date(fecha + "T23:59:59.999");
 
@@ -431,47 +435,17 @@ export default function BikerSearch() {
     end.setMinutes(clampStep(finStep) * 15 + 59, 59, 999);
 
     return (allPhotos || []).filter((ph) => {
-      if (!ph?.timestamp) return false;
+      if (!ph?.timestamp) return false; // cuando sí filtramos por fecha/hora, necesitamos timestamp
       const d = new Date(ph.timestamp);
       if (isNaN(d)) return false;
-
-      // Siempre filtramos por FECHA del día seleccionado
-      if (!(d >= dayStart && d <= dayEnd)) return false;
-
-      // Si NO ignoramos hora, aplicamos ventana 5:00–15:00 (o lo que mueva el usuario)
-      if (!ignorarHora && !(d >= start && d <= end)) return false;
-
-      if ((ph.aiConfidence || 0) < confIA) return false;
-      return true;
+      return d >= dayStart && d <= dayEnd && d >= start && d <= end;
     });
-  }, [allPhotos, fecha, iniStep, finStep, confIA, ignorarHora]);
-
-  /* ---------- logs de diagnóstico para entender el timestamp --------- */
-  useEffect(() => {
-    if (!allPhotos?.length) return;
-    const sample = allPhotos.slice(0, 5).map((p) => p.timestamp);
-    console.debug("[Search] Fotos totales:", allPhotos.length, " | Filtradas:", filtered.length, " | IgnorarHora:", ignorarHora, " | sample:", sample);
-  }, [allPhotos.length, filtered.length, ignorarHora]);
+  }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
   /* ---------- clusters & selección ---------- */
   const clusters = useMemo(() => {
-    const map = new Map();
-    for (const ph of filtered) {
-      const d = new Date(ph.timestamp);
-      const key =
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T` +
-        `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(ph);
-    }
-    return Array.from(map.entries())
-      .map(([k, items]) => ({
-        key: k,
-        fecha: k.slice(0, 10),
-        hora: k.slice(11, 16),
-        items: items.sort((a, b) => (a.timestamp > b.timestamp ? 1 : -1)),
-      }))
-      .sort((a, b) => (a.key < b.key ? 1 : -1));
+    // si algún día querés agrupar por minuto, dejé el molde listo; por ahora no lo usamos en UI
+    return [];
   }, [filtered]);
 
   const [vista, setVista] = useState("mosaico");
@@ -497,12 +471,6 @@ export default function BikerSearch() {
   const clearSel = () => setSel(new Set());
   const totalQ = useMemo(() => sel.size * 50, [sel]);
 
-  // helper UI para setear 00:00–23:59 rápido
-  const setTodoElDia = () => {
-    // mantenemos el rango visual 5–15, pero al activar "Ignorar hora" no afecta
-    setIgnorarHora(true);
-  };
-
   return (
     <div className="min-h-screen surface pb-28">
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
@@ -516,6 +484,8 @@ export default function BikerSearch() {
               className="h-9 border rounded-lg px-2 bg-white"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
+              disabled={ignorarHora}
+              title={ignorarHora ? "Ignorando fecha/hora" : ""}
             />
           </div>
 
@@ -529,7 +499,7 @@ export default function BikerSearch() {
                   checked={ignorarHora}
                   onChange={(e) => setIgnorarHora(e.target.checked)}
                 />
-                Ignorar hora
+                Ignorar fecha/hora
               </label>
             </div>
             <DualSlider
@@ -541,14 +511,6 @@ export default function BikerSearch() {
               onChangeB={setFinStep}
               width={260}
             />
-            <button
-              type="button"
-              onClick={setTodoElDia}
-              className="mt-1 text-xs underline text-slate-600"
-              title="Mostrar fotos de todo el día"
-            >
-              Todo el día
-            </button>
           </div>
 
           {/* RUTA */}
@@ -606,7 +568,7 @@ export default function BikerSearch() {
               hasMoreClusters={hasMoreClusters}
               onToggleSel={(id) => toggleSel(id)}
               selected={sel}
-              thumbAspect={"square"}
+              thumbAspect={"3:4"}
               resolvePhotographerName={(id) => {
                 const p = resolver.photographerById.get(String(id));
                 return p?.label || id || "—";
