@@ -224,6 +224,14 @@ export default function BikerSearch() {
               if (name && RUTAS_FIJAS.includes(name)) setRuta(name);
             }
             if (!selHotspots.length) setSelHotspots([String(hs.name)]); // nombre de punto
+
+            // === NUEVO: preseleccionar FOTÓGRAFO dueñ@ del evento del hotspot ===
+           if (!selPhotogs.length && hs.event_id) {
+             const evOfHotspot = await fetchEvent(hs.event_id);
+             if (evOfHotspot?.photographer_id) {
+               setSelPhotogs([String(evOfHotspot.photographer_id)]);
+             }
+           }
           }
         }
 
