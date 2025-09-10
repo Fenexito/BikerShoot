@@ -847,7 +847,7 @@ export default function EventoEditor() {
             </div>
 
             {/* Lista de precios seleccionada (vista pública) */}
-            {isValidUuid(ev.price_list_id) && selectedList ? (
+            {selectedList ? (
               <div className="mt-4 rounded-xl border border-white/10 p-3 bg-white/5">
                 <div className="text-xs text-slate-400 mb-1">Lista de precios</div>
                 <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
