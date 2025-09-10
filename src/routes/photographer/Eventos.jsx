@@ -412,7 +412,7 @@ function CardEvento({ ev, onPublicar, onEliminar }) {
           <img
             src={portada}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover object-center"
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-slate-400 text-sm">
@@ -420,10 +420,17 @@ function CardEvento({ ev, onPublicar, onEliminar }) {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-        {/* Estado arriba a la derecha: texto grande + dot de color */}
-        <div className="absolute top-2 right-3 flex items-center gap-2">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${est.dot}`} />
-          <span className={`text-xs md:text-sm font-bold drop-shadow ${est.text}`}>
+        {/* Estado arriba a la derecha como badge legible */}
+        <div className="absolute top-2 right-2">
+          <span
+            className={
+              `inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs md:text-sm font-bold text-white border backdrop-blur-sm shadow ` +
+              (ev.estado === "publicado"
+                ? "bg-emerald-600/90 border-emerald-300/40"
+                : "bg-amber-600/90 border-amber-300/40")
+            }
+          >
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${est.dot}`} />
             {est.label}
           </span>
         </div>
@@ -462,17 +469,6 @@ function CardEvento({ ev, onPublicar, onEliminar }) {
           >
             Eliminar
           </button>
-        </div>
-
-        {/* Link para setear portada desde el editor */}
-        <div className="mt-2 text-xs">
-          <Link
-            to={`/studio/eventos/${ev.id}?tab=fotos`}
-            className="text-slate-300 hover:text-white underline underline-offset-4"
-            title="Cambiar portada del evento"
-          >
-            Cambiar portada
-          </Link>
         </div>
       </div>
     </div>
