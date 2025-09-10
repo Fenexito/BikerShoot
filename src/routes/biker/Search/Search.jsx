@@ -13,7 +13,7 @@ import {
 } from "../../../lib/searchApi.js";
 
 import SearchResults from "./SearchResults";
-import MultiSelectCheckbox from "../../../ui/MultiSelectCheckbox.jsx";
+import MultiSelectCheckbox from "./MultiSelectCheckbox.jsx";
 
 /* ================== Utils ================== */
 const HHMMtoMin = (hhmm) => {
