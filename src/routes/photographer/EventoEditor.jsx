@@ -94,6 +94,8 @@ export default function EventoEditor() {
 
   // Listas de precios
   const [priceLists, setPriceLists] = useState([]);
+  // Valor seleccionado en el select (puede ser UUID o un id tipo "pl_xxx")
+  const [uiSelectedPl, setUiSelectedPl] = useState("");
 
   // Subida
   const [uploadPoint, setUploadPoint] = useState("");
@@ -294,6 +296,11 @@ export default function EventoEditor() {
     })();
     return () => (mounted = false);
   }, [ev?.photographer_id, uid]);
+
+  // Mantener sincronizado el select con el valor del evento cuando cambia
+  useEffect(() => {
+    setUiSelectedPl(ev?.price_list_id || "");
+  }, [ev?.price_list_id]);
 
   /* ---- Puntos del evento ---- */
   useEffect(() => {
@@ -655,7 +662,7 @@ export default function EventoEditor() {
       </>
     );
 
-  const selectedList = ev.price_list_id
+  const selectedList = isValidUuid(ev.price_list_id)
     ? priceLists.find((pl) => String(pl?.id || "") === String(ev.price_list_id))
     : null;
 
@@ -745,21 +752,27 @@ export default function EventoEditor() {
               <Field label="Lista de precios">
                 <select
                   className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                  value={ev.price_list_id || ""}
+                  value={uiSelectedPl}
                   onChange={(e) => {
                     const val = e.target.value || "";
+                    setUiSelectedPl(val);
+                    // Solo persistimos al estado del evento si es UUID válido
                     setEv({ ...ev, price_list_id: isValidUuid(val) ? val : null });
                   }}
                 >
                   <option value="">— Sin lista (usa precio base)</option>
-                  {priceLists
-                    .filter((pl) => isValidUuid(pl?.id))
-                    .map((pl) => (
-                      <option key={pl.id} value={pl.id}>
-                        {pl.nombre}
-                      </option>
-                    ))}
+                  {priceLists.map((pl) => (
+                    <option key={pl.id ?? pl.key ?? pl.nombre} value={pl.id ?? pl.key ?? pl.nombre}>
+                      {pl.nombre}
+                    </option>
+                  ))}
                 </select>
+                {/* Aviso si la opción elegida no es UUID (no se guardará en la DB) */}
+                {uiSelectedPl && !isValidUuid(uiSelectedPl) && (
+                  <div className="mt-1 text-xs text-amber-300">
+                    Esta lista no tiene ID válido (UUID). No se podrá asignar al evento hasta que tenga un UUID.
+                  </div>
+                )}
               </Field>
 
               <Field label="Notas (privadas)" full>
@@ -837,7 +850,7 @@ export default function EventoEditor() {
             </div>
 
             {/* Lista de precios seleccionada (vista pública) */}
-            {ev.price_list_id && selectedList ? (
+            {isValidUuid(ev.price_list_id) && selectedList ? (
               <div className="mt-4 rounded-xl border border-white/10 p-3 bg-white/5">
                 <div className="text-xs text-slate-400 mb-1">Lista de precios</div>
                 <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
