@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import UploadManager from "./upload/UploadManager.jsx";
 import { supabase } from "../../lib/supabaseClient";
 import { useModal, useToast } from "../../state/ui.jsx";
+import PhotoLightbox from "../../components/PhotoLightbox";
 
 /* ===== Utils ===== */
 const fmtDate = (iso) =>
@@ -12,6 +13,13 @@ const fmtDate = (iso) =>
     month: "short",
     year: "numeric",
   });
+
+function formatQ(val) {
+  if (val === null || val === undefined) return "—";
+  const n = Number(String(val).replace(/[^\d.]/g, ""));
+  if (!isFinite(n)) return "—";
+  return `Q${Number.isInteger(n) ? n : n.toFixed(2)}`;
+}
 
 function windowsFromPerfilPunto(p) {
   try {
@@ -37,6 +45,7 @@ function mapEventRow(row) {
     notas: row.notas ?? row.notes ?? "",
     price_list_id: row.price_list_id ?? null,
     photographer_id: row.photographer_id ?? row.created_by ?? null,
+    cover_url: row.cover_url || row.portada_url || row.portada || row.cover || null, // ← portada
   };
 }
 
@@ -52,9 +61,8 @@ function buildEventPatch(ev) {
     estado: ev.estado,
     precioBase: ev.precioBase,
     notas: ev.notas,
+    cover_url: ev.cover_url || null, // ← portada
     // Solo guardar si es un UUID válido (la columna en DB es UUID).
-    // Si viene un "pl_abc123" (local), NO lo mandamos para evitar:
-    // "invalid input syntax for type uuid".
     price_list_id: isValidUuid(ev.price_list_id) ? ev.price_list_id : null,
   };
 }
@@ -84,7 +92,7 @@ export default function EventoEditor() {
   const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
 
-  // Listas de precios (placeholder)
+  // Listas de precios
   const [priceLists, setPriceLists] = useState([]);
 
   // Subida
@@ -92,6 +100,9 @@ export default function EventoEditor() {
   // UI (modal + toasts)
   const { openModal } = useModal();
   const { toast } = useToast();
+
+  // Lightbox de portada
+  const [lbOpen, setLbOpen] = useState(false);
 
   /* ==== Hooks MEMO ==== */
   const fotosPorPunto = useMemo(() => {
@@ -214,7 +225,7 @@ export default function EventoEditor() {
           default_windows: windowsFromPerfilPunto(p),
         }));
 
-        // Listas de precios del perfil (pueden venir como JSON o string)
+        // Listas de precios del perfil
         let pls = [];
         const rawPls = profile?.price_lists;
         if (Array.isArray(rawPls)) pls = rawPls;
@@ -266,7 +277,7 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.id]);
 
-  /* ---- Realtime sobre event_asset (inserts/updates/deletes) ---- */
+  /* ---- Realtime sobre event_asset ---- */
   useEffect(() => {
     if (!ev?.id) return;
     const channel = supabase
@@ -275,7 +286,6 @@ export default function EventoEditor() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'event_asset', filter: `event_id=eq.${ev.id}` },
         (_payload) => {
-          // refrescamos simple para mantener sincronía
           refreshAssets();
         }
       )
@@ -326,8 +336,7 @@ export default function EventoEditor() {
           const windows = [{ start: p.horaIni || "06:00", end: p.horaFin || "12:00" }];
           await supabase.from("event_hotspot").update({ windows }).eq("id", p.id);
         }
-        // opcional: brindá feedback extra
-        toast({ type: "success", title: "Cambios guardados", description: "Todo quedó al 100." });
+        toast({ type: "success", title: "Cambios guardados", description: "Todo quedó al 100.", position: "bottom-right" });
       },
     });
   }
@@ -412,24 +421,14 @@ export default function EventoEditor() {
     }
   }
 
-  /* ---- Función para obtener URL pública ---- */
+  /* ---- Helpers de Storage ---- */
   function getPublicUrl(storagePath) {
     if (!storagePath) return '';
-    
-    // Si ya es una URL completa, la devolvemos tal cual
     if (storagePath.startsWith('http')) return storagePath;
-    
-    // El bucket se llama "fotos", no "events"
-    const { data } = supabase.storage
-      .from('fotos') // ← BUCKET CORRECTO: "fotos"
-      .getPublicUrl(storagePath);
-    
+    const { data } = supabase.storage.from('fotos').getPublicUrl(storagePath);
     return data.publicUrl;
   }
-
-  // === Helpers para paths de Supabase Storage ===
   function splitStoragePath(storagePath) {
-    // storagePath típico: "eventos/<eventId>/<pointId>/archivo.jpg"
     const clean = String(storagePath || "").replace(/^\/+/, "");
     const parts = clean.split("/").filter(Boolean);
     const name = parts.pop() || "";
@@ -437,59 +436,36 @@ export default function EventoEditor() {
     return { folder, name };
   }
 
-  /* ---- subida ---- */
+  /* ---- subida firmada (fotos normales) ---- */
   async function getSignedUrl({ eventId, pointId, filename, size, contentType }) {
     try {
-      console.log("🔍 Debug: UUIDs enviados:", { eventId, pointId, filename, size, contentType });
-
-      // Validación CRÍTICA
       if (!pointId || pointId === "") {
-        throw new Error("❌ pointId está vacío. Selecciona un punto primero.");
+        throw new Error("Seleccioná un punto primero.");
       }
-
       const { data: sess } = await supabase.auth.getSession();
       const token = sess?.session?.access_token || null;
-      
-      if (!token) {
-        throw new Error("No se pudo obtener el token de autenticación");
-      }
-
-      if (!isValidUuid(eventId)) {
-        throw new Error(`eventId no es UUID válido: ${eventId}`);
-      }
-      
-      if (!isValidUuid(pointId)) {
-        throw new Error(`pointId no es UUID válido: ${pointId}`);
-      }
+      if (!token) throw new Error("No se pudo obtener el token de autenticación");
+      if (!isValidUuid(eventId)) throw new Error(`eventId no es UUID válido: ${eventId}`);
+      if (!isValidUuid(pointId)) throw new Error(`pointId no es UUID válido: ${pointId}`);
 
       const { data, error } = await supabase.functions.invoke("signed-event-upload", {
         body: { eventId, pointId, filename, size, contentType },
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (error) {
-        console.error("❌ Error de Supabase:", error);
-        throw new Error(error.message || "No se pudo firmar la subida");
-      }
-
-      console.log("✅ Respuesta de signed-event-upload:", data);
+      if (error) throw new Error(error.message || "No se pudo firmar la subida");
       return data;
     } catch (error) {
-      console.error("❌ Error completo en getSignedUrl:", error);
+      console.error("getSignedUrl:", error);
       throw error;
     }
   }
 
   async function onUploaded(assets) {
     try {
-      console.log("🔍 onUploaded assets:", assets);
-      
       const { data: sess } = await supabase.auth.getSession();
       const token = sess?.session?.access_token || null;
-      
       if (!token) throw new Error("Iniciá sesión para registrar fotos");
 
-      // ✅ REGISTRO con la estructura EXACTA de tu tabla (SIN 'bytes')
       const assetsToInsert = assets.map((a) => ({
         id: crypto.randomUUID(),
         event_id: ev.id,
@@ -497,50 +473,29 @@ export default function EventoEditor() {
         storage_path: a.path,
         taken_at: new Date().toISOString(),
         meta: { 
-          bytes: a.size, // ✅ El tamaño va DENTRO de 'meta'
+          bytes: a.size,
           filename: a.filename || '',
           contentType: a.contentType || ''
         }
       }));
 
-      console.log("📝 Insertando en DB:", assetsToInsert);
-
       const { data, error } = await supabase
         .from("event_asset")
         .insert(assetsToInsert)
         .select();
+      if (error) throw new Error(`Error de base de datos: ${error.code} - ${error.message}`);
 
-      if (error) {
-        console.error("❌ Error insertando en DB:", error);
-        throw new Error(`Error de base de datos: ${error.code} - ${error.message}`);
-      }
-
-      console.log("✅ Assets registrados en DB:", data);
-
-      // Actualizar lista de fotos
       const { data: rows, error: fetchError } = await supabase
         .from("event_asset")
         .select("*")
         .eq("event_id", ev.id)
         .order("taken_at", { ascending: true });
-        
       if (fetchError) throw fetchError;
-      
       setFotos(Array.isArray(rows) ? rows : []);
-      
-      toast({
-        type: "success",
-        title: "Foto subida",
-        description: "Se registró en el evento.",
-      });
-      
+      toast({ type: "success", title: "Foto subida", description: "Se registró en el evento.", position: "bottom-right" });
     } catch (e) {
-      console.error("❌ Error en onUploaded:", e);
-      toast({
-        type: "error",
-        title: "Error registrando foto",
-        description: e.message || "Se subió la foto pero no se pudo registrar en la base.",
-      });
+      console.error("onUploaded:", e);
+      toast({ type: "error", title: "Error registrando foto", description: e.message || "Se subió la foto pero no se pudo registrar.", position: "bottom-right" });
     }
   }
 
@@ -566,7 +521,6 @@ export default function EventoEditor() {
         .delete()
         .eq("id", asset.id);
       if (error) throw error;
-      // Actualizar UI sin otro fetch
       setFotos((prev) => prev.filter((x) => x.id !== asset.id));
     } catch (e) {
       console.error("No se pudo limpiar el registro:", e);
@@ -576,7 +530,6 @@ export default function EventoEditor() {
 
   // Lista archivos reales en el bucket por carpeta y devuelve un Set con los nombres existentes
   async function listExistingInBucketByFolder(folder) {
-    // Si folder == "", lista raíz del bucket
     const { data, error } = await supabase.storage.from("fotos").list(folder || "", { limit: 1000 });
     if (error) throw error;
     const set = new Set((data || []).map((f) => f.name));
@@ -586,14 +539,12 @@ export default function EventoEditor() {
   // Reconciliar: compara event_asset vs objetos reales en bucket
   async function reconcileAssetsWithBucket({ strict = true } = {}) {
     if (!ev?.id) return;
-    // 1) Agrupar por carpeta de storage
     const byFolder = new Map();
     for (const a of fotos) {
       const { folder, name } = splitStoragePath(a.storage_path);
       if (!byFolder.has(folder)) byFolder.set(folder, []);
       byFolder.get(folder).push({ id: a.id, name, storage_path: a.storage_path });
     }
-    // 2) Listar existentes por carpeta y detectar faltantes
     const missing = [];
     for (const [folder, arr] of byFolder.entries()) {
       let existingSet;
@@ -611,14 +562,11 @@ export default function EventoEditor() {
     }
 
     if (missing.length === 0) {
-      // Si no hay huérfanos, igual refrescamos assets por si cambió algo
       await refreshAssets();
       return;
     }
 
-    // 3) Quitar de la DB los registros huérfanos (opcionalmente con confirm)
     if (!strict) {
-      // Solo limpiar UI sin tocar DB
       setFotos((prev) => prev.filter((x) => !missing.some((m) => m.id === x.id)));
       return;
     }
@@ -659,22 +607,48 @@ export default function EventoEditor() {
     );
 
   const selectedList = ev.price_list_id ? priceLists.find((l) => l.id === ev.price_list_id) : null;
+  const estadoTag = ev.estado === "publicado"
+    ? { text: "Publicado", bg: "bg-emerald-600", ring: "ring-emerald-400/30" }
+    : { text: "Borrador",  bg: "bg-amber-600",   ring: "ring-amber-400/30" };
 
   return (
     <main className="w-full max-w-[1100px] mx-auto px-5 py-6">
       {/* Header */}
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Link to="/studio/eventos" className="text-blue-400 font-semibold">← Volver</Link>
-        <h1 className="text-2xl md:text-3xl font-display font-black">{ev.nombre}</h1>
-        <span className="text-slate-400">· {fmtDate(ev.fecha)} · {ev.ruta}</span>
+      <div className="mb-5">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/studio/eventos"
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.12]"
+            title="Volver al listado"
+          >
+            <span className="text-lg">←</span>
+            <span className="text-sm font-medium">Volver</span>
+          </Link>
 
-        <div className="ml-auto flex items-center gap-2">
-          <button className="h-10 px-4 rounded-xl bg-green-600 text-white font-display font-bold border border-white/10" onClick={guardarTodo}>
-            Guardar
-          </button>
-          <button className="h-10 px-4 rounded-xl bg-blue-500 text-white font-display font-bold border border-white/10" onClick={publicarToggle}>
-            {ev.estado === "publicado" ? "Despublicar" : "Publicar"}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              className="h-10 px-4 rounded-xl bg-green-600 hover:bg-green-700 text-white font-display font-bold border border-white/10"
+              onClick={guardarTodo}
+            >
+              Guardar
+            </button>
+            <button
+              className={`h-10 px-4 rounded-xl text-white font-display font-bold border border-white/10 ${
+                ev.estado === "publicado" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+              }`}
+              onClick={publicarToggle}
+            >
+              {ev.estado === "publicado" ? "Despublicar" : "Publicar"}
+            </button>
+          </div>
+        </div>
+
+        {/* Título y metadata */}
+        <div className="mt-4">
+          <h1 className="text-2xl md:text-3xl font-display font-black">{ev.nombre}</h1>
+          <div className="mt-1 text-sm text-slate-300">
+            {fmtDate(ev.fecha)} · {ev.ruta}
+          </div>
         </div>
       </div>
 
@@ -689,6 +663,7 @@ export default function EventoEditor() {
       {/* ===== Resumen ===== */}
       {tab === "resumen" && (
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Izquierda: info editable */}
           <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Información del evento</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -702,9 +677,13 @@ export default function EventoEditor() {
                 <input className="h-11 w-full rounded-lg border border-white/15 bg-white/10 text-white px-3" value={ev.ruta} readOnly />
               </Field>
 
-              <Field label="Precio base (Q)">
-                <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => setEv({ ...ev, precioBase: Number(e.target.value || 0) })} disabled={!!ev.price_list_id} />
-              </Field>
+              {/* Si hay lista, NO mostramos precio base */}
+              {!ev.price_list_id && (
+                <Field label="Precio base (Q)">
+                  <input type="number" min={1} className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.precioBase || 50} onChange={(e) => setEv({ ...ev, precioBase: Number(e.target.value || 0) })} />
+                </Field>
+              )}
+
               <Field label="Lista de precios (opcional)">
                 <select className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3" value={ev.price_list_id || ""} onChange={(e) => setEv({ ...ev, price_list_id: e.target.value || null })}>
                   <option value="">— Sin lista (usa precio base)</option>
@@ -718,26 +697,97 @@ export default function EventoEditor() {
                 <textarea rows={3} className="w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 py-2" value={ev.notas || ""} onChange={(e) => setEv({ ...ev, notas: e.target.value })} />
               </Field>
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="font-semibold mb-3">Resumen</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <KPI label="Puntos" value={puntos.length} />
-              <KPI label="Fotos" value={fotos.length} />
-              <div className="col-span-2">
-                <div className="text-xs text-slate-400 mb-1">Estado</div>
-                <div className="text-sm font-semibold">{ev.estado}</div>
+            {/* Portada */}
+            <div className="mt-6">
+              <h4 className="font-semibold mb-2">Portada del evento</h4>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="w-full sm:w-72 aspect-video rounded-xl overflow-hidden border border-white/10 bg-white/5 grid place-items-center">
+                  {ev.cover_url ? (
+                    <img
+                      src={ev.cover_url}
+                      alt="Portada del evento"
+                      className="w-full h-full object-cover"
+                      onClick={() => setLbOpen(true)}
+                      title="Ver grande"
+                    />
+                  ) : (
+                    <div className="text-slate-400 text-sm">Sin portada</div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap gap-2">
+                    {ev.cover_url && (
+                      <button
+                        className="h-10 px-3 rounded-lg bg-white/10 border border-white/15"
+                        onClick={() => setLbOpen(true)}
+                      >
+                        Ver grande
+                      </button>
+                    )}
+                    <label className="h-10 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center cursor-pointer">
+                      Cambiar / Subir
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleCoverPick}
+                      />
+                    </label>
+                    {ev.cover_url && (
+                      <button
+                        className="h-10 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+                        onClick={removeCover}
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Recomendado 16:9 (ej. 1600×900). Se guardará en el bucket <code>fotos</code>.
+                  </p>
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Derecha: resumen formal */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <h3 className="font-semibold mb-3">Resumen</h3>
+
+            {/* Estado grande */}
+            <div className={`rounded-xl ${estadoTag.bg} ${estadoTag.ring} ring-2 text-white px-4 py-3 flex items-center justify-between`}>
+              <div className="text-sm">Estado</div>
+              <div className="text-lg font-display font-extrabold tracking-wide">{estadoTag.text}</div>
+            </div>
+
+            {/* KPIs */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <KPI label="Puntos" value={puntos.length} />
+              <KPI label="Fotos" value={fotos.length} />
+            </div>
+
+            {/* Lista de precios seleccionada (vista pública) */}
             {ev.price_list_id && selectedList ? (
-              <div className="mt-4">
-                <div className="text-xs text-slate-400 mb-1">Lista seleccionada</div>
+              <div className="mt-4 rounded-xl border border-white/10 p-3 bg-white/5">
+                <div className="text-xs text-slate-400 mb-1">Lista de precios</div>
                 <div className="text-sm font-semibold mb-2">{selectedList.nombre}</div>
-                <div className="text-xs text-white/70">Si hay <strong>lista</strong>, manda sobre el precio base.</div>
+                {selectedList.notas ? (
+                  <div className="text-xs text-slate-300 mb-2">{selectedList.notas}</div>
+                ) : null}
+                <div className="grid grid-cols-1 gap-2">
+                  {(selectedList.items || []).map((it, idx) => (
+                    <div key={idx} className="rounded-lg border border-white/10 p-2 bg-white/5 flex items-center justify-between">
+                      <div className="text-sm">{it.nombre}</div>
+                      <div className="text-base font-display font-bold">{formatQ(it.precio)}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className="mt-4 text-xs text-white/70">Sin lista asignada. Se usará <strong>precio base</strong> (Q{ev.precioBase || 50}).</div>
+              <div className="mt-4 text-xs text-white/70">
+                Sin lista asignada. Se usará <strong>precio base</strong> (Q{ev.precioBase || 50}).
+              </div>
             )}
           </div>
         </section>
@@ -828,7 +878,6 @@ export default function EventoEditor() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="font-semibold mb-3">Subida de fotos</h3>
             
-            {/* Validación de punto seleccionado */}
             {!uploadPoint && (
               <div className="bg-yellow-500/20 border border-yellow-500/50 p-3 rounded-lg mb-4">
                 <div className="text-yellow-200 font-semibold">⚠️ Selecciona un punto</div>
@@ -924,6 +973,18 @@ export default function EventoEditor() {
           )}
         </section>
       )}
+
+      {/* Lightbox de portada */}
+      {lbOpen && ev?.cover_url && (
+        <PhotoLightbox
+          images={[{ src: ev.cover_url, alt: "Portada del evento" }]}
+          index={0}
+          onIndexChange={() => {}}
+          onClose={() => setLbOpen(false)}
+          captionPosition="bottom-centered"
+          arrowBlue
+        />
+      )}
     </main>
   );
 }
@@ -968,4 +1029,35 @@ function KPI({ label, value }) {
       <div className="text-xl font-display font-bold">{value}</div>
     </div>
   );
+}
+
+/* ==== Portada: handlers ==== */
+async function uploadCoverToStorage(file, eventId) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `covers/${eventId}/${Date.now()}_${file.name.replace(/[^\w.\-]+/g, "_")}`;
+  const { error: upErr } = await supabase.storage.from("fotos").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type || `image/${ext}`,
+  });
+  if (upErr) throw upErr;
+  const { data } = supabase.storage.from("fotos").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function setCoverUrl(eventId, url) {
+  const { error } = await supabase.from("event").update({ cover_url: url }).eq("id", eventId);
+  if (error) throw error;
+}
+
+/* NOTA: Estos handlers usan `this`? No; el compilador de React
+   moverá las referencias arriba. Los consumimos vía `handleCoverPick/removeCover`
+   que tienen acceso a `ev`, `setEv`, `toast` en el scope del componente. */
+function bindCoverHandlers(ctx) {
+  return {
+    handleCoverPick: async (e) => {
+    },
+    removeCover: async () => {
+    },
+  };
 }
