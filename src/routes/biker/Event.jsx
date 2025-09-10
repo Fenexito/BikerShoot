@@ -26,16 +26,20 @@ function shuffle(arr) {
 /** Obtener URL pública desde Supabase Storage (bucket 'fotos') */
 function getPublicUrl(storagePath) {
   if (!storagePath) return "";
-  if (String(storagePath).startsWith("http")) return storagePath;
-  const { data } = supabase.storage.from("fotos").getPublicUrl(storagePath);
+  const raw = String(storagePath).trim();
+  if (/^https?:\/\//i.test(raw)) return raw; // ya es URL
+  // Limpieza: quitar leading "/" y posible prefijo "fotos/"
+  const clean = raw.replace(/^\/+/, "").replace(/^fotos\//i, "");
+  const { data } = supabase.storage.from("fotos").getPublicUrl(clean);
   return data?.publicUrl || "";
 }
 
 /** Mini carrusel (scroll horizontal suave) */
 function MiniCarousel({ images = [] }) {
-  if (!images.length) {
+  const pics = (images || []).filter(Boolean);
+  if (!pics.length) {
     return (
-      <div className="h-24 rounded-xl bg-slate-50 grid place-items-center text-slate-400 text-sm">
+      <div className="h-36 rounded-xl bg-slate-50 grid place-items-center text-slate-400 text-sm">
         Sin fotos de muestra
       </div>
     );
@@ -43,10 +47,10 @@ function MiniCarousel({ images = [] }) {
   return (
     <div className="overflow-x-auto no-scrollbar">
       <div className="flex gap-2">
-        {images.map((url, i) => (
+        {pics.map((url, i) => (
           <div
             key={i}
-            className="w-40 h-24 rounded-xl overflow-hidden bg-slate-200 border border-slate-100 shrink-0"
+            className="w-48 h-36 rounded-xl overflow-hidden bg-slate-200 border border-slate-100 shrink-0"
             title="Vista previa"
           >
             <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -158,12 +162,14 @@ export default function BikerEvent() {
           .limit(500);
         if (errAssets) throw errAssets;
 
-        const allAssets = (assets || []).map((a) => ({
-          id: a.id,
-          event_id: a.event_id,
-          hotspot_id: a.hotspot_id || null,
-          url: getPublicUrl(a.storage_path),
-        }));
+        const allAssets = (assets || [])
+          .map((a) => ({
+            id: a.id,
+            event_id: a.event_id,
+            hotspot_id: a.hotspot_id || null,
+            url: getPublicUrl(a.storage_path),
+          }))
+          .filter((a) => !!a.url);
 
         // Agrupar por hotspot_id (si existe)
         const byHotspot = {};
@@ -183,7 +189,7 @@ export default function BikerEvent() {
         // Para cada punto, si no hay fotos propias, usar un sample general del evento
         const finalByHotspot = {};
         for (const pt of mappedPts) {
-          const pool = byHotspot[pt.id]?.length ? byHotspot[pt.id] : general;
+          const pool = (byHotspot[pt.id]?.length ? byHotspot[pt.id] : general).filter(Boolean);
           const pics = shuffle(pool).slice(0, 8); // 8 de muestra
           finalByHotspot[pt.id] = pics;
         }
@@ -267,7 +273,15 @@ export default function BikerEvent() {
       <section className="mb-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-display font-bold">Puntos del evento</h2>
-          {loadingPts && <span className="text-sm text-slate-500">Cargando…</span>}
+          <div className="flex items-center gap-3">
+            {loadingPts && <span className="text-sm text-slate-500">Cargando…</span>}
+            <button
+              className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-display font-bold"
+              onClick={() => nav(`/app/buscar?evento=${encodeURIComponent(evt.id)}`)}
+            >
+              BUSCAR FOTOS DEL EVENTO
+            </button>
+          </div>
         </div>
 
         {!loadingPts && hotspots.length === 0 && (
@@ -293,8 +307,7 @@ export default function BikerEvent() {
                   <div className="text-right text-xs text-slate-500">
                     {pt.horaIni || pt.horaFin ? (
                       <div>
-                        {pt.horaIni ? fmtHora(pt.horaIni) : "—"}
-                        {pt.horaFin ? ` – ${fmtHora(pt.horaFin)}` : ""}
+                        {pt.horaIni || "—"}{pt.horaFin ? ` – ${pt.horaFin}` : ""}
                       </div>
                     ) : null}
                   </div>
@@ -305,7 +318,7 @@ export default function BikerEvent() {
                 </div>
 
                 <button
-                  className="mt-4 w-full h-10 rounded-xl bg-blue-600 text-white font-display font-bold"
+                  className="mt-4 h-10 px-4 rounded-xl bg-blue-600 text-white font-display font-bold mx-auto block"
                   onClick={() =>
                     nav(
                       `/app/buscar?evento=${encodeURIComponent(
@@ -320,16 +333,6 @@ export default function BikerEvent() {
             </article>
           ))}
         </div>
-      </section>
-
-      {/* CTA general para el evento */}
-      <section className="mb-6">
-        <button
-          className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-display font-bold"
-          onClick={() => nav(`/app/buscar?evento=${encodeURIComponent(evt.id)}`)}
-        >
-          BUSCAR FOTOS DEL EVENTO
-        </button>
       </section>
     </main>
   );
