@@ -138,7 +138,7 @@ function MiniCarousel({ images = [], intervalMs = 3500, fadeMs = 700 }) {
           <img
             src={url}
             alt=""
-            className="w-full h-full object-contain" 
+            className="w-full h-full object-cover" 
             loading="lazy"
             draggable={false}
           />
