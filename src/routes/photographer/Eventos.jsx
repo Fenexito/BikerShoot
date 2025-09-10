@@ -487,18 +487,26 @@ function PhotoCount({ eventId }) {
     let mounted = true;
     (async () => {
       try {
-        // 1) event_photo
+        // 1) 📸 event_asset (tabla real que usa el editor)
+        let { count: c0, error: e0 } = await supabase
+          .from("event_asset")
+          .select("id", { count: "exact", head: true })
+          .eq("event_id", eventId);
+
+        if (!e0 && typeof c0 === "number") {
+          if (mounted) setCount(c0);
+          return;
+        }
+
+        // 2) Fallbacks legacy por si existen
         let { count: c1, error: e1 } = await supabase
           .from("event_photo")
           .select("id", { count: "exact", head: true })
           .eq("event_id", eventId);
-
         if (!e1 && typeof c1 === "number") {
           if (mounted) setCount(c1);
           return;
         }
-
-        // 2) photo (fallback)
         let { count: c2, error: e2 } = await supabase
           .from("photo")
           .select("id", { count: "exact", head: true })
