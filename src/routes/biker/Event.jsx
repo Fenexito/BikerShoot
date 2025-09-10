@@ -24,14 +24,55 @@ function shuffle(arr) {
   return a;
 }
 /** Obtener URL pública desde Supabase Storage (bucket 'fotos') */
-function getPublicUrl(storagePath) {
+async function getPublicUrl(storagePath) {
   if (!storagePath) return "";
   const raw = String(storagePath).trim();
-  if (/^https?:\/\//i.test(raw)) return raw; // ya es URL
-  // Limpieza: quitar leading "/" y posible prefijo "fotos/"
+  if (/^https?:\/\//i.test(raw)) return raw; // ya es URL completa
+  // quitar "/" inicial y prefijo "fotos/"
   const clean = raw.replace(/^\/+/, "").replace(/^fotos\//i, "");
   const { data } = supabase.storage.from("fotos").getPublicUrl(clean);
-  return data?.publicUrl || "";
+  if (data?.publicUrl) return data.publicUrl;
+  // fallback: bucket privado → URL firmada 1h
+  const signed = await supabase.storage.from("fotos").createSignedUrl(clean, 3600);
+  return signed?.data?.signedUrl || "";
+}
+
+/** Lista todos los assets en 'fotos/eventos/<eventId>/**' y devuelve {hotspot_id,url}[] */
+async function listAssetsFromStorage(eventId) {
+  const prefix = `eventos/${eventId}`;
+  const { data: level1, error: e1 } = await supabase.storage.from("fotos").list(prefix, { limit: 1000 });
+  if (e1) return [];
+  const out = [];
+  for (const entry of level1 || []) {
+    if (entry?.id || entry?.name) {
+      const folder = `${prefix}/${entry.name}`;
+      const { data: files, error: e2 } = await supabase.storage.from("fotos").list(folder, { limit: 1000 });
+      if (e2) continue;
+      for (const f of files || []) {
+        if (f?.name) {
+          out.push({
+            hotspot_id: entry.name,
+            storage_path: `${folder}/${f.name}`,
+          });
+        }
+      }
+    }
+  }
+  const { data: directFiles } = await supabase.storage.from("fotos").list(prefix, { limit: 1000 });
+  for (const f of directFiles || []) {
+    if (f?.name) {
+      out.push({
+        hotspot_id: null,
+        storage_path: `${prefix}/${f.name}`,
+      });
+    }
+  }
+  const resolved = [];
+  for (const a of out) {
+    const url = await getPublicUrl(a.storage_path);
+    if (url) resolved.push({ ...a, url });
+  }
+  return resolved;
 }
 
 /** Mini carrusel (scroll horizontal suave) */
@@ -141,35 +182,50 @@ export default function BikerEvent() {
         if (errPts) throw errPts;
 
         const mappedPts = (pts || []).map((p) => {
-          const w0 = Array.isArray(p.windows) && p.windows[0] ? p.windows[0] : null;
+          const w0 = Array.isArray(p?.windows) && p.windows[0] ? p.windows[0] : null;
           return {
             id: p.id,
             nombre: p.name || "Punto",
             lat: p.lat ?? null,
             lng: p.lng ?? null,
             route_id: p.route_id || null,
-            horaIni: w0?.start || null,
-            horaFin:  w0?.end   || null,
+            horaIni: (w0?.start ?? "") || "",
+            horaFin: (w0?.end ?? "") || "",
           };
         });
 
-        // 2) Fotos del evento: event_asset con storage_path (resolvemos a URL pública)
-        const { data: assets, error: errAssets } = await supabase
-          .from("event_asset")
-          .select("id, event_id, hotspot_id, storage_path, taken_at")
-          .eq("event_id", id)
-          .order("taken_at", { ascending: false })
-          .limit(500);
-        if (errAssets) throw errAssets;
+        // 2) Assets desde tabla (puede fallar con anon por RLS)
+        let allAssets = [];
+        try {
+          const { data: assets } = await supabase
+            .from("event_asset")
+            .select("id, event_id, hotspot_id, storage_path, taken_at")
+            .eq("event_id", id)
+            .order("taken_at", { ascending: false })
+            .limit(1000);
+          if (Array.isArray(assets) && assets.length) {
+            // Resolver URLs (getPublicUrl ahora es async)
+            const withUrls = [];
+            for (const a of assets) {
+              const url = await getPublicUrl(a.storage_path);
+              if (url) withUrls.push({
+                id: a.id,
+                event_id: a.event_id,
+                hotspot_id: a.hotspot_id || null,
+                url
+              });
+            }
+            allAssets = withUrls;
+          }
+        } catch (_) {
+          // ignoramos: probamos por storage
+        }
 
-        const allAssets = (assets || [])
-          .map((a) => ({
-            id: a.id,
-            event_id: a.event_id,
-            hotspot_id: a.hotspot_id || null,
-            url: getPublicUrl(a.storage_path),
-          }))
-          .filter((a) => !!a.url);
+        // Plan B: si DB no devolvió nada, leemos del Storage por carpetas
+        if (!allAssets.length) {
+          const listed = await listAssetsFromStorage(id);
+          allAssets = listed;
+        }
 
         // Agrupar por hotspot_id (si existe)
         const byHotspot = {};
@@ -307,7 +363,7 @@ export default function BikerEvent() {
                   <div className="text-right text-xs text-slate-500">
                     {pt.horaIni || pt.horaFin ? (
                       <div>
-                        {pt.horaIni || "—"}{pt.horaFin ? ` – ${pt.horaFin}` : ""}
+                        {(pt.horaIni || "—")}{pt.horaFin ? ` – ${pt.horaFin}` : ""}
                       </div>
                     ) : null}
                   </div>
