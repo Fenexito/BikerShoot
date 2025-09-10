@@ -72,8 +72,36 @@ function isValidUuid(uuid) {
   return uuidRegex.test(uuid);
 }
 
-// ==== Handlers de portada (definidos arriba para evitar TDZ/hoisting) ====
-function useCoverHandlers(ev, setEv, toast, setLbOpen) {
+/* ===== Componente ===== */
+export default function EventoEditor() {
+  const routeParams = useParams();
+  const [searchParams] = useSearchParams();
+  const paramId = routeParams.id || routeParams.eventId || routeParams.evId || "";
+  const initialTab = searchParams.get("tab") || "resumen";
+
+  const [ev, setEv] = useState(null);
+  const [fotos, setFotos] = useState([]);
+  const [puntos, setPuntos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState(initialTab);
+  const [authReady, setAuthReady] = useState(false);
+  const [noSession, setNoSession] = useState(false);
+  const [uid, setUid] = useState(null);
+
+  // Catálogo leído del perfil (JSON)
+  const [catalog, setCatalog] = useState([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+
+  // Listas de precios
+  const [priceLists, setPriceLists] = useState([]);
+
+  // Subida
+  const [uploadPoint, setUploadPoint] = useState("");
+  // UI (modal + toasts)
+  const { openModal } = useModal();
+  const { toast } = useToast();
+
+  // Handlers de portada (upload/cambiar/eliminar) — inline para evitar TDZ
   const handleCoverPick = async (e) => {
     try {
       const file = e.target.files?.[0];
@@ -121,41 +149,6 @@ function useCoverHandlers(ev, setEv, toast, setLbOpen) {
       });
     }
   };
-
-  return { handleCoverPick, removeCover };
-}
-
-/* ===== Componente ===== */
-export default function EventoEditor() {
-  const routeParams = useParams();
-  const [searchParams] = useSearchParams();
-  const paramId = routeParams.id || routeParams.eventId || routeParams.evId || "";
-  const initialTab = searchParams.get("tab") || "resumen";
-
-  const [ev, setEv] = useState(null);
-  const [fotos, setFotos] = useState([]);
-  const [puntos, setPuntos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState(initialTab);
-  const [authReady, setAuthReady] = useState(false);
-  const [noSession, setNoSession] = useState(false);
-  const [uid, setUid] = useState(null);
-
-  // Catálogo leído del perfil (JSON)
-  const [catalog, setCatalog] = useState([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
-
-  // Listas de precios
-  const [priceLists, setPriceLists] = useState([]);
-
-  // Subida
-  const [uploadPoint, setUploadPoint] = useState("");
-  // UI (modal + toasts)
-  const { openModal } = useModal();
-  const { toast } = useToast();
-
-  // Handlers de portada (upload/cambiar/eliminar)
-  const { handleCoverPick, removeCover } = useCoverHandlers(ev, setEv, toast, setLbOpen);
 
   // Lightbox de portada
   const [lbOpen, setLbOpen] = useState(false);
