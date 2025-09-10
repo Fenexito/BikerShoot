@@ -80,29 +80,28 @@ async function listAssetsFromStorage(eventId) {
 }
 
 /** Mini carrusel (scroll horizontal suave) */
-function MiniCarousel({ images = [] }) {
+function MiniCarousel({ images = [], intervalMs = 3500, fadeMs = 700 }) {
   const pics = (images || []).filter(Boolean);
-  const scrollerRef = React.useRef(null);
+  const [idx, setIdx] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
 
-  // Auto-scroll suave con requestAnimationFrame
+  // Auto-advance (una imagen a la vez)
   React.useEffect(() => {
-    let raf;
-    const speedPxPerFrame = 0.8; // ↔️ velocidad (podés subir/bajar)
-    const tick = () => {
-      const el = scrollerRef.current;
-      if (!el) { raf = requestAnimationFrame(tick); return; }
-      if (!paused && pics.length) {
-        el.scrollLeft += speedPxPerFrame;
-        // Al llegar al final, reiniciamos al inicio (loop infinito)
-        const max = el.scrollWidth - el.clientWidth;
-        if (el.scrollLeft >= max - 1) el.scrollLeft = 0;
+    if (!pics.length) return;
+    const t = setInterval(() => {
+      if (!paused) {
+        setIdx((i) => (i + 1) % pics.length);
       }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [paused, pics.length]);
+    }, Math.max(1500, intervalMs));
+    return () => clearInterval(t);
+  }, [pics.length, paused, intervalMs]);
+
+  // Preload siguiente para evitar parpadeo
+  React.useEffect(() => {
+    if (pics.length < 2) return;
+    const next = new Image();
+    next.src = pics[(idx + 1) % pics.length];
+  }, [idx, pics]);
 
   if (!pics.length) {
     return (
@@ -111,26 +110,40 @@ function MiniCarousel({ images = [] }) {
       </div>
     );
   }
+
   return (
     <div
-      ref={scrollerRef}
-      className="overflow-x-auto no-scrollbar"
+      className="relative h-40 rounded-xl overflow-hidden border border-slate-100 bg-slate-200"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
       onTouchEnd={() => setPaused(false)}
     >
-      <div className="flex gap-2">
-        {pics.map((url, i) => (
-          <div
-            key={i}
-            className="w-56 h-40 rounded-xl overflow-hidden bg-slate-200 border border-slate-100 shrink-0"
-            title="Vista previa"
-          >
-            <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
-          </div>
-        ))}
-      </div>
+      <style>{`
+        .fade-slide {
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          transition: opacity ${fadeMs}ms ease-in-out, transform ${fadeMs}ms ease-in-out;
+          transform: scale(1.02);
+          will-change: opacity, transform;
+        }
+        .fade-slide.active {
+          opacity: 1;
+          transform: scale(1.0);
+        }
+      `}</style>
+      {pics.map((url, i) => (
+        <div key={i} className={`fade-slide ${i === idx ? "active" : ""}`}>
+          <img
+            src={url}
+            alt=""
+            className="w-full h-full object-cover"
+            loading="lazy"
+            draggable={false}
+          />
+        </div>
+      ))}
     </div>
   );
 }
