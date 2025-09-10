@@ -18,21 +18,6 @@ function parseWindowsField(win) {
   return [];
 }
 
-/** Busca route.id por nombre (tolerante a mayúsculas/espacios) */
-async function fetchRouteIdByName(routeName) {
-  if (!routeName) return null;
-  const { data, error } = await supabase
-    .from("photo_routes")
-    .select("id, name")
-    .ilike("name", routeName.trim());
-  if (error) throw error;
-  const row =
-    (data || []).find(
-      (r) => r.name.trim().toLowerCase() === routeName.trim().toLowerCase()
-    ) || data?.[0];
-  return row?.id || null;
-}
-
 /** ----------------- Básicos ----------------- **/
 export async function fetchEvent(eventId) {
   const { data, error } = await supabase
@@ -105,7 +90,19 @@ export async function getRouteName(route_id) {
   return data?.name || "";
 }
 
-/** ----------------- Ruta → Fotógrafos/Puntos (vía eventos) ----------------- **/
+/** ----------------- Ruta → Fotógrafos/Puntos (solo vía eventos) ----------------- **/
+async function fetchRouteIdByName(routeName) {
+  if (!routeName) return null;
+  // tolerante a espacios/upper/lower con ilike
+  const { data, error } = await supabase
+    .from("photo_routes")
+    .select("id, name")
+    .ilike("name", routeName.trim());
+  if (error) throw error;
+  const row = (data || []).find((r) => r.name.trim().toLowerCase() === routeName.trim().toLowerCase()) || data?.[0];
+  return row?.id || null;
+}
+
 export async function fetchPhotographersByRoute(routeName) {
   const routeId = await fetchRouteIdByName(routeName);
   if (!routeId) return [];
@@ -116,7 +113,6 @@ export async function fetchPhotographersByRoute(routeName) {
     .select("event_id")
     .eq("route_id", routeId);
   if (e1) throw e1;
-
   const eventIds = Array.from(new Set((hs || []).map((h) => h.event_id).filter(Boolean)));
   if (eventIds.length === 0) return [];
 
@@ -143,6 +139,7 @@ export async function fetchHotspotsByRoute(routeName, photographerIds = []) {
   const routeId = await fetchRouteIdByName(routeName);
   if (!routeId) return [];
 
+  // Primero traemos todos los hotspots de la ruta
   const { data: hsAll, error: e1 } = await supabase
     .from("event_hotspot")
     .select("id, event_id, name, route_id, windows")
@@ -152,6 +149,7 @@ export async function fetchHotspotsByRoute(routeName, photographerIds = []) {
 
   if (!hsAll || hsAll.length === 0) return [];
 
+  // Si no hay fotógrafos seleccionados: devolver todos
   if (!photographerIds || photographerIds.length === 0) {
     return hsAll.map((p) => {
       const wins = parseWindowsField(p.windows);
@@ -167,7 +165,7 @@ export async function fetchHotspotsByRoute(routeName, photographerIds = []) {
     });
   }
 
-  // Filtrar por eventos de esos fotógrafos
+  // Si hay fotógrafos, filtramos por eventos de esos fotógrafos
   const eventIds = Array.from(new Set(hsAll.map((h) => h.event_id).filter(Boolean)));
   if (eventIds.length === 0) return [];
 
