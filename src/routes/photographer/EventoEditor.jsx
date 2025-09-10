@@ -72,6 +72,59 @@ function isValidUuid(uuid) {
   return uuidRegex.test(uuid);
 }
 
+// ==== Handlers de portada (definidos arriba para evitar TDZ/hoisting) ====
+function useCoverHandlers(ev, setEv, toast, setLbOpen) {
+  const handleCoverPick = async (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!ev?.id) throw new Error("Evento inválido");
+      const publicUrl = await uploadCoverToStorage(file, ev.id);
+      await setCoverUrl(ev.id, publicUrl);
+      setEv((o) => ({ ...o, cover_url: publicUrl }));
+      toast({
+        type: "success",
+        title: "Portada actualizada",
+        description: "Se cambió la imagen de portada.",
+        position: "bottom-right"
+      });
+      e.target.value = "";
+    } catch (err) {
+      console.error(err);
+      toast({
+        type: "error",
+        title: "No se pudo subir la portada",
+        description: err.message || "Error subiendo imagen.",
+        position: "bottom-right"
+      });
+    }
+  };
+
+  const removeCover = async () => {
+    try {
+      if (!ev?.id) return;
+      await setCoverUrl(ev.id, null);
+      setEv((o) => ({ ...o, cover_url: null }));
+      toast({
+        type: "success",
+        title: "Portada eliminada",
+        description: "Se quitó la portada del evento.",
+        position: "bottom-right"
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        type: "error",
+        title: "No se pudo eliminar la portada",
+        description: err.message || "Error actualizando evento.",
+        position: "bottom-right"
+      });
+    }
+  };
+
+  return { handleCoverPick, removeCover };
+}
+
 /* ===== Componente ===== */
 export default function EventoEditor() {
   const routeParams = useParams();
@@ -1051,58 +1104,4 @@ async function uploadCoverToStorage(file, eventId) {
 async function setCoverUrl(eventId, url) {
   const { error } = await supabase.from("event").update({ cover_url: url }).eq("id", eventId);
   if (error) throw error;
-}
-
-// ==== Bind handlers de portada al scope del componente ====
-export function useCoverHandlers(ev, setEv, toast, setLbOpen) {
-  const handleCoverPick = async (e) => {
-    try {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!ev?.id) throw new Error("Evento inválido");
-      const publicUrl = await uploadCoverToStorage(file, ev.id);
-      await setCoverUrl(ev.id, publicUrl);
-      setEv((o) => ({ ...o, cover_url: publicUrl }));
-      toast({
-        type: "success",
-        title: "Portada actualizada",
-        description: "Se cambió la imagen de portada.",
-        position: "bottom-right"
-      });
-      // reset input
-      e.target.value = "";
-    } catch (err) {
-      console.error(err);
-      toast({
-        type: "error",
-        title: "No se pudo subir la portada",
-        description: err.message || "Error subiendo imagen.",
-        position: "bottom-right"
-      });
-    }
-  };
-
-  const removeCover = async () => {
-    try {
-      if (!ev?.id) return;
-      await setCoverUrl(ev.id, null);
-      setEv((o) => ({ ...o, cover_url: null }));
-      toast({
-        type: "success",
-        title: "Portada eliminada",
-        description: "Se quitó la portada del evento.",
-        position: "bottom-right"
-      });
-    } catch (err) {
-      console.error(err);
-      toast({
-        type: "error",
-        title: "No se pudo eliminar la portada",
-        description: err.message || "Error actualizando evento.",
-        position: "bottom-right"
-      });
-    }
-  };
-
-  return { handleCoverPick, removeCover };
 }
