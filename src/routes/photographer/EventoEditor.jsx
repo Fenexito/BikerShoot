@@ -53,7 +53,7 @@ function buildEventPatch(ev) {
   return {
     title: ev.nombre,
     date: ev.fecha,
-    status: ev.estado === "publicado" ? "published" : "borrador" === ev.estado ? "draft" : "draft",
+    status: ev.estado === "publicado" ? "published" : "draft",
     nombre: ev.nombre,
     fecha: ev.fecha,
     ruta: ev.ruta,
@@ -297,10 +297,28 @@ export default function EventoEditor() {
     return () => (mounted = false);
   }, [ev?.photographer_id, uid]);
 
-  // Mantener sincronizado el select con el valor del evento cuando cambia
+  // Mantener sincronizado el select con la DB o con cache local por evento
   useEffect(() => {
-    setUiSelectedPl(ev?.price_list_id || "");
-  }, [ev?.price_list_id]);
+    if (!ev?.id) return;
+    const key = `plsel:${ev.id}`;
+    if (isValidUuid(ev?.price_list_id)) {
+      setUiSelectedPl(ev.price_list_id);
+      try { localStorage.setItem(key, ev.price_list_id); } catch {}
+    } else {
+      try {
+        const cached = localStorage.getItem(key);
+        setUiSelectedPl(cached || "");
+      } catch {
+        setUiSelectedPl("");
+      }
+    }
+  }, [ev?.id, ev?.price_list_id]);
+
+  // Cada vez que cambia la selección en UI, cachearla por evento
+  useEffect(() => {
+    if (!ev?.id) return;
+    try { localStorage.setItem(`plsel:${ev.id}`, uiSelectedPl || ""); } catch {}
+  }, [uiSelectedPl, ev?.id]);
 
   /* ---- Puntos del evento ---- */
   useEffect(() => {
