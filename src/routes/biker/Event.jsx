@@ -82,20 +82,49 @@ async function listAssetsFromStorage(eventId) {
 /** Mini carrusel (scroll horizontal suave) */
 function MiniCarousel({ images = [] }) {
   const pics = (images || []).filter(Boolean);
+  const scrollerRef = React.useRef(null);
+  const [paused, setPaused] = React.useState(false);
+
+  // Auto-scroll suave con requestAnimationFrame
+  React.useEffect(() => {
+    let raf;
+    const speedPxPerFrame = 0.8; // ↔️ velocidad (podés subir/bajar)
+    const tick = () => {
+      const el = scrollerRef.current;
+      if (!el) { raf = requestAnimationFrame(tick); return; }
+      if (!paused && pics.length) {
+        el.scrollLeft += speedPxPerFrame;
+        // Al llegar al final, reiniciamos al inicio (loop infinito)
+        const max = el.scrollWidth - el.clientWidth;
+        if (el.scrollLeft >= max - 1) el.scrollLeft = 0;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [paused, pics.length]);
+
   if (!pics.length) {
     return (
-      <div className="h-36 rounded-xl bg-slate-50 grid place-items-center text-slate-400 text-sm">
+      <div className="h-40 rounded-xl bg-slate-50 grid place-items-center text-slate-400 text-sm">
         Sin fotos de muestra
       </div>
     );
   }
   return (
-    <div className="overflow-x-auto no-scrollbar">
+    <div
+      ref={scrollerRef}
+      className="overflow-x-auto no-scrollbar"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={() => setPaused(true)}
+      onTouchEnd={() => setPaused(false)}
+    >
       <div className="flex gap-2">
         {pics.map((url, i) => (
           <div
             key={i}
-            className="w-48 h-36 rounded-xl overflow-hidden bg-slate-200 border border-slate-100 shrink-0"
+            className="w-56 h-40 rounded-xl overflow-hidden bg-slate-200 border border-slate-100 shrink-0"
             title="Vista previa"
           >
             <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
