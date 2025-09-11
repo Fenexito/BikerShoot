@@ -390,15 +390,6 @@ export default function BikerSearch() {
       });
 
       // 🔧 Normalizar a array (soporta ambos formatos: [] o {items, hasMore})
-      const fotos = Ar<<<<<<< HEAD
-        const resp = await fetchPhotos({
-        event_id: params.get("evento") || undefined,
-        hotspot_ids: hotspot_ids.length ? hotspot_ids : undefined,
-        photographer_ids: selPhotogs.length ? selPhotogs : undefined,
-        route_id: route_id || undefined,
-      });
-
-      // 🔧 Normalizar a array (soporta ambos formatos: [] o {items, hasMore})
       const fotos = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
 
       // (opcional) si querés detectar hasMore del nuevo formato:
@@ -424,38 +415,19 @@ export default function BikerSearch() {
       // Marcar ruta en UI y **setear siempre array**
       const fotosWithRoute = ruta !== "Todos" ? fotos.map((f) => ({ ...f, route: ruta })) : fotos;
       setAllPhotos(Array.isArray(fotosWithRoute) ? fotosWithRoute : []);
-=======
-        const fotos = await fetchPhotos({
-          event_id: params.get("evento") || undefined,
-          hotspot_ids: hotspot_ids.length ? hotspot_ids : undefined,
-          photographer_ids: selPhotogs.length ? selPhotogs : undefined,
-          route_id: route_id || undefined, // 👈 importante
-        });
+      } catch (e) {
+        console.error("Cargando fotos:", e);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruta, arrToCsv(selHotspots), arrToCsv(selPhotogs)]);
 
-        if (!alive) return;
-
-        // Resolver de hotspot si faltó algo
-        if (fotos.length && resolver.hotspotById.size === 0 && ruta !== "Todos") {
-          const ids = Array.from(new Set(fotos.map((f) => String(f.hotspotId)).filter(Boolean)));
-          if (ids.length) {
-            const routeId = await getRouteIdByName(ruta);
-            if (routeId) {
-              const { data } = await supabase
-                .from("event_hotspot")
-                .select("id, name")
-                .eq("route_id", routeId)
-                .in("id", ids);
-              const hsMap = new Map((data || []).map((h) => [String(h.id), { name: h.name }]));
-              if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-            }
-          }
-        }
-
-        // Marcar ruta en UI
-        const fotosWithRoute = ruta !== "Todos" ? fotos.map((f) => ({ ...f, route: ruta })) : fotos;
-        setAllPhotos(fotosWithRoute);
->>>>>>> 83757d748f453d6fc97b5265c64d4bd89ef364aa
-e, filtramos por fecha (día) y por rango horario.
+  /* ---------- filtro front: SIN IA / SIN COLORES ----------
+     - Si ignorarHora === true, NO filtramos por fecha ni hora.
+     - Si ignorarHora === false, filtramos por fecha (día) y por rango horario.
      - Si una foto NO tiene timestamp, la mostramos cuando ignorarHora === true. */
   const filtered = useMemo(() => {
     if (ignorarHora) {
