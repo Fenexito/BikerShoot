@@ -112,26 +112,71 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
 }
 
 /* ======= Helpers Supabase (CORRECTOS) ======= */
-/** 1) Conseguir TODOS los event_route.id por nombre de ruta (opcionalmente filtrado por fotógrafos o por evento) */
+// 👇 Reemplaza tu getEventRouteIdsByName por esta versión más tolerante
 async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId = null } = {}) {
   if (!routeName) return [];
-  let base = supabase.from("event_route").select("id, name, event_id").ilike("name", routeName.trim());
 
-  if (eventId) {
-    base = base.eq("event_id", eventId);
-  } else if (Array.isArray(photographerIds) && photographerIds.length > 0) {
-    const { data: evs } = await supabase
+  // Alias por ruta fija (ajustá si tus datos usan otros nombres)
+  const ALIAS = {
+    "Ruta Interamericana": ["interamericana", "rn-1", "rn1", "interamericana (rn-1)"],
+    "RN-14": ["rn-14", "rn14", "ruta nacional 14"],
+    "Carretera al Salvador": ["salvador", "ca-1", "carretera al salvador"],
+    "Carretera al Atlántico": ["atlántico", "atlantico", "ca-9", "carretera al atlántico"],
+    "RN-10 (Cañas)": ["rn-10", "rn10", "cañas", "canas"],
+  };
+  const wanted = String(routeName || "").trim();
+  const alias = (ALIAS[wanted] || [wanted])
+    .map(t => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase());
+
+  // 1) Traer candidates de event_route (filtrados por event si aplica)
+  let q = supabase.from("event_route").select("id, name, event_id");
+  if (eventId) q = q.eq("event_id", eventId);
+
+  // si hay fotógrafos, primero sacamos sus eventos y filtramos por esos event_id
+  if (!eventId && Array.isArray(photographerIds) && photographerIds.length) {
+    const { data: evs, error: evErr } = await supabase
       .from("event")
       .select("id, photographer_id")
       .in("photographer_id", photographerIds);
-    const evIds = (evs || []).map((e) => String(e.id));
-    if (evIds.length) base = base.in("event_id", evIds);
-    else return [];
+    if (evErr) throw evErr;
+    const evIds = (evs || []).map(e => String(e.id));
+    if (evIds.length === 0) return [];
+    q = q.in("event_id", evIds);
   }
 
-  const { data, error } = await base;
+  const { data: routes, error } = await q;
   if (error) throw error;
-  return (data || []).map((r) => String(r.id));
+
+  // 2) Matching tolerante por texto (client-side)
+  const norm = s => String(s || "")
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+  const matched = (routes || []).filter(r => {
+    const n = norm(r.name);
+    return alias.some(a => n.includes(a));
+  });
+
+  // 3) Si no encontramos nada, último intento: buscar por columnas de la tabla event
+  if (matched.length === 0 && Array.isArray(photographerIds) && photographerIds.length) {
+    const { data: evs2 } = await supabase
+      .from("event")
+      .select("id, ruta, location")
+      .in("photographer_id", photographerIds);
+    const evIds2 = [];
+    for (const e of (evs2 || [])) {
+      const txt = norm(e.ruta || e.location || "");
+      if (alias.some(a => txt.includes(a))) evIds2.push(String(e.id));
+    }
+    if (evIds2.length) {
+      const { data: routes2 } = await supabase
+        .from("event_route").select("id, name, event_id")
+        .in("event_id", evIds2);
+      const again = (routes2 || []).filter(r => alias.some(a => norm(r.name).includes(a)));
+      return again.map(r => String(r.id));
+    }
+  }
+
+  return matched.map(r => String(r.id));
 }
 
 /** 2) Todos los hotspots de varias rutas (routeIds) */
@@ -311,6 +356,18 @@ export default function BikerSearch() {
             eventId: params.get("evento") || null,
           })
         : [];
+
+        if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
+          const { data: hsByName } = await supabase
+            .from("event_hotspot")
+            .select("id, name, route_id")
+            .in("name", selHotspots);
+          const rs = Array.from(new Set((hsByName || []).map(h => String(h.route_id)).filter(Boolean)));
+          if (rs.length) {
+            console.log("[BUSCAR][fallback por puntos] routeIds:", rs);
+            routeIds = rs;
+          }
+        }
 
       // 2) Resolver hotspotIds por nombre sobre esas rutas
       let hotspotIds = [];
