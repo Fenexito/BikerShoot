@@ -4,7 +4,7 @@ import { FixedSizeGrid as Grid } from "react-window";
 import PhotoLightbox from "../../../components/PhotoLightbox.jsx";
 import { useCart } from "../../../state/CartContext.jsx";
 
-/* Utils de formato (tolerantes a timestamp nulo/invalid) */
+/* Utils */
 const fmtDate = (iso) => {
   const d = new Date(iso);
   return isNaN(d) ? "" : d.toLocaleDateString("es-GT", { year: "numeric", month: "short", day: "2-digit" });
@@ -15,36 +15,29 @@ const fmtTime = (iso) => {
 };
 
 export default function SearchResults({
-  vista,
-  setVista,
   paginatedPhotos,
-  totalPhotos,
-  paginatedClusters, // ignorado (quitamos 'Momentos')
-  totalClusters,     // ignorado
+  totalPhotos,             // ya no mostramos contador
   onLoadMore,
   hasMorePhotos,
-  hasMoreClusters,   // ignorado
   onToggleSel,
   selected,
-  thumbAspect = "3:4",
   resolvePhotographerName,
   resolveHotspotName,
   totalQ,
   clearSel,
 }) {
-  // ---------- Controles de visual ----------
-  const [zoom, setZoom] = useState(240); // ancho base deseado de celda (px)
-  const [aspectMode, setAspectMode] = useState("auto"); // 'auto' | '16:9' | '4:3' | '1:1' | '9:16'
+  // ---------- Controles ----------
+  const [cols, setCols] = useState(12);              // 12 (mín) ↔ 4 (máx)
+  const [aspectMode, setAspectMode] = useState("1:1"); // por defecto 1:1
   const [showLabels, setShowLabels] = useState(false);
 
   // ---------- Lightbox ----------
   const [lbOpen, setLbOpen] = useState(false);
   const [lbIndex, setLbIndex] = useState(0);
-
   const openLightbox = (idx) => { setLbIndex(idx); setLbOpen(true); };
   const closeLightbox = () => setLbOpen(false);
 
-  // Estadísticas de orientación (para 'auto')
+  // Auto-aspecto (por si querés activarlo más tarde)
   const orientStats = useMemo(() => {
     let portrait = 0, landscape = 0;
     for (const p of paginatedPhotos || []) {
@@ -59,15 +52,12 @@ export default function SearchResults({
     return { portrait, landscape, pPct: portrait/total, lPct: landscape/total };
   }, [paginatedPhotos]);
 
-  // Aspecto efectivo
   const effAspect = useMemo(() => {
-    if (aspectMode !== "auto") return aspectMode;
-    if (orientStats.lPct >= 0.8) return "16:9";
-    if (orientStats.pPct >= 0.8) return "9:16";
-    return "4:3";
-  }, [aspectMode, orientStats]);
+    // fijo por requerimiento; si quisieras "auto", intercambiar aquí
+    return aspectMode;
+  }, [aspectMode]);
 
-  // Datos para lightbox
+  // Lightbox data
   const images = useMemo(() => {
     return (paginatedPhotos || []).map((p) => ({
       src: p.url,
@@ -82,33 +72,23 @@ export default function SearchResults({
   }, [paginatedPhotos, resolvePhotographerName, resolveHotspotName]);
 
   return (
-    // Full-bleed: rompe el contenedor y usa todo el ancho de la pantalla
+    // Full-bleed: ocupa todo el ancho
     <section className="w-screen ml-[calc(50%-50vw)]">
       {/* Toolbar de visual */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm px-2 sm:px-4">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-500">Vista:</span>
-          <button
-            type="button"
-            onClick={() => setVista?.("mosaico")}
-            className={"h-8 px-3 rounded-md border bg-white text-slate-700 border-slate-300"}
-          >
-            Mosaico
-          </button>
-          {/* quitamos 'Momentos' */}
-        </div>
-
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2">
-            <span className="text-slate-500">Zoom</span>
+            <span className="text-slate-500">Tamaño</span>
+            {/* 4 ↔ 12 columnas */}
             <input
               type="range"
-              min={140}
-              max={360}
-              step={10}
-              value={zoom}
-              onChange={(e) => setZoom(parseInt(e.target.value, 10))}
+              min={4}
+              max={12}
+              step={1}
+              value={cols}
+              onChange={(e) => setCols(parseInt(e.target.value, 10))}
             />
+            <span className="text-slate-400 text-xs">({cols} por fila)</span>
           </label>
 
           <label className="flex items-center gap-2">
@@ -118,10 +98,9 @@ export default function SearchResults({
               value={aspectMode}
               onChange={(e) => setAspectMode(e.target.value)}
             >
-              <option value="auto">Auto</option>
+              <option value="1:1">1:1</option>
               <option value="16:9">16:9</option>
               <option value="4:3">4:3</option>
-              <option value="1:1">1:1</option>
               <option value="9:16">9:16</option>
             </select>
           </label>
@@ -130,10 +109,6 @@ export default function SearchResults({
             <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
             <span className="text-slate-500">Mostrar info debajo</span>
           </label>
-
-          <div className="text-slate-500 hidden sm:block">
-            {`${paginatedPhotos?.length || 0} / ${totalPhotos} fotos`}
-          </div>
         </div>
       </div>
 
@@ -146,30 +121,30 @@ export default function SearchResults({
           selected={selected}
           onOpenLightbox={openLightbox}
           aspect={effAspect}
-          zoom={zoom}
+          colsTarget={cols}
           showLabels={showLabels}
           resolvePhotographerName={resolvePhotographerName}
           resolveHotspotName={resolveHotspotName}
         />
       </div>
 
-      {/* Barra de selección */}
+      {/* Barra de selección (más notoria) */}
       {typeof totalQ === "number" && selected?.size > 0 && (
-        <div className="sticky bottom-3 z-40 mt-3">
-          <div className="max-w-[740px] mx-auto rounded-2xl bg-white/85 backdrop-blur border border-slate-200 px-4 py-2.5 flex items-center justify-between text-sm shadow-lg">
+        <div className="sticky bottom-3 z-[1101] mt-3">
+          <div className="max-w-[820px] mx-auto rounded-2xl bg-blue-600/95 text-white px-4 py-2.5 flex items-center justify-between text-sm shadow-2xl">
             <div className="truncate">
               <span className="font-semibold">{selected.size}</span> foto{selected.size === 1 ? "" : "s"} seleccionada{selected.size === 1 ? "" : "s"}
-              <span className="mx-2 text-slate-400">•</span>
+              <span className="mx-2 text-white/60">•</span>
               Total estimado: <span className="font-display font-bold">Q{Math.round(totalQ)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button className="h-9 px-3 rounded-xl border bg-white font-display font-bold" onClick={clearSel}>Limpiar</button>
+              <button className="h-9 px-3 rounded-xl bg-white text-blue-700 font-display font-bold" onClick={clearSel}>Limpiar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Lightbox full-screen */}
+      {/* Lightbox */}
       {lbOpen && (
         <>
           <PhotoLightbox
@@ -178,7 +153,10 @@ export default function SearchResults({
             onIndexChange={setLbIndex}
             onClose={closeLightbox}
             showThumbnails
-            captionPosition="bottom-centered"
+            captionPosition="header"
+            footerSafeArea={72}       // deja espacio para el HUD de abajo
+            showHeaderClose={false}   // usamos nuestro botón rojo
+            arrowBlue
           />
           <LightboxHUD
             item={paginatedPhotos[lbIndex]}
@@ -195,26 +173,29 @@ export default function SearchResults({
 }
 
 /* -------------------- Grilla virtualizada -------------------- */
-function MosaicoVirtualized({ data, loadMore, hasMore, onToggleSel, selected, onOpenLightbox, aspect, zoom, showLabels, resolvePhotographerName, resolveHotspotName }) {
+function MosaicoVirtualized({
+  data, loadMore, hasMore, onToggleSel, selected, onOpenLightbox,
+  aspect, colsTarget, showLabels, resolvePhotographerName, resolveHotspotName
+}) {
   const lastRowSeen = useRef(-1);
 
   return (
-    <div className="h-[78vh] md:h-[80vh] lg:h-[82vh] xl:h-[86vh] rounded-2xl border bg-white">
+    <div className="h-[78vh] md:h-[80vh] lg:h-[82vh] xl:h-[86vh] rounded-2xl border bg-white pb-2">
       <AutoSizer>
         {({ width, height }) => {
           const GAP = 8;
-          const baseCell = zoom; // controlado por slider
-          const cols = Math.max(1, Math.floor((width - GAP) / (baseCell + GAP)));
-
+          const cols = Math.max(1, Math.min(colsTarget, 24)); // seguridad
           const cellW = Math.floor((width - GAP * (cols + 1)) / cols);
 
           const ratio = aspect === "1:1" ? 1
             : aspect === "4:3" ? 3/4
             : aspect === "16:9" ? 9/16
             : aspect === "9:16" ? 16/9
-            : 3/4; // default 4:3
+            : 1;
 
-          const cellH = Math.round(cellW * ratio);
+          const labelH = showLabels ? 42 : 0; // altura extra para texto
+          const imgH = Math.round(cellW * ratio);
+          const cellH = imgH + labelH;
 
           const columnWidth = cellW + GAP;
           const rowHeight = cellH + GAP;
@@ -232,9 +213,7 @@ function MosaicoVirtualized({ data, loadMore, hasMore, onToggleSel, selected, on
               onItemsRendered={({ visibleRowStopIndex }) => {
                 if (visibleRowStopIndex !== lastRowSeen.current) {
                   lastRowSeen.current = visibleRowStopIndex;
-                  if (hasMore && visibleRowStopIndex >= rowCount - 1) {
-                    loadMore?.();
-                  }
+                  if (hasMore && visibleRowStopIndex >= rowCount - 1) loadMore?.();
                 }
               }}
             >
@@ -243,26 +222,38 @@ function MosaicoVirtualized({ data, loadMore, hasMore, onToggleSel, selected, on
                 const item = data[idx];
                 if (!item) return <div style={style} />;
                 const isSel = selected?.has?.(item.id);
-                const phName = resolvePhotographerName ? resolvePhotographerName(item.photographerId) : (item.photographerId || "");
                 const hsName = resolveHotspotName ? resolveHotspotName(item.hotspotId) : (item.hotspotId || "");
 
                 return (
                   <div style={style} className="p-2">
                     <div
-                      className={"group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 " + (isSel ? "ring-2 ring-blue-600" : "")}
+                      className={
+                        "group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 transition-shadow " +
+                        (isSel ? "ring-4 ring-blue-600 shadow-[0_0_0_4px_rgba(59,130,246,0.35)]" : "hover:shadow-md")
+                      }
                     >
-                      <button
-                        type="button"
-                        className="absolute z-10 top-2 left-2 h-7 px-2 rounded-md bg-white/90 text-xs border border-slate-200 shadow-sm"
-                        onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
-                        title={isSel ? "Quitar de selección" : "Agregar a selección"}
-                      >
-                        {isSel ? "Quitar" : "Elegir"}
-                      </button>
+                      {/* Badge selección */}
+                      {isSel && (
+                        <div className="absolute top-2 left-2 z-10 h-7 px-2 rounded-md bg-blue-600 text-white text-xs shadow">
+                          Seleccionada
+                        </div>
+                      )}
+                      {/* Botón elegir/quitar */}
+                      {!isSel && (
+                        <button
+                          type="button"
+                          className="absolute z-10 top-2 left-2 h-7 px-2 rounded-md bg-white/90 text-xs border border-slate-200 shadow-sm"
+                          onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
+                          title="Agregar a selección"
+                        >
+                          Elegir
+                        </button>
+                      )}
 
+                      {/* Imagen */}
                       <div
                         className="w-full bg-slate-200 cursor-zoom-in"
-                        style={{ height: cellH }}
+                        style={{ height: imgH }}
                         onClick={() => onOpenLightbox(idx)}
                         title="Ver grande"
                       >
@@ -276,6 +267,7 @@ function MosaicoVirtualized({ data, loadMore, hasMore, onToggleSel, selected, on
                         />
                       </div>
 
+                      {/* Info debajo (ajusta altura de la celda) */}
                       {showLabels && (
                         <div className="p-2 text-[12px] leading-tight text-slate-700">
                           <div className="truncate">{fmtDate(item.timestamp)} {fmtTime(item.timestamp)}</div>
@@ -299,11 +291,10 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
   const { addItem, setOpen } = useCart();
   if (!item) return null;
 
-  const precio = 50; // TODO: si hay precio real, mapear aquí
+  const precio = 50; // TODO: enlazar si hay precio real
   const phName = resolvePhotographerName?.(item.photographerId) || "Fotógrafo";
   const hotName = resolveHotspotName?.(item.hotspotId) || "Punto";
   const route = item.route || "";
-
   const name = `Foto • ${phName} • ${fmtDate(item.timestamp)} ${fmtTime(item.timestamp)}`;
 
   const agregarCarrito = () => {
@@ -313,18 +304,18 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
 
   return (
     <>
-      {/* Cerrar rojo arriba derecha */}
+      {/* Cerrar rojo arriba derecha – sobre el lightbox */}
       <button
         type="button"
         onClick={onClose}
-        className="fixed top-3 right-3 z-[100] h-9 px-3 rounded-lg bg-red-600 text-white shadow-lg"
+        className="fixed top-3 right-3 z-[1101] h-9 px-3 rounded-lg bg-red-600 text-white shadow-lg"
         title="Cerrar"
       >
         Cerrar
       </button>
 
-      {/* Barra inferior con info + acciones */}
-      <div className="fixed left-0 right-0 bottom-0 z-[100] px-3 pb-3 pointer-events-none">
+      {/* Barra inferior con info + acciones – sobre el lightbox */}
+      <div className="fixed left-0 right-0 bottom-0 z-[1101] px-3 pb-3 pointer-events-none">
         <div className="mx-auto max-w-5xl">
           <div className="pointer-events-auto rounded-2xl bg-black/60 backdrop-blur border border-white/15 text-white px-4 py-2.5 flex flex-wrap items-center gap-3">
             <div className="min-w-[220px] grow">
@@ -342,7 +333,7 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
             </div>
             <div className="flex items-center gap-2 ml-auto">
               <button
-                className={"h-9 px-3 rounded-xl border bg-white text-black font-display font-bold " + (selected ? "ring-2 ring-blue-400" : "")}
+                className={"h-9 px-3 rounded-xl border bg-white text-black font-display font-bold " + (selected ? "ring-2 ring-blue-300" : "")}
                 onClick={onToggleSel}
               >
                 {selected ? "Quitar de selección" : "Agregar a selección"}

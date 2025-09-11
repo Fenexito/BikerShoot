@@ -161,7 +161,6 @@ async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId
     return alias.some((a) => n.includes(a));
   });
 
-  // Sin photogs: lo resolvemos por eventos más abajo (no desde aquí)
   return matched.map((r) => String(r.id));
 }
 
@@ -194,7 +193,7 @@ async function getEventIdsByDateRouteAndPhotogs({ fechaYmd, routeName, photograp
   return out;
 }
 
-// === NUEVO: Eventos (cualquier fotógrafo) por FECHA + RUTA
+// Eventos (cualquier fotógrafo) por FECHA + RUTA
 async function getEventsByDateAndRoute({ fechaYmd, routeName }) {
   if (!fechaYmd || !routeName) return { evIds: [], eventMap: new Map() };
   const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
@@ -217,7 +216,7 @@ async function getEventsByDateAndRoute({ fechaYmd, routeName }) {
   return { evIds, eventMap };
 }
 
-// === NUEVO: Eventos (cualquier fotógrafo) solo por RUTA (ignorar fecha/hora)
+// Eventos (cualquier fotógrafo) solo por RUTA (ignorar fecha/hora)
 async function getEventsByRoute({ routeName }) {
   if (!routeName) return { evIds: [], eventMap: new Map() };
   const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
@@ -322,6 +321,22 @@ export default function BikerSearch() {
   // fotos (buscador principal)
   const [allPhotos, setAllPhotos] = useState([]);
   const [allHasMore, setAllHasMore] = useState(false);
+
+  // --- Ocultar filtros al hacer scroll (solo aquí) ---
+  const [hideFilters, setHideFilters] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const down = y > last + 6;
+      const up = y < last - 6;
+      if (down && y > 120) setHideFilters(true);
+      else if (up) setHideFilters(false);
+      last = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   /* ---------- Prefill si venís de ?hotspot/?evento ---------- */
   useEffect(() => {
@@ -794,21 +809,16 @@ export default function BikerSearch() {
     );
   }, [allPhotos, filtered, ignorarHora]);
 
-  /* ================== Paginación & selección (principal) ================== */
-  const clusters = useMemo(() => [], [filtered]); // (a futuro)
-  const [vista, setVista] = useState("mosaico");
+  /* ================== Paginación & selección ================== */
   const [page, setPage] = useState(1);
   const pageSize = 60;
   useEffect(() => {
     setPage(1);
-  }, [filtered.length, vista]);
+  }, [filtered.length]);
 
   const totalPhotos = filtered.length;
-  const totalClusters = clusters.length;
   const paginatedPhotos = useMemo(() => filtered.slice(0, page * pageSize), [filtered, page]);
-  const paginatedClusters = useMemo(() => clusters.slice(0, page * 3), [clusters, page]);
   const hasMorePhotos = paginatedPhotos.length < totalPhotos;
-  const hasMoreClusters = paginatedClusters.length < totalClusters;
   const onLoadMore = () => setPage((p) => p + 1);
 
   const [sel, setSel] = useState(() => new Set());
@@ -824,115 +834,126 @@ export default function BikerSearch() {
   return (
     <div className="min-h-screen surface pb-28">
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* ======= una sola fila (NO se movió) ======= */}
-        <div className="flex flex-wrap items-end gap-3">
-          {/* FECHA */}
-          <div>
-            <label className="block text-sm font-medium text-slate-600">Fecha</label>
-            <input
-              type="date"
-              className="h-9 border rounded-lg px-2 bg-white"
-              value={toYmd(fecha) || ""}
-              onChange={(e) => {
-                console.log("[UI] change fecha ->", e.target.value);
-                setFecha(e.target.value);
-              }}
-              disabled={ignorarHora}
-              title={ignorarHora ? "Ignorando fecha/hora" : ""}
-            />
-          </div>
-
-          {/* HORA */}
-          <div className="min-w-[260px]">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
-              <label className="flex items-center gap-1 text-xs text-slate-600">
+        {/* === Filtros sticky y colapsables (se ocultan al scrollear) === */}
+        <div
+          className={`sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 transition-all duration-300 ${
+            hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className="pt-3 pb-3">
+            <div className="flex flex-wrap items-end gap-3">
+              {/* FECHA */}
+              <div>
+                <label className="block text-sm font-medium text-slate-600">Fecha</label>
                 <input
-                  type="checkbox"
-                  checked={ignorarHora}
+                  type="date"
+                  className="h-9 border rounded-lg px-2 bg-white"
+                  value={toYmd(fecha) || ""}
                   onChange={(e) => {
-                    console.log("[UI] change ignorarHora ->", e.target.checked);
-                    setIgnorarHora(e.target.checked);
+                    console.log("[UI] change fecha ->", e.target.value);
+                    setFecha(e.target.value);
                   }}
+                  disabled={ignorarHora}
+                  title={ignorarHora ? "Ignorando fecha/hora" : ""}
                 />
-                Ignorar fecha/hora
-              </label>
+              </div>
+
+              {/* HORA */}
+              <div className="min-w-[260px]">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
+                  <label className="flex items-center gap-1 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={ignorarHora}
+                      onChange={(e) => {
+                        console.log("[UI] change ignorarHora ->", e.target.checked);
+                        setIgnorarHora(e.target.checked);
+                      }}
+                    />
+                    Ignorar fecha/hora
+                  </label>
+                </div>
+                <DualSlider
+                  min={MIN_STEP}
+                  max={MAX_STEP}
+                  a={iniStep}
+                  b={finStep}
+                  onChangeA={(v) => {
+                    console.log("[UI] change inicio ->", v, stepToTime24(v));
+                    setIniStep(v);
+                  }}
+                  onChangeB={(v) => {
+                    console.log("[UI] change fin ->", v, stepToTime24(v));
+                    setFinStep(v);
+                  }}
+                  width={260}
+                />
+              </div>
+
+              {/* RUTA */}
+              <div>
+                <label className="block text-sm font-medium text-slate-600">Ruta</label>
+                <select
+                  className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
+                  value={ruta}
+                  onChange={(e) => {
+                    console.log("[UI] change ruta ->", e.target.value);
+                    setRuta(e.target.value);
+                  }}
+                >
+                  <option value="Todos">Todas</option>
+                  {RUTAS_FIJAS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* FOTÓGRAFO (multi) */}
+              <div className="min-w-[220px]">
+                <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
+                <MultiSelectCheckbox
+                  options={useMemo(() => {
+                    const list = rows.filter((r) => (r.rutas || []).includes(ruta));
+                    return list
+                      .map((p) => ({
+                        value: p.id,
+                        label: resolver.photographerById.get(p.id)?.label || p.id,
+                      }))
+                      .sort((a, b) => a.label.localeCompare(b.label));
+                  }, [rows, ruta, resolver.photographerById])}
+                  value={selPhotogs}
+                  onChange={(vals) => {
+                    console.log("[UI] change photogs ->", vals);
+                    setSelPhotogs(vals);
+                  }}
+                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
+                />
+              </div>
+
+              {/* PUNTO (multi) */}
+              <div className="min-w-[220px]">
+                <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
+                <MultiSelectCheckbox
+                  options={useMemo(() => {
+                    const base = rows.filter((r) => (r.rutas || []).includes(ruta));
+                    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
+                    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
+                    return Array.from(set)
+                      .sort((a, b) => a.localeCompare(b))
+                      .map((name) => ({ value: name, label: name }));
+                  }, [rows, ruta, arrToCsv(selPhotogs)])}
+                  value={selHotspots}
+                  onChange={(vals) => {
+                    console.log("[UI] change puntos ->", vals);
+                    setSelHotspots(vals);
+                  }}
+                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
+                />
+              </div>
             </div>
-            <DualSlider
-              min={MIN_STEP}
-              max={MAX_STEP}
-              a={iniStep}
-              b={finStep}
-              onChangeA={(v) => {
-                console.log("[UI] change inicio ->", v, stepToTime24(v));
-                setIniStep(v);
-              }}
-              onChangeB={(v) => {
-                console.log("[UI] change fin ->", v, stepToTime24(v));
-                setFinStep(v);
-              }}
-              width={260}
-            />
-          </div>
-
-          {/* RUTA */}
-          <div>
-            <label className="block text-sm font-medium text-slate-600">Ruta</label>
-            <select
-              className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
-              value={ruta}
-              onChange={(e) => {
-                console.log("[UI] change ruta ->", e.target.value);
-                setRuta(e.target.value);
-              }}
-            >
-              <option value="Todos">Todas</option>
-              {RUTAS_FIJAS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* FOTÓGRAFO (multi) */}
-          <div className="min-w-[220px]">
-            <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
-            <MultiSelectCheckbox
-              options={useMemo(() => {
-                const list = rows.filter((r) => (r.rutas || []).includes(ruta));
-                return list
-                  .map((p) => ({ value: p.id, label: resolver.photographerById.get(p.id)?.label || p.id }))
-                  .sort((a, b) => a.label.localeCompare(b.label));
-              }, [rows, ruta, resolver.photographerById])}
-              value={selPhotogs}
-              onChange={(vals) => {
-                console.log("[UI] change photogs ->", vals);
-                setSelPhotogs(vals);
-              }}
-              placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
-            />
-          </div>
-
-          {/* PUNTO (multi) */}
-          <div className="min-w-[220px]">
-            <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
-            <MultiSelectCheckbox
-              options={useMemo(() => {
-                const base = rows.filter((r) => (r.rutas || []).includes(ruta));
-                const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
-                const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
-                return Array.from(set)
-                  .sort((a, b) => a.localeCompare(b))
-                  .map((name) => ({ value: name, label: name }));
-              }, [rows, ruta, arrToCsv(selPhotogs)])}
-              value={selHotspots}
-              onChange={(vals) => {
-                console.log("[UI] change puntos ->", vals);
-                setSelHotspots(vals);
-              }}
-              placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
-            />
           </div>
         </div>
 
@@ -942,18 +963,12 @@ export default function BikerSearch() {
             <div className="text-slate-500">Buscando fotos…</div>
           ) : (
             <SearchResults
-              vista={vista}
-              setVista={setVista}
               paginatedPhotos={paginatedPhotos}
               totalPhotos={totalPhotos}
-              paginatedClusters={paginatedClusters}
-              totalClusters={totalClusters}
               onLoadMore={onLoadMore}
               hasMorePhotos={hasMorePhotos}
-              hasMoreClusters={hasMoreClusters}
               onToggleSel={(id) => toggleSel(id)}
               selected={sel}
-              thumbAspect={"3:4"}
               resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
               resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
               totalQ={totalQ}
