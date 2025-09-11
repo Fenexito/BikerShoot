@@ -465,7 +465,7 @@ export default function BikerSearch() {
       }
 
       // 3) Intentar fetchPhotos “estilo nuevo” (routeIds[])
-      const fecha = new Date().toISOString().slice(0, 10); // usamos tus filtros locales después
+      const fechaParam = typeof fecha === "string" ? fecha : new Date().toISOString().slice(0,10);
       const inicioHHMM = stepToTime24(iniStep);
       const finHHMM = stepToTime24(finStep);
 
@@ -475,7 +475,7 @@ export default function BikerSearch() {
         routeIds,
         hotspotIds,
         photographerIds: selPhotogs,
-        fecha,
+        fecha: fechaParam,
         inicioHHMM,
         finHHMM,
         ignorarHora,
