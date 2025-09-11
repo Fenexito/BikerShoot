@@ -122,6 +122,22 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   );
 }
 
+/* ======= Helpers fecha y alias ======= */
+const toYmd = (v) => {
+  if (!v) return null;
+  if (typeof v === "string") {
+    // si ya viene "YYYY-MM-DD ..."
+    const s10 = v.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s10)) return s10;
+    // si viene ISO con TZ
+    const d = new Date(v);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    return null;
+  }
+  const d = new Date(v);
+  return isNaN(d) ? null : d.toISOString().slice(0, 10);
+};
+
 /* ======= Helpers Supabase (IDs y URLS) ======= */
 async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId = null } = {}) {
   if (!routeName) return [];
@@ -180,11 +196,10 @@ async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
   return data || [];
 }
 
-async function getEventIdsByDateRouteAndPhotogs({ fechaISO, routeName, photographerIds = [] }) {
-  if (!photographerIds.length || !fechaISO) return [];
+// Eventos del/los fotógrafos en la **FECHA exacta** (comparación por 'YYYY-MM-DD') y cuyo texto de ruta machea alias
+async function getEventIdsByDateRouteAndPhotogs({ fechaYmd, routeName, photographerIds = [] }) {
+  if (!photographerIds.length || !fechaYmd) return [];
   const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
-  const dayStart = new Date(fechaISO + "T00:00:00");
-  const dayEnd = new Date(fechaISO + "T23:59:59.999");
 
   const { data: evs } = await supabase
     .from("event")
@@ -193,14 +208,29 @@ async function getEventIdsByDateRouteAndPhotogs({ fechaISO, routeName, photograp
 
   const out = [];
   for (const e of (evs || [])) {
-    const fIso = e.fecha || e.date || null;
-    if (!fIso) continue;
-    const d = new Date(fIso);
-    if (isNaN(d)) continue;
-    if (d >= dayStart && d <= dayEnd) {
-      const txt = norm(e.ruta || e.location || "");
-      if (alias.some((a) => txt.includes(a))) out.push(String(e.id));
-    }
+    const dStr = toYmd(e.fecha) || toYmd(e.date);
+    if (!dStr) continue;
+    if (dStr !== fechaYmd) continue; // 👈 evitar TZ
+    const txt = norm(e.ruta || e.location || "");
+    if (alias.some((a) => txt.includes(a))) out.push(String(e.id));
+  }
+  return out;
+}
+
+// Igual que lo anterior, pero **sin filtrar por fecha** (para "Ignorar fecha/hora")
+async function getEventIdsByRouteAndPhotogs({ routeName, photographerIds = [] }) {
+  if (!photographerIds.length) return [];
+  const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
+
+  const { data: evs } = await supabase
+    .from("event")
+    .select("id, ruta, location, photographer_id")
+    .in("photographer_id", photographerIds);
+
+  const out = [];
+  for (const e of (evs || [])) {
+    const txt = norm(e.ruta || e.location || "");
+    if (alias.some((a) => txt.includes(a))) out.push(String(e.id));
   }
   return out;
 }
@@ -415,12 +445,17 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ================== Buscar fotos (robusto) ================== */
+  /* ================== Buscar fotos (robusto + logs) ================== */
+  // log al cambiar fecha (para ver qué se usa)
+  useEffect(() => {
+    console.log("[UI] fecha seleccionada:", fecha);
+  }, [fecha]);
+
   async function runSearch() {
     try {
       setLoading(true);
 
-      const fechaParam = typeof fecha === "string" ? fecha : new Date().toISOString().slice(0, 10);
+      const fechaParam = toYmd(fecha) || new Date().toISOString().slice(0, 10);
       const inicioHHMM = stepToTime24(iniStep);
       const finHHMM = stepToTime24(finStep);
 
@@ -433,22 +468,36 @@ export default function BikerSearch() {
             })
           : [];
 
-      // 2) Resolver por FECHA+PUNTO si routeIds vacío (evento correcto del día)
+      // 2) Resolver por FECHA **si NO ignorás hora**, o por RUTA (sin fecha) si sí ignorás
       if ((!routeIds || routeIds.length === 0) && ruta !== "Todos" && selPhotogs.length) {
-        const evIdsByDay = await getEventIdsByDateRouteAndPhotogs({
-          fechaISO: fechaParam,
-          routeName: ruta,
-          photographerIds: selPhotogs,
-        });
-        if (evIdsByDay.length) {
-          const { data: routesEvs } = await supabase.from("event_route").select("id, event_id, name").in("event_id", evIdsByDay);
+        let evIdsByScope = [];
+        if (ignorarHora) {
+          evIdsByScope = await getEventIdsByRouteAndPhotogs({
+            routeName: ruta,
+            photographerIds: selPhotogs,
+          });
+          console.log("[BUSCAR] ignorarHora=TRUE, eventos x ruta:", evIdsByScope.length);
+        } else {
+          evIdsByScope = await getEventIdsByDateRouteAndPhotogs({
+            fechaYmd: fechaParam,
+            routeName: ruta,
+            photographerIds: selPhotogs,
+          });
+          console.log("[BUSCAR] ignorarHora=FALSE, eventos x fecha+ruta:", evIdsByScope.length, "fechaParam:", fechaParam);
+        }
+
+        if (evIdsByScope.length) {
+          const { data: routesEvs } = await supabase
+            .from("event_route")
+            .select("id, event_id, name")
+            .in("event_id", evIdsByScope);
           const alias = (ROUTE_ALIAS[ruta] || [ruta]).map(norm);
           const keep = (routesEvs || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
           if (keep.length) routeIds = keep.map((r) => String(r.id));
         }
       }
 
-      // 3) Fallback por NOMBRE DE PUNTO → routeIds
+      // 3) Fallback por NOMBRE DE PUNTO → routeIds (independiente de fecha)
       if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
         const { data: hsByName } = await supabase
           .from("event_hotspot")
@@ -474,9 +523,9 @@ export default function BikerSearch() {
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
       }
 
-      console.log("[BUSCAR] ruta:", ruta, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
+      console.log("[BUSCAR] ruta:", ruta, "fechaParam:", fechaParam, "ignorarHora:", ignorarHora, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
 
-      // ====== Intento A: fetchPhotos ======
+      // ====== Intento A: fetchPhotos (si ignorás hora, NO le pasamos fecha/horas) ======
       let items = [];
       let hasMore = false;
       try {
@@ -484,13 +533,14 @@ export default function BikerSearch() {
           routeIds,
           hotspotIds,
           photographerIds: selPhotogs,
-          fecha: fechaParam,
-          inicioHHMM,
-          finHHMM,
+          fecha: ignorarHora ? undefined : fechaParam,
+          inicioHHMM: ignorarHora ? undefined : inicioHHMM,
+          finHHMM: ignorarHora ? undefined : finHHMM,
           ignorarHora,
           page: 0,
           limit: 200,
         });
+
         const arr = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
         const normed = [];
         for (const x of arr) {
@@ -508,17 +558,29 @@ export default function BikerSearch() {
         }
         items = normed;
         hasMore = !Array.isArray(resp) && !!resp?.hasMore;
-      } catch (_) {
-        // ignorar
+        console.log("[RESULT A] fetchPhotos items:", items.length);
+      } catch (e) {
+        console.log("[RESULT A] fetchPhotos error:", e?.message || e);
       }
 
       // ====== Intento B/C: event_asset o Storage ======
       if (!items.length && selPhotogs.length) {
-        const evIds = await getEventIdsByDateRouteAndPhotogs({
-          fechaISO: fechaParam,
-          routeName: ruta,
-          photographerIds: selPhotogs,
-        });
+        let evIds = [];
+        if (ignorarHora) {
+          evIds = await getEventIdsByRouteAndPhotogs({
+            routeName: ruta,
+            photographerIds: selPhotogs,
+          });
+          console.log("[RESULT B] eventos sin fecha:", evIds.length);
+        } else {
+          evIds = await getEventIdsByDateRouteAndPhotogs({
+            fechaYmd: fechaParam,
+            routeName: ruta,
+            photographerIds: selPhotogs,
+          });
+          console.log("[RESULT B] eventos por fecha:", evIds.length);
+        }
+
         if (evIds.length) {
           try {
             let q = supabase
@@ -544,8 +606,10 @@ export default function BikerSearch() {
                 });
               }
               items = tmp;
+              console.log("[RESULT B] event_asset items:", items.length);
             }
-          } catch (_) {
+          } catch (err) {
+            console.log("[RESULT B] event_asset RLS/err, fallback storage:", err?.message || err);
             const merged = [];
             for (const evId of evIds) {
               const listed = await listAssetsFromStorage(evId, {
@@ -560,12 +624,14 @@ export default function BikerSearch() {
               );
             }
             items = merged;
+            console.log("[RESULT C] storage items:", items.length);
           }
         }
       }
 
       setAllHasMore(hasMore);
       setAllPhotos(Array.isArray(items) ? items : []);
+      console.log("[RESULT FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
     } catch (e) {
       console.error("Buscar fotos:", e);
       setAllPhotos([]);
@@ -590,7 +656,7 @@ export default function BikerSearch() {
     const base = Array.isArray(allPhotos) ? allPhotos : [];
     if (ignorarHora) return base.slice();
 
-    const fechaStr = fecha;
+    const fechaStr = toYmd(fecha);
     const dayStart = new Date(fechaStr + "T00:00:00");
     const dayEnd = new Date(fechaStr + "T23:59:59.999");
 
@@ -646,11 +712,59 @@ export default function BikerSearch() {
   const [vistaForced, setVistaForced] = useState("mosaico");
   const [pageForced, setPageForced] = useState(1);
 
+  async function getPublicUrl(storagePath) {
+    if (!storagePath) return "";
+    const raw = String(storagePath).trim();
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const clean = raw.replace(/^\/+/, "").replace(/^fotos\//i, "");
+    const { data } = supabase.storage.from("fotos").getPublicUrl(clean);
+    if (data?.publicUrl) return data.publicUrl;
+    const signed = await supabase.storage.from("fotos").createSignedUrl(clean, 3600);
+    return signed?.data?.signedUrl || "";
+  }
+
+  async function listAssetsFromStorage(eventId, { onlyHotspots = [] } = {}) {
+    const root = `events/${eventId}`;
+    async function listAllFiles(folder) {
+      const acc = [];
+      const stack = [folder];
+      while (stack.length) {
+        const cur = stack.pop();
+        const { data } = await supabase.storage.from("fotos").list(cur, { limit: 1000 });
+        for (const entry of data || []) {
+          if (entry.name && /\.[a-z0-9]{2,4}$/i.test(entry.name)) {
+            acc.push(`${cur}/${entry.name}`);
+          } else if (entry.name) {
+            stack.push(`${cur}/${entry.name}`);
+          }
+        }
+      }
+      return acc;
+    }
+    const files = await listAllFiles(root);
+    const items = [];
+    for (const p of files) {
+      const parts = p.split("/").filter(Boolean);
+      const idxEv = parts.indexOf("events");
+      const evId = parts[idxEv + 1];
+      const hsId = parts[idxEv + 2] || null;
+      if (String(evId) !== String(eventId)) continue;
+      if (onlyHotspots.length && (!hsId || !onlyHotspots.includes(String(hsId)))) continue;
+      const url = await getPublicUrl(p);
+      items.push({
+        id: p,
+        url,
+        timestamp: null,
+        hotspotId: hsId,
+        photographerId: null,
+      });
+    }
+    return items;
+  }
+
   async function loadForced() {
     try {
       setForcedLoading(true);
-
-      // Intento 1: event_asset directo
       let out = [];
       try {
         const { data: assets } = await supabase
@@ -674,11 +788,8 @@ export default function BikerSearch() {
             });
           }
         }
-      } catch (_) {
-        // ignorado
-      }
+      } catch (_) {}
 
-      // Intento 2: Storage fallback si 0
       if (!out.length) {
         const listed = await listAssetsFromStorage(FORCED.eventId, {
           onlyHotspots: [FORCED.hotspotId],
@@ -732,8 +843,11 @@ export default function BikerSearch() {
             <input
               type="date"
               className="h-9 border rounded-lg px-2 bg-white"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              value={toYmd(fecha) || ""}
+              onChange={(e) => {
+                console.log("[UI] change fecha ->", e.target.value);
+                setFecha(e.target.value);
+              }}
               disabled={ignorarHora}
               title={ignorarHora ? "Ignorando fecha/hora" : ""}
             />
@@ -744,17 +858,45 @@ export default function BikerSearch() {
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
               <label className="flex items-center gap-1 text-xs text-slate-600">
-                <input type="checkbox" checked={ignorarHora} onChange={(e) => setIgnorarHora(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={ignorarHora}
+                  onChange={(e) => {
+                    console.log("[UI] change ignorarHora ->", e.target.checked);
+                    setIgnorarHora(e.target.checked);
+                  }}
+                />
                 Ignorar fecha/hora
               </label>
             </div>
-            <DualSlider min={MIN_STEP} max={MAX_STEP} a={iniStep} b={finStep} onChangeA={setIniStep} onChangeB={setFinStep} width={260} />
+            <DualSlider
+              min={MIN_STEP}
+              max={MAX_STEP}
+              a={iniStep}
+              b={finStep}
+              onChangeA={(v) => {
+                console.log("[UI] change inicio ->", v, stepToTime24(v));
+                setIniStep(v);
+              }}
+              onChangeB={(v) => {
+                console.log("[UI] change fin ->", v, stepToTime24(v));
+                setFinStep(v);
+              }}
+              width={260}
+            />
           </div>
 
           {/* RUTA */}
           <div>
             <label className="block text-sm font-medium text-slate-600">Ruta</label>
-            <select className="h-9 border rounded-lg px-2 bg-white min-w-[200px]" value={ruta} onChange={(e) => setRuta(e.target.value)}>
+            <select
+              className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
+              value={ruta}
+              onChange={(e) => {
+                console.log("[UI] change ruta ->", e.target.value);
+                setRuta(e.target.value);
+              }}
+            >
               <option value="Todos">Todas</option>
               {RUTAS_FIJAS.map((r) => (
                 <option key={r} value={r}>
@@ -775,7 +917,10 @@ export default function BikerSearch() {
                   .sort((a, b) => a.label.localeCompare(b.label));
               }, [rows, ruta, resolver.photographerById])}
               value={selPhotogs}
-              onChange={setSelPhotogs}
+              onChange={(vals) => {
+                console.log("[UI] change photogs ->", vals);
+                setSelPhotogs(vals);
+              }}
               placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
             />
           </div>
@@ -793,7 +938,10 @@ export default function BikerSearch() {
                   .map((name) => ({ value: name, label: name }));
               }, [rows, ruta, arrToCsv(selPhotogs)])}
               value={selHotspots}
-              onChange={setSelHotspots}
+              onChange={(vals) => {
+                console.log("[UI] change puntos ->", vals);
+                setSelHotspots(vals);
+              }}
               placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
             />
           </div>
@@ -839,8 +987,8 @@ export default function BikerSearch() {
           </button>
         </div>
         <p className="text-slate-600 text-sm mb-2">
-          Evento: <code>{FORCED.eventId}</code> · Hotspot: <code>{FORCED.hotspotId}</code> · Fotógrafo:{" "}
-          <code>{FORCED.photographerId}</code>
+          Evento: <code>8bb5758e-58f6-425e-a7f8-d616dd971dae</code> · Hotspot: <code>4e625e42-96f1-44cc-ba68-b474c0de1aa5</code> · Fotógrafo:{" "}
+          <code>4f896569-08d9-4234-bada-27de418c64d6</code>
         </p>
 
         {forcedLoading ? (
