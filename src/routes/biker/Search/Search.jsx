@@ -1,3 +1,4 @@
+// src/routes/biker/Search/Search.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
@@ -22,6 +23,17 @@ const RUTAS_FIJAS = [
   "RN-10 (Cañas)",
 ];
 
+/* ======= Alias tolerantes para matching de rutas ======= */
+const ROUTE_ALIAS = {
+  "Ruta Interamericana": ["interamericana", "rn-1", "rn1", "ca-1"],
+  "RN-14": ["rn-14", "rn14", "ruta nacional 14"],
+  "Carretera al Salvador": ["salvador", "ca-1", "carretera al salvador"],
+  "Carretera al Atlántico": ["atlántico", "atlantico", "ca-9", "carretera al atlantico"],
+  "RN-10 (Cañas)": ["rn-10", "rn10", "cañas", "canas"],
+};
+const norm = (s) => String(s || "")
+  .normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
 /* ======= Tiempo (paso de 15 min) ======= */
 const MIN_STEP = 5 * 4;   // 5:00
 const MAX_STEP = 15 * 4;  // 15:00
@@ -45,7 +57,7 @@ const to12h = (t24) => {
 const csvToArr = (v) => (!v ? [] : v.split(",").filter(Boolean));
 const arrToCsv = (a) => (Array.isArray(a) ? a.join(",") : "");
 
-/* ======= Dual Slider (igual al de tu perfil) ======= */
+/* ======= Dual Slider ======= */
 function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   const ref = React.useRef(null);
   const dragging = React.useRef(null);
@@ -111,53 +123,34 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   );
 }
 
-/* ======= Helpers Supabase (CORRECTOS) ======= */
-// 👇 Reemplaza tu getEventRouteIdsByName por esta versión más tolerante
+/* ======= Helpers Supabase (IDs y URLS) ======= */
 async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId = null } = {}) {
   if (!routeName) return [];
+  const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
 
-  // Alias por ruta fija (ajustá si tus datos usan otros nombres)
-  const ALIAS = {
-    "Ruta Interamericana": ["interamericana", "rn-1", "rn1", "interamericana (rn-1)"],
-    "RN-14": ["rn-14", "rn14", "ruta nacional 14"],
-    "Carretera al Salvador": ["salvador", "ca-1", "carretera al salvador"],
-    "Carretera al Atlántico": ["atlántico", "atlantico", "ca-9", "carretera al atlántico"],
-    "RN-10 (Cañas)": ["rn-10", "rn10", "cañas", "canas"],
-  };
-  const wanted = String(routeName || "").trim();
-  const alias = (ALIAS[wanted] || [wanted])
-    .map(t => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase());
-
-  // 1) Traer candidates de event_route (filtrados por event si aplica)
+  // 1) Candidatos en event_route (opcionalmente por evento o por fotógrafo)
   let q = supabase.from("event_route").select("id, name, event_id");
   if (eventId) q = q.eq("event_id", eventId);
-
-  // si hay fotógrafos, primero sacamos sus eventos y filtramos por esos event_id
-  if (!eventId && Array.isArray(photographerIds) && photographerIds.length) {
+  if (!eventId && photographerIds.length) {
     const { data: evs, error: evErr } = await supabase
       .from("event")
       .select("id, photographer_id")
       .in("photographer_id", photographerIds);
     if (evErr) throw evErr;
-    const evIds = (evs || []).map(e => String(e.id));
+    const evIds = (evs || []).map((e) => String(e.id));
     if (evIds.length === 0) return [];
     q = q.in("event_id", evIds);
   }
-
   const { data: routes, error } = await q;
   if (error) throw error;
 
-  // 2) Matching tolerante por texto (client-side)
-  const norm = s => String(s || "")
-    .normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-
-  const matched = (routes || []).filter(r => {
+  const matched = (routes || []).filter((r) => {
     const n = norm(r.name);
-    return alias.some(a => n.includes(a));
+    return alias.some((a) => n.includes(a));
   });
 
-  // 3) Si no encontramos nada, último intento: buscar por columnas de la tabla event
-  if (matched.length === 0 && Array.isArray(photographerIds) && photographerIds.length) {
+  // 2) Último recurso: derivar desde tabla event (ruta/location) → event_route
+  if (matched.length === 0 && photographerIds.length) {
     const { data: evs2 } = await supabase
       .from("event")
       .select("id, ruta, location")
@@ -165,21 +158,19 @@ async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId
     const evIds2 = [];
     for (const e of (evs2 || [])) {
       const txt = norm(e.ruta || e.location || "");
-      if (alias.some(a => txt.includes(a))) evIds2.push(String(e.id));
+      if (alias.some((a) => txt.includes(a))) evIds2.push(String(e.id));
     }
     if (evIds2.length) {
       const { data: routes2 } = await supabase
         .from("event_route").select("id, name, event_id")
         .in("event_id", evIds2);
-      const again = (routes2 || []).filter(r => alias.some(a => norm(r.name).includes(a)));
-      return again.map(r => String(r.id));
+      const again = (routes2 || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
+      return again.map((r) => String(r.id));
     }
   }
-
-  return matched.map(r => String(r.id));
+  return matched.map((r) => String(r.id));
 }
 
-/** 2) Todos los hotspots de varias rutas (routeIds) */
 async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
   if (!routeIds.length) return [];
   let q = supabase.from("event_hotspot").select("id, name, route_id").in("route_id", routeIds);
@@ -187,6 +178,81 @@ async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
   const { data, error } = await q;
   if (error) throw error;
   return data || [];
+}
+
+// Eventos del/los fotógrafos en la FECHA (día completo) y cuyo texto de ruta machea alias
+async function getEventIdsByDateRouteAndPhotogs({ fechaISO, routeName, photographerIds = [] }) {
+  if (!photographerIds.length || !fechaISO) return [];
+  const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
+  const dayStart = new Date(fechaISO + "T00:00:00");
+  const dayEnd = new Date(fechaISO + "T23:59:59.999");
+
+  const { data: evs } = await supabase
+    .from("event")
+    .select("id, fecha, date, ruta, location, photographer_id")
+    .in("photographer_id", photographerIds);
+
+  const out = [];
+  for (const e of (evs || [])) {
+    const fIso = e.fecha || e.date || null;
+    if (!fIso) continue;
+    const d = new Date(fIso);
+    if (isNaN(d)) continue;
+    if (d >= dayStart && d <= dayEnd) {
+      const txt = norm(e.ruta || e.location || "");
+      if (alias.some((a) => txt.includes(a))) out.push(String(e.id));
+    }
+  }
+  return out;
+}
+
+/* ==== Helpers Storage (URL pública y listado fallback) ==== */
+// Igual que en Event.jsx: construye URL pública desde Storage. :contentReference[oaicite:2]{index=2}
+async function getPublicUrl(storagePath) {
+  if (!storagePath) return "";
+  const raw = String(storagePath).trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const clean = raw.replace(/^\/+/, "").replace(/^fotos\//i, "");
+  const { data } = supabase.storage.from("fotos").getPublicUrl(clean);
+  if (data?.publicUrl) return data.publicUrl;
+  const signed = await supabase.storage.from("fotos").createSignedUrl(clean, 3600);
+  return signed?.data?.signedUrl || "";
+}
+
+// Lista recursiva en bucket 'fotos' bajo events/<eventId>/** y retorna [{id,url,hotspotId,timestamp?}]
+async function listAssetsFromStorage(eventId, { onlyHotspots = [] } = {}) {
+  const root = `events/${eventId}`;
+  async function listAllFiles(folder) {
+    const acc = [];
+    const stack = [folder];
+    while (stack.length) {
+      const cur = stack.pop();
+      const { data } = await supabase.storage.from("fotos").list(cur, { limit: 1000 });
+      for (const entry of data || []) {
+        if (entry.name && /\.[a-z0-9]{2,4}$/i.test(entry.name)) {
+          acc.push(`${cur}/${entry.name}`);
+        } else if (entry.name) {
+          stack.push(`${cur}/${entry.name}`);
+        }
+      }
+    }
+    return acc;
+  }
+  const files = await listAllFiles(root); // 'events/<eventId>/<hotspotId>/.../file.jpg'
+  const items = [];
+  for (const p of files) {
+    const parts = p.split("/").filter(Boolean);
+    const idxEv = parts.indexOf("events");
+    const evId = parts[idxEv + 1];
+    const hsId = parts[idxEv + 2] || null;
+    if (String(evId) !== String(eventId)) continue;
+    if (onlyHotspots.length && (!hsId || !onlyHotspots.includes(String(hsId)))) continue;
+    const url = await getPublicUrl(p);
+    items.push({
+      id: p, url, timestamp: null, hotspotId: hsId, photographerId: null,
+    });
+  }
+  return items;
 }
 
 /* ================== Componente ================== */
@@ -210,16 +276,16 @@ export default function BikerSearch() {
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
   const [selHotspots, setSelHotspots] = useState(() => (params.get("punto") ? [params.get("punto")] : []));
 
-  // catálogos (RPC → misma UX)
+  // catálogos y resolutores
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [catalogReady, setCatalogReady] = useState(false);
-
   const [resolver, setResolver] = useState({
     photographerById: new Map(),
     hotspotById: new Map(),
   });
 
+  // fotos
   const [allPhotos, setAllPhotos] = useState([]);
 
   /* ---------- Prefill si venís de ?hotspot/?evento ---------- */
@@ -277,12 +343,7 @@ export default function BikerSearch() {
         }
         setLoading(true);
         const { data, error } = await supabase.rpc("get_photographers_cards", {
-          q: null,
-          ruta,
-          punto: null,
-          orden: "nombre",
-          limit_n: 500,
-          offset_n: 0,
+          q: null, ruta, punto: null, orden: "nombre", limit_n: 500, offset_n: 0,
         });
         if (error) throw error;
 
@@ -329,7 +390,7 @@ export default function BikerSearch() {
       .map((name) => ({ value: name, label: name }));
   }, [rows, ruta, arrToCsv(selPhotogs)]);
 
-  /* ---------- Limpieza de selecciones inválidas al cargar catálogo ---------- */
+  /* ---------- Limpieza post-catálogo ---------- */
   useEffect(() => {
     if (!catalogReady) return;
     const validPhotogIds = new Set(photogOptions.map((o) => String(o.value)));
@@ -342,14 +403,18 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ================== Buscar fotos (modo compat) ================== */
+  /* ================== Buscar fotos (robusto) ================== */
   const [allHasMore, setAllHasMore] = useState(false);
 
-  async function runSearch(reset = true) {
+  async function runSearch() {
     try {
       setLoading(true);
 
-      // 1) Resolver routeIds correctos (event_route)
+      const fechaParam = typeof fecha === "string" ? fecha : new Date().toISOString().slice(0,10);
+      const inicioHHMM = stepToTime24(iniStep);
+      const finHHMM = stepToTime24(finStep);
+
+      // 1) Resolver routeIds correctos
       let routeIds = ruta !== "Todos"
         ? await getEventRouteIdsByName(ruta, {
             photographerIds: selPhotogs.length ? selPhotogs : [],
@@ -357,105 +422,40 @@ export default function BikerSearch() {
           })
         : [];
 
-        if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
-          const { data: hsByName } = await supabase
-            .from("event_hotspot")
-            .select("id, name, route_id")
-            .in("name", selHotspots);
-          const rs = Array.from(new Set((hsByName || []).map(h => String(h.route_id)).filter(Boolean)));
-          if (rs.length) {
-            console.log("[BUSCAR][fallback por puntos] routeIds:", rs);
-            routeIds = rs;
-          }
+      // 2) Resolver por FECHA+PUNTO si routeIds vacío (evento correcto del día)
+      if ((!routeIds || routeIds.length === 0) && ruta !== "Todos" && selPhotogs.length) {
+        const evIdsByDay = await getEventIdsByDateRouteAndPhotogs({
+          fechaISO: fechaParam, routeName: ruta, photographerIds: selPhotogs,
+        });
+        if (evIdsByDay.length) {
+          const { data: routesEvs } = await supabase
+            .from("event_route")
+            .select("id, event_id, name")
+            .in("event_id", evIdsByDay);
+          const alias = (ROUTE_ALIAS[ruta] || [ruta]).map(norm);
+          const keep = (routesEvs || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
+          if (keep.length) routeIds = keep.map((r) => String(r.id));
         }
+      }
 
-        // 🧠 2.5) Filtro por FECHA + alias de Ruta + Punto para amarrar el evento correcto
-        if ((!routeIds || routeIds.length === 0) && ruta !== "Todos" && (selPhotogs?.length || 0) > 0) {
-          // normalizar fecha "YYYY-MM-DD" → rango del día
-          const fechaStr = (typeof fecha === "string" ? fecha : new Date().toISOString().slice(0,10));
-          const dayStart = `${fechaStr}T00:00:00`;
-          const dayEnd   = `${fechaStr}T23:59:59.999`;
-
-          // alias tolerantes para Interamericana
-          const alias = ["interamericana", "rn-1", "rn1", "ca-1"].map(s =>
-            s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()
-          );
-          const norm = (s) => String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-
-          // 1) eventos del/los fotógrafos ese día
-          const { data: evs } = await supabase
-            .from("event")
-            .select("id, fecha, date, ruta, location, photographer_id")
-            .in("photographer_id", selPhotogs);
-
-          const evIdsByDay = [];
-          for (const e of (evs || [])) {
-            // fecha del evento en cualquiera de los dos campos
-            const fIso = e.fecha || e.date || null;
-            if (!fIso) continue;
-            const d = new Date(fIso);
-            if (isNaN(d)) continue;
-            const iso = d.toISOString();
-            if (iso >= new Date(dayStart).toISOString() && iso <= new Date(dayEnd).toISOString()) {
-              // check alias de ruta contra ruta/location
-              const txt = norm(e.ruta || e.location || "");
-              if (alias.some(a => txt.includes(a))) {
-                evIdsByDay.push(String(e.id));
-              }
-            }
-          }
-
-          // 2) si hay eventos del día, tratar de obtener routeIds desde el hotspot por NOMBRE
-          if (evIdsByDay.length) {
-            let routeIdsFromHotspot = [];
-            if (selHotspots.length) {
-              const { data: hs } = await supabase
-                .from("event_hotspot")
-                .select("id, name, route_id, event_id")
-                .in("event_id", evIdsByDay)
-                .in("name", selHotspots);
-              routeIdsFromHotspot = Array.from(
-                new Set((hs || []).map(h => String(h.route_id)).filter(Boolean))
-              );
-            }
-
-            // 3) si con hotspot no salió, sacar routeIds desde event_route del mismo evento
-            if (!routeIdsFromHotspot.length) {
-              const { data: routesEvs } = await supabase
-                .from("event_route")
-                .select("id, event_id, name")
-                .in("event_id", evIdsByDay);
-              // filtrar por alias de Interamericana
-              const keep = (routesEvs || []).filter(r => alias.some(a => norm(r.name).includes(a)));
-              routeIdsFromHotspot = keep.map(r => String(r.id));
-            }
-
-            if (routeIdsFromHotspot.length) {
-              console.log("[BUSCAR][por fecha+punto] routeIds:", routeIdsFromHotspot);
-              routeIds = routeIdsFromHotspot; // ← gracias al 'let' de arriba
-            }
-          }
+      // 3) Fallback por NOMBRE DE PUNTO → routeIds
+      if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
+        const { data: hsByName } = await supabase
+          .from("event_hotspot")
+          .select("id, name, route_id")
+          .in("name", selHotspots);
+        const rs = Array.from(new Set((hsByName || []).map((h) => String(h.route_id)).filter(Boolean)));
+        if (rs.length) {
+          console.log("[BUSCAR][fallback por puntos] routeIds:", rs);
+          routeIds = rs;
         }
+      }
 
-        // 🛟 Fallback que ya tenías: derivar desde puntos si aún vacío
-        if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
-          const { data: hsByName } = await supabase
-            .from("event_hotspot")
-            .select("id, name, route_id")
-            .in("name", selHotspots);
-          const rs = Array.from(new Set((hsByName || []).map(h => String(h.route_id)).filter(Boolean)));
-          if (rs.length) {
-            console.log("[BUSCAR][fallback por puntos] routeIds:", rs);
-            routeIds = rs;
-          }
-        }
-
-      // 2) Resolver hotspotIds por nombre sobre esas rutas
+      // 4) Hotspots filtrados por NOMBRE sobre las rutas resultantes
       let hotspotIds = [];
       if (routeIds.length && selHotspots.length) {
         const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
         hotspotIds = hs.map((h) => String(h.id));
-        // cache nombres
         const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
       } else if (routeIds.length) {
@@ -464,52 +464,98 @@ export default function BikerSearch() {
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
       }
 
-      // 3) Intentar fetchPhotos “estilo nuevo” (routeIds[])
-      const fechaParam = typeof fecha === "string" ? fecha : new Date().toISOString().slice(0,10);
-      const inicioHHMM = stepToTime24(iniStep);
-      const finHHMM = stepToTime24(finStep);
-
       console.log("[BUSCAR] ruta:", ruta, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
 
-      const tryNew = await fetchPhotos({
-        routeIds,
-        hotspotIds,
-        photographerIds: selPhotogs,
-        fecha: fechaParam,
-        inicioHHMM,
-        finHHMM,
-        ignorarHora,
-        page: 0,
-        limit: 200,
-      }).catch(() => null);
-
+      // ====== Intento A: fetchPhotos (nuevo/compat) ======
       let items = [];
       let hasMore = false;
+      try {
+        const resp = await fetchPhotos({
+          routeIds,
+          hotspotIds,
+          photographerIds: selPhotogs,
+          fecha: fechaParam,
+          inicioHHMM,
+          finHHMM,
+          ignorarHora,
+          page: 0,
+          limit: 200,
+        });
 
-      if (tryNew && (Array.isArray(tryNew) || Array.isArray(tryNew.items))) {
-        const arr = Array.isArray(tryNew) ? tryNew : tryNew.items;
-        items = Array.isArray(arr) ? arr : [];
-        hasMore = !Array.isArray(tryNew) && !!tryNew.hasMore;
-      } else {
-        // 4) Compat: fan-out por cada route_id usando la firma vieja { route_id, hotspot_ids, photographer_ids }
-        const merged = new Map();
-        const routeList = routeIds.length ? routeIds : [null]; // si no hay ruta, probá sin route_id
-        for (const rId of routeList) {
-          const resp = await fetchPhotos({
-            event_id: params.get("evento") || undefined,
-            hotspot_ids: hotspotIds.length ? hotspotIds : undefined,
-            photographer_ids: selPhotogs.length ? selPhotogs : undefined,
-            route_id: rId || undefined,
-          }).catch(() => null);
-
-          const arr = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
-          for (const it of arr) merged.set(it.id, it);
-          hasMore = hasMore || (!!resp && !Array.isArray(resp) && !!resp.hasMore);
+        const arr = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
+        // Normalizar al shape que necesita SearchResults (id, url, timestamp…)
+        const normed = [];
+        for (const x of arr) {
+          const id = x.id || x.asset_id || x.storage_path || x.url || cryptoRandomId();
+          const url = x.url || (x.storage_path ? await getPublicUrl(x.storage_path) : "");
+          if (!url) continue;
+          normed.push({
+            id: String(id),
+            url,
+            timestamp: x.timestamp || x.taken_at || x.created_at || null,
+            hotspotId: x.hotspotId || x.hotspot_id || null,
+            photographerId: x.photographerId || x.photographer_id || (selPhotogs[0] || null),
+            route: ruta !== "Todos" ? ruta : (x.route || null),
+          });
         }
-        items = Array.from(merged.values());
+        items = normed;
+        hasMore = !Array.isArray(resp) && !!resp?.hasMore;
+      } catch (_) {
+        // ignoramos error: vamos a fallback
       }
 
-      // 5) Guardar
+      // ====== Intento B: si A trajo vacío → event_asset directo ======
+      if (!items.length && selPhotogs.length) {
+        const evIds = await getEventIdsByDateRouteAndPhotogs({
+          fechaISO: fechaParam, routeName: ruta, photographerIds: selPhotogs,
+        });
+
+        if (evIds.length) {
+          // 1) event_asset (si RLS deja)
+          try {
+            let q = supabase
+              .from("event_asset")
+              .select("id, event_id, hotspot_id, storage_path, taken_at")
+              .in("event_id", evIds)
+              .order("taken_at", { ascending: false })
+              .limit(1200);
+            if (hotspotIds.length) q = q.in("hotspot_id", hotspotIds);
+
+            const { data: assets } = await q;
+            if (Array.isArray(assets) && assets.length) {
+              const tmp = [];
+              for (const a of assets) {
+                const url = await getPublicUrl(a.storage_path);
+                if (!url) continue;
+                tmp.push({
+                  id: String(a.id),
+                  url,
+                  timestamp: a.taken_at || null,
+                  hotspotId: a.hotspot_id || null,
+                  photographerId: selPhotogs[0] || null,
+                  route: ruta !== "Todos" ? ruta : null,
+                });
+              }
+              items = tmp;
+            }
+          } catch (_) {
+            // 2) Storage directo como plan C (sin timestamps)
+            const merged = [];
+            for (const evId of evIds) {
+              const listed = await listAssetsFromStorage(evId, {
+                onlyHotspots: hotspotIds.length ? hotspotIds : [],
+              });
+              merged.push(...listed.map((it) => ({
+                ...it,
+                photographerId: selPhotogs[0] || null,
+                route: ruta !== "Todos" ? ruta : null,
+              })));
+            }
+            items = merged;
+          }
+        }
+      }
+
       setAllHasMore(hasMore);
       setAllPhotos(Array.isArray(items) ? items : []);
     } catch (e) {
@@ -521,20 +567,20 @@ export default function BikerSearch() {
     }
   }
 
-  // Disparar cuando cambian filtros base (como lo tenías)
+  // Disparar cuando cambian filtros base
   useEffect(() => {
     if (ruta === "Todos") {
       setAllPhotos([]);
       setAllHasMore(false);
       return;
     }
-    runSearch(true);
+    runSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ruta, arrToCsv(selPhotogs), arrToCsv(selHotspots), ignorarHora, iniStep, finStep]);
+  }, [ruta, arrToCsv(selPhotogs), arrToCsv(selHotspots), ignorarHora, iniStep, finStep, fecha]);
 
   /* ================== Filtro front por fecha/hora ================== */
   const filtered = useMemo(() => {
-    const base = Array.isArray(allPhotos) ? allPhotos : []; // blindaje
+    const base = Array.isArray(allPhotos) ? allPhotos : [];
     if (ignorarHora) return base.slice();
 
     const fechaStr = fecha;
@@ -554,7 +600,7 @@ export default function BikerSearch() {
     });
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
-  /* ================== Paginación & selección (igual) ================== */
+  /* ================== Paginación & selección ================== */
   const clusters = useMemo(() => [], [filtered]);
   const [vista, setVista] = useState("mosaico");
   const [page, setPage] = useState(1);
@@ -699,4 +745,14 @@ export default function BikerSearch() {
       </div>
     </div>
   );
+}
+
+/* Utilidad local */
+function cryptoRandomId() {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const arr = new Uint32Array(2);
+    crypto.getRandomValues(arr);
+    return `${arr[0].toString(16)}${arr[1].toString(16)}`;
+  }
+  return String(Math.random()).slice(2);
 }
