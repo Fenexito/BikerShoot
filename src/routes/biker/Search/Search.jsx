@@ -689,14 +689,26 @@ export default function BikerSearch() {
     const end = new Date(dayStart);
     end.setMinutes(clampStep(finStep) * 15 + 59, 59, 999);
 
-    return base.filter((ph) => {
-      if (!ph?.timestamp) return false;
+    const out = base.filter((ph) => {
+      // ⚠️ Fotos del Storage a veces no traen timestamp → NO las botemos.
+      if (!ph?.timestamp) return true;
+
       const d = new Date(ph.timestamp);
-      if (isNaN(d)) return false;
+      if (isNaN(d)) return true; // tolerante a inválidos
+
       return d >= dayStart && d <= dayEnd && d >= start && d <= end;
     });
+
+    return out;
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
+  // DEBUG extra: ver conteo después del filtro
+  useEffect(() => {
+    console.log("[FILTER] base:", Array.isArray(allPhotos) ? allPhotos.length : 0,
+                "filtered:", Array.isArray(filtered) ? filtered.length : 0,
+                "ignorarHora:", ignorarHora);
+  }, [allPhotos, filtered, ignorarHora]);
+  
   /* ================== Paginación & selección (principal) ================== */
   const clusters = useMemo(() => [], [filtered]); // aún no agrupamos
   const [vista, setVista] = useState("mosaico");
