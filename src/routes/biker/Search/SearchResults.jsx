@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { FixedSizeGrid as Grid } from "react-window";
-import PhotoLightbox from "./PhotoLightbox.jsx";
+import PhotoLightbox from "../../../components/PhotoLightbox.jsx";
 import { useCart } from "../../../state/CartContext.jsx";
 
 /* Utils de formato (tolerantes a timestamp nulo/invalid) */
