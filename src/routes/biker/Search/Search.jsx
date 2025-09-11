@@ -350,13 +350,94 @@ export default function BikerSearch() {
       setLoading(true);
 
       // 1) Resolver routeIds correctos (event_route)
-      const routeIds = ruta !== "Todos"
+      let routeIds = ruta !== "Todos"
         ? await getEventRouteIdsByName(ruta, {
             photographerIds: selPhotogs.length ? selPhotogs : [],
             eventId: params.get("evento") || null,
           })
         : [];
 
+        if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
+          const { data: hsByName } = await supabase
+            .from("event_hotspot")
+            .select("id, name, route_id")
+            .in("name", selHotspots);
+          const rs = Array.from(new Set((hsByName || []).map(h => String(h.route_id)).filter(Boolean)));
+          if (rs.length) {
+            console.log("[BUSCAR][fallback por puntos] routeIds:", rs);
+            routeIds = rs;
+          }
+        }
+
+        // 🧠 2.5) Filtro por FECHA + alias de Ruta + Punto para amarrar el evento correcto
+        if ((!routeIds || routeIds.length === 0) && ruta !== "Todos" && (selPhotogs?.length || 0) > 0) {
+          // normalizar fecha "YYYY-MM-DD" → rango del día
+          const fechaStr = (typeof fecha === "string" ? fecha : new Date().toISOString().slice(0,10));
+          const dayStart = `${fechaStr}T00:00:00`;
+          const dayEnd   = `${fechaStr}T23:59:59.999`;
+
+          // alias tolerantes para Interamericana
+          const alias = ["interamericana", "rn-1", "rn1", "ca-1"].map(s =>
+            s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()
+          );
+          const norm = (s) => String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+          // 1) eventos del/los fotógrafos ese día
+          const { data: evs } = await supabase
+            .from("event")
+            .select("id, fecha, date, ruta, location, photographer_id")
+            .in("photographer_id", selPhotogs);
+
+          const evIdsByDay = [];
+          for (const e of (evs || [])) {
+            // fecha del evento en cualquiera de los dos campos
+            const fIso = e.fecha || e.date || null;
+            if (!fIso) continue;
+            const d = new Date(fIso);
+            if (isNaN(d)) continue;
+            const iso = d.toISOString();
+            if (iso >= new Date(dayStart).toISOString() && iso <= new Date(dayEnd).toISOString()) {
+              // check alias de ruta contra ruta/location
+              const txt = norm(e.ruta || e.location || "");
+              if (alias.some(a => txt.includes(a))) {
+                evIdsByDay.push(String(e.id));
+              }
+            }
+          }
+
+          // 2) si hay eventos del día, tratar de obtener routeIds desde el hotspot por NOMBRE
+          if (evIdsByDay.length) {
+            let routeIdsFromHotspot = [];
+            if (selHotspots.length) {
+              const { data: hs } = await supabase
+                .from("event_hotspot")
+                .select("id, name, route_id, event_id")
+                .in("event_id", evIdsByDay)
+                .in("name", selHotspots);
+              routeIdsFromHotspot = Array.from(
+                new Set((hs || []).map(h => String(h.route_id)).filter(Boolean))
+              );
+            }
+
+            // 3) si con hotspot no salió, sacar routeIds desde event_route del mismo evento
+            if (!routeIdsFromHotspot.length) {
+              const { data: routesEvs } = await supabase
+                .from("event_route")
+                .select("id, event_id, name")
+                .in("event_id", evIdsByDay);
+              // filtrar por alias de Interamericana
+              const keep = (routesEvs || []).filter(r => alias.some(a => norm(r.name).includes(a)));
+              routeIdsFromHotspot = keep.map(r => String(r.id));
+            }
+
+            if (routeIdsFromHotspot.length) {
+              console.log("[BUSCAR][por fecha+punto] routeIds:", routeIdsFromHotspot);
+              routeIds = routeIdsFromHotspot; // ← gracias al 'let' de arriba
+            }
+          }
+        }
+
+        // 🛟 Fallback que ya tenías: derivar desde puntos si aún vacío
         if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
           const { data: hsByName } = await supabase
             .from("event_hotspot")
