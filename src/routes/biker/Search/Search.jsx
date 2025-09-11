@@ -1,4 +1,3 @@
-// src/routes/biker/Search/Search.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
@@ -112,43 +111,37 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   );
 }
 
-/* ======= Helpers Supabase locales ======= */
-async function getRouteIdByName(routeName) {
-  if (!routeName) return null;
-  const { data, error } = await supabase
-    .from("photo_routes")
-    .select("id, name")
-    .ilike("name", routeName.trim());
-  if (error) throw error;
-  const row =
-    (data || []).find(
-      (r) => r.name.trim().toLowerCase() === routeName.trim().toLowerCase()
-    ) || data?.[0];
-  return row?.id || null;
-}
+/* ======= Helpers Supabase (CORRECTOS) ======= */
+/** 1) Conseguir TODOS los event_route.id por nombre de ruta (opcionalmente filtrado por fotógrafos o por evento) */
+async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId = null } = {}) {
+  if (!routeName) return [];
+  let base = supabase.from("event_route").select("id, name, event_id").ilike("name", routeName.trim());
 
-async function getAllHotspotsForRoute(routeName) {
-  const routeId = await getRouteIdByName(routeName);
-  if (!routeId) return [];
-  const { data, error } = await supabase
-    .from("event_hotspot")
-    .select("id, name")
-    .eq("route_id", routeId);
-  if (error) throw error;
-  return data || [];
-}
+  if (eventId) {
+    base = base.eq("event_id", eventId);
+  } else if (Array.isArray(photographerIds) && photographerIds.length > 0) {
+    const { data: evs } = await supabase
+      .from("event")
+      .select("id, photographer_id")
+      .in("photographer_id", photographerIds);
+    const evIds = (evs || []).map((e) => String(e.id));
+    if (evIds.length) base = base.in("event_id", evIds);
+    else return [];
+  }
 
-async function mapPointNamesToHotspotIds(routeName, pointNames = []) {
-  if (!routeName || !pointNames?.length) return [];
-  const routeId = await getRouteIdByName(routeName);
-  if (!routeId) return [];
-  const { data, error } = await supabase
-    .from("event_hotspot")
-    .select("id, name")
-    .eq("route_id", routeId)
-    .in("name", pointNames);
+  const { data, error } = await base;
   if (error) throw error;
   return (data || []).map((r) => String(r.id));
+}
+
+/** 2) Todos los hotspots de varias rutas (routeIds) */
+async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
+  if (!routeIds.length) return [];
+  let q = supabase.from("event_hotspot").select("id, name, route_id").in("route_id", routeIds);
+  if (names?.length) q = q.in("name", names.map(String));
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
 }
 
 /* ================== Componente ================== */
@@ -156,17 +149,13 @@ export default function BikerSearch() {
   const nav = useNavigate();
   const [params] = useSearchParams();
 
-  // -------- flags de origen (evento/hotspot) --------
   const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
 
-  // -------- filtros en una sola fila --------
+  // -------- filtros (una sola fila, intacto) --------
   const [fecha, setFecha] = useState(() => params.get("fecha") || new Date().toISOString().slice(0, 10));
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
-
-  // 🔥 Ignorar fecha y hora (por defecto, activado si NO venís de evento/hotspot)
   const [ignorarHora, setIgnorarHora] = useState(() => !forcedFromEvent);
-
   const [ruta, setRuta] = useState(() => {
     const r = params.get("ruta");
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
@@ -174,69 +163,51 @@ export default function BikerSearch() {
 
   // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
-  const [selHotspots, setSelHotspots] = useState(() => {
-    const fromPunto = params.get("punto");
-    return fromPunto ? [fromPunto] : [];
-  });
+  const [selHotspots, setSelHotspots] = useState(() => (params.get("punto") ? [params.get("punto")] : []));
 
-  // catálogos (RPC)
-  const [rows, setRows] = useState([]);         // {id, rutas[], puntos[]}
+  // catálogos (RPC → misma UX)
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [catalogReady, setCatalogReady] = useState(false);
 
-  // resolutores
   const [resolver, setResolver] = useState({
-    photographerById: new Map(),   // id -> {label}
-    hotspotById: new Map(),        // hotspot_id -> {name}
+    photographerById: new Map(),
+    hotspotById: new Map(),
   });
 
-  // fotos
   const [allPhotos, setAllPhotos] = useState([]);
 
-  /* ---------- si venís de ?evento/?hotspot: prefills ---------- */
+  /* ---------- Prefill si venís de ?hotspot/?evento ---------- */
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const hotspotParam = params.get("hotspot"); // UUID real
+        const hotspotParam = params.get("hotspot");
         if (hotspotParam) {
           const hs = await fetchHotspot(hotspotParam);
           if (hs) {
-            // ruta por route_id del hotspot
             if (!params.get("ruta") && hs.route_id) {
               const name = await getRouteName(hs.route_id);
               if (name && RUTAS_FIJAS.includes(name)) setRuta(name);
             }
-            // horas
             if (!params.get("inicio") && hs.horaIni) setIniStep(clampStep(timeToStep(hs.horaIni)));
             if (!params.get("fin") && hs.horaFin) setFinStep(clampStep(timeToStep(hs.horaFin)));
-            // punto por NOMBRE
-            if (!params.get("punto") && hs.name) {
-              setSelHotspots([String(hs.name)]);
-            }
-            // fotógrafo dueño del evento del hotspot
+            if (!params.get("punto") && hs.name) setSelHotspots([String(hs.name)]);
             if (!selPhotogs.length && hs.event_id) {
-              const evOfHotspot = await fetchEvent(hs.event_id);
-              if (evOfHotspot?.photographer_id) {
-                setSelPhotogs([String(evOfHotspot.photographer_id)]);
-              }
+              const ev = await fetchEvent(hs.event_id);
+              if (ev?.photographer_id) setSelPhotogs([String(ev.photographer_id)]);
             }
-            // si venís de botón, respetá horas -> desactiva "ignorar hora"
             setIgnorarHora(false);
           }
         }
-        // Si vino explícito ?photogs=
         const photogsCsv = params.get("photogs");
-        if (photogsCsv && !selPhotogs.length) {
-          setSelPhotogs(csvToArr(photogsCsv));
-        }
+        if (photogsCsv && !selPhotogs.length) setSelPhotogs(csvToArr(photogsCsv));
 
-        // Resolver del evento (si vino ?evento=) para nombres de hotspots directos
         const evento = params.get("evento");
         if (evento) {
           const pts = await fetchHotspotsByEvent(evento);
           if (!alive) return;
-          const hsMap = new Map(pts.map((p) => [String(p.id), { name: p.name }]));
+          const hsMap = new Map((pts || []).map((p) => [String(p.id), { name: p.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
         }
       } catch (e) {
@@ -247,7 +218,7 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- cargar fotógrafos y puntos vía RPC (igual photographers.jsx) ---------- */
+  /* ---------- Cargar fotógrafos/puntos (RPC) ---------- */
   useEffect(() => {
     let alive = true;
     setCatalogReady(false);
@@ -270,23 +241,18 @@ export default function BikerSearch() {
         });
         if (error) throw error;
 
-        if (!alive) return;
-
         const mapped = (data || []).map((r) => ({
           id: String(r.id),
           estudio: r.estudio,
           username: (r.username || "").replace(/^@/, ""),
           rutas: Array.isArray(r.rutas) ? r.rutas : [],
-          puntos: Array.isArray(r.puntos) ? r.puntos : [], // strings (nombres)
+          puntos: Array.isArray(r.puntos) ? r.puntos : [],
         }));
+        if (!alive) return;
         setRows(mapped);
 
-        // resolver de nombres de fotógrafo
         const phMap = new Map(
-          mapped.map((p) => [
-            p.id,
-            { label: p.estudio || p.username || p.id },
-          ])
+          mapped.map((p) => [p.id, { label: p.estudio || p.username || p.id }])
         );
         setResolver((prev) => ({ ...prev, photographerById: phMap }));
       } catch (e) {
@@ -301,7 +267,7 @@ export default function BikerSearch() {
     return () => { alive = false; };
   }, [ruta]);
 
-  /* ---------- opciones para selects (multi) ---------- */
+  /* ---------- Opciones multi ---------- */
   const photogOptions = useMemo(() => {
     const list = rows.filter((r) => (r.rutas || []).includes(ruta));
     return list
@@ -311,42 +277,14 @@ export default function BikerSearch() {
 
   const hotspotOptions = useMemo(() => {
     const base = rows.filter((r) => (r.rutas || []).includes(ruta));
-    const filteredByPhotog =
-      selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
-
-    const set = new Set(
-      filteredByPhotog.flatMap((r) =>
-        (r.puntos || []).map((p) => String(p))
-      )
-    );
+    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
+    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
     return Array.from(set)
       .sort((a, b) => a.localeCompare(b))
       .map((name) => ({ value: name, label: name }));
   }, [rows, ruta, arrToCsv(selPhotogs)]);
 
-  /* ---------- aplicar prefill SOLO cuando ya hay catálogo ---------- */
-  useEffect(() => {
-    if (!catalogReady) return;
-
-    // Punto
-    const puntoParam = params.get("punto");
-    if (puntoParam && !selHotspots.length) {
-      const ok = hotspotOptions.some((o) => o.value === puntoParam);
-      if (ok) setSelHotspots([puntoParam]);
-    }
-
-    // Photogs
-    const photogsCsv = params.get("photogs");
-    if (photogsCsv && !selPhotogs.length) {
-      const ids = csvToArr(photogsCsv);
-      const validIds = new Set(photogOptions.map((o) => String(o.value)));
-      const keep = ids.filter((id) => validIds.has(id));
-      if (keep.length) setSelPhotogs(keep);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogReady, photogOptions.length, hotspotOptions.length]);
-
-  /* ---------- NO limpiar selecciones hasta que el catálogo esté listo ---------- */
+  /* ---------- Limpieza de selecciones inválidas al cargar catálogo ---------- */
   useEffect(() => {
     if (!catalogReady) return;
     const validPhotogIds = new Set(photogOptions.map((o) => String(o.value)));
@@ -359,104 +297,127 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ---------- cargar fotos (mapear nombres de punto -> hotspot_id reales) ---------- */
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
+  /* ================== Buscar fotos (modo compat) ================== */
+  const [allHasMore, setAllHasMore] = useState(false);
 
-        // mapear nombres de punto a ids reales (event_hotspot)
-        let hotspot_ids = [];
-        let route_id = null;
-        if (ruta !== "Todos") {
-          // resolvemos el route_id para filtrar eventos del fotógrafo
-          route_id = await getRouteIdByName(ruta);
-          if (selHotspots.length > 0) {
-            hotspot_ids = await mapPointNamesToHotspotIds(ruta, selHotspots);
-          } else {
-            const allHs = await getAllHotspotsForRoute(ruta);
-            hotspot_ids = allHs.map((h) => String(h.id));
-            const hsMap = new Map(allHs.map((h) => [String(h.id), { name: h.name }]));
-            if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          }
-        }
+  async function runSearch(reset = true) {
+    try {
+      setLoading(true);
 
-        const resp = await fetchPhotos({
-        event_id: params.get("evento") || undefined,
-        hotspot_ids: hotspot_ids.length ? hotspot_ids : undefined,
-        photographer_ids: selPhotogs.length ? selPhotogs : undefined,
-        route_id: route_id || undefined,
-      });
+      // 1) Resolver routeIds correctos (event_route)
+      const routeIds = ruta !== "Todos"
+        ? await getEventRouteIdsByName(ruta, {
+            photographerIds: selPhotogs.length ? selPhotogs : [],
+            eventId: params.get("evento") || null,
+          })
+        : [];
 
-      // 🔧 Normalizar a array (soporta ambos formatos: [] o {items, hasMore})
-      const fotos = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
-
-      // (opcional) si querés detectar hasMore del nuevo formato:
-      const hasMoreFromApi = !Array.isArray(resp) && !!resp?.hasMore;
-
-      // Resolver de hotspot si faltó algo (igual que ya lo hacías)
-      if (fotos.length && resolver.hotspotById.size === 0 && ruta !== "Todos") {
-        const ids = Array.from(new Set(fotos.map((f) => String(f.hotspotId)).filter(Boolean)));
-        if (ids.length) {
-          const routeId = await getRouteIdByName(ruta);
-          if (routeId) {
-            const { data } = await supabase
-              .from("event_hotspot")
-              .select("id, name")
-              .eq("route_id", routeId)
-              .in("id", ids);
-            const hsMap = new Map((data || []).map((h) => [String(h.id), { name: h.name }]));
-            setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          }
-        }
+      // 2) Resolver hotspotIds por nombre sobre esas rutas
+      let hotspotIds = [];
+      if (routeIds.length && selHotspots.length) {
+        const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
+        hotspotIds = hs.map((h) => String(h.id));
+        // cache nombres
+        const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
+        setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+      } else if (routeIds.length) {
+        const hs = await getHotspotsByRouteIds(routeIds);
+        const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
+        setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
       }
 
-      // Marcar ruta en UI y **setear siempre array**
-      const fotosWithRoute = ruta !== "Todos" ? fotos.map((f) => ({ ...f, route: ruta })) : fotos;
-      setAllPhotos(Array.isArray(fotosWithRoute) ? fotosWithRoute : []);
-      } catch (e) {
-        console.error("Cargando fotos:", e);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ruta, arrToCsv(selHotspots), arrToCsv(selPhotogs)]);
+      // 3) Intentar fetchPhotos “estilo nuevo” (routeIds[])
+      const fecha = new Date().toISOString().slice(0, 10); // usamos tus filtros locales después
+      const inicioHHMM = stepToTime24(iniStep);
+      const finHHMM = stepToTime24(finStep);
 
-  /* ---------- filtro front: SIN IA / SIN COLORES ----------
-     - Si ignorarHora === true, NO filtramos por fecha ni hora.
-     - Si ignorarHora === false, filtramos por fecha (día) y por rango horario.
-     - Si una foto NO tiene timestamp, la mostramos cuando ignorarHora === true. */
-  const filtered = useMemo(() => {
-    if (ignorarHora) {
-      // sin filtros de fecha/hora (para depurar)
-      return allPhotos.slice();
+      console.log("[BUSCAR] ruta:", ruta, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
+
+      const tryNew = await fetchPhotos({
+        routeIds,
+        hotspotIds,
+        photographerIds: selPhotogs,
+        fecha,
+        inicioHHMM,
+        finHHMM,
+        ignorarHora,
+        page: 0,
+        limit: 200,
+      }).catch(() => null);
+
+      let items = [];
+      let hasMore = false;
+
+      if (tryNew && (Array.isArray(tryNew) || Array.isArray(tryNew.items))) {
+        const arr = Array.isArray(tryNew) ? tryNew : tryNew.items;
+        items = Array.isArray(arr) ? arr : [];
+        hasMore = !Array.isArray(tryNew) && !!tryNew.hasMore;
+      } else {
+        // 4) Compat: fan-out por cada route_id usando la firma vieja { route_id, hotspot_ids, photographer_ids }
+        const merged = new Map();
+        const routeList = routeIds.length ? routeIds : [null]; // si no hay ruta, probá sin route_id
+        for (const rId of routeList) {
+          const resp = await fetchPhotos({
+            event_id: params.get("evento") || undefined,
+            hotspot_ids: hotspotIds.length ? hotspotIds : undefined,
+            photographer_ids: selPhotogs.length ? selPhotogs : undefined,
+            route_id: rId || undefined,
+          }).catch(() => null);
+
+          const arr = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
+          for (const it of arr) merged.set(it.id, it);
+          hasMore = hasMore || (!!resp && !Array.isArray(resp) && !!resp.hasMore);
+        }
+        items = Array.from(merged.values());
+      }
+
+      // 5) Guardar
+      setAllHasMore(hasMore);
+      setAllPhotos(Array.isArray(items) ? items : []);
+    } catch (e) {
+      console.error("Buscar fotos:", e);
+      setAllPhotos([]);
+      setAllHasMore(false);
+    } finally {
+      setLoading(false);
     }
+  }
 
-    const dayStart = new Date(fecha + "T00:00:00");
-    const dayEnd = new Date(fecha + "T23:59:59.999");
+  // Disparar cuando cambian filtros base (como lo tenías)
+  useEffect(() => {
+    if (ruta === "Todos") {
+      setAllPhotos([]);
+      setAllHasMore(false);
+      return;
+    }
+    runSearch(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruta, arrToCsv(selPhotogs), arrToCsv(selHotspots), ignorarHora, iniStep, finStep]);
+
+  /* ================== Filtro front por fecha/hora ================== */
+  const filtered = useMemo(() => {
+    const base = Array.isArray(allPhotos) ? allPhotos : []; // blindaje
+    if (ignorarHora) return base.slice();
+
+    const fechaStr = fecha;
+    const dayStart = new Date(fechaStr + "T00:00:00");
+    const dayEnd = new Date(fechaStr + "T23:59:59.999");
 
     const start = new Date(dayStart);
     start.setMinutes(clampStep(iniStep) * 15, 0, 0);
     const end = new Date(dayStart);
     end.setMinutes(clampStep(finStep) * 15 + 59, 59, 999);
 
-    return (allPhotos || []).filter((ph) => {
-      if (!ph?.timestamp) return false; // cuando sí filtramos por fecha/hora, necesitamos timestamp
+    return base.filter((ph) => {
+      if (!ph?.timestamp) return false;
       const d = new Date(ph.timestamp);
       if (isNaN(d)) return false;
       return d >= dayStart && d <= dayEnd && d >= start && d <= end;
     });
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
-  /* ---------- clusters & selección ---------- */
-  const clusters = useMemo(() => {
-    // si algún día querés agrupar por minuto, dejé el molde listo; por ahora no lo usamos en UI
-    return [];
-  }, [filtered]);
-
+  /* ================== Paginación & selección (igual) ================== */
+  const clusters = useMemo(() => [], [filtered]);
   const [vista, setVista] = useState("mosaico");
   const [page, setPage] = useState(1);
   const pageSize = 60;
@@ -483,7 +444,7 @@ export default function BikerSearch() {
   return (
     <div className="min-h-screen surface pb-28">
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* ======= una sola fila ======= */}
+        {/* ======= una sola fila (NO se movió) ======= */}
         <div className="flex flex-wrap items-end gap-3">
           {/* FECHA */}
           <div>
@@ -541,7 +502,12 @@ export default function BikerSearch() {
           <div className="min-w-[220px]">
             <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
             <MultiSelectCheckbox
-              options={photogOptions}
+              options={useMemo(() => {
+                const list = rows.filter((r) => (r.rutas || []).includes(ruta));
+                return list
+                  .map((p) => ({ value: p.id, label: resolver.photographerById.get(p.id)?.label || p.id }))
+                  .sort((a, b) => a.label.localeCompare(b.label));
+              }, [rows, ruta, resolver.photographerById])}
               value={selPhotogs}
               onChange={setSelPhotogs}
               placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
@@ -552,7 +518,14 @@ export default function BikerSearch() {
           <div className="min-w-[220px]">
             <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
             <MultiSelectCheckbox
-              options={hotspotOptions}
+              options={useMemo(() => {
+                const base = rows.filter((r) => (r.rutas || []).includes(ruta));
+                const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
+                const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
+                return Array.from(set)
+                  .sort((a, b) => a.localeCompare(b))
+                  .map((name) => ({ value: name, label: name }));
+              }, [rows, ruta, arrToCsv(selPhotogs)])}
               value={selHotspots}
               onChange={setSelHotspots}
               placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
@@ -578,14 +551,8 @@ export default function BikerSearch() {
               onToggleSel={(id) => toggleSel(id)}
               selected={sel}
               thumbAspect={"3:4"}
-              resolvePhotographerName={(id) => {
-                const p = resolver.photographerById.get(String(id));
-                return p?.label || id || "—";
-              }}
-              resolveHotspotName={(id) => {
-                const h = resolver.hotspotById.get(String(id));
-                return h?.name || id || "—";
-              }}
+              resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
+              resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
               totalQ={totalQ}
               clearSel={clearSel}
             />
