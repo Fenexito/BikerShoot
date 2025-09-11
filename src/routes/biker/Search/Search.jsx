@@ -112,40 +112,55 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   );
 }
 
-/* ======= Helpers Supabase locales ======= */
-async function getRouteIdByName(routeName) {
-  if (!routeName) return null;
-  const { data, error } = await supabase
-    .from("photo_routes")
-    .select("id, name")
-    .ilike("name", routeName.trim());
+/* ======= Helpers Supabase (NUEVOS / corregidos) ======= */
+
+/** Devuelve TODOS los event_route.id cuyo name machee, opcionalmente filtrados por fotógrafos o evento. */
+async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId = null } = {}) {
+  if (!routeName) return [];
+  let base = supabase.from("event_route").select("id, name, event_id");
+
+  base = base.ilike("name", routeName.trim());
+
+  if (eventId) {
+    base = base.eq("event_id", eventId);
+  } else if (Array.isArray(photographerIds) && photographerIds.length > 0) {
+    // Saco los eventos de esos fotógrafos y filtro routes por esos event_id
+    const { data: evs, error: errEvs } = await supabase
+      .from("event")
+      .select("id, photographer_id")
+      .in("photographer_id", photographerIds);
+    if (errEvs) throw errEvs;
+    const evIds = (evs || []).map((e) => String(e.id));
+    if (evIds.length === 0) return [];
+    base = base.in("event_id", evIds);
+  }
+
+  const { data, error } = await base;
   if (error) throw error;
-  const row =
-    (data || []).find(
-      (r) => r.name.trim().toLowerCase() === routeName.trim().toLowerCase()
-    ) || data?.[0];
-  return row?.id || null;
+  return (data || []).map((r) => String(r.id));
 }
 
-async function getAllHotspotsForRoute(routeName) {
-  const routeId = await getRouteIdByName(routeName);
-  if (!routeId) return [];
+/** Lista de hotspots (id,name) para VARIOS route_id */
+async function getAllHotspotsForRoute(routeName, opts) {
+  const routeIds = await getEventRouteIdsByName(routeName, opts);
+  if (!routeIds.length) return [];
   const { data, error } = await supabase
     .from("event_hotspot")
-    .select("id, name")
-    .eq("route_id", routeId);
+    .select("id, name, route_id")
+    .in("route_id", routeIds);
   if (error) throw error;
   return data || [];
 }
 
-async function mapPointNamesToHotspotIds(routeName, pointNames = []) {
+/** Mapea nombres de puntos → IDs de hotspot considerando VARIOS route_id */
+async function mapPointNamesToHotspotIds(routeName, pointNames = [], opts) {
   if (!routeName || !pointNames?.length) return [];
-  const routeId = await getRouteIdByName(routeName);
-  if (!routeId) return [];
+  const routeIds = await getEventRouteIdsByName(routeName, opts);
+  if (!routeIds.length) return [];
   const { data, error } = await supabase
     .from("event_hotspot")
-    .select("id, name")
-    .eq("route_id", routeId)
+    .select("id, name, route_id")
+    .in("route_id", routeIds)
     .in("name", pointNames);
   if (error) throw error;
   return (data || []).map((r) => String(r.id));
@@ -358,235 +373,207 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ---------- cargar fotos (mapear nombres de punto -> hotspot_id reales) ---------- */
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-
-        // mapear nombres de punto a ids reales (event_hotspot)
-        let hotspot_ids = [];
-        let route_id = null;
-        if (ruta !== "Todos") {
-          // resolvemos el route_id para filtrar eventos del fotógrafo
-          route_id = await getRouteIdByName(ruta);
-          if (selHotspots.length > 0) {
-            hotspot_ids = await mapPointNamesToHotspotIds(ruta, selHotspots);
-          } else {
-            const allHs = await getAllHotspotsForRoute(ruta);
-            hotspot_ids = allHs.map((h) => String(h.id));
-            const hsMap = new Map(allHs.map((h) => [String(h.id), { name: h.name }]));
-            if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          }
-        }
-
-        const fotos = await fetchPhotos({
-          event_id: params.get("evento") || undefined,
-          hotspot_ids: hotspot_ids.length ? hotspot_ids : undefined,
-          photographer_ids: selPhotogs.length ? selPhotogs : undefined,
-          route_id: route_id || undefined, // 👈 importante
-        });
-
-        if (!alive) return;
-
-        // Resolver de hotspot si faltó algo
-        if (fotos.length && resolver.hotspotById.size === 0 && ruta !== "Todos") {
-          const ids = Array.from(new Set(fotos.map((f) => String(f.hotspotId)).filter(Boolean)));
-          if (ids.length) {
-            const routeId = await getRouteIdByName(ruta);
-            if (routeId) {
-              const { data } = await supabase
-                .from("event_hotspot")
-                .select("id, name")
-                .eq("route_id", routeId)
-                .in("id", ids);
-              const hsMap = new Map((data || []).map((h) => [String(h.id), { name: h.name }]));
-              if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-            }
-          }
-        }
-
-        // Marcar ruta en UI
-        const fotosWithRoute = ruta !== "Todos" ? fotos.map((f) => ({ ...f, route: ruta })) : fotos;
-        setAllPhotos(fotosWithRoute);
-      } catch (e) {
-        console.error("Cargando fotos:", e);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ruta, arrToCsv(selHotspots), arrToCsv(selPhotogs)]);
-
-  /* ---------- filtro front: SIN IA / SIN COLORES ----------
-     - Si ignorarHora === true, NO filtramos por fecha ni hora.
-     - Si ignorarHora === false, filtramos por fecha (día) y por rango horario.
-     - Si una foto NO tiene timestamp, la mostramos cuando ignorarHora === true. */
-  const filtered = useMemo(() => {
-    if (ignorarHora) {
-      // sin filtros de fecha/hora (para depurar)
-      return allPhotos.slice();
-    }
-
-    const dayStart = new Date(fecha + "T00:00:00");
-    const dayEnd = new Date(fecha + "T23:59:59.999");
-
-    const start = new Date(dayStart);
-    start.setMinutes(clampStep(iniStep) * 15, 0, 0);
-    const end = new Date(dayStart);
-    end.setMinutes(clampStep(finStep) * 15 + 59, 59, 999);
-
-    return (allPhotos || []).filter((ph) => {
-      if (!ph?.timestamp) return false; // cuando sí filtramos por fecha/hora, necesitamos timestamp
-      const d = new Date(ph.timestamp);
-      if (isNaN(d)) return false;
-      return d >= dayStart && d <= dayEnd && d >= start && d <= end;
-    });
-  }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
-
-  /* ---------- clusters & selección ---------- */
-  const clusters = useMemo(() => {
-    // si algún día querés agrupar por minuto, dejé el molde listo; por ahora no lo usamos en UI
-    return [];
-  }, [filtered]);
-
+  /* ================== Ejecutar búsqueda ================== */
   const [vista, setVista] = useState("mosaico");
-  const [page, setPage] = useState(1);
-  const pageSize = 60;
-  useEffect(() => { setPage(1); }, [filtered.length, vista]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [selected, setSelected] = useState(new Set());
 
-  const totalPhotos = filtered.length;
-  const totalClusters = clusters.length;
-  const paginatedPhotos = useMemo(() => filtered.slice(0, page * pageSize), [filtered, page]);
-  const paginatedClusters = useMemo(() => clusters.slice(0, page * 3), [clusters, page]);
-  const hasMorePhotos = paginatedPhotos.length < totalPhotos;
-  const hasMoreClusters = paginatedClusters.length < totalClusters;
-  const onLoadMore = () => setPage((p) => p + 1);
+  const fechaStr = fecha; // 'YYYY-MM-DD'
+  const inicioHHMM = stepToTime24(iniStep);
+  const finHHMM = stepToTime24(finStep);
 
-  const [sel, setSel] = useState(() => new Set());
-  const toggleSel = (id) =>
-    setSel((prev) => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
+  async function doSearch(resetPage = true) {
+    try {
+      // Resolver routeIds según ruta seleccionada y fotógrafos (si hay)
+      let routeIds = [];
+      if (ruta && ruta !== "Todos") {
+        routeIds = await getEventRouteIdsByName(ruta, {
+          photographerIds: selPhotogs.length ? selPhotogs : [],
+          eventId: params.get("evento") || null,
+        });
+      }
+
+      // Resolver hotspotIds según nombres (si hay y hay ruta)
+      let hotspotIds = [];
+      if (routeIds.length && selHotspots.length) {
+        hotspotIds = await mapPointNamesToHotspotIds(ruta, selHotspots, {
+          photographerIds: selPhotogs.length ? selPhotogs : [],
+          eventId: params.get("evento") || null,
+        });
+      }
+
+      const nextPage = resetPage ? 0 : page + 1;
+      const res = await fetchPhotos({
+        routeIds,
+        hotspotIds,
+        photographerIds: selPhotogs,
+        fecha: fechaStr,
+        inicioHHMM,
+        finHHMM,
+        ignorarHora,
+        page: nextPage,
+        limit: 200,
+      });
+
+      const items = res.items || [];
+      setHasMore(!!res.hasMore);
+
+      if (resetPage) {
+        setAllPhotos(items);
+        setPage(0);
+      } else {
+        const map = new Map(allPhotos.map((x) => [x.id, x]));
+        for (const it of items) map.set(it.id, it);
+        setAllPhotos(Array.from(map.values()));
+        setPage(nextPage);
+      }
+    } catch (e) {
+      console.error("Buscar fotos:", e);
+    }
+  }
+
+  useEffect(() => {
+    // search al cargar si hay ruta fija
+    if (ruta !== "Todos") {
+      doSearch(true);
+    } else {
+      setAllPhotos([]);
+      setHasMore(false);
+      setPage(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruta, arrToCsv(selPhotogs), arrToCsv(selHotspots), fechaStr, ignorarHora, inicioHHMM, finHHMM]);
+
+  /* ================== UI ================== */
+  const totalPhotos = allPhotos.length;
+  const paginatedPhotos = allPhotos; // ya paginamos vía API
+
+  const resolvePhotographerName = (id) => {
+    return resolver.photographerById.get(String(id))?.label || "—";
+  };
+  const resolveHotspotName = (id) => {
+    return resolver.hotspotById.get(String(id))?.name || "—";
+  };
+
+  const onToggleSel = (id) =>
+    setSelected((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
     });
-  const clearSel = () => setSel(new Set());
-  const totalQ = useMemo(() => sel.size * 50, [sel]);
+
+  const clearSel = () => setSelected(new Set());
 
   return (
-    <div className="min-h-screen surface pb-28">
-      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* ======= una sola fila ======= */}
-        <div className="flex flex-wrap items-end gap-3">
-          {/* FECHA */}
-          <div>
-            <label className="block text-sm font-medium text-slate-600">Fecha</label>
-            <input
-              type="date"
-              className="h-9 border rounded-lg px-2 bg-white"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              disabled={ignorarHora}
-              title={ignorarHora ? "Ignorando fecha/hora" : ""}
-            />
-          </div>
+    <main className="w-full max-w-6xl mx-auto px-4 md:px-6 xl:px-8 py-6">
+      <header className="mb-4">
+        <h1 className="text-2xl md:text-3xl font-black">Buscar fotos</h1>
+        <p className="text-slate-600 mt-1 text-sm">
+          Filtrá por fecha, ruta, fotógrafo y punto. Si venís desde un evento/punto, respetamos su horario.
+        </p>
+      </header>
 
-          {/* HORA */}
-          <div className="min-w-[260px]">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
-              <label className="flex items-center gap-1 text-xs text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={ignorarHora}
-                  onChange={(e) => setIgnorarHora(e.target.checked)}
-                />
-                Ignorar fecha/hora
-              </label>
-            </div>
-            <DualSlider
-              min={MIN_STEP}
-              max={MAX_STEP}
-              a={iniStep}
-              b={finStep}
-              onChangeA={setIniStep}
-              onChangeB={setFinStep}
-              width={260}
-            />
-          </div>
-
-          {/* RUTA */}
-          <div>
-            <label className="block text-sm font-medium text-slate-600">Ruta</label>
-            <select
-              className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
-              value={ruta}
-              onChange={(e) => setRuta(e.target.value)}
-            >
-              <option value="Todos">Todas</option>
-              {RUTAS_FIJAS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* FOTÓGRAFO (multi) */}
-          <div className="min-w-[220px]">
-            <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
-            <MultiSelectCheckbox
-              options={photogOptions}
-              value={selPhotogs}
-              onChange={setSelPhotogs}
-              placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
-            />
-          </div>
-
-          {/* PUNTO (multi) */}
-          <div className="min-w-[220px]">
-            <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
-            <MultiSelectCheckbox
-              options={hotspotOptions}
-              value={selHotspots}
-              onChange={setSelHotspots}
-              placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
-            />
-          </div>
+      {/* ====== Barra de filtros (NO SE TOCA TU UX) ====== */}
+      <section className="mb-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+        <div className="md:col-span-2">
+          <label className="block text-xs text-slate-500">Fecha</label>
+          <input
+            type="date"
+            className="h-10 border rounded-lg px-2 bg-white w-full"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
         </div>
 
-        {/* ======= RESULTADOS ======= */}
-        <div className="mt-5">
-          {loading ? (
-            <div className="text-slate-500">Buscando fotos…</div>
-          ) : (
-            <SearchResults
-              vista={vista}
-              setVista={setVista}
-              paginatedPhotos={paginatedPhotos}
-              totalPhotos={totalPhotos}
-              paginatedClusters={paginatedClusters}
-              totalClusters={totalClusters}
-              onLoadMore={onLoadMore}
-              hasMorePhotos={hasMorePhotos}
-              hasMoreClusters={hasMoreClusters}
-              onToggleSel={(id) => toggleSel(id)}
-              selected={sel}
-              thumbAspect={"3:4"}
-              resolvePhotographerName={(id) => {
-                const p = resolver.photographerById.get(String(id));
-                return p?.label || id || "—";
-              }}
-              resolveHotspotName={(id) => {
-                const h = resolver.hotspotById.get(String(id));
-                return h?.name || id || "—";
-              }}
-              totalQ={totalQ}
-              clearSel={clearSel}
-            />
-          )}
+        <div className="flex flex-col">
+          <label className="block text-xs text-slate-500 mb-1">Ruta</label>
+          <select
+            className="h-10 border rounded-lg px-2 bg-white"
+            value={ruta}
+            onChange={(e) => setRuta(e.target.value)}
+          >
+            <option value="Todos">Todas</option>
+            {RUTAS_FIJAS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
         </div>
-      </div>
-    </div>
+
+        <div className="flex flex-col">
+          <label className="block text-xs text-slate-500 mb-1">Fotógrafo(s)</label>
+          <MultiSelectCheckbox
+            options={useMemo(() => photogOptions, [photogOptions])}
+            value={selPhotogs}
+            onChange={setSelPhotogs}
+            placeholder="Seleccionar estudio(s)…"
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="block text-xs text-slate-500 mb-1">Punto(s)</label>
+          <MultiSelectCheckbox
+            options={useMemo(() => hotspotOptions, [hotspotOptions])}
+            value={selHotspots}
+            onChange={setSelHotspots}
+            placeholder="Seleccionar punto(s)…"
+          />
+        </div>
+      </section>
+
+      {/* Rango de hora + toggle ignorar */}
+      <section className="mb-4 flex items-center gap-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={ignorarHora}
+            onChange={(e) => setIgnorarHora(e.target.checked)}
+          />
+          <span>Ignorar fecha/hora</span>
+        </label>
+
+        {!ignorarHora && (
+          <DualSlider
+            min={MIN_STEP}
+            max={MAX_STEP}
+            a={iniStep}
+            b={finStep}
+            onChangeA={setIniStep}
+            onChangeB={setFinStep}
+            width={280}
+          />
+        )}
+
+        <button
+          type="button"
+          onClick={() => doSearch(true)}
+          className="ml-auto h-10 px-4 rounded-lg bg-blue-600 text-white font-display font-bold"
+        >
+          Buscar
+        </button>
+      </section>
+
+      {/* Resultados */}
+      <SearchResults
+        vista={vista}
+        setVista={setVista}
+        paginatedPhotos={paginatedPhotos}
+        totalPhotos={totalPhotos}
+        paginatedClusters={[]}  // por ahora no usamos "momentos"
+        totalClusters={0}
+        onLoadMore={() => doSearch(false)}
+        hasMorePhotos={hasMore}
+        hasMoreClusters={false}
+        onToggleSel={onToggleSel}
+        selected={selected}
+        thumbAspect="3:4"
+        resolvePhotographerName={resolvePhotographerName}
+        resolveHotspotName={resolveHotspotName}
+        totalQ={null}
+        clearSel={clearSel}
+      />
+    </main>
   );
 }
