@@ -664,7 +664,7 @@ export default function BikerSearch() {
         return;
       }
 
-      // ======== SIN FOTÓGRAFOS: FECHA+RUTA(+PUNTOS) o RUTA(+PUNTOS) ========
+      // ======== SIN FOTÓGRAFOS ========
       if (ruta === "Todos") {
         setAllPhotos([]);
         setAllHasMore(false);
@@ -699,7 +699,7 @@ export default function BikerSearch() {
         console.log("[BUSCAR] NO-PHOTOG hotspots x evento:", hotspotIds.length, hotspotIds);
       }
 
-      // Intento principal: event_asset (sin fotógrafo)
+      // event_asset / storage
       let items = [];
       try {
         let q = supabase
@@ -729,7 +729,6 @@ export default function BikerSearch() {
           items = tmp;
           console.log("[RESULT NO-PHOTOG B] event_asset items:", items.length);
         } else {
-          // Fallback Storage
           const merged = [];
           for (const evId of evIds) {
             const listed = await listAssetsFromStorage(evId, {
@@ -790,7 +789,6 @@ export default function BikerSearch() {
     end.setMinutes(clampStep(finStep) * 15 + 59, 59, 999);
 
     const out = base.filter((ph) => {
-      // Si no hay timestamp (fallback de Storage), la dejamos pasar
       if (!ph?.timestamp) return true;
       const d = new Date(ph.timestamp);
       if (isNaN(d)) return true;
@@ -814,9 +812,7 @@ export default function BikerSearch() {
   /* ================== Paginación & selección ================== */
   const [page, setPage] = useState(1);
   const pageSize = 60;
-  useEffect(() => {
-    setPage(1);
-  }, [filtered.length]);
+  useEffect(() => { setPage(1); }, [filtered.length]);
 
   const totalPhotos = filtered.length;
   const paginatedPhotos = useMemo(() => filtered.slice(0, page * pageSize), [filtered, page]);
@@ -836,9 +832,9 @@ export default function BikerSearch() {
   return (
     <div className="min-h-screen surface pb-28">
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* === Filtros sticky y colapsables (SIN fondo blanco) === */}
+        {/* === Filtros sticky y colapsables (debajo del header) === */}
         <div
-          className={`sticky top-0 z-30 border-b border-slate-200 transition-all duration-300 ${
+          className={`sticky top-[88px] z-30 border-b border-slate-200 transition-all duration-300 ${
             hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
           }`}
         >
