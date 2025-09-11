@@ -122,14 +122,12 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   );
 }
 
-/* ======= Helpers fecha y alias ======= */
+/* ======= Helpers fecha ======= */
 const toYmd = (v) => {
   if (!v) return null;
   if (typeof v === "string") {
-    // si ya viene "YYYY-MM-DD ..."
     const s10 = v.slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(s10)) return s10;
-    // si viene ISO con TZ
     const d = new Date(v);
     if (!isNaN(d)) return d.toISOString().slice(0, 10);
     return null;
@@ -189,7 +187,7 @@ async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId
 
 async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
   if (!routeIds.length) return [];
-  let q = supabase.from("event_hotspot").select("id, name, route_id").in("route_id", routeIds);
+  let q = supabase.from("event_hotspot").select("id, name, route_id, event_id").in("route_id", routeIds);
   if (names?.length) q = q.in("name", names.map(String));
   const { data, error } = await q;
   if (error) throw error;
@@ -210,7 +208,7 @@ async function getEventIdsByDateRouteAndPhotogs({ fechaYmd, routeName, photograp
   for (const e of (evs || [])) {
     const dStr = toYmd(e.fecha) || toYmd(e.date);
     if (!dStr) continue;
-    if (dStr !== fechaYmd) continue; // 👈 evitar TZ
+    if (dStr !== fechaYmd) continue; // 👈 comparación por string, sin TZ
     const txt = norm(e.ruta || e.location || "");
     if (alias.some((a) => txt.includes(a))) out.push(String(e.id));
   }
@@ -446,7 +444,6 @@ export default function BikerSearch() {
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
   /* ================== Buscar fotos (robusto + logs) ================== */
-  // log al cambiar fecha (para ver qué se usa)
   useEffect(() => {
     console.log("[UI] fecha seleccionada:", fecha);
   }, [fecha]);
@@ -459,7 +456,7 @@ export default function BikerSearch() {
       const inicioHHMM = stepToTime24(iniStep);
       const finHHMM = stepToTime24(finStep);
 
-      // 1) Resolver routeIds correctos
+      // 1) Resolver routeIds correctos (mejor si ya tenemos evento/photogs)
       let routeIds =
         ruta !== "Todos"
           ? await getEventRouteIdsByName(ruta, {
@@ -468,55 +465,55 @@ export default function BikerSearch() {
             })
           : [];
 
-      // 2) Resolver por FECHA **si NO ignorás hora**, o por RUTA (sin fecha) si sí ignorás
-      if ((!routeIds || routeIds.length === 0) && ruta !== "Todos" && selPhotogs.length) {
-        let evIdsByScope = [];
+      // 2) Resolver eventos (por fecha o no) para acotar hotspots del evento correcto
+      let evIdsScope = [];
+      if (ruta !== "Todos" && selPhotogs.length) {
         if (ignorarHora) {
-          evIdsByScope = await getEventIdsByRouteAndPhotogs({
+          evIdsScope = await getEventIdsByRouteAndPhotogs({
             routeName: ruta,
             photographerIds: selPhotogs,
           });
-          console.log("[BUSCAR] ignorarHora=TRUE, eventos x ruta:", evIdsByScope.length);
+          console.log("[BUSCAR] ignorarHora=TRUE, eventos x ruta:", evIdsScope.length);
         } else {
-          evIdsByScope = await getEventIdsByDateRouteAndPhotogs({
+          evIdsScope = await getEventIdsByDateRouteAndPhotogs({
             fechaYmd: fechaParam,
             routeName: ruta,
             photographerIds: selPhotogs,
           });
-          console.log("[BUSCAR] ignorarHora=FALSE, eventos x fecha+ruta:", evIdsByScope.length, "fechaParam:", fechaParam);
-        }
-
-        if (evIdsByScope.length) {
-          const { data: routesEvs } = await supabase
-            .from("event_route")
-            .select("id, event_id, name")
-            .in("event_id", evIdsByScope);
-          const alias = (ROUTE_ALIAS[ruta] || [ruta]).map(norm);
-          const keep = (routesEvs || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
-          if (keep.length) routeIds = keep.map((r) => String(r.id));
+          console.log("[BUSCAR] ignorarHora=FALSE, eventos x fecha+ruta:", evIdsScope.length, "fechaParam:", fechaParam);
         }
       }
 
-      // 3) Fallback por NOMBRE DE PUNTO → routeIds (independiente de fecha)
-      if ((!routeIds || routeIds.length === 0) && selHotspots.length) {
-        const { data: hsByName } = await supabase
-          .from("event_hotspot")
-          .select("id, name, route_id")
-          .in("name", selHotspots);
-        const rs = Array.from(new Set((hsByName || []).map((h) => String(h.route_id)).filter(Boolean)));
-        if (rs.length) {
-          console.log("[BUSCAR][fallback por puntos] routeIds:", rs);
-          routeIds = rs;
-        }
+      // Si routeIds vacío, intentar derivarlos desde los eventos encontrados
+      if ((!routeIds || routeIds.length === 0) && evIdsScope.length) {
+        const { data: routesEvs } = await supabase
+          .from("event_route")
+          .select("id, event_id, name")
+          .in("event_id", evIdsScope);
+        const alias = (ROUTE_ALIAS[ruta] || [ruta]).map(norm);
+        const keep = (routesEvs || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
+        if (keep.length) routeIds = keep.map((r) => String(r.id));
       }
 
-      // 4) Hotspots filtrados por NOMBRE sobre las rutas resultantes
+      // 3) Resolver hotspots: si elegiste puntos, filtrarlos **por evento**
       let hotspotIds = [];
-      if (routeIds.length && selHotspots.length) {
+      if (selHotspots.length && evIdsScope.length) {
+        const { data: hsScoped } = await supabase
+          .from("event_hotspot")
+          .select("id, name, route_id, event_id")
+          .in("event_id", evIdsScope)
+          .in("name", selHotspots);
+        hotspotIds = (hsScoped || []).map((h) => String(h.id));
+        const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
+        setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+        console.log("[BUSCAR] hotspots x evento:", hotspotIds.length, hotspotIds);
+      } else if (routeIds.length && selHotspots.length) {
+        // Si no hay eventos (caso raro), caemos al filtro por ruta
         const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
         hotspotIds = hs.map((h) => String(h.id));
         const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+        console.log("[BUSCAR] hotspots x ruta:", hotspotIds.length, hotspotIds);
       } else if (routeIds.length) {
         const hs = await getHotspotsByRouteIds(routeIds);
         const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
@@ -525,7 +522,7 @@ export default function BikerSearch() {
 
       console.log("[BUSCAR] ruta:", ruta, "fechaParam:", fechaParam, "ignorarHora:", ignorarHora, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
 
-      // ====== Intento A: fetchPhotos (si ignorás hora, NO le pasamos fecha/horas) ======
+      // ====== Intento A: fetchPhotos ======
       let items = [];
       let hasMore = false;
       try {
@@ -563,57 +560,67 @@ export default function BikerSearch() {
         console.log("[RESULT A] fetchPhotos error:", e?.message || e);
       }
 
-      // ====== Intento B/C: event_asset o Storage ======
-      if (!items.length && selPhotogs.length) {
-        let evIds = [];
-        if (ignorarHora) {
-          evIds = await getEventIdsByRouteAndPhotogs({
-            routeName: ruta,
-            photographerIds: selPhotogs,
-          });
-          console.log("[RESULT B] eventos sin fecha:", evIds.length);
-        } else {
-          evIds = await getEventIdsByDateRouteAndPhotogs({
-            fechaYmd: fechaParam,
-            routeName: ruta,
-            photographerIds: selPhotogs,
-          });
-          console.log("[RESULT B] eventos por fecha:", evIds.length);
+      // ====== Intento B: event_asset (y si da 0, C: Storage) ======
+      if (!items.length && selPhotogs.length && (evIdsScope.length || routeIds.length)) {
+        const evIds = evIdsScope.slice();
+
+        // Si no hubo eventos pero sí routeIds, intentemos deducir eventos desde esas rutas
+        if (!evIds.length && routeIds.length) {
+          const { data: evFromRoutes } = await supabase
+            .from("event_route")
+            .select("event_id")
+            .in("id", routeIds);
+          const uniq = Array.from(new Set((evFromRoutes || []).map((r) => String(r.event_id)).filter(Boolean)));
+          evIds.push(...uniq);
+          console.log("[RESULT B] eventos deducidos por routeIds:", evIds.length);
         }
 
-        if (evIds.length) {
-          try {
-            let q = supabase
-              .from("event_asset")
-              .select("id, event_id, hotspot_id, storage_path, taken_at")
-              .in("event_id", evIds)
-              .order("taken_at", { ascending: false })
-              .limit(1200);
-            if (hotspotIds.length) q = q.in("hotspot_id", hotspotIds);
-            const { data: assets } = await q;
-            if (Array.isArray(assets) && assets.length) {
-              const tmp = [];
-              for (const a of assets) {
-                const url = await getPublicUrl(a.storage_path);
-                if (!url) continue;
-                tmp.push({
-                  id: String(a.id),
-                  url,
-                  timestamp: a.taken_at || null,
-                  hotspotId: a.hotspot_id || null,
-                  photographerId: selPhotogs[0] || null,
-                  route: ruta !== "Todos" ? ruta : null,
-                });
-              }
-              items = tmp;
-              console.log("[RESULT B] event_asset items:", items.length);
+        // Recalcular hotspotIds acotados al/los eventos (si hay nombres)
+        let scopedHotspotIds = hotspotIds.slice();
+        if (selHotspots.length) {
+          const { data: hsScoped } = await supabase
+            .from("event_hotspot")
+            .select("id, name, event_id")
+            .in("event_id", evIds)
+            .in("name", selHotspots);
+          scopedHotspotIds = (hsScoped || []).map((h) => String(h.id));
+          console.log("[RESULT B] hotspotIds (scoped):", scopedHotspotIds.length, scopedHotspotIds);
+        }
+
+        try {
+          let q = supabase
+            .from("event_asset")
+            .select("id, event_id, hotspot_id, storage_path, taken_at")
+            .in("event_id", evIds)
+            .order("taken_at", { ascending: false })
+            .limit(1200);
+          if (scopedHotspotIds.length) q = q.in("hotspot_id", scopedHotspotIds);
+
+          const { data: assets, error } = await q;
+          if (error) throw error;
+
+          if (Array.isArray(assets) && assets.length) {
+            const tmp = [];
+            for (const a of assets) {
+              const url = await getPublicUrl(a.storage_path);
+              if (!url) continue;
+              tmp.push({
+                id: String(a.id),
+                url,
+                timestamp: a.taken_at || null,
+                hotspotId: a.hotspot_id || null,
+                photographerId: selPhotogs[0] || null,
+                route: ruta !== "Todos" ? ruta : null,
+              });
             }
-          } catch (err) {
-            console.log("[RESULT B] event_asset RLS/err, fallback storage:", err?.message || err);
+            items = tmp;
+            console.log("[RESULT B] event_asset items:", items.length);
+          } else {
+            // ====== C) Storage fallback si regresó 0 ======
             const merged = [];
             for (const evId of evIds) {
               const listed = await listAssetsFromStorage(evId, {
-                onlyHotspots: hotspotIds.length ? hotspotIds : [],
+                onlyHotspots: scopedHotspotIds.length ? scopedHotspotIds : [],
               });
               merged.push(
                 ...listed.map((it) => ({
@@ -626,10 +633,27 @@ export default function BikerSearch() {
             items = merged;
             console.log("[RESULT C] storage items:", items.length);
           }
+        } catch (err) {
+          console.log("[RESULT B] event_asset error, fallback storage:", err?.message || err);
+          const merged = [];
+          for (const evId of evIds) {
+            const listed = await listAssetsFromStorage(evId, {
+              onlyHotspots: hotspotIds.length ? hotspotIds : [],
+            });
+            merged.push(
+              ...listed.map((it) => ({
+                ...it,
+                photographerId: selPhotogs[0] || null,
+                route: ruta !== "Todos" ? ruta : null,
+              }))
+            );
+          }
+          items = merged;
+          console.log("[RESULT C] storage items:", items.length);
         }
       }
 
-      setAllHasMore(hasMore);
+      setAllHasMore(false);
       setAllPhotos(Array.isArray(items) ? items : []);
       console.log("[RESULT FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
     } catch (e) {
@@ -674,7 +698,7 @@ export default function BikerSearch() {
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
   /* ================== Paginación & selección (principal) ================== */
-  const clusters = useMemo(() => [], [filtered]);
+  const clusters = useMemo(() => [], [filtered]); // aún no agrupamos
   const [vista, setVista] = useState("mosaico");
   const [page, setPage] = useState(1);
   const pageSize = 60;
@@ -712,54 +736,11 @@ export default function BikerSearch() {
   const [vistaForced, setVistaForced] = useState("mosaico");
   const [pageForced, setPageForced] = useState(1);
 
-  async function getPublicUrl(storagePath) {
-    if (!storagePath) return "";
-    const raw = String(storagePath).trim();
-    if (/^https?:\/\//i.test(raw)) return raw;
-    const clean = raw.replace(/^\/+/, "").replace(/^fotos\//i, "");
-    const { data } = supabase.storage.from("fotos").getPublicUrl(clean);
-    if (data?.publicUrl) return data.publicUrl;
-    const signed = await supabase.storage.from("fotos").createSignedUrl(clean, 3600);
-    return signed?.data?.signedUrl || "";
+  async function getPublicUrl_local(storagePath) {
+    return getPublicUrl(storagePath);
   }
-
-  async function listAssetsFromStorage(eventId, { onlyHotspots = [] } = {}) {
-    const root = `events/${eventId}`;
-    async function listAllFiles(folder) {
-      const acc = [];
-      const stack = [folder];
-      while (stack.length) {
-        const cur = stack.pop();
-        const { data } = await supabase.storage.from("fotos").list(cur, { limit: 1000 });
-        for (const entry of data || []) {
-          if (entry.name && /\.[a-z0-9]{2,4}$/i.test(entry.name)) {
-            acc.push(`${cur}/${entry.name}`);
-          } else if (entry.name) {
-            stack.push(`${cur}/${entry.name}`);
-          }
-        }
-      }
-      return acc;
-    }
-    const files = await listAllFiles(root);
-    const items = [];
-    for (const p of files) {
-      const parts = p.split("/").filter(Boolean);
-      const idxEv = parts.indexOf("events");
-      const evId = parts[idxEv + 1];
-      const hsId = parts[idxEv + 2] || null;
-      if (String(evId) !== String(eventId)) continue;
-      if (onlyHotspots.length && (!hsId || !onlyHotspots.includes(String(hsId)))) continue;
-      const url = await getPublicUrl(p);
-      items.push({
-        id: p,
-        url,
-        timestamp: null,
-        hotspotId: hsId,
-        photographerId: null,
-      });
-    }
-    return items;
+  async function listAssetsFromStorage_local(eventId, opts) {
+    return listAssetsFromStorage(eventId, opts);
   }
 
   async function loadForced() {
@@ -776,7 +757,7 @@ export default function BikerSearch() {
 
         if (Array.isArray(assets) && assets.length) {
           for (const a of assets) {
-            const url = await getPublicUrl(a.storage_path);
+            const url = await getPublicUrl_local(a.storage_path);
             if (!url) continue;
             out.push({
               id: String(a.id),
@@ -791,7 +772,7 @@ export default function BikerSearch() {
       } catch (_) {}
 
       if (!out.length) {
-        const listed = await listAssetsFromStorage(FORCED.eventId, {
+        const listed = await listAssetsFromStorage_local(FORCED.eventId, {
           onlyHotspots: [FORCED.hotspotId],
         });
         out = listed.map((it) => ({
