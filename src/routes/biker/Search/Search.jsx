@@ -23,7 +23,6 @@ const RUTAS_FIJAS = [
   "RN-10 (Cañas)",
 ];
 
-/* ======= Alias tolerantes para matching de rutas ======= */
 const ROUTE_ALIAS = {
   "Ruta Interamericana": ["interamericana", "rn-1", "rn1", "ca-1"],
   "RN-14": ["rn-14", "rn14", "ruta nacional 14"],
@@ -31,12 +30,12 @@ const ROUTE_ALIAS = {
   "Carretera al Atlántico": ["atlántico", "atlantico", "ca-9", "carretera al atlantico"],
   "RN-10 (Cañas)": ["rn-10", "rn10", "cañas", "canas"],
 };
-const norm = (s) => String(s || "")
-  .normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+const norm = (s) =>
+  String(s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 /* ======= Tiempo (paso de 15 min) ======= */
-const MIN_STEP = 5 * 4;   // 5:00
-const MAX_STEP = 15 * 4;  // 15:00
+const MIN_STEP = 5 * 4; // 5:00
+const MAX_STEP = 15 * 4; // 15:00
 const clampStep = (s) => Math.max(MIN_STEP, Math.min(MAX_STEP, Number(s) || MIN_STEP));
 const timeToStep = (t = "06:00") => {
   const [h, m] = (t || "00:00").split(":").map((n) => parseInt(n || "0", 10));
@@ -162,7 +161,8 @@ async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId
     }
     if (evIds2.length) {
       const { data: routes2 } = await supabase
-        .from("event_route").select("id, name, event_id")
+        .from("event_route")
+        .select("id, name, event_id")
         .in("event_id", evIds2);
       const again = (routes2 || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
       return again.map((r) => String(r.id));
@@ -180,7 +180,6 @@ async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
   return data || [];
 }
 
-// Eventos del/los fotógrafos en la FECHA (día completo) y cuyo texto de ruta machea alias
 async function getEventIdsByDateRouteAndPhotogs({ fechaISO, routeName, photographerIds = [] }) {
   if (!photographerIds.length || !fechaISO) return [];
   const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
@@ -207,7 +206,6 @@ async function getEventIdsByDateRouteAndPhotogs({ fechaISO, routeName, photograp
 }
 
 /* ==== Helpers Storage (URL pública y listado fallback) ==== */
-// Igual que en Event.jsx: construye URL pública desde Storage. :contentReference[oaicite:2]{index=2}
 async function getPublicUrl(storagePath) {
   if (!storagePath) return "";
   const raw = String(storagePath).trim();
@@ -222,6 +220,7 @@ async function getPublicUrl(storagePath) {
 // Lista recursiva en bucket 'fotos' bajo events/<eventId>/** y retorna [{id,url,hotspotId,timestamp?}]
 async function listAssetsFromStorage(eventId, { onlyHotspots = [] } = {}) {
   const root = `events/${eventId}`;
+
   async function listAllFiles(folder) {
     const acc = [];
     const stack = [folder];
@@ -238,7 +237,8 @@ async function listAssetsFromStorage(eventId, { onlyHotspots = [] } = {}) {
     }
     return acc;
   }
-  const files = await listAllFiles(root); // 'events/<eventId>/<hotspotId>/.../file.jpg'
+
+  const files = await listAllFiles(root);
   const items = [];
   for (const p of files) {
     const parts = p.split("/").filter(Boolean);
@@ -249,7 +249,11 @@ async function listAssetsFromStorage(eventId, { onlyHotspots = [] } = {}) {
     if (onlyHotspots.length && (!hsId || !onlyHotspots.includes(String(hsId)))) continue;
     const url = await getPublicUrl(p);
     items.push({
-      id: p, url, timestamp: null, hotspotId: hsId, photographerId: null,
+      id: p,
+      url,
+      timestamp: null,
+      hotspotId: hsId,
+      photographerId: null,
     });
   }
   return items;
@@ -285,8 +289,9 @@ export default function BikerSearch() {
     hotspotById: new Map(),
   });
 
-  // fotos
+  // fotos (buscador principal)
   const [allPhotos, setAllPhotos] = useState([]);
+  const [allHasMore, setAllHasMore] = useState(false);
 
   /* ---------- Prefill si venís de ?hotspot/?evento ---------- */
   useEffect(() => {
@@ -325,7 +330,9 @@ export default function BikerSearch() {
         console.error("Preconfig buscar:", e);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -343,7 +350,12 @@ export default function BikerSearch() {
         }
         setLoading(true);
         const { data, error } = await supabase.rpc("get_photographers_cards", {
-          q: null, ruta, punto: null, orden: "nombre", limit_n: 500, offset_n: 0,
+          q: null,
+          ruta,
+          punto: null,
+          orden: "nombre",
+          limit_n: 500,
+          offset_n: 0,
         });
         if (error) throw error;
 
@@ -357,9 +369,7 @@ export default function BikerSearch() {
         if (!alive) return;
         setRows(mapped);
 
-        const phMap = new Map(
-          mapped.map((p) => [p.id, { label: p.estudio || p.username || p.id }])
-        );
+        const phMap = new Map(mapped.map((p) => [p.id, { label: p.estudio || p.username || p.id }]));
         setResolver((prev) => ({ ...prev, photographerById: phMap }));
       } catch (e) {
         console.error("RPC get_photographers_cards:", e);
@@ -370,7 +380,9 @@ export default function BikerSearch() {
         }
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [ruta]);
 
   /* ---------- Opciones multi ---------- */
@@ -404,34 +416,32 @@ export default function BikerSearch() {
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
   /* ================== Buscar fotos (robusto) ================== */
-  const [allHasMore, setAllHasMore] = useState(false);
-
   async function runSearch() {
     try {
       setLoading(true);
 
-      const fechaParam = typeof fecha === "string" ? fecha : new Date().toISOString().slice(0,10);
+      const fechaParam = typeof fecha === "string" ? fecha : new Date().toISOString().slice(0, 10);
       const inicioHHMM = stepToTime24(iniStep);
       const finHHMM = stepToTime24(finStep);
 
       // 1) Resolver routeIds correctos
-      let routeIds = ruta !== "Todos"
-        ? await getEventRouteIdsByName(ruta, {
-            photographerIds: selPhotogs.length ? selPhotogs : [],
-            eventId: params.get("evento") || null,
-          })
-        : [];
+      let routeIds =
+        ruta !== "Todos"
+          ? await getEventRouteIdsByName(ruta, {
+              photographerIds: selPhotogs.length ? selPhotogs : [],
+              eventId: params.get("evento") || null,
+            })
+          : [];
 
       // 2) Resolver por FECHA+PUNTO si routeIds vacío (evento correcto del día)
       if ((!routeIds || routeIds.length === 0) && ruta !== "Todos" && selPhotogs.length) {
         const evIdsByDay = await getEventIdsByDateRouteAndPhotogs({
-          fechaISO: fechaParam, routeName: ruta, photographerIds: selPhotogs,
+          fechaISO: fechaParam,
+          routeName: ruta,
+          photographerIds: selPhotogs,
         });
         if (evIdsByDay.length) {
-          const { data: routesEvs } = await supabase
-            .from("event_route")
-            .select("id, event_id, name")
-            .in("event_id", evIdsByDay);
+          const { data: routesEvs } = await supabase.from("event_route").select("id, event_id, name").in("event_id", evIdsByDay);
           const alias = (ROUTE_ALIAS[ruta] || [ruta]).map(norm);
           const keep = (routesEvs || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
           if (keep.length) routeIds = keep.map((r) => String(r.id));
@@ -466,7 +476,7 @@ export default function BikerSearch() {
 
       console.log("[BUSCAR] ruta:", ruta, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
 
-      // ====== Intento A: fetchPhotos (nuevo/compat) ======
+      // ====== Intento A: fetchPhotos ======
       let items = [];
       let hasMore = false;
       try {
@@ -481,9 +491,7 @@ export default function BikerSearch() {
           page: 0,
           limit: 200,
         });
-
         const arr = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
-        // Normalizar al shape que necesita SearchResults (id, url, timestamp…)
         const normed = [];
         for (const x of arr) {
           const id = x.id || x.asset_id || x.storage_path || x.url || cryptoRandomId();
@@ -501,17 +509,17 @@ export default function BikerSearch() {
         items = normed;
         hasMore = !Array.isArray(resp) && !!resp?.hasMore;
       } catch (_) {
-        // ignoramos error: vamos a fallback
+        // ignorar
       }
 
-      // ====== Intento B: si A trajo vacío → event_asset directo ======
+      // ====== Intento B/C: event_asset o Storage ======
       if (!items.length && selPhotogs.length) {
         const evIds = await getEventIdsByDateRouteAndPhotogs({
-          fechaISO: fechaParam, routeName: ruta, photographerIds: selPhotogs,
+          fechaISO: fechaParam,
+          routeName: ruta,
+          photographerIds: selPhotogs,
         });
-
         if (evIds.length) {
-          // 1) event_asset (si RLS deja)
           try {
             let q = supabase
               .from("event_asset")
@@ -520,7 +528,6 @@ export default function BikerSearch() {
               .order("taken_at", { ascending: false })
               .limit(1200);
             if (hotspotIds.length) q = q.in("hotspot_id", hotspotIds);
-
             const { data: assets } = await q;
             if (Array.isArray(assets) && assets.length) {
               const tmp = [];
@@ -539,17 +546,18 @@ export default function BikerSearch() {
               items = tmp;
             }
           } catch (_) {
-            // 2) Storage directo como plan C (sin timestamps)
             const merged = [];
             for (const evId of evIds) {
               const listed = await listAssetsFromStorage(evId, {
                 onlyHotspots: hotspotIds.length ? hotspotIds : [],
               });
-              merged.push(...listed.map((it) => ({
-                ...it,
-                photographerId: selPhotogs[0] || null,
-                route: ruta !== "Todos" ? ruta : null,
-              })));
+              merged.push(
+                ...listed.map((it) => ({
+                  ...it,
+                  photographerId: selPhotogs[0] || null,
+                  route: ruta !== "Todos" ? ruta : null,
+                }))
+              );
             }
             items = merged;
           }
@@ -567,7 +575,6 @@ export default function BikerSearch() {
     }
   }
 
-  // Disparar cuando cambian filtros base
   useEffect(() => {
     if (ruta === "Todos") {
       setAllPhotos([]);
@@ -600,12 +607,14 @@ export default function BikerSearch() {
     });
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
-  /* ================== Paginación & selección ================== */
+  /* ================== Paginación & selección (principal) ================== */
   const clusters = useMemo(() => [], [filtered]);
   const [vista, setVista] = useState("mosaico");
   const [page, setPage] = useState(1);
   const pageSize = 60;
-  useEffect(() => { setPage(1); }, [filtered.length, vista]);
+  useEffect(() => {
+    setPage(1);
+  }, [filtered.length, vista]);
 
   const totalPhotos = filtered.length;
   const totalClusters = clusters.length;
@@ -624,6 +633,93 @@ export default function BikerSearch() {
     });
   const clearSel = () => setSel(new Set());
   const totalQ = useMemo(() => sel.size * 50, [sel]);
+
+  /* ========== DEBUG: GALERÍA FORZADA (EVENTO+HOTSPOT específicos) ========== */
+  const FORCED = {
+    eventId: "8bb5758e-58f6-425e-a7f8-d616dd971dae",
+    hotspotId: "4e625e42-96f1-44cc-ba68-b474c0de1aa5",
+    photographerId: "4f896569-08d9-4234-bada-27de418c64d6",
+  };
+
+  const [forcedLoading, setForcedLoading] = useState(false);
+  const [forcedPhotos, setForcedPhotos] = useState([]);
+  const [vistaForced, setVistaForced] = useState("mosaico");
+  const [pageForced, setPageForced] = useState(1);
+
+  async function loadForced() {
+    try {
+      setForcedLoading(true);
+
+      // Intento 1: event_asset directo
+      let out = [];
+      try {
+        const { data: assets } = await supabase
+          .from("event_asset")
+          .select("id, event_id, hotspot_id, storage_path, taken_at")
+          .eq("event_id", FORCED.eventId)
+          .eq("hotspot_id", FORCED.hotspotId)
+          .order("taken_at", { ascending: true });
+
+        if (Array.isArray(assets) && assets.length) {
+          for (const a of assets) {
+            const url = await getPublicUrl(a.storage_path);
+            if (!url) continue;
+            out.push({
+              id: String(a.id),
+              url,
+              timestamp: a.taken_at || null,
+              hotspotId: a.hotspot_id || null,
+              photographerId: FORCED.photographerId,
+              route: "Ruta Interamericana",
+            });
+          }
+        }
+      } catch (_) {
+        // ignorado
+      }
+
+      // Intento 2: Storage fallback si 0
+      if (!out.length) {
+        const listed = await listAssetsFromStorage(FORCED.eventId, {
+          onlyHotspots: [FORCED.hotspotId],
+        });
+        out = listed.map((it) => ({
+          ...it,
+          photographerId: FORCED.photographerId,
+          route: "Ruta Interamericana",
+        }));
+      }
+
+      console.log("[FORZADO] fotos:", out.length);
+      setForcedPhotos(out);
+      setPageForced(1);
+    } catch (e) {
+      console.error("Forzado error:", e);
+      setForcedPhotos([]);
+    } finally {
+      setForcedLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadForced(); // corre una vez; es estático
+  }, []);
+
+  const pageSizeForced = 60;
+  const paginatedForced = useMemo(
+    () => (Array.isArray(forcedPhotos) ? forcedPhotos.slice(0, pageForced * pageSizeForced) : []),
+    [forcedPhotos, pageForced]
+  );
+  const hasMoreForced = paginatedForced.length < (forcedPhotos?.length || 0);
+  const onLoadMoreForced = () => setPageForced((p) => p + 1);
+  const [selForced, setSelForced] = useState(() => new Set());
+  const toggleSelForced = (id) =>
+    setSelForced((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  const clearSelForced = () => setSelForced(new Set());
 
   return (
     <div className="min-h-screen surface pb-28">
@@ -648,36 +744,22 @@ export default function BikerSearch() {
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
               <label className="flex items-center gap-1 text-xs text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={ignorarHora}
-                  onChange={(e) => setIgnorarHora(e.target.checked)}
-                />
+                <input type="checkbox" checked={ignorarHora} onChange={(e) => setIgnorarHora(e.target.checked)} />
                 Ignorar fecha/hora
               </label>
             </div>
-            <DualSlider
-              min={MIN_STEP}
-              max={MAX_STEP}
-              a={iniStep}
-              b={finStep}
-              onChangeA={setIniStep}
-              onChangeB={setFinStep}
-              width={260}
-            />
+            <DualSlider min={MIN_STEP} max={MAX_STEP} a={iniStep} b={finStep} onChangeA={setIniStep} onChangeB={setFinStep} width={260} />
           </div>
 
           {/* RUTA */}
           <div>
             <label className="block text-sm font-medium text-slate-600">Ruta</label>
-            <select
-              className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
-              value={ruta}
-              onChange={(e) => setRuta(e.target.value)}
-            >
+            <select className="h-9 border rounded-lg px-2 bg-white min-w-[200px]" value={ruta} onChange={(e) => setRuta(e.target.value)}>
               <option value="Todos">Todas</option>
               {RUTAS_FIJAS.map((r) => (
-                <option key={r} value={r}>{r}</option>
+                <option key={r} value={r}>
+                  {r}
+                </option>
               ))}
             </select>
           </div>
@@ -717,7 +799,7 @@ export default function BikerSearch() {
           </div>
         </div>
 
-        {/* ======= RESULTADOS ======= */}
+        {/* ======= RESULTADOS (BUSCADOR PRINCIPAL) ======= */}
         <div className="mt-5">
           {loading ? (
             <div className="text-slate-500">Buscando fotos…</div>
@@ -742,6 +824,47 @@ export default function BikerSearch() {
             />
           )}
         </div>
+
+        {/* ======= DEBUG / SECCIÓN INFERIOR (FORZADA) ======= */}
+        <hr className="my-8" />
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-bold">Depuración: galería forzada (evento + punto específicos)</h2>
+          <button
+            className="text-sm underline text-blue-600"
+            type="button"
+            onClick={loadForced}
+            title="Recargar forzado"
+          >
+            Recargar
+          </button>
+        </div>
+        <p className="text-slate-600 text-sm mb-2">
+          Evento: <code>{FORCED.eventId}</code> · Hotspot: <code>{FORCED.hotspotId}</code> · Fotógrafo:{" "}
+          <code>{FORCED.photographerId}</code>
+        </p>
+
+        {forcedLoading ? (
+          <div className="text-slate-500">Cargando galería forzada…</div>
+        ) : (
+          <SearchResults
+            vista={vistaForced}
+            setVista={setVistaForced}
+            paginatedPhotos={paginatedForced}
+            totalPhotos={forcedPhotos?.length || 0}
+            paginatedClusters={[]} // sin clusters
+            totalClusters={0}
+            onLoadMore={onLoadMoreForced}
+            hasMorePhotos={hasMoreForced}
+            hasMoreClusters={false}
+            onToggleSel={(id) => toggleSelForced(id)}
+            selected={selForced}
+            thumbAspect={"3:4"}
+            resolvePhotographerName={() => "—"}
+            resolveHotspotName={() => "MIRADOR SAN LUCAS"}
+            totalQ={0}
+            clearSel={clearSelForced}
+          />
+        )}
       </div>
     </div>
   );
