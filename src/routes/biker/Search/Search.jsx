@@ -30,11 +30,12 @@ const ROUTE_ALIAS = {
   "Carretera al Atlántico": ["atlántico", "atlantico", "ca-9", "carretera al atlantico"],
   "RN-10 (Cañas)": ["rn-10", "rn10", "cañas", "canas"],
 };
+
 const norm = (s) =>
   String(s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 /* ======= Tiempo (paso de 15 min) ======= */
-const MIN_STEP = 5 * 4; // 5:00
+const MIN_STEP = 5 * 4;  // 05:00
 const MAX_STEP = 15 * 4; // 15:00
 const clampStep = (s) => Math.max(MIN_STEP, Math.min(MAX_STEP, Number(s) || MIN_STEP));
 const timeToStep = (t = "06:00") => {
@@ -295,7 +296,7 @@ export default function BikerSearch() {
 
   const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
 
-  // -------- filtros (una sola fila, intacto) --------
+  // -------- filtros (una sola fila) --------
   const [fecha, setFecha] = useState(() => params.get("fecha") || new Date().toISOString().slice(0, 10));
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
@@ -473,7 +474,7 @@ export default function BikerSearch() {
       const inicioHHMM = stepToTime24(iniStep);
       const finHHMM = stepToTime24(finStep);
 
-      // Si hay fotógrafo(s): flujo conocido
+      // ======== CON FOTÓGRAFOS ========
       if (selPhotogs.length > 0) {
         let routeIds =
           ruta !== "Todos"
@@ -763,6 +764,7 @@ export default function BikerSearch() {
     }
   }
 
+  // Ejecutar búsqueda cuando cambian filtros clave
   useEffect(() => {
     if (ruta === "Todos") {
       setAllPhotos([]);
@@ -834,9 +836,9 @@ export default function BikerSearch() {
   return (
     <div className="min-h-screen surface pb-28">
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* === Filtros sticky y colapsables (se ocultan al scrollear) === */}
+        {/* === Filtros sticky y colapsables (SIN fondo blanco) === */}
         <div
-          className={`sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 transition-all duration-300 ${
+          className={`sticky top-0 z-30 border-b border-slate-200 transition-all duration-300 ${
             hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
           }`}
         >

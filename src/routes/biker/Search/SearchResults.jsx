@@ -27,7 +27,7 @@ export default function SearchResults({
   clearSel,
 }) {
   // ---------- Controles ----------
-  const [cols, setCols] = useState(12);              // 12 (mín) ↔ 4 (máx)
+  const [cols, setCols] = useState(12);                // 12 (mín) ↔ 4 (máx)
   const [aspectMode, setAspectMode] = useState("1:1"); // por defecto 1:1
   const [showLabels, setShowLabels] = useState(false);
 
@@ -37,27 +37,8 @@ export default function SearchResults({
   const openLightbox = (idx) => { setLbIndex(idx); setLbOpen(true); };
   const closeLightbox = () => setLbOpen(false);
 
-  // Auto-aspecto (por si querés activarlo más tarde)
-  const orientStats = useMemo(() => {
-    let portrait = 0, landscape = 0;
-    for (const p of paginatedPhotos || []) {
-      try {
-        const u = String(p.url);
-        if (/\b9x16\b|portrait|_v\./i.test(u)) portrait++;
-        else if (/\b16x9\b|landscape|_h\./i.test(u)) landscape++;
-        else landscape++;
-      } catch { landscape++; }
-    }
-    const total = portrait + landscape || 1;
-    return { portrait, landscape, pPct: portrait/total, lPct: landscape/total };
-  }, [paginatedPhotos]);
+  const effAspect = useMemo(() => aspectMode, [aspectMode]);
 
-  const effAspect = useMemo(() => {
-    // fijo por requerimiento; si quisieras "auto", intercambiar aquí
-    return aspectMode;
-  }, [aspectMode]);
-
-  // Lightbox data
   const images = useMemo(() => {
     return (paginatedPhotos || []).map((p) => ({
       src: p.url,
@@ -72,14 +53,12 @@ export default function SearchResults({
   }, [paginatedPhotos, resolvePhotographerName, resolveHotspotName]);
 
   return (
-    // Full-bleed: ocupa todo el ancho
     <section className="w-screen ml-[calc(50%-50vw)]">
-      {/* Toolbar de visual */}
+      {/* Toolbar de visual (solo los 3 controles que acordamos) */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm px-2 sm:px-4">
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2">
             <span className="text-slate-500">Tamaño</span>
-            {/* 4 ↔ 12 columnas */}
             <input
               type="range"
               min={4}
@@ -128,7 +107,7 @@ export default function SearchResults({
         />
       </div>
 
-      {/* Barra de selección (más notoria) */}
+      {/* Barra de selección */}
       {typeof totalQ === "number" && selected?.size > 0 && (
         <div className="sticky bottom-3 z-[1101] mt-3">
           <div className="max-w-[820px] mx-auto rounded-2xl bg-blue-600/95 text-white px-4 py-2.5 flex items-center justify-between text-sm shadow-2xl">
@@ -154,8 +133,8 @@ export default function SearchResults({
             onClose={closeLightbox}
             showThumbnails
             captionPosition="header"
-            footerSafeArea={72}       // deja espacio para el HUD de abajo
-            showHeaderClose={false}   // usamos nuestro botón rojo
+            footerSafeArea={72}
+            showHeaderClose={false}
             arrowBlue
           />
           <LightboxHUD
@@ -184,7 +163,12 @@ function MosaicoVirtualized({
       <AutoSizer>
         {({ width, height }) => {
           const GAP = 8;
-          const cols = Math.max(1, Math.min(colsTarget, 24)); // seguridad
+
+          // Ensanchamos cuando el aspecto es 16:9 (menos columnas efectivas => thumbs más anchas)
+          const baseCols = Math.max(4, Math.min(colsTarget, 12));
+          const widthBoost = aspect === "16:9" ? 0.75 : 1; // 16:9 = ~25% menos columnas
+          const cols = Math.max(4, Math.floor(baseCols * widthBoost));
+
           const cellW = Math.floor((width - GAP * (cols + 1)) / cols);
 
           const ratio = aspect === "1:1" ? 1
@@ -193,7 +177,7 @@ function MosaicoVirtualized({
             : aspect === "9:16" ? 16/9
             : 1;
 
-          const labelH = showLabels ? 42 : 0; // altura extra para texto
+          const labelH = showLabels ? 42 : 0;
           const imgH = Math.round(cellW * ratio);
           const cellH = imgH + labelH;
 
@@ -232,13 +216,11 @@ function MosaicoVirtualized({
                         (isSel ? "ring-4 ring-blue-600 shadow-[0_0_0_4px_rgba(59,130,246,0.35)]" : "hover:shadow-md")
                       }
                     >
-                      {/* Badge selección */}
                       {isSel && (
                         <div className="absolute top-2 left-2 z-10 h-7 px-2 rounded-md bg-blue-600 text-white text-xs shadow">
                           Seleccionada
                         </div>
                       )}
-                      {/* Botón elegir/quitar */}
                       {!isSel && (
                         <button
                           type="button"
@@ -250,7 +232,6 @@ function MosaicoVirtualized({
                         </button>
                       )}
 
-                      {/* Imagen */}
                       <div
                         className="w-full bg-slate-200 cursor-zoom-in"
                         style={{ height: imgH }}
@@ -267,7 +248,6 @@ function MosaicoVirtualized({
                         />
                       </div>
 
-                      {/* Info debajo (ajusta altura de la celda) */}
                       {showLabels && (
                         <div className="p-2 text-[12px] leading-tight text-slate-700">
                           <div className="truncate">{fmtDate(item.timestamp)} {fmtTime(item.timestamp)}</div>
@@ -291,7 +271,7 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
   const { addItem, setOpen } = useCart();
   if (!item) return null;
 
-  const precio = 50; // TODO: enlazar si hay precio real
+  const precio = 50;
   const phName = resolvePhotographerName?.(item.photographerId) || "Fotógrafo";
   const hotName = resolveHotspotName?.(item.hotspotId) || "Punto";
   const route = item.route || "";
@@ -304,7 +284,6 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
 
   return (
     <>
-      {/* Cerrar rojo arriba derecha – sobre el lightbox */}
       <button
         type="button"
         onClick={onClose}
@@ -314,7 +293,6 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
         Cerrar
       </button>
 
-      {/* Barra inferior con info + acciones – sobre el lightbox */}
       <div className="fixed left-0 right-0 bottom-0 z-[1101] px-3 pb-3 pointer-events-none">
         <div className="mx-auto max-w-5xl">
           <div className="pointer-events-auto rounded-2xl bg-black/60 backdrop-blur border border-white/15 text-white px-4 py-2.5 flex flex-wrap items-center gap-3">
