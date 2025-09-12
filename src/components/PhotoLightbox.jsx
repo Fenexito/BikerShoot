@@ -1,10 +1,18 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 /**
- * Lightbox minimalista:
- * - La imagen NUNCA queda debajo de la barra superior (caption) ni del carrusel.
- * - Usa zonas seguras: topSafeArea y bottomSafeArea (px) para reservar espacio.
- * - Thumbnails arriba, foto centrada, sin recortes (object-contain).
+ * PhotoLightbox – visor full-screen
+ *
+ * Props:
+ * - images: Array<{ src: string, alt?: string, caption?: string, meta?: { fileName?: string, time?: string, hotspot?: string } }>
+ * - index: number
+ * - onIndexChange: (next:number)=>void
+ * - onClose: ()=>void
+ * - showThumbnails?: boolean
+ * - captionPosition?: 'header' | 'bottom-centered' (default: 'header')
+ * - arrowBlue?: boolean (default: false)
+ * - footerSafeArea?: number (px) – espacio reservado abajo para HUD externo
+ * - showHeaderClose?: boolean (default: false)
  */
 export default function PhotoLightbox({
   images = [],
@@ -13,95 +21,182 @@ export default function PhotoLightbox({
   onClose,
   showThumbnails = true,
   captionPosition = "header",
-  topSafeArea = 56,
-  bottomSafeArea = 140,
-  showHeaderClose = false,
   arrowBlue = false,
+  footerSafeArea = 0,
+  showHeaderClose = false,
 }) {
-  const cur = images[index] || {};
+  const total = images.length || 0;
+  const safeIndex = Math.max(0, Math.min(index, Math.max(0, total - 1)));
+  const current = images[safeIndex] || {};
+  const containerRef = useRef(null);
 
+  const prev = () => onIndexChange?.((safeIndex - 1 + total) % total);
+  const next = () => onIndexChange?.((safeIndex + 1) % total);
+
+  // Preload vecinos
+  const preload = useMemo(() => {
+    const arr = [];
+    if (total > 1) {
+      const prevIdx = (safeIndex - 1 + total) % total;
+      const nextIdx = (safeIndex + 1) % total;
+      images[prevIdx]?.src && arr.push(images[prevIdx].src);
+      images[nextIdx]?.src && arr.push(images[nextIdx].src);
+    }
+    return arr;
+  }, [images, safeIndex, total]);
+
+  // Bloquear scroll del body
   useEffect(() => {
-    const onKey = (e) => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => (document.body.style.overflow = prev);
+  }, []);
+
+  // Navegación por teclado
+  useEffect(() => {
+    function onKey(e) {
       if (e.key === "Escape") onClose?.();
-      if (e.key === "ArrowRight") onIndexChange?.(Math.min(images.length - 1, index + 1));
-      if (e.key === "ArrowLeft") onIndexChange?.(Math.max(0, index - 1));
-    };
+      else if (e.key === "ArrowLeft") prev();
+      else if (e.key === "ArrowRight") next();
+    }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, images.length, onClose, onIndexChange]);
+  }, [prev, next, onClose]);
 
-  const prev = () => onIndexChange?.(Math.max(0, index - 1));
-  const next = () => onIndexChange?.(Math.min(images.length - 1, index + 1));
+  const fileName = current?.meta?.fileName || current?.alt || current?.caption || "";
+  const time = current?.meta?.time || "";
+  const hotspot = current?.meta?.hotspot || "";
+
+  const arrowCls =
+    "h-12 w-12 rounded-full bg-white/15 hover:bg-white/25 text-white text-2xl leading-none grid place-items-center border border-white/20";
+  const arrowClsBlue =
+    "h-12 w-12 rounded-full bg-blue-600/80 hover:bg-blue-600 text-white text-2xl leading-none grid place-items-center shadow-lg";
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/95 text-white">
-      {/* Header con caption (no tapa la imagen porque reservamos topSafeArea) */}
+    <div className="fixed inset-0 z-[1000]" aria-modal="true" role="dialog" ref={containerRef}>
+      {/* Fondo – click cierra */}
+      <div className="absolute inset-0 bg-black/90" onClick={onClose} />
+
+      {/* Header (si se usa modo header) */}
       {captionPosition === "header" && (
         <div
-          className="absolute top-0 left-0 right-0 h-14 px-4 flex items-center justify-between border-b border-white/10 bg-black/40 backdrop-blur-sm"
-          style={{ height: `${topSafeArea}px` }}
+          className="absolute top-0 left-0 right-0 p-3 flex items-center gap-3"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="truncate pr-3 text-sm opacity-90">{cur.caption || ""}</div>
+          <div className="ml-1 text-xs sm:text-sm text-slate-300">
+            {total > 0 ? `${safeIndex + 1} / ${total}` : "0 / 0"}
+            {current?.caption ? <span className="hidden sm:inline"> · {current.caption}</span> : null}
+          </div>
           {showHeaderClose && (
-            <button onClick={onClose} className="h-9 px-3 rounded-lg bg-white/10 hover:bg-white/20">
+            <button
+              className="ml-auto h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
+              onClick={onClose}
+              title="Cerrar (Esc)"
+            >
               Cerrar
             </button>
           )}
         </div>
       )}
 
-      {/* Zona de imagen: respeta zonas seguras superior e inferior */}
+      {/* Contenedor central – click cierra (fuera de la imagen) */}
       <div
-        className="absolute left-0 right-0 top-0 bottom-0 grid place-items-center px-3"
-        style={{ paddingTop: `${topSafeArea + 8}px`, paddingBottom: `${bottomSafeArea + 8}px` }}
+        className={`absolute inset-0 flex items-center justify-center px-3 ${
+          captionPosition === "bottom-centered" ? "pt-10" : "pt-10"
+        }`}
+        onClick={onClose}
       >
+        {/* Imagen – NO cierra al click */}
         <img
-          src={cur.src}
-          alt={cur.alt || ""}
-          className="max-w-[min(96vw,1400px)] max-h-[calc(100vh-200px)] object-contain"
-          style={{
-            maxHeight: `calc(100vh - ${topSafeArea + bottomSafeArea + 40}px)`,
-          }}
+          src={current?.src}
+          alt={current?.alt || ""}
+          className="max-h-full max-w-full object-contain select-none"
+          draggable={false}
+          onClick={(e) => e.stopPropagation()}
         />
       </div>
 
       {/* Flechas */}
-      <button
-        className={`absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center border border-white/30 bg-white/10 hover:bg-white/20 ${arrowBlue ? "text-sky-300" : ""}`}
-        onClick={prev}
-        disabled={index === 0}
-        title="Anterior"
-      >
-        ‹
-      </button>
-      <button
-        className={`absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full grid place-items-center border border-white/30 bg-white/10 hover:bg-white/20 ${arrowBlue ? "text-sky-300" : ""}`}
-        onClick={next}
-        disabled={index >= images.length - 1}
-        title="Siguiente"
-      >
-        ›
-      </button>
+      {total > 1 && (
+        <>
+          <div className="absolute inset-y-0 left-0 w-16 grid place-items-center" onClick={(e) => e.stopPropagation()}>
+            <button className={arrowBlue ? arrowClsBlue : arrowCls} onClick={prev} title="Anterior (←)">
+              ‹
+            </button>
+          </div>
+          <div className="absolute inset-y-0 right-0 w-16 grid place-items-center" onClick={(e) => e.stopPropagation()}>
+            <button className={arrowBlue ? arrowClsBlue : arrowCls} onClick={next} title="Siguiente (→)">
+              ›
+            </button>
+          </div>
+        </>
+      )}
 
-      {/* Thumbnails arriba */}
-      {showThumbnails && images.length > 1 && (
-        <div className="absolute left-0 right-0 top-0" style={{ top: `${topSafeArea}px` }}>
-          <div className="px-3 py-2 overflow-x-auto">
-            <div className="flex gap-2">
-              {images.map((im, i) => (
-                <button
-                  key={i}
-                  className={`relative h-16 w-16 rounded-lg overflow-hidden border transition-all ${i === index ? "ring-4 ring-blue-500 border-transparent" : "border-white/20 hover:border-white/40"}`}
-                  onClick={() => onIndexChange?.(i)}
-                  title={`Ir a ${i + 1}`}
-                >
-                  <img src={im.src} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+      {/* Caption abajo centrada (si se usa) */}
+      {captionPosition === "bottom-centered" && (
+        <div
+          className="absolute left-0 right-0 px-4"
+          style={{ bottom: (showThumbnails ? 88 : 16) + footerSafeArea }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto max-w-5xl">
+            <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex items-center justify-center gap-2 whitespace-nowrap text-[12px] text-slate-100">
+                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/15">
+                  {safeIndex + 1} / {total}
+                </span>
+                <span className="text-slate-300">·</span>
+                <span className="font-mono text-sm font-semibold select-text" title={fileName}>
+                  {fileName || "Foto"}
+                </span>
+                {time && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <span>{time}</span>
+                  </>
+                )}
+                {hotspot && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <span>{hotspot}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Thumbnails (carrusel) – desplazadas hacia arriba para no tapar HUD */}
+      {showThumbnails && total > 1 && (
+        <div
+          className="absolute left-0 right-0 p-2 bg-black/40"
+          style={{ bottom: 8 + footerSafeArea }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto max-w-5xl flex gap-2 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {images.map((im, i) => (
+              <button
+                key={i}
+                className={`w-16 h-16 rounded overflow-hidden border transition-transform ${
+                  i === safeIndex
+                    ? "border-yellow-300 ring-2 ring-yellow-300 ring-offset-2 ring-offset-black/30 scale-105"
+                    : "border-white/10 hover:border-white/40"
+                }`}
+                onClick={() => onIndexChange?.(i)}
+                title={im.alt || im.caption || `Foto ${i + 1}`}
+              >
+                <img src={im.src} alt="" className="w-full h-full object-cover" draggable={false} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Preload vecinos */}
+      {preload.map((p, i) => (
+        <link key={i} rel="preload" as="image" href={p} />
+      ))}
     </div>
   );
 }

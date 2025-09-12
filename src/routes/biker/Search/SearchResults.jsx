@@ -16,7 +16,7 @@ const fmtTime = (iso) => {
 
 export default function SearchResults({
   paginatedPhotos,
-  totalPhotos,
+  totalPhotos,             // ya no mostramos contador
   onLoadMore,
   hasMorePhotos,
   onToggleSel,
@@ -26,8 +26,9 @@ export default function SearchResults({
   totalQ,
   clearSel,
 }) {
-  // ---------- Controles (centrados) ----------
-  const [cols, setCols] = useState(5); // por defecto 5 por fila
+  // ---------- Controles ----------
+  const [cols, setCols] = useState(12);                // 12 (mín) ↔ 4 (máx)
+  const [aspectMode, setAspectMode] = useState("1:1"); // por defecto 1:1
   const [showLabels, setShowLabels] = useState(false);
 
   // ---------- Lightbox ----------
@@ -36,7 +37,8 @@ export default function SearchResults({
   const openLightbox = (idx) => { setLbIndex(idx); setLbOpen(true); };
   const closeLightbox = () => setLbOpen(false);
 
-  // Para el lightbox
+  const effAspect = useMemo(() => aspectMode, [aspectMode]);
+
   const images = useMemo(() => {
     return (paginatedPhotos || []).map((p) => ({
       src: p.url,
@@ -50,43 +52,43 @@ export default function SearchResults({
     }));
   }, [paginatedPhotos, resolvePhotographerName, resolveHotspotName]);
 
-  // Carrito múltiple desde la barra de selección
-  const { addItem, setOpen: openCart } = useCart();
-  const addSelectedToCart = () => {
-    const precio = 50;
-    const map = new Map((paginatedPhotos || []).map(i => [i.id, i]));
-    let added = 0;
-    for (const id of selected || []) {
-      const it = map.get(id);
-      if (!it) continue;
-      const name = `Foto • ${resolvePhotographerName?.(it.photographerId) || "Fotógrafo"} • ${fmtDate(it.timestamp)} ${fmtTime(it.timestamp)}`;
-      addItem?.({ id: it.id, name, price: precio, img: it.url, qty: 1 });
-      added++;
-    }
-    if (added > 0) openCart?.(true);
-  };
-
   return (
     <section className="w-screen ml-[calc(50%-50vw)]">
-      {/* Toolbar de visual — centrada */}
-      <div className="mb-3 flex flex-wrap items-center justify-center gap-5 text-sm px-2 sm:px-4">
-        <label className="flex items-center gap-2">
-          <span className="text-slate-500">Tamaño</span>
-          <input
-            type="range"
-            min={4}
-            max={12}
-            step={1}
-            value={cols}
-            onChange={(e) => setCols(parseInt(e.target.value, 10))}
-          />
-          <span className="text-slate-400 text-xs">({cols} por fila)</span>
-        </label>
+      {/* Toolbar de visual (solo los 3 controles que acordamos) */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm px-2 sm:px-4">
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">Tamaño</span>
+            <input
+              type="range"
+              min={4}
+              max={12}
+              step={1}
+              value={cols}
+              onChange={(e) => setCols(parseInt(e.target.value, 10))}
+            />
+            <span className="text-slate-400 text-xs">({cols} por fila)</span>
+          </label>
 
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
-          <span className="text-slate-500">Mostrar info debajo</span>
-        </label>
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">Aspecto</span>
+            <select
+              className="h-8 border rounded-md px-2 bg-white"
+              value={aspectMode}
+              onChange={(e) => setAspectMode(e.target.value)}
+            >
+              <option value="1:1">1:1</option>
+              <option value="16:9">16:9</option>
+              <option value="4:3">4:3</option>
+              <option value="9:16">9:16</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
+            <span className="text-slate-500">Mostrar info debajo</span>
+          </label>
+        </div>
       </div>
 
       <div className="px-2 sm:px-4">
@@ -97,6 +99,7 @@ export default function SearchResults({
           onToggleSel={onToggleSel}
           selected={selected}
           onOpenLightbox={openLightbox}
+          aspect={effAspect}
           colsTarget={cols}
           showLabels={showLabels}
           resolvePhotographerName={resolvePhotographerName}
@@ -115,9 +118,6 @@ export default function SearchResults({
             </div>
             <div className="flex items-center gap-2">
               <button className="h-9 px-3 rounded-xl bg-white text-blue-700 font-display font-bold" onClick={clearSel}>Limpiar</button>
-              <button className="h-9 px-3 rounded-xl bg-emerald-500 text-white font-display font-bold" onClick={addSelectedToCart}>
-                Agregar al carrito
-              </button>
             </div>
           </div>
         </div>
@@ -133,8 +133,7 @@ export default function SearchResults({
             onClose={closeLightbox}
             showThumbnails
             captionPosition="header"
-            topSafeArea={56}
-            bottomSafeArea={140}
+            footerSafeArea={72}
             showHeaderClose={false}
             arrowBlue
           />
@@ -155,23 +154,31 @@ export default function SearchResults({
 /* -------------------- Grilla virtualizada -------------------- */
 function MosaicoVirtualized({
   data, loadMore, hasMore, onToggleSel, selected, onOpenLightbox,
-  colsTarget, showLabels, resolvePhotographerName, resolveHotspotName
+  aspect, colsTarget, showLabels, resolvePhotographerName, resolveHotspotName
 }) {
   const lastRowSeen = useRef(-1);
 
-  // Altura grande para permitir más scroll (≈ 10 filas o más)
   return (
-    <div className="h-[150vh] md:h-[160vh] lg:h-[170vh] rounded-2xl border bg-white pb-2">
+    <div className="h-[78vh] md:h-[80vh] lg:h-[82vh] xl:h-[86vh] rounded-2xl border bg-white pb-2">
       <AutoSizer>
         {({ width, height }) => {
           const GAP = 8;
 
-          const cols = Math.max(4, Math.min(colsTarget, 12));
+          // Ensanchamos cuando el aspecto es 16:9 (menos columnas efectivas => thumbs más anchas)
+          const baseCols = Math.max(4, Math.min(colsTarget, 12));
+          const widthBoost = aspect === "16:9" ? 0.75 : 1; // 16:9 = ~25% menos columnas
+          const cols = Math.max(4, Math.floor(baseCols * widthBoost));
+
           const cellW = Math.floor((width - GAP * (cols + 1)) / cols);
 
-          // Caja cuadrada para miniatura; la imagen va con object-contain para verse COMPLETA
-          const imgH = cellW;
+          const ratio = aspect === "1:1" ? 1
+            : aspect === "4:3" ? 3/4
+            : aspect === "16:9" ? 9/16
+            : aspect === "9:16" ? 16/9
+            : 1;
+
           const labelH = showLabels ? 42 : 0;
+          const imgH = Math.round(cellW * ratio);
           const cellH = imgH + labelH;
 
           const columnWidth = cellW + GAP;
@@ -226,7 +233,7 @@ function MosaicoVirtualized({
                       )}
 
                       <div
-                        className="w-full bg-slate-200 cursor-zoom-in grid place-items-center"
+                        className="w-full bg-slate-200 cursor-zoom-in"
                         style={{ height: imgH }}
                         onClick={() => onOpenLightbox(idx)}
                         title="Ver grande"
@@ -236,9 +243,8 @@ function MosaicoVirtualized({
                           alt=""
                           loading="lazy"
                           decoding="async"
-                          className="max-w-full max-h-full object-contain"
+                          className="w-full h-full object-cover"
                           draggable={false}
-                          style={{ width: "100%", height: "100%" }}
                         />
                       </div>
 
@@ -274,7 +280,6 @@ function LightboxHUD({ item, resolvePhotographerName, resolveHotspotName, select
   const agregarCarrito = () => {
     addItem?.({ id: item.id, name, price: precio, img: item.url, qty: 1 });
     setOpen?.(true);
-    onClose?.(); // minimizar visor tras agregar
   };
 
   return (
