@@ -42,11 +42,11 @@ export default function HeaderUser() {
     nav("/?logout=1", { replace: true });
   }
 
-  // Mantener comportamiento original: STICKY top-4 (no fixed)
+  // Mantiene look original: sticky + sombra + rounded
   return (
     <>
       <header className="sticky top-4 z-50 px-4">
-        {/* Truco de colapso sin empujar contenido: grid rows 1fr → 0fr */}
+        {/* Colapso suave sin mover layout cuando se oculta */}
         <div className={`grid transition-all duration-300 ${hiddenHeader ? "grid-rows-[0fr] opacity-0 -mb-5 pointer-events-none" : "grid-rows-[1fr] opacity-100 mb-0"}`}>
           <div className="overflow-hidden">
             <div className="bg-white text-slate-900 rounded-2xl shadow-lg">
@@ -107,7 +107,7 @@ export default function HeaderUser() {
             window.scrollTo({ top: 0, behavior: "smooth" });
             setHiddenHeader(false);
           }}
-          className="fixed bottom-4 right-4 z-[60] h-11 px-4 rounded-full bg-blue-600 text-white font-bold shadow-xl border border-blue-500/70"
+          className="fixed bottom-4 right-4 z-[2000] h-11 px-4 rounded-full bg-blue-600 text-white font-bold shadow-xl border border-blue-500/70 pointer-events-auto"
           title="Volver arriba"
         >
           Inicio ↑
