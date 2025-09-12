@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 
 /**
- * PhotoLightbox – visor full-screen con "zonas seguras" superior/inferior.
+ * PhotoLightbox – visor full-screen con zona segura inferior para HUD externo.
  *
  * Props:
  *  - images: Array<{ src, alt?, caption?, meta?: { fileName?, time?, hotspot? } }>
@@ -13,7 +13,6 @@ import React, { useEffect, useMemo, useRef } from "react";
  *  - captionPosition?: 'header' | 'bottom-centered'
  *  - arrowBlue?: boolean
  *  - safeBottom?: number   // px reservados en la parte inferior (HUD externo)
- *  - safeTop?: number      // px reservados en la parte superior (header, etc.)
  */
 export default function PhotoLightbox({
   images = [],
@@ -24,13 +23,12 @@ export default function PhotoLightbox({
   captionPosition = "bottom-centered",
   arrowBlue = false,
   safeBottom = 0,
-  safeTop = 0,
 }) {
   const total = images.length || 0;
   const current = images[index] || {};
   const containerRef = useRef(null);
 
-  // Bloquear scroll del body mientras abierto
+  // Bloquear scroll del body mientras está abierto
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -62,15 +60,15 @@ export default function PhotoLightbox({
     ? "w-10 h-10 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white border border-blue-500/60"
     : "w-10 h-10 rounded-full bg-white/10 text-white border border-white/15";
 
-  // Metadatos mínimos para caption chip (no el HUD)
+  // Espacios: subimos un cacho la imagen y reservamos bien abajo
+  const paddingTop = 32; // mueve la foto hacia arriba (tenías margen)
+  const captionPad = captionPosition === "bottom-centered" ? 80 : 24; // espacio del chip
+  const bottomPad = (safeBottom || 0) + captionPad; // zona segura + chip
+
+  // Metadatos mínimos para el chip (no el HUD)
   const fileName = current?.meta?.fileName || current?.alt || "";
   const time = current?.meta?.time || "";
   const hotspot = current?.meta?.hotspot || "";
-
-  // Zonas seguras
-  const baseBottomPad = captionPosition === "bottom-centered" ? 80 : 24; // chip inferior
-  const paddingBottom = baseBottomPad + (safeBottom || 0);
-  const paddingTop = 12 + (safeTop || 0); // empuja un poquito hacia arriba
 
   return (
     <div className="fixed inset-0 z-[1000]" aria-modal="true" role="dialog" ref={containerRef}>
@@ -86,10 +84,10 @@ export default function PhotoLightbox({
         Cerrar
       </button>
 
-      {/* Imagen centrada (respeta zonas seguras) */}
+      {/* Imagen centrada (respeta zonas) */}
       <div
         className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingTop, paddingBottom }}
+        style={{ paddingTop, paddingBottom: bottomPad }}
         onClick={onClose}
       >
         <img
@@ -101,7 +99,7 @@ export default function PhotoLightbox({
         />
       </div>
 
-      {/* Caption chip inferior (pequeño), sobre la foto, respetando safeBottom */}
+      {/* Caption chip inferior (pequeño) – sobre la foto, respetando safeBottom */}
       {captionPosition === "bottom-centered" && (
         <div
           className="absolute left-0 right-0 bottom-0 flex justify-center items-end pointer-events-none z-[2000]"
