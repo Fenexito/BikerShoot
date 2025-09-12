@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { FixedSizeGrid as Grid } from "react-window";
-import { useCart } from "../../../state/CartContext.jsx";
 
 const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("es-GT", { year:"numeric", month:"short", day:"2-digit" }); };
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "--:--" : d.toLocaleTimeString("es-GT", { hour:"2-digit", minute:"2-digit" }); };
