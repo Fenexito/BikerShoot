@@ -1,179 +1,300 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import AutoSizer from "react-virtualized-auto-sizer";
+import { FixedSizeGrid as Grid } from "react-window";
+import PhotoLightbox from "../../../components/PhotoLightbox.jsx";
+import { useCart } from "../../../state/CartContext.jsx";
 
-/**
- * PhotoLightbox – visor full-screen (con zona segura inferior)
- *
- * Props:
- *  - images: Array<{ src, alt?, caption?, meta?: { fileName?, time?, hotspot? } }>
- *  - index: number
- *  - onIndexChange(next:number): void
- *  - onClose(): void
- *  - showThumbnails?: boolean
- *  - captionPosition?: 'header' | 'bottom-centered'
- *  - arrowBlue?: boolean
- *  - safeBottom?: number   // píxeles de zona segura inferior (para HUD externo)
- */
-export default function PhotoLightbox({
-  images = [],
-  index = 0,
-  onIndexChange,
-  onClose,
-  showThumbnails = false,
-  captionPosition = "bottom-centered",
-  arrowBlue = false,
-  safeBottom = 0,
+const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("es-GT", { year:"numeric", month:"short", day:"2-digit" }); };
+const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "--:--" : d.toLocaleTimeString("es-GT", { hour:"2-digit", minute:"2-digit" }); };
+
+export default function SearchResults({
+  vista, setVista,
+  paginatedPhotos, totalPhotos,
+  paginatedClusters, totalClusters,
+  onLoadMore, hasMorePhotos, hasMoreClusters,
+  onToggleSel, selected,
+  thumbAspect = "3:4",
+  resolvePhotographerName, resolveHotspotName,
+  totalQ, clearSel,
 }) {
-  const total = images.length || 0;
-  const current = images[index] || {};
-  const containerRef = useRef(null);
+  const [zoom, setZoom] = useState(240);
+  const [aspectMode, setAspectMode] = useState("auto");
+  const [showLabels, setShowLabels] = useState(false);
 
-  // Bloquear scroll del body mientras está abierto
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev || "";
-    };
-  }, []);
+  const [lbOpen, setLbOpen] = useState(false);
+  const [lbIndex, setLbIndex] = useState(0);
+  const openLightbox = (idx) => { setLbIndex(idx); setLbOpen(true); };
+  const closeLightbox = () => setLbOpen(false);
 
-  // Teclado: Esc, ←, →
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") onClose?.();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
+  // Stats orientación → aspecto automático
+  const orientStats = useMemo(() => {
+    let portrait = 0, landscape = 0;
+    for (const p of paginatedPhotos || []) {
+      try {
+        const u = String(p.url);
+        if (/\b9x16\b|portrait|_v\./i.test(u)) portrait++;
+        else if (/\b16x9\b|landscape|_h\./i.test(u)) landscape++;
+        else landscape++;
+      } catch { landscape++; }
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [index, total]);
+    const total = portrait + landscape || 1;
+    return { portrait, landscape, pPct: portrait/total, lPct: landscape/total };
+  }, [paginatedPhotos]);
 
-  function prev() {
-    if (!total) return;
-    onIndexChange?.((index - 1 + total) % total);
-  }
-  function next() {
-    if (!total) return;
-    onIndexChange?.((index + 1) % total);
-  }
+  const effAspect = useMemo(() => {
+    if (aspectMode !== "auto") return aspectMode;
+    if (orientStats.lPct >= 0.8) return "16:9";
+    if (orientStats.pPct >= 0.8) return "9:16";
+    return "4:3";
+  }, [aspectMode, orientStats]);
 
-  // Preload vecinos
-  const preload = useMemo(() => {
-    const a = images[(index - 1 + total) % total]?.src;
-    const b = images[(index + 1) % total]?.src;
-    return [a, b].filter(Boolean);
-  }, [index, total, images]);
-
-  const arrowCls = arrowBlue
-    ? "w-10 h-10 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white border border-blue-500/60"
-    : "w-10 h-10 rounded-full bg-white/10 text-white border border-white/15";
-
-  // Metadatos básicos (por si querés mini caption)
-  const fileName = current?.meta?.fileName || current?.alt || "";
-  const time = current?.meta?.time || "";
-  const hotspot = current?.meta?.hotspot || "";
-
-  // Alturas internas: base para caption + zona segura para tu HUD inferior
-  const baseBottomPad = captionPosition === "bottom-centered" ? 80 : 24; // px aprox
-  const paddingBottom = baseBottomPad + (safeBottom || 0);
+  // Datos para el lightbox (caption chico)
+  const images = useMemo(() => {
+    return (paginatedPhotos || []).map((p) => ({
+      src: p.url,
+      alt: "Foto",
+      caption: `${fmtDate(p.timestamp)} ${fmtTime(p.timestamp)} · ${resolvePhotographerName?.(p.photographerId) || ""}`,
+      meta: {
+        fileName: p.id,
+        time: `${fmtDate(p.timestamp)} ${fmtTime(p.timestamp)}`,
+        hotspot: resolveHotspotName?.(p.hotspotId) || "",
+      },
+    }));
+  }, [paginatedPhotos, resolvePhotographerName, resolveHotspotName]);
 
   return (
-    <div className="fixed inset-0 z-[1000]" aria-modal="true" role="dialog" ref={containerRef}>
-      {/* Fondo – click cierra */}
-      <div className="absolute inset-0 bg-black/90" onClick={onClose} />
+    <section className="w-screen ml-[calc(50%-50vw)]">
+      {/* Toolbar */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm px-2 sm:px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500">Vista:</span>
+          <button type="button" onClick={() => setVista?.("mosaico")} className="h-8 px-3 rounded-md border bg-white text-slate-700 border-slate-300">Mosaico</button>
+        </div>
 
-      {/* SOLO botón cerrar arriba a la derecha (sin info arriba-izquierda) */}
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">Zoom</span>
+            <input type="range" min={140} max={360} step={10} value={zoom} onChange={(e)=>setZoom(parseInt(e.target.value,10))}/>
+          </label>
+
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">Aspecto</span>
+            <select className="h-8 border rounded-md px-2 bg-white" value={aspectMode} onChange={(e)=>setAspectMode(e.target.value)}>
+              <option value="auto">Auto</option>
+              <option value="16:9">16:9</option>
+              <option value="4:3">4:3</option>
+              <option value="1:1">1:1</option>
+              <option value="9:16">9:16</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
+            <span className="text-slate-500">Mostrar info debajo</span>
+          </label>
+
+          <div className="text-slate-500 hidden sm:block">{`${paginatedPhotos?.length || 0} / ${totalPhotos} fotos`}</div>
+        </div>
+      </div>
+
+      <div className="px-2 sm:px-4">
+        <MosaicoVirtualized
+          data={paginatedPhotos || []}
+          loadMore={onLoadMore}
+          hasMore={!!hasMorePhotos}
+          onToggleSel={onToggleSel}
+          selected={selected}
+          onOpenLightbox={openLightbox}
+          aspect={effAspect}
+          zoom={zoom}
+          showLabels={showLabels}
+          resolvePhotographerName={resolvePhotographerName}
+          resolveHotspotName={resolveHotspotName}
+        />
+      </div>
+
+      {/* Barra de selección */}
+      {typeof totalQ === "number" && selected?.size > 0 && (
+        <div className="sticky bottom-3 z-40 mt-3">
+          <div className="max-w-[740px] mx-auto rounded-2xl bg-white/85 backdrop-blur border border-slate-200 px-4 py-2.5 flex items-center justify-between text-sm shadow-lg">
+            <div className="truncate">
+              <span className="font-semibold">{selected.size}</span> foto{selected.size === 1 ? "" : "s"} seleccionada{selected.size === 1 ? "" : "s"}
+              <span className="mx-2 text-slate-400">•</span>
+              Total estimado: <span className="font-display font-bold">Q{Math.round(totalQ)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="h-9 px-3 rounded-xl border bg-white font-display font-bold" onClick={clearSel}>Limpiar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox + HUD */}
+      {lbOpen && (
+        <>
+          <PhotoLightbox
+            images={images}
+            index={lbIndex}
+            onIndexChange={setLbIndex}
+            onClose={closeLightbox}
+            showThumbnails
+            captionPosition="bottom-centered"
+            safeBottom={112}  // altura reservada para el HUD de abajo
+          />
+          <LightboxHUD
+            item={paginatedPhotos[lbIndex]}
+            photogName={resolvePhotographerName?.(paginatedPhotos[lbIndex]?.photographerId)}
+            hotspotName={resolveHotspotName?.(paginatedPhotos[lbIndex]?.hotspotId)}
+            route={paginatedPhotos[lbIndex]?.route || ""}
+            selected={selected?.has?.(paginatedPhotos[lbIndex]?.id)}
+            onToggleSel={() => onToggleSel(paginatedPhotos[lbIndex]?.id)}
+            onClose={closeLightbox}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ---------- Grilla virtualizada ---------- */
+function MosaicoVirtualized({ data, loadMore, hasMore, onToggleSel, selected, onOpenLightbox, aspect, zoom, showLabels, resolvePhotographerName, resolveHotspotName }) {
+  const lastRowSeen = useRef(-1);
+  return (
+    <div className="h-[78vh] md:h-[80vh] lg:h-[82vh] xl:h-[86vh] rounded-2xl border bg-white">
+      <AutoSizer>
+        {({ width, height }) => {
+          const GAP = 8;
+          const baseCell = zoom;
+          const cols = Math.max(1, Math.floor((width - GAP) / (baseCell + GAP)));
+          const cellW = Math.floor((width - GAP * (cols + 1)) / cols);
+          const ratio = aspect === "1:1" ? 1 : aspect === "4:3" ? 3/4 : aspect === "16:9" ? 9/16 : aspect === "9:16" ? 16/9 : 3/4;
+          const cellH = Math.round(cellW * ratio);
+          const columnWidth = cellW + GAP;
+          const rowHeight = cellH + GAP;
+          const rowCount = Math.ceil(data.length / cols);
+
+          return (
+            <Grid
+              columnCount={cols}
+              columnWidth={columnWidth}
+              height={height}
+              rowCount={rowCount}
+              rowHeight={rowHeight}
+              width={width}
+              style={{ overflowX: "hidden" }}
+              onItemsRendered={({ visibleRowStopIndex }) => {
+                if (visibleRowStopIndex !== lastRowSeen.current) {
+                  lastRowSeen.current = visibleRowStopIndex;
+                  if (hasMore && visibleRowStopIndex >= rowCount - 1) loadMore?.();
+                }
+              }}
+            >
+              {({ columnIndex, rowIndex, style }) => {
+                const idx = rowIndex * cols + columnIndex;
+                const item = data[idx];
+                if (!item) return <div style={style} />;
+                const isSel = selected?.has?.(item.id);
+                const phName = resolvePhotographerName ? resolvePhotographerName(item.photographerId) : (item.photographerId || "");
+                const hsName = resolveHotspotName ? resolveHotspotName(item.hotspotId) : (item.hotspotId || "");
+
+                return (
+                  <div style={style} className="p-2">
+                    <div className={"group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 " + (isSel ? "ring-2 ring-blue-600" : "")}>
+                      <button
+                        type="button"
+                        className="absolute z-10 top-2 left-2 h-7 px-2 rounded-md bg-white/90 text-xs border border-slate-200 shadow-sm"
+                        onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
+                        title={isSel ? "Quitar de selección" : "Agregar a selección"}
+                      >
+                        {isSel ? "Quitar" : "Elegir"}
+                      </button>
+
+                      <div className="w-full bg-slate-200 cursor-zoom-in" style={{ height: cellH }} onClick={() => onOpenLightbox(idx)} title="Ver grande">
+                        <img src={item.url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" draggable={false} />
+                      </div>
+
+                      {showLabels && (
+                        <div className="p-2 text-[12px] leading-tight text-slate-700">
+                          <div className="truncate">{fmtDate(item.timestamp)} {fmtTime(item.timestamp)}</div>
+                          <div className="truncate opacity-70">{hsName}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }}
+            </Grid>
+          );
+        }}
+      </AutoSizer>
+    </div>
+  );
+}
+
+/* ---------- HUD inferior (info real + botones) ---------- */
+function LightboxHUD({ item, photogName, hotspotName, route, selected, onToggleSel, onClose }) {
+  const { addItem, setOpen } = useCart();
+  if (!item) return null;
+
+  const precio = item.price ?? 50; // si traés price real en el item, se usa
+  const phName = photogName || "Fotógrafo";
+  const hotName = hotspotName || "Punto";
+  const dateStr = fmtDate(item.timestamp);
+  const timeStr = fmtTime(item.timestamp);
+
+  const name = `Foto • ${phName} • ${dateStr} ${timeStr}`;
+
+  const agregarCarrito = () => {
+    addItem?.({ id: item.id, name, price: precio, img: item.url, qty: 1 });
+    setOpen?.(true);
+  };
+
+  return (
+    <>
+      {/* Cerrar rojo arriba derecha (por si preferís cerrar desde el HUD también) */}
       <button
-        className="fixed top-3 right-3 z-[1010] h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
+        type="button"
         onClick={onClose}
-        title="Cerrar (Esc)"
+        className="fixed top-3 right-3 z-[1100] h-9 px-3 rounded-lg bg-red-600 text-white shadow-lg"
+        title="Cerrar"
       >
         Cerrar
       </button>
 
-      {/* Contenedor central (la imagen no cierra al click) */}
-      <div
-        className="absolute inset-0 flex items-center justify-center pt-10"
-        style={{ paddingBottom }}
-        onClick={onClose}
-      >
-        <img
-          src={current?.src}
-          alt={current?.alt || ""}
-          className="max-w-[96vw] max-h-[90vh] object-contain select-none"
-          onClick={(e) => e.stopPropagation()}
-          draggable={false}
-        />
-      </div>
-
-      {/* Caption inferior opcional (chiquito) */}
-      {captionPosition === "bottom-centered" && (
-        <div
-          className="absolute left-0 right-0 bottom-0 flex justify-center items-end pointer-events-none"
-          style={{ paddingBottom: safeBottom }}
-        >
-          <div className="pointer-events-auto mb-2 rounded-full bg-black/50 text-white text-xs sm:text-sm px-3 py-1.5 border border-white/10">
-            {total > 0 ? `${index + 1} / ${total}` : "0 / 0"}
-            {current?.caption ? <span className="hidden sm:inline"> · {current.caption}</span> : null}
-            {(fileName || time || hotspot) && (
-              <span className="hidden md:inline">
-                {fileName ? <> · {fileName}</> : null}
-                {time ? <> · {time}</> : null}
-                {hotspot ? <> · {hotspot}</> : null}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Flechas */}
-      {total > 1 && (
-        <>
-          <button
-            className={`${arrowCls} absolute left-3 top-1/2 -translate-y-1/2 z-[1010]`}
-            onClick={(e) => { e.stopPropagation(); prev(); }}
-            aria-label="Anterior"
-            title="Anterior (←)"
-          >
-            ‹
-          </button>
-          <button
-            className={`${arrowCls} absolute right-3 top-1/2 -translate-y-1/2 z-[1010]`}
-            onClick={(e) => { e.stopPropagation(); next(); }}
-            aria-label="Siguiente"
-            title="Siguiente (→)"
-          >
-            ›
-          </button>
-        </>
-      )}
-
-      {/* Thumbnails (carrusel) */}
-      {showThumbnails && total > 1 && (
-        <div
-          className="absolute bottom-0 left-0 right-0 p-2 bg-black/40"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mx-auto max-w-5xl flex gap-2 overflow-auto">
-            {images.map((im, i) => (
+      {/* Cinta inferior de info (HUD) */}
+      <div className="fixed left-0 right-0 bottom-0 z-[1090] px-3 pb-3 pointer-events-none">
+        <div className="mx-auto max-w-5xl">
+          <div className="pointer-events-auto rounded-2xl bg-black/60 backdrop-blur border border-white/15 text-white px-4 py-2.5 flex flex-wrap items-center gap-3">
+            <div className="min-w-[240px] grow">
+              <div className="text-[13px] leading-tight">
+                <span className="">{phName}</span>
+                <span className="mx-2 text-white/60">•</span>
+                <span className="">{route || "—"}</span>
+                <span className="mx-2 text-white/60">•</span>
+                <span className="">{hotName}</span>
+                <span className="mx-2 text-white/60">•</span>
+                <span className="font-semibold">{dateStr} {timeStr}</span>
+                <span className="mx-2 text-white/60">•</span>
+                <span className="">Q{precio}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
               <button
-                key={i}
-                className={`w-16 h-16 rounded overflow-hidden border-4 ${
-                  i === index ? "border-blue-500 ring-4 ring-blue-500" : "border-white/10"
-                }`}
-                onClick={() => onIndexChange?.(i)}
-                title={im.alt || im.caption || `Foto ${i + 1}`}
+                className={"h-9 px-3 rounded-xl border bg-white text-black font-display font-bold " + (selected ? "ring-2 ring-blue-400" : "")}
+                onClick={onToggleSel}
               >
-                <img src={im.src} alt="" className="w-full h-full object-cover" draggable={false} />
+                {selected ? "Quitar de selección" : "Agregar a selección"}
               </button>
-            ))}
+              <button
+                className="h-9 px-3 rounded-xl bg-blue-600 text-white font-display font-bold"
+                onClick={agregarCarrito}
+              >
+                Agregar al carrito
+              </button>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Preload vecinos */}
-      {preload.map((p, i) => (
-        <link key={i} rel="preload" as="image" href={p} />
-      ))}
-    </div>
+      </div>
+    </>
   );
 }
