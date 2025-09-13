@@ -1,5 +1,5 @@
 // src/components/PhotoLightbox.jsx
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useCallback } from "react";
 
 /**
  * PhotoLightbox – visor full-screen con “zona segura” inferior para tu HUD.
@@ -28,12 +28,19 @@ export default function PhotoLightbox({
   const current = images[index] || {};
   const containerRef = useRef(null);
 
+  // ====== CONSTS ======
+  const EXTRA_PUSH_UP = 72; // empuja la imagen y el carrusel hacia arriba (no toca tu HUD)
+  const THUMB_SIZE = 72;    // px fijos para miniaturas (ancho/alto constantes)
+  const THUMB_GAP  = 8;     // separación entre thumbs
+
+  // ====== BODY SCROLL LOCK ======
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev || ""; };
   }, []);
 
+  // ====== KEYBOARD NAV ======
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") onClose?.();
@@ -47,6 +54,7 @@ export default function PhotoLightbox({
   function prev() { if (total) onIndexChange?.((index - 1 + total) % total); }
   function next() { if (total) onIndexChange?.((index + 1) % total); }
 
+  // ====== PRELOAD VECINOS ======
   const preload = useMemo(() => {
     const a = images[(index - 1 + total) % total]?.src;
     const b = images[(index + 1) % total]?.src;
@@ -57,24 +65,43 @@ export default function PhotoLightbox({
     ? "w-10 h-10 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white border border-blue-500/60"
     : "w-10 h-10 rounded-full bg-white/10 text-white border border-white/15";
 
-  // ── Ajustes de posicionamiento ──────────────────────────────────────────────
-  // Más empuje hacia arriba para que el HUD NO tape nada.
-  const EXTRA_PUSH_UP = 65; // ← subido (antes era menor). Si querés más, aumentá este número.
+  // ====== PADDING (NO TOCA TU HUD) ======
   const captionPad = captionPosition === "bottom-centered" ? 80 : 24; // espacio del chip
-  const bottomPad = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;   // empuja la imagen hacia arriba
-  const topPad = 12; // margen superior mínimo (dejamos más espacio arriba)
+  const bottomPad = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;   // sube la imagen
+  const topPad = 12; // margen superior leve
 
-  // Metadatos mínimos para el chip (no el HUD)
+  // ====== CAPTION CHIP DATA (NO ES HUD) ======
   const fileName = current?.meta?.fileName || current?.alt || "";
   const time = current?.meta?.time || "";
   const hotspot = current?.meta?.hotspot || "";
+
+  // ====== CARRUSEL REFS & AUTO-CENTER ======
+  const railRef = useRef(null);
+
+  const centerThumb = useCallback((i) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const child = rail.children?.[i];
+    if (!child) return;
+
+    const railRect  = rail.getBoundingClientRect();
+    const childRect = child.getBoundingClientRect();
+    const current   = rail.scrollLeft;
+    const target    = current + (childRect.left + childRect.width / 2) - (railRect.left + railRect.width / 2);
+
+    rail.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    if (showThumbnails && total > 0) centerThumb(index);
+  }, [index, total, showThumbnails, centerThumb]);
 
   return (
     <div className="fixed inset-0 z-[1000]" aria-modal="true" role="dialog" ref={containerRef}>
       {/* Fondo */}
       <div className="absolute inset-0 bg-black/90" onClick={onClose} />
 
-      {/* SOLO botón cerrar arriba-derecha (no tocamos tu HUD) */}
+      {/* SOLO botón cerrar arriba-derecha */}
       <button
         className="fixed top-3 right-3 z-[2100] h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
         onClick={onClose}
@@ -83,7 +110,7 @@ export default function PhotoLightbox({
         Cerrar
       </button>
 
-      {/* Imagen centrada (respeta topPad y bottomPad, así no la tapa el HUD) */}
+      {/* Imagen centrada (respeta topPad y bottomPad; tu HUD no tapa nada) */}
       <div
         className="absolute inset-0 flex items-center justify-center"
         style={{ paddingTop: topPad, paddingBottom: bottomPad }}
@@ -140,26 +167,49 @@ export default function PhotoLightbox({
         </>
       )}
 
-      {/* Carrusel de thumbnails – por ENCIMA del HUD */}
+      {/* Carrusel full-width (thumbs fijas, se desplaza; la foto queda centrada) */}
       {showThumbnails && total > 1 && (
         <div
-          className="absolute left-0 right-0 p-2 bg-black/40 z-[3000]"
-          style={{ bottom: (safeBottom || 0) + EXTRA_PUSH_UP + 8 }} // subido más
+          className="absolute left-0 right-0 z-[3000]"
+          style={{ bottom: (safeBottom || 0) + EXTRA_PUSH_UP + 8 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="mx-auto max-w-5xl flex gap-2 overflow-auto">
-            {images.map((im, i) => (
-              <button
-                key={i}
-                className={`w-16 h-16 rounded overflow-hidden border-4 ${
-                  i === index ? "border-blue-500 ring-4 ring-blue-500" : "border-white/10"
-                }`}
-                onClick={() => onIndexChange?.(i)}
-                title={im.alt || im.caption || `Foto ${i + 1}`}
-              >
-                <img src={im.src} alt="" className="w-full h-full object-cover" draggable={false} />
-              </button>
-            ))}
+          <div
+            ref={railRef}
+            className="w-screen overflow-x-auto overflow-y-hidden"
+            style={{
+              WebkitOverflowScrolling: "touch",
+              padding: 8,
+            }}
+          >
+            <div
+              className="flex flex-nowrap items-center"
+              style={{ gap: THUMB_GAP, paddingLeft: 8, paddingRight: 8 }}
+            >
+              {images.map((im, i) => (
+                <button
+                  key={i}
+                  className={`flex-none rounded overflow-hidden border-4 ${
+                    i === index ? "border-blue-500 ring-4 ring-blue-500" : "border-white/10"
+                  }`}
+                  style={{
+                    width: THUMB_SIZE,
+                    height: THUMB_SIZE,
+                    minWidth: THUMB_SIZE,
+                    minHeight: THUMB_SIZE,
+                  }}
+                  onClick={() => onIndexChange?.(i)}
+                  title={im.alt || im.caption || `Foto ${i + 1}`}
+                >
+                  <img
+                    src={im.src}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
