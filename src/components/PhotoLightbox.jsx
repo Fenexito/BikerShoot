@@ -28,14 +28,12 @@ export default function PhotoLightbox({
   const current = images[index] || {};
   const containerRef = useRef(null);
 
-  // Bloquear scroll del body mientras está abierto
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev || ""; };
   }, []);
 
-  // Teclado: Esc, ←, →
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") onClose?.();
@@ -49,7 +47,6 @@ export default function PhotoLightbox({
   function prev() { if (total) onIndexChange?.((index - 1 + total) % total); }
   function next() { if (total) onIndexChange?.((index + 1) % total); }
 
-  // Preload vecinos
   const preload = useMemo(() => {
     const a = images[(index - 1 + total) % total]?.src;
     const b = images[(index + 1) % total]?.src;
@@ -61,12 +58,11 @@ export default function PhotoLightbox({
     : "w-10 h-10 rounded-full bg-white/10 text-white border border-white/15";
 
   // ── Ajustes de posicionamiento ──────────────────────────────────────────────
-  // Subimos la imagen “un cacho” para que el HUD no la tape.
-  // EXTRA empuja la foto hacia arriba y el carrusel por encima del HUD.
-  const EXTRA_PUSH_UP = 36; // <- si querés más/menos, modifica este número
+  // Más empuje hacia arriba para que el HUD NO tape nada.
+  const EXTRA_PUSH_UP = 72; // ← subido (antes era menor). Si querés más, aumentá este número.
   const captionPad = captionPosition === "bottom-centered" ? 80 : 24; // espacio del chip
   const bottomPad = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;   // empuja la imagen hacia arriba
-  const topPad = 24; // margen superior (tenés espacio arriba)
+  const topPad = 8; // margen superior mínimo (dejamos más espacio arriba)
 
   // Metadatos mínimos para el chip (no el HUD)
   const fileName = current?.meta?.fileName || current?.alt || "";
@@ -78,7 +74,7 @@ export default function PhotoLightbox({
       {/* Fondo */}
       <div className="absolute inset-0 bg-black/90" onClick={onClose} />
 
-      {/* SOLO botón cerrar arriba-derecha (no tocamos HUD) */}
+      {/* SOLO botón cerrar arriba-derecha (no tocamos tu HUD) */}
       <button
         className="fixed top-3 right-3 z-[2100] h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
         onClick={onClose}
@@ -148,7 +144,7 @@ export default function PhotoLightbox({
       {showThumbnails && total > 1 && (
         <div
           className="absolute left-0 right-0 p-2 bg-black/40 z-[3000]"
-          style={{ bottom: (safeBottom || 0) + EXTRA_PUSH_UP + 8 }}
+          style={{ bottom: (safeBottom || 0) + EXTRA_PUSH_UP + 8 }} // subido más
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mx-auto max-w-5xl flex gap-2 overflow-auto">
