@@ -50,6 +50,10 @@ import StudioEstadisticas from './routes/photographer/Estadisticas.jsx'
 import StudioPerfil from './routes/photographer/PhotographerProfile.jsx'
 import StudioCargaRapida from './routes/photographer/CargaRapida.jsx'
 
+// 👉 Onboarding + Guard (NUEVOS)
+import Onboarding from './routes/photographer/onboarding.jsx'
+import StudioGate from './routes/photographer/StudioGate.jsx'
+
 // 🧩 store del toaster para disparar desde acá (mismo que usa tu Toaster.jsx)
 import { useToast } from './state/ui.jsx'
 
@@ -88,7 +92,7 @@ function LayoutShell(){
         type: 'success',
         title: 'Sesión cerrada con éxito',
         description: '¡Nos miramos pronto!',
-        position: 'top' // tu Toaster pinta todo lo que no sea "bottom" arriba-derecha
+        position: 'top'
       })
       sp.delete('logout')
       changed = true
@@ -166,8 +170,8 @@ export default function App(){
           {/* portal biker */}
           <Route path='/app' element={<BikerHome/>}/>
           <Route path='/app/historial' element={<BikerHistory/>}/>
-          <Route path='/app/historial/:id' element={<BikerOrderDetail/>}/> {/* ← NUEVA */}
-          <Route path='/app/eventos/:id' element={<BikerEvent/>}/> {/* ← NUEVA (placeholder evento) */}
+          <Route path='/app/historial/:id' element={<BikerOrderDetail/>}/>
+          <Route path='/app/eventos/:id' element={<BikerEvent/>}/>
           <Route path='/app/buscar/configurar' element={<BikerSearchSetup/>}/>
           <Route path='/app/buscar' element={<BikerSearch/>}/>
           <Route path='/app/buscar/por-fotografo' element={<SearchByPhotographer/>}/>
@@ -189,14 +193,19 @@ export default function App(){
           </Route>
           {/* portal fotógrafo */}
           <Route path='/set-password' element={<SetPassword/>}/>
-          <Route path='/studio' element={<StudioHome/>}/>
-          <Route path='/studio/eventos' element={<StudioEventos/>}/>
-          <Route path='/studio/eventos/:id' element={<EventoEditor/>}/>
-          <Route path='/studio/pedidos' element={<StudioPedidos/>}/>
-          <Route path='/studio/pedidos/:id' element={<OrderDetail/>}/>
-          <Route path='/studio/estadisticas' element={<StudioEstadisticas/>}/>
-          <Route path='/studio/perfil' element={<StudioPerfil/>}/>
-          <Route path='/studio/carga-rapida' element={<StudioCargaRapida/>}/>
+          
+          {/* Onboarding obligatorio */}
+          <Route path='/studio/onboarding' element={<Onboarding/>}/>
+
+          {/* Todas las vistas del Studio pasan por el guard */}
+          <Route path='/studio' element={<StudioGate><StudioHome/></StudioGate>}/>
+          <Route path='/studio/eventos' element={<StudioGate><StudioEventos/></StudioGate>}/>
+          <Route path='/studio/eventos/:id' element={<StudioGate><EventoEditor/></StudioGate>}/>
+          <Route path='/studio/pedidos' element={<StudioGate><StudioPedidos/></StudioGate>}/>
+          <Route path='/studio/pedidos/:id' element={<StudioGate><OrderDetail/></StudioGate>}/>
+          <Route path='/studio/estadisticas' element={<StudioGate><StudioEstadisticas/></StudioGate>}/>
+          <Route path='/studio/perfil' element={<StudioGate><StudioPerfil/></StudioGate>}/>
+          <Route path='/studio/carga-rapida' element={<StudioGate><StudioCargaRapida/></StudioGate>}/>
         </Route>
       </Routes>
     </CartProvider>
