@@ -26,12 +26,11 @@ export default function PhotoLightbox({
 }) {
   const total = images.length || 0;
   const current = images[index] || {};
-  const containerRef = useRef(null);
 
   // ====== CONSTS ======
-  const EXTRA_PUSH_UP = 72; // empuja la imagen y el carrusel hacia arriba (no toca tu HUD)
-  const THUMB_SIZE = 72;    // px fijos para miniaturas (ancho/alto constantes)
-  const THUMB_GAP  = 8;     // separación entre thumbs
+  const EXTRA_PUSH_UP = 72; // empuja imagen/carrusel hacia arriba (HUD intacto)
+  const THUMB_SIZE = 72;    // miniaturas tamaño fijo
+  const THUMB_GAP  = 8;
 
   // ====== BODY SCROLL LOCK ======
   useEffect(() => {
@@ -66,38 +65,66 @@ export default function PhotoLightbox({
     : "w-10 h-10 rounded-full bg-white/10 text-white border border-white/15";
 
   // ====== PADDING (NO TOCA TU HUD) ======
-  const captionPad = captionPosition === "bottom-centered" ? 80 : 24; // espacio del chip
-  const bottomPad = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;   // sube la imagen
-  const topPad = 12; // margen superior leve
+  const captionPad = captionPosition === "bottom-centered" ? 80 : 24;
+  const bottomPad  = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;
+  const topPad     = 12;
 
   // ====== CAPTION CHIP DATA (NO ES HUD) ======
   const fileName = current?.meta?.fileName || current?.alt || "";
   const time = current?.meta?.time || "";
   const hotspot = current?.meta?.hotspot || "";
 
-  // ====== CARRUSEL REFS & AUTO-CENTER ======
-  const railRef = useRef(null);
+  // ====== CARRUSEL: rail (scroll) + lista (flex) ======
+  const railRef = useRef(null);  // contenedor con overflow-x
+  const listRef = useRef(null);  // div.flex con los botones
 
-  const centerThumb = useCallback((i) => {
+  // Centrar SIEMPRE la miniatura seleccionada
+  const centerThumb = useCallback((i, behavior = "smooth") => {
     const rail = railRef.current;
-    if (!rail) return;
-    const child = rail.children?.[i];
-    if (!child) return;
+    const list = listRef.current;
+    if (!rail || !list) return;
 
-    const railRect  = rail.getBoundingClientRect();
-    const childRect = child.getBoundingClientRect();
-    const current   = rail.scrollLeft;
-    const target    = current + (childRect.left + childRect.width / 2) - (railRect.left + railRect.width / 2);
+    const item = list.children?.[i];
+    if (!item) return;
 
-    rail.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+    // Posición del item relativo a la lista (no al viewport)
+    const itemLeft  = item.offsetLeft;
+    const itemWidth = item.offsetWidth;
+    // Centro deseado del contenedor visible
+    const railVisibleCenter = rail.clientWidth / 2;
+    // Scroll objetivo para que el centro del item quede en el centro del rail
+    let target = itemLeft - (railVisibleCenter - itemWidth / 2);
+
+    // Limitar el scroll (0 .. maxScroll)
+    const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    if (target < 0) target = 0;
+    if (target > maxScroll) target = maxScroll;
+
+    rail.scrollTo({ left: Math.round(target), behavior });
   }, []);
 
+  // Al abrir: centrar sin animación (para evitar “brinco”)
+  const didMountRef = useRef(false);
   useEffect(() => {
-    if (showThumbnails && total > 0) centerThumb(index);
+    if (!showThumbnails || total === 0) return;
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      centerThumb(index, "instant"); // primer centrado “duro”
+    } else {
+      centerThumb(index, "smooth");  // siguientes cambios con animación
+    }
+  }, [index, total, showThumbnails, centerThumb]);
+
+  // Re-centrar si cambia el tamaño de la ventana
+  useEffect(() => {
+    if (!showThumbnails || total === 0) return;
+    const onResize = () => centerThumb(index, "instant");
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, [index, total, showThumbnails, centerThumb]);
 
   return (
-    <div className="fixed inset-0 z-[1000]" aria-modal="true" role="dialog" ref={containerRef}>
+    <div className="fixed inset-0 z-[1000]" aria-modal="true" role="dialog">
       {/* Fondo */}
       <div className="absolute inset-0 bg-black/90" onClick={onClose} />
 
@@ -110,7 +137,7 @@ export default function PhotoLightbox({
         Cerrar
       </button>
 
-      {/* Imagen centrada (respeta topPad y bottomPad; tu HUD no tapa nada) */}
+      {/* Imagen centrada (respeta topPad y bottomPad, HUD no tapa) */}
       <div
         className="absolute inset-0 flex items-center justify-center"
         style={{ paddingTop: topPad, paddingBottom: bottomPad }}
@@ -145,7 +172,7 @@ export default function PhotoLightbox({
         </div>
       )}
 
-      {/* Flechas (por encima de la imagen) */}
+      {/* Flechas */}
       {total > 1 && (
         <>
           <button
@@ -167,7 +194,7 @@ export default function PhotoLightbox({
         </>
       )}
 
-      {/* Carrusel full-width (thumbs fijas, se desplaza; la foto queda centrada) */}
+      {/* Carrusel full-width – miniatura ACTIVA siempre centrada */}
       {showThumbnails && total > 1 && (
         <div
           className="absolute left-0 right-0 z-[3000]"
@@ -180,9 +207,11 @@ export default function PhotoLightbox({
             style={{
               WebkitOverflowScrolling: "touch",
               padding: 8,
+              scrollSnapType: "x mandatory", // scroll-snap para alinear al centro al soltar
             }}
           >
             <div
+              ref={listRef}
               className="flex flex-nowrap items-center"
               style={{ gap: THUMB_GAP, paddingLeft: 8, paddingRight: 8 }}
             >
@@ -197,6 +226,8 @@ export default function PhotoLightbox({
                     height: THUMB_SIZE,
                     minWidth: THUMB_SIZE,
                     minHeight: THUMB_SIZE,
+                    scrollSnapAlign: "center", // cada thumb “pide” quedar centrada
+                    scrollSnapStop: "always",
                   }}
                   onClick={() => onIndexChange?.(i)}
                   title={im.alt || im.caption || `Foto ${i + 1}`}
