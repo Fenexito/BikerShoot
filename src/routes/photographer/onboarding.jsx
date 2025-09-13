@@ -3,8 +3,7 @@ import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 
-/* ====== Constantes visuales del Studio (matching de tu app) ====== */
-// Reusa la misma lista base que usás en el Studio
+/* ====== Catálogo de rutas igual que en el Studio ====== */
 const RUTAS = [
   "Ruta Interamericana",
   "RN-14",
@@ -13,7 +12,7 @@ const RUTAS = [
   "RN-10 (Cañas)",
 ];
 
-/* ====== Helpers de Perfil (shape y estilos consistentes) ====== */
+/* ====== Helpers (forma de datos alineada a tu Perfil) ====== */
 function templatePreciosBase3() {
   return [
     { nombre: "1 foto", precio: "" },
@@ -33,14 +32,10 @@ function newPriceList(nombre = "Fotos de Domingo") {
     items: templatePreciosBase3(),
   };
 }
-
-// Igual a tu PhotographerProfile: en UI usamos `cuentas` top-level
-// y al guardar lo mapeamos a `pagos.cuentas`.  :contentReference[oaicite:3]{index=3}
 function isProfileComplete(p) {
   if (!p) return false;
   const telOk = !!(p.telefono && p.telefono.trim().length >= 8);
   const userOk = !!(p.username && p.username.trim().length >= 3);
-  // aquí esperamos `cuentas` top-level en el state de esta pantalla
   const cuentasOk = Array.isArray(p.cuentas) && p.cuentas.length >= 1;
   const puntosOk = Array.isArray(p.puntos) && p.puntos.length >= 1;
   const pl = Array.isArray(p.price_lists) ? p.price_lists : [];
@@ -55,38 +50,15 @@ function isProfileComplete(p) {
   return telOk && userOk && cuentasOk && puntosOk && preciosOk;
 }
 
-/* ===== Header flotante como en Perfil (para alinear bajo tu header) ===== */
-function useFloatingHeaderOffset(defaultPx = 88) {
-  const [offset, setOffset] = React.useState(defaultPx);
-  React.useEffect(() => {
-    function calc() {
-      const el = document.querySelector("[data-app-header]") || document.querySelector("header");
-      if (!el) return setOffset(0);
-      const rect = el.getBoundingClientRect();
-      setOffset(Math.max(0, rect.bottom));
-    }
-    calc();
-    window.addEventListener("resize", calc);
-    window.addEventListener("scroll", calc, { passive: true });
-    return () => {
-      window.removeEventListener("resize", calc);
-      window.removeEventListener("scroll", calc);
-    };
-  }, []);
-  return offset;
-}
-
-/* =========================== Página =========================== */
 export default function Onboarding() {
   const nav = useNavigate();
-  const headerOffset = useFloatingHeaderOffset();
-  const [stickyH, setStickyH] = React.useState(96);
 
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState("");
   const [user, setUser] = React.useState(null);
 
+  // ⚠️ Incluimos `precios` en el state para cumplir tu CHECK de la tabla
   const [data, setData] = React.useState({
     username: "",
     estudio: "",
@@ -95,24 +67,17 @@ export default function Onboarding() {
     website: "",
     facebook: "",
     instagram: "",
-    // UI local:
-    cuentas: [],           // ← top-level (se guarda como pagos.cuentas)
+    avatar_url: "",
+    portafolio: [],
+    // UI
+    cuentas: [],
     puntos: [],
     price_lists: [newPriceList("Fotos de Domingo")],
-    portafolio: [],
-    avatar_url: "",
+    precios: templatePreciosBase3(), // ← siempre presente
   });
 
   const [step, setStep] = React.useState(0);
   const STEPS = ["Contacto", "Identidad", "Precios", "Puntos", "Pagos", "Final"];
-
-  const stickyRef = React.useRef(null);
-  React.useEffect(() => {
-    const measure = () => setStickyH(stickyRef.current?.offsetHeight || 96);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
 
   React.useEffect(() => {
     let alive = true;
@@ -125,10 +90,11 @@ export default function Onboarding() {
         if (!alive) return;
         setUser(u);
 
+        // Traer o crear perfil base
         const prof = await fetchOrCreatePhotographer(u);
         if (!alive) return;
 
-        // Mapear shape del perfil a nuestro state visual
+        // Mapear a nuestro state (manteniendo `precios` con 3 tramos mínimo)
         const cuentas = Array.isArray(prof?.pagos?.cuentas) ? prof.pagos.cuentas : [];
         const price_lists =
           Array.isArray(prof?.price_lists) && prof.price_lists.length
@@ -146,6 +112,11 @@ export default function Onboarding() {
           instagram: prof?.instagram || "",
           avatar_url: prof?.avatar_url || "",
           portafolio: Array.isArray(prof?.portafolio) ? prof.portafolio : [],
+          // aseguramos 3 tramos en `precios` para tu CHECK
+          precios:
+            Array.isArray(prof?.precios) && prof.precios.length >= 3
+              ? prof.precios
+              : templatePreciosBase3(),
           price_lists: price_lists.map((pl) => ({
             ...pl,
             visible_publico: isDomingoList(pl.nombre) ? true : !!pl.visible_publico,
@@ -156,6 +127,7 @@ export default function Onboarding() {
           puntos: Array.isArray(prof?.puntos) ? prof.puntos : [],
         }));
 
+        // Si ya está completo, directo al Studio
         if (isProfileComplete({ ...prof, cuentas })) {
           nav("/studio", { replace: true });
           return;
@@ -166,7 +138,9 @@ export default function Onboarding() {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [nav]);
 
   async function fetchOrCreatePhotographer(u) {
@@ -182,7 +156,7 @@ export default function Onboarding() {
         estudio: u.user_metadata?.display_name || "",
         correo: u.email || "",
         portafolio: [],
-        precios: templatePreciosBase3(),
+        precios: templatePreciosBase3(), // ← semilla con 3
         price_lists: [newPriceList("Fotos de Domingo")],
         pagos: { cuentas: [] },
         puntos: [],
@@ -199,16 +173,24 @@ export default function Onboarding() {
 
   async function savePartial(overrides = {}) {
     if (!user) return;
-    setSaving(true); setMsg("");
+    setSaving(true);
+    setMsg("");
     try {
       const next = { ...data, ...overrides };
 
+      // Endurecer listas tipo Domingo + asegurar items
       const hardenedLists = (next.price_lists || []).map((pl) => ({
         ...pl,
         visible_publico: isDomingoList(pl.nombre) ? true : !!pl.visible_publico,
         lock_public: isDomingoList(pl.nombre),
         items: Array.isArray(pl.items) && pl.items.length ? pl.items : templatePreciosBase3(),
       }));
+
+      // ⚠️ Asegurar `precios` con 3 tramos SIEMPRE para pasar tu CHECK
+      const safePrecios =
+        Array.isArray(next.precios) && next.precios.length >= 3
+          ? next.precios
+          : templatePreciosBase3();
 
       const payload = {
         username: next.username?.trim() || null,
@@ -220,7 +202,10 @@ export default function Onboarding() {
         instagram: next.instagram?.trim() || null,
         avatar_url: next.avatar_url || null,
         portafolio: Array.isArray(next.portafolio) ? next.portafolio : [],
-        precios: [], // legacy lo mantenés en Perfil; aquí usamos price_lists
+
+        // 🔵 AQUÍ va la clave del fix:
+        precios: safePrecios,
+
         price_lists: hardenedLists,
         pagos: { cuentas: Array.isArray(next.cuentas) ? next.cuentas : [] },
         puntos: Array.isArray(next.puntos) ? next.puntos : [],
@@ -241,20 +226,30 @@ export default function Onboarding() {
     }
   }
 
+  const canJump = (i) => i <= step; // si querés permitir volver a pasos previos
+  const goTo = async (i) => {
+    if (i === step) return;
+    if (!canJump(i)) return;
+    try {
+      await savePartial();
+      setStep(i);
+    } catch {}
+  };
+
   async function nextStep() {
     try {
       await savePartial();
       if (step < STEPS.length - 1) setStep(step + 1);
     } catch {}
   }
-  async function prevStep() {
+  function prevStep() {
     setStep((s) => Math.max(0, s - 1));
   }
   async function finish() {
     try {
       await savePartial();
       if (!isProfileComplete(data)) {
-        setMsg("Aún faltan campos obligatorios. Revisá los pasos marcados.");
+        setMsg("Aún faltan campos obligatorios. Revisá los pasos.");
         return;
       }
       nav("/studio", { replace: true });
@@ -263,63 +258,54 @@ export default function Onboarding() {
 
   /* =========================== UI =========================== */
 
-  // barra sticky con título + progreso (matching Studio)  :contentReference[oaicite:4]{index=4}
-  const Progress = (
-    <div ref={stickyRef} className="fixed left-0 right-0 z-40" style={{ top: headerOffset + 8 }}>
-      <div className="max-w-6xl mx-auto px-5">
-        <div className="rounded-2xl bg-studio-panel border border-white/10 px-4 py-3 flex items-center gap-3 shadow">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg sm:text-xl font-display font-black truncate">Onboarding del Studio</h1>
-            <p className="text-white/70 text-xs sm:text-sm truncate">
-              Completá estos pasos para activar tu perfil de Fotógrafo.
-            </p>
-          </div>
-          <div className="hidden sm:flex items-center gap-2">
-            {STEPS.map((s, i) => (
-              <span
-                key={s}
-                className={
-                  "px-2 py-1 rounded-lg border text-xs " +
-                  (i === step
-                    ? "bg-blue-600 text-white border-white/10"
-                    : "bg-white/5 text-white/80 border-white/15")
-                }
-                title={s}
-              >
-                {i + 1}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // loading
   if (loading) {
     return (
       <main className="min-h-[60vh] grid place-items-center text-slate-100">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Preparando tu Studio…</div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          Preparando tu Studio…
+        </div>
       </main>
     );
   }
 
   return (
-    <main
-      className="max-w-6xl mx-auto px-5 pb-10 text-slate-100"
-      style={{ paddingTop: headerOffset + stickyH + 12 }}
-    >
-      {/* BG detrás del header y sub-encabezado como en Perfil */}
-      <div
-        className="fixed left-0 right-0 z-30 bg-studio-panel border-b border-white/10"
-        style={{ top: 0, height: headerOffset + stickyH + 12 }}
-        aria-hidden
-      />
+    <main className="max-w-6xl mx-auto px-5 py-6 text-slate-100">
+      {/* Título + Stepper integrados (sin tarjeta separada) */}
+      <div className="mb-4">
+        <h1 className="text-2xl sm:text-3xl font-display font-black">Onboarding del Studio</h1>
+        <p className="text-white/70 text-sm">
+          Paso <span className="text-blue-400 font-semibold">{step + 1}</span> de {STEPS.length}
+        </p>
 
-      {Progress}
+        <div className="mt-3 flex flex-wrap items-center gap-10">
+          <div className="flex items-center gap-2">
+            {STEPS.map((s, i) => (
+              <button
+                key={s}
+                onClick={() => goTo(i)}
+                title={s}
+                aria-current={i === step ? "step" : undefined}
+                className={
+                  "grid place-items-center rounded-full border font-bold " +
+                  (i === step
+                    ? "bg-blue-600 text-white border-white/10"
+                    : "bg-white/10 text-white/80 border-white/15") +
+                  " " +
+                  "w-12 h-12 sm:w-14 sm:h-14"
+                }
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+          <div className="text-sm text-white/70 hidden sm:block">
+            {STEPS[step]}
+          </div>
+        </div>
+      </div>
 
       {msg && (
-        <div className="mt-3 max-w-3xl">
+        <div className="mb-4 max-w-3xl">
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 px-4 py-3 text-sm">
             {msg}
           </div>
@@ -506,13 +492,11 @@ export default function Onboarding() {
           </div>
 
           <div className="mt-3 grid gap-3">
-            {(data.puntos || []).map((p, idx) => (
+            {(data.puntos || []).map((p) => (
               <div key={p.id} className="rounded-xl border border-white/10 p-4 bg-white/5 relative">
                 <button
                   className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-red-600 text-white"
-                  onClick={() =>
-                    setData((d) => ({ ...d, puntos: d.puntos.filter((x) => x.id !== p.id) }))
-                  }
+                  onClick={() => setData((d) => ({ ...d, puntos: d.puntos.filter((x) => x.id !== p.id) }))}
                   type="button"
                   title="Eliminar"
                 >
@@ -544,9 +528,7 @@ export default function Onboarding() {
                     }}
                   >
                     {RUTAS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
+                      <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
                   <input
@@ -585,12 +567,7 @@ export default function Onboarding() {
                         ...d,
                         puntos: d.puntos.map((x) =>
                           x.id === p.id
-                            ? {
-                                ...x,
-                                horarios: [
-                                  { ...x.horarios?.[0], inicio: v, fin: x.horarios?.[0]?.fin || "08:00", dia: x.horarios?.[0]?.dia || "Domingo" },
-                                ],
-                              }
+                            ? { ...x, horarios: [{ ...x.horarios?.[0], inicio: v, fin: x.horarios?.[0]?.fin || "08:00", dia: x.horarios?.[0]?.dia || "Domingo" }] }
                             : x
                         ),
                       }));
@@ -606,12 +583,7 @@ export default function Onboarding() {
                         ...d,
                         puntos: d.puntos.map((x) =>
                           x.id === p.id
-                            ? {
-                                ...x,
-                                horarios: [
-                                  { ...x.horarios?.[0], fin: v, inicio: x.horarios?.[0]?.inicio || "06:00", dia: x.horarios?.[0]?.dia || "Domingo" },
-                                ],
-                              }
+                            ? { ...x, horarios: [{ ...x.horarios?.[0], fin: v, inicio: x.horarios?.[0]?.inicio || "06:00", dia: x.horarios?.[0]?.dia || "Domingo" }] }
                             : x
                         ),
                       }));
@@ -725,7 +697,6 @@ export default function Onboarding() {
         </SectionCard>
       )}
 
-      {/* footer peque */}
       <div className="mt-6 text-xs text-white/50">
         <Link to="/studio/perfil" className="underline underline-offset-2">Ver mi perfil</Link>
       </div>
@@ -734,7 +705,6 @@ export default function Onboarding() {
 }
 
 /* ======================= Subcomponentes UI ======================= */
-
 function SectionCard({ title, subtitle, children }) {
   return (
     <section className="mt-2">
@@ -764,7 +734,9 @@ function NavRow({ onPrev, onNext, nextLabel = "Continuar", busy }) {
           <button className="h-10 px-4 rounded-xl bg-white/10 text-white border border-white/15" onClick={onPrev}>
             Atrás
           </button>
-        ) : <span />}
+        ) : (
+          <span />
+        )}
       </div>
       <button
         className="h-10 px-4 rounded-xl bg-blue-600 text-white font-display font-bold disabled:opacity-50"
