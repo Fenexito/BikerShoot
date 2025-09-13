@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 
 /**
- * PhotoLightbox – visor full-screen con zona segura inferior para HUD externo.
+ * PhotoLightbox – visor full-screen con “zona segura” inferior para tu HUD.
  *
  * Props:
  *  - images: Array<{ src, alt?, caption?, meta?: { fileName?, time?, hotspot? } }>
@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useRef } from "react";
  *  - showThumbnails?: boolean
  *  - captionPosition?: 'header' | 'bottom-centered'
  *  - arrowBlue?: boolean
- *  - safeBottom?: number   // px reservados en la parte inferior (HUD externo)
+ *  - safeBottom?: number   // altura del HUD (para no tapar la imagen)
  */
 export default function PhotoLightbox({
   images = [],
@@ -60,10 +60,13 @@ export default function PhotoLightbox({
     ? "w-10 h-10 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white border border-blue-500/60"
     : "w-10 h-10 rounded-full bg-white/10 text-white border border-white/15";
 
-  // Espacios: subimos un cacho la imagen y reservamos bien abajo
-  const paddingTop = 32; // mueve la foto hacia arriba (tenías margen)
+  // ── Ajustes de posicionamiento ──────────────────────────────────────────────
+  // Subimos la imagen “un cacho” para que el HUD no la tape.
+  // EXTRA empuja la foto hacia arriba y el carrusel por encima del HUD.
+  const EXTRA_PUSH_UP = 36; // <- si querés más/menos, modifica este número
   const captionPad = captionPosition === "bottom-centered" ? 80 : 24; // espacio del chip
-  const bottomPad = (safeBottom || 0) + captionPad; // zona segura + chip
+  const bottomPad = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;   // empuja la imagen hacia arriba
+  const topPad = 24; // margen superior (tenés espacio arriba)
 
   // Metadatos mínimos para el chip (no el HUD)
   const fileName = current?.meta?.fileName || current?.alt || "";
@@ -75,7 +78,7 @@ export default function PhotoLightbox({
       {/* Fondo */}
       <div className="absolute inset-0 bg-black/90" onClick={onClose} />
 
-      {/* SOLO botón cerrar arriba-derecha */}
+      {/* SOLO botón cerrar arriba-derecha (no tocamos HUD) */}
       <button
         className="fixed top-3 right-3 z-[2100] h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
         onClick={onClose}
@@ -84,10 +87,10 @@ export default function PhotoLightbox({
         Cerrar
       </button>
 
-      {/* Imagen centrada (respeta zonas) */}
+      {/* Imagen centrada (respeta topPad y bottomPad, así no la tapa el HUD) */}
       <div
         className="absolute inset-0 flex items-center justify-center"
-        style={{ paddingTop, paddingBottom: bottomPad }}
+        style={{ paddingTop: topPad, paddingBottom: bottomPad }}
         onClick={onClose}
       >
         <img
@@ -99,7 +102,7 @@ export default function PhotoLightbox({
         />
       </div>
 
-      {/* Caption chip inferior (pequeño) – sobre la foto, respetando safeBottom */}
+      {/* Caption chip inferior (pequeño), sobre la foto, respetando safeBottom */}
       {captionPosition === "bottom-centered" && (
         <div
           className="absolute left-0 right-0 bottom-0 flex justify-center items-end pointer-events-none z-[2000]"
@@ -141,11 +144,11 @@ export default function PhotoLightbox({
         </>
       )}
 
-      {/* Carrusel de thumbnails – SIEMPRE por ENCIMA del HUD */}
+      {/* Carrusel de thumbnails – por ENCIMA del HUD */}
       {showThumbnails && total > 1 && (
         <div
-          className="absolute left-0 right-0 p-2 bg-black/40 z-[2200]"
-          style={{ bottom: (safeBottom || 0) + 8 }}
+          className="absolute left-0 right-0 p-2 bg-black/40 z-[3000]"
+          style={{ bottom: (safeBottom || 0) + EXTRA_PUSH_UP + 8 }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mx-auto max-w-5xl flex gap-2 overflow-auto">
