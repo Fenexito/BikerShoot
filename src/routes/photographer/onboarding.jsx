@@ -3,8 +3,8 @@ import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 
-/** ====== Helpers (compatibles con tu PhotographerProfile.jsx) ====== */
-// Rutas maestras simples (mismo catálogo base que usás en el perfil)  :contentReference[oaicite:2]{index=2}
+/* ====== Constantes visuales del Studio (matching de tu app) ====== */
+// Reusa la misma lista base que usás en el Studio
 const RUTAS = [
   "Ruta Interamericana",
   "RN-14",
@@ -13,7 +13,7 @@ const RUTAS = [
   "RN-10 (Cañas)",
 ];
 
-// Plantilla de tramos de precios (1,2,3 fotos)  :contentReference[oaicite:3]{index=3}
+/* ====== Helpers de Perfil (shape y estilos consistentes) ====== */
 function templatePreciosBase3() {
   return [
     { nombre: "1 foto", precio: "" },
@@ -34,37 +34,59 @@ function newPriceList(nombre = "Fotos de Domingo") {
   };
 }
 
-function getRoles(user) {
-  const md = user?.user_metadata || {};
-  if (Array.isArray(md.roles)) return md.roles;
-  return md.role ? [md.role] : [];
-}
-
-/** Perfil completo: teléfono, username >=3, al menos 1 cuenta de pago,
- *  al menos 1 punto de cobertura, al menos 1 lista de precios con valores.
- *  (Mismo shape que usás en PhotographerProfile)  :contentReference[oaicite:4]{index=4}
- */
+// Igual a tu PhotographerProfile: en UI usamos `cuentas` top-level
+// y al guardar lo mapeamos a `pagos.cuentas`.  :contentReference[oaicite:3]{index=3}
 function isProfileComplete(p) {
   if (!p) return false;
   const telOk = !!(p.telefono && p.telefono.trim().length >= 8);
   const userOk = !!(p.username && p.username.trim().length >= 3);
-  const pagosOk = Array.isArray(p?.pagos?.cuentas) && p.pagos.cuentas.length >= 1;
-  const puntosOk = Array.isArray(p?.puntos) && p.puntos.length >= 1;
-  const pl = Array.isArray(p?.price_lists) ? p.price_lists : [];
-  const preciosOk = pl.length >= 1 && pl.some(plx =>
-    Array.isArray(plx.items) && plx.items.length >= 3 && plx.items.every(it => String(it.precio || "").trim() !== "")
-  );
-  return telOk && userOk && pagosOk && puntosOk && preciosOk;
+  // aquí esperamos `cuentas` top-level en el state de esta pantalla
+  const cuentasOk = Array.isArray(p.cuentas) && p.cuentas.length >= 1;
+  const puntosOk = Array.isArray(p.puntos) && p.puntos.length >= 1;
+  const pl = Array.isArray(p.price_lists) ? p.price_lists : [];
+  const preciosOk =
+    pl.length >= 1 &&
+    pl.some(
+      (plx) =>
+        Array.isArray(plx.items) &&
+        plx.items.length >= 3 &&
+        plx.items.every((it) => String(it.precio || "").trim() !== "")
+    );
+  return telOk && userOk && cuentasOk && puntosOk && preciosOk;
 }
 
+/* ===== Header flotante como en Perfil (para alinear bajo tu header) ===== */
+function useFloatingHeaderOffset(defaultPx = 88) {
+  const [offset, setOffset] = React.useState(defaultPx);
+  React.useEffect(() => {
+    function calc() {
+      const el = document.querySelector("[data-app-header]") || document.querySelector("header");
+      if (!el) return setOffset(0);
+      const rect = el.getBoundingClientRect();
+      setOffset(Math.max(0, rect.bottom));
+    }
+    calc();
+    window.addEventListener("resize", calc);
+    window.addEventListener("scroll", calc, { passive: true });
+    return () => {
+      window.removeEventListener("resize", calc);
+      window.removeEventListener("scroll", calc);
+    };
+  }, []);
+  return offset;
+}
+
+/* =========================== Página =========================== */
 export default function Onboarding() {
   const nav = useNavigate();
+  const headerOffset = useFloatingHeaderOffset();
+  const [stickyH, setStickyH] = React.useState(96);
+
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState("");
   const [user, setUser] = React.useState(null);
 
-  // State del perfil (mismo shape que PhotographerProfile.jsx)  :contentReference[oaicite:5]{index=5}
   const [data, setData] = React.useState({
     username: "",
     estudio: "",
@@ -73,17 +95,24 @@ export default function Onboarding() {
     website: "",
     facebook: "",
     instagram: "",
-    avatar_url: "",
-    portafolio: [],
-    precios: templatePreciosBase3(),
-    price_lists: [newPriceList("Fotos de Domingo")],
-    pagos: { cuentas: [] },
+    // UI local:
+    cuentas: [],           // ← top-level (se guarda como pagos.cuentas)
     puntos: [],
+    price_lists: [newPriceList("Fotos de Domingo")],
+    portafolio: [],
+    avatar_url: "",
   });
 
-  // Paso actual
   const [step, setStep] = React.useState(0);
   const STEPS = ["Contacto", "Identidad", "Precios", "Puntos", "Pagos", "Final"];
+
+  const stickyRef = React.useRef(null);
+  React.useEffect(() => {
+    const measure = () => setStickyH(stickyRef.current?.offsetHeight || 96);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   React.useEffect(() => {
     let alive = true;
@@ -93,27 +122,21 @@ export default function Onboarding() {
         const { data: sess } = await supabase.auth.getSession();
         const u = sess?.session?.user;
         if (!u) return nav("/login-fotografo", { replace: true });
-
-        // Solo fotógrafos hacen onboarding del Studio
-        const roles = getRoles(u);
-        if (!roles.includes("fotografo")) {
-          return nav("/login-fotografo", { replace: true });
-        }
         if (!alive) return;
-
         setUser(u);
 
-        // Traer perfil si ya existe, o sembrar uno mínimo  :contentReference[oaicite:6]{index=6}
         const prof = await fetchOrCreatePhotographer(u);
         if (!alive) return;
 
-        // Prellenar
+        // Mapear shape del perfil a nuestro state visual
         const cuentas = Array.isArray(prof?.pagos?.cuentas) ? prof.pagos.cuentas : [];
-        const price_lists = Array.isArray(prof?.price_lists) && prof.price_lists.length
-          ? prof.price_lists
-          : [newPriceList("Fotos de Domingo")];
+        const price_lists =
+          Array.isArray(prof?.price_lists) && prof.price_lists.length
+            ? prof.price_lists
+            : [newPriceList("Fotos de Domingo")];
 
-        setData({
+        setData((d) => ({
+          ...d,
           username: prof?.username || "",
           estudio: prof?.estudio || (u.user_metadata?.display_name || ""),
           telefono: prof?.telefono || "",
@@ -123,14 +146,17 @@ export default function Onboarding() {
           instagram: prof?.instagram || "",
           avatar_url: prof?.avatar_url || "",
           portafolio: Array.isArray(prof?.portafolio) ? prof.portafolio : [],
-          precios: Array.isArray(prof?.precios) && prof.precios.length ? prof.precios : templatePreciosBase3(),
-          price_lists,
-          pagos: { cuentas },
+          price_lists: price_lists.map((pl) => ({
+            ...pl,
+            visible_publico: isDomingoList(pl.nombre) ? true : !!pl.visible_publico,
+            lock_public: isDomingoList(pl.nombre),
+            items: Array.isArray(pl.items) && pl.items.length ? pl.items : templatePreciosBase3(),
+          })),
+          cuentas,
           puntos: Array.isArray(prof?.puntos) ? prof.puntos : [],
-        });
+        }));
 
-        // Si ya está completo, mandarlo al Studio
-        if (isProfileComplete(prof)) {
+        if (isProfileComplete({ ...prof, cuentas })) {
           nav("/studio", { replace: true });
           return;
         }
@@ -177,7 +203,6 @@ export default function Onboarding() {
     try {
       const next = { ...data, ...overrides };
 
-      // endurecer lista Domingo visible y con 3 tramos como en el perfil  :contentReference[oaicite:7]{index=7}
       const hardenedLists = (next.price_lists || []).map((pl) => ({
         ...pl,
         visible_publico: isDomingoList(pl.nombre) ? true : !!pl.visible_publico,
@@ -195,9 +220,9 @@ export default function Onboarding() {
         instagram: next.instagram?.trim() || null,
         avatar_url: next.avatar_url || null,
         portafolio: Array.isArray(next.portafolio) ? next.portafolio : [],
-        precios: Array.isArray(next.precios) ? next.precios : [],
+        precios: [], // legacy lo mantenés en Perfil; aquí usamos price_lists
         price_lists: hardenedLists,
-        pagos: { cuentas: Array.isArray(next.pagos?.cuentas) ? next.pagos.cuentas : [] },
+        pagos: { cuentas: Array.isArray(next.cuentas) ? next.cuentas : [] },
         puntos: Array.isArray(next.puntos) ? next.puntos : [],
       };
 
@@ -218,340 +243,511 @@ export default function Onboarding() {
 
   async function nextStep() {
     try {
-      // Guardar antes de avanzar
       await savePartial();
       if (step < STEPS.length - 1) setStep(step + 1);
-    } catch { /* msg ya seteado */ }
+    } catch {}
   }
-
+  async function prevStep() {
+    setStep((s) => Math.max(0, s - 1));
+  }
   async function finish() {
     try {
       await savePartial();
       if (!isProfileComplete(data)) {
-        setMsg("Aún faltan campos obligatorios. Revisá los pasos.");
+        setMsg("Aún faltan campos obligatorios. Revisá los pasos marcados.");
         return;
       }
       nav("/studio", { replace: true });
     } catch {}
   }
 
+  /* =========================== UI =========================== */
+
+  // barra sticky con título + progreso (matching Studio)  :contentReference[oaicite:4]{index=4}
+  const Progress = (
+    <div ref={stickyRef} className="fixed left-0 right-0 z-40" style={{ top: headerOffset + 8 }}>
+      <div className="max-w-6xl mx-auto px-5">
+        <div className="rounded-2xl bg-studio-panel border border-white/10 px-4 py-3 flex items-center gap-3 shadow">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg sm:text-xl font-display font-black truncate">Onboarding del Studio</h1>
+            <p className="text-white/70 text-xs sm:text-sm truncate">
+              Completá estos pasos para activar tu perfil de Fotógrafo.
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2">
+            {STEPS.map((s, i) => (
+              <span
+                key={s}
+                className={
+                  "px-2 py-1 rounded-lg border text-xs " +
+                  (i === step
+                    ? "bg-blue-600 text-white border-white/10"
+                    : "bg-white/5 text-white/80 border-white/15")
+                }
+                title={s}
+              >
+                {i + 1}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // loading
   if (loading) {
     return (
-      <main className="min-h-screen grid place-items-center bg-black text-slate-100">
-        <div className="max-w-md w-full p-6 rounded-2xl border border-white/10 bg-neutral-900">
-          <h1 className="text-xl font-bold">Preparando tu Studio…</h1>
-          {msg && <p className="text-slate-300 mt-2">{msg}</p>}
-        </div>
+      <main className="min-h-[60vh] grid place-items-center text-slate-100">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">Preparando tu Studio…</div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-black text-slate-100">
-      <div className="max-w-3xl mx-auto px-5 py-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-black font-display">Onboarding Fotógrafo</h1>
-          <Link to="/studio" className="text-sm underline underline-offset-2 text-white/70">Salir</Link>
+    <main
+      className="max-w-6xl mx-auto px-5 pb-10 text-slate-100"
+      style={{ paddingTop: headerOffset + stickyH + 12 }}
+    >
+      {/* BG detrás del header y sub-encabezado como en Perfil */}
+      <div
+        className="fixed left-0 right-0 z-30 bg-studio-panel border-b border-white/10"
+        style={{ top: 0, height: headerOffset + stickyH + 12 }}
+        aria-hidden
+      />
+
+      {Progress}
+
+      {msg && (
+        <div className="mt-3 max-w-3xl">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 px-4 py-3 text-sm">
+            {msg}
+          </div>
         </div>
-        <p className="text-slate-300 mt-1">Completá estos pasos para activar tu Studio.</p>
+      )}
 
-        <ol className="flex flex-wrap gap-2 text-xs mt-4">
-          {STEPS.map((s, i) => (
-            <li key={s}
-                className={`px-2 py-1 rounded ${i === step ? "bg-blue-600 text-white" : "bg-white/10 text-white/80"}`}>
-              {i + 1}. {s}
-            </li>
+      {/* ===== Paso 0: Contacto ===== */}
+      {step === 0 && (
+        <SectionCard title="Contacto" subtitle="Tu número y correo para coordinar entregas y pagos.">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Teléfono *">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.telefono}
+                onChange={(e) => setData((d) => ({ ...d, telefono: e.target.value }))}
+                placeholder="Ej. 5555-5555"
+              />
+            </Field>
+            <Field label="Correo">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.correo}
+                onChange={(e) => setData((d) => ({ ...d, correo: e.target.value }))}
+                placeholder="tu@correo.com"
+              />
+            </Field>
+          </div>
+          <NavRow onNext={nextStep} nextLabel="Continuar" busy={saving} />
+        </SectionCard>
+      )}
+
+      {/* ===== Paso 1: Identidad ===== */}
+      {step === 1 && (
+        <SectionCard title="Identidad" subtitle="Definí tu usuario y el nombre de tu estudio.">
+          <div className="grid md:grid-cols-2 gap-3">
+            <Field label="Usuario * (mín. 3)">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.username}
+                onChange={(e) => setData((d) => ({ ...d, username: e.target.value }))}
+                placeholder="@usuario"
+              />
+            </Field>
+            <Field label="Nombre de Estudio">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.estudio}
+                onChange={(e) => setData((d) => ({ ...d, estudio: e.target.value }))}
+                placeholder="Mi Estudio"
+              />
+            </Field>
+          </div>
+          <div className="grid md:grid-cols-3 gap-3 mt-3">
+            <Field label="Instagram">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.instagram}
+                onChange={(e) => setData((d) => ({ ...d, instagram: e.target.value }))}
+                placeholder="https://instagram.com/..."
+              />
+            </Field>
+            <Field label="Facebook">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.facebook}
+                onChange={(e) => setData((d) => ({ ...d, facebook: e.target.value }))}
+                placeholder="https://facebook.com/..."
+              />
+            </Field>
+            <Field label="Website">
+              <input
+                className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                value={data.website}
+                onChange={(e) => setData((d) => ({ ...d, website: e.target.value }))}
+                placeholder="https://..."
+              />
+            </Field>
+          </div>
+          <NavRow onPrev={prevStep} onNext={nextStep} busy={saving} />
+        </SectionCard>
+      )}
+
+      {/* ===== Paso 2: Precios ===== */}
+      {step === 2 && (
+        <SectionCard title="Listas de precios" subtitle="Definí al menos una lista (Domingo recomendado) con 3 tramos llenos.">
+          {data.price_lists.map((pl, i) => (
+            <div key={pl.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-4">
+              <div className="flex items-center gap-2">
+                <input
+                  className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white flex-1 placeholder-white/60"
+                  value={pl.nombre}
+                  onChange={(e) => {
+                    const nombre = e.target.value;
+                    setData((d) => {
+                      const arr = [...d.price_lists];
+                      arr[i] = {
+                        ...arr[i],
+                        nombre,
+                        lock_public: isDomingoList(nombre),
+                        visible_publico: isDomingoList(nombre) ? true : !!arr[i].visible_publico,
+                      };
+                      return { ...d, price_lists: arr };
+                    });
+                  }}
+                  placeholder="Nombre de la lista (ej. Fotos de Domingo)"
+                />
+                <label className="text-xs text-white/70 inline-flex items-center gap-2 ml-2">
+                  <input
+                    type="checkbox"
+                    disabled={pl.lock_public}
+                    checked={!!pl.visible_publico}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setData((d) => {
+                        const arr = [...d.price_lists];
+                        arr[i] = { ...arr[i], visible_publico: pl.lock_public ? true : !!val };
+                        return { ...d, price_lists: arr };
+                      });
+                    }}
+                  />
+                  Visible {pl.lock_public && <span className="opacity-70">(forzado por Domingo)</span>}
+                </label>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-3 mt-3">
+                {pl.items.map((it, idx) => (
+                  <Field key={idx} label={it.nombre}>
+                    <input
+                      className="h-11 w-full rounded-lg border border-white/15 bg-white/5 text-white px-3 placeholder-white/60"
+                      value={it.precio}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setData((d) => {
+                          const lists = [...d.price_lists];
+                          const items = [...lists[i].items];
+                          items[idx] = { ...items[idx], precio: v };
+                          lists[i] = { ...lists[i], items };
+                          return { ...d, price_lists: lists };
+                        });
+                      }}
+                      placeholder="Q..."
+                    />
+                  </Field>
+                ))}
+              </div>
+            </div>
           ))}
-        </ol>
+          <div className="flex items-center justify-between">
+            <button
+              className="h-10 px-3 rounded-lg bg-white/10 text-white border border-white/15"
+              onClick={() =>
+                setData((d) => ({ ...d, price_lists: [...d.price_lists, newPriceList("Nuevo tipo de evento")] }))
+              }
+              type="button"
+            >
+              Agregar lista
+            </button>
+            <NavRow onPrev={prevStep} onNext={nextStep} busy={saving} />
+          </div>
+        </SectionCard>
+      )}
 
-        {msg && <div className="mt-3 text-sm text-yellow-300">{msg}</div>}
+      {/* ===== Paso 3: Puntos ===== */}
+      {step === 3 && (
+        <SectionCard title="Puntos de cobertura" subtitle="Agregá al menos un punto con ruta y horario.">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-white/70">Tus ubicaciones para tomar fotos.</div>
+            <button
+              className="h-9 px-3 rounded-lg bg-blue-600 text-white font-display font-bold"
+              onClick={() => {
+                const nuevo = {
+                  id: "pt" + Math.random().toString(36).slice(2, 7),
+                  nombre: "Nuevo Punto",
+                  ruta: RUTAS[0],
+                  lat: 14.62, lon: -90.52,
+                  horarios: [{ dia: "Domingo", inicio: "06:00", fin: "08:00" }],
+                };
+                setData((d) => ({ ...d, puntos: [...(d.puntos || []), nuevo] }));
+              }}
+              type="button"
+            >
+              Agregar punto
+            </button>
+          </div>
 
-        {/* PASO 0: Contacto */}
-        {step === 0 && (
-          <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="grid md:grid-cols-2 gap-3">
-              <Field label="Teléfono *">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.telefono} onChange={e=>setData(d=>({...d, telefono: e.target.value}))}
-                       placeholder="Ej. 5555-5555" />
-              </Field>
-              <Field label="Correo">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.correo} onChange={e=>setData(d=>({...d, correo: e.target.value}))}
-                       placeholder="tu@correo.com" />
-              </Field>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Btn onClick={nextStep} busy={saving}>Continuar</Btn>
-            </div>
-          </section>
-        )}
+          <div className="mt-3 grid gap-3">
+            {(data.puntos || []).map((p, idx) => (
+              <div key={p.id} className="rounded-xl border border-white/10 p-4 bg-white/5 relative">
+                <button
+                  className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-red-600 text-white"
+                  onClick={() =>
+                    setData((d) => ({ ...d, puntos: d.puntos.filter((x) => x.id !== p.id) }))
+                  }
+                  type="button"
+                  title="Eliminar"
+                >
+                  ✕
+                </button>
 
-        {/* PASO 1: Identidad */}
-        {step === 1 && (
-          <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="grid md:grid-cols-2 gap-3">
-              <Field label="Usuario * (mín. 3)">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.username} onChange={e=>setData(d=>({...d, username: e.target.value}))}
-                       placeholder="tuusuario" />
-              </Field>
-              <Field label="Nombre de Estudio">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.estudio} onChange={e=>setData(d=>({...d, estudio: e.target.value}))}
-                       placeholder="Mi Estudio" />
-              </Field>
-            </div>
-            <div className="grid md:grid-cols-3 gap-3 mt-3">
-              <Field label="Instagram">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.instagram} onChange={e=>setData(d=>({...d, instagram: e.target.value}))}
-                       placeholder="https://instagram.com/..." />
-              </Field>
-              <Field label="Facebook">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.facebook} onChange={e=>setData(d=>({...d, facebook: e.target.value}))}
-                       placeholder="https://facebook.com/..." />
-              </Field>
-              <Field label="Website">
-                <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                       value={data.website} onChange={e=>setData(d=>({...d, website: e.target.value}))}
-                       placeholder="https://..." />
-              </Field>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Btn onClick={nextStep} busy={saving}>Continuar</Btn>
-            </div>
-          </section>
-        )}
-
-        {/* PASO 2: Precios (lista Domingo obligatoria con 3 tramos) */}
-        {step === 2 && (
-          <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            {data.price_lists.map((pl, i) => (
-              <div key={pl.id} className="mb-5">
-                <div className="flex items-center gap-2">
-                  <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                         value={pl.nombre}
-                         onChange={e=>{
-                           const nombre = e.target.value;
-                           setData(d=>{
-                             const arr = [...d.price_lists];
-                             arr[i] = {...arr[i], nombre,
-                               lock_public: isDomingoList(nombre),
-                               visible_publico: isDomingoList(nombre) ? true : !!arr[i].visible_publico
-                             };
-                             return {...d, price_lists: arr};
-                           });
-                         }}
-                         placeholder="Nombre de la lista (ej. Fotos de Domingo)"/>
-                  <label className="text-xs text-white/70 inline-flex items-center gap-2 ml-2">
-                    <input type="checkbox" disabled={pl.lock_public} checked={!!pl.visible_publico}
-                           onChange={e=>{
-                             const val = e.target.checked;
-                             setData(d=>{
-                               const arr = [...d.price_lists];
-                               arr[i] = {...arr[i], visible_publico: pl.lock_public ? true : !!val};
-                               return {...d, price_lists: arr};
-                             });
-                           }}/>
-                    Visible al público {pl.lock_public && <span className="opacity-70">(forzado)</span>}
-                  </label>
+                <div className="grid md:grid-cols-[1fr_1fr_.8fr_.8fr] gap-2">
+                  <input
+                    className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                    value={p.nombre}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData((d) => ({
+                        ...d,
+                        puntos: d.puntos.map((x) => (x.id === p.id ? { ...x, nombre: v } : x)),
+                      }));
+                    }}
+                    placeholder="Nombre del punto"
+                  />
+                  <select
+                    className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                    value={p.ruta}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData((d) => ({
+                        ...d,
+                        puntos: d.puntos.map((x) => (x.id === p.id ? { ...x, ruta: v } : x)),
+                      }));
+                    }}
+                  >
+                    {RUTAS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                    value={p.lat}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData((d) => ({
+                        ...d,
+                        puntos: d.puntos.map((x) => (x.id === p.id ? { ...x, lat: Number(v) } : x)),
+                      }));
+                    }}
+                    placeholder="Lat"
+                  />
+                  <input
+                    className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                    value={p.lon}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData((d) => ({
+                        ...d,
+                        puntos: d.puntos.map((x) => (x.id === p.id ? { ...x, lon: Number(v) } : x)),
+                      }));
+                    }}
+                    placeholder="Lon"
+                  />
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-3 mt-3">
-                  {pl.items.map((it, idx) => (
-                    <Field key={idx} label={it.nombre}>
-                      <input className="w-full h-11 rounded-lg border border-white/15 bg-white/5 text-white px-3"
-                             value={it.precio}
-                             onChange={e=>{
-                               const v = e.target.value;
-                               setData(d=>{
-                                 const lists = [...d.price_lists];
-                                 const items = [...lists[i].items];
-                                 items[idx] = {...items[idx], precio: v};
-                                 lists[i] = {...lists[i], items};
-                                 return {...d, price_lists: lists};
-                               });
-                             }}
-                             placeholder="Q..." />
-                    </Field>
-                  ))}
+                <div className="grid md:grid-cols-[1fr_1fr] gap-2 mt-2">
+                  <input
+                    className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                    value={p.horarios?.[0]?.inicio || "06:00"}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData((d) => ({
+                        ...d,
+                        puntos: d.puntos.map((x) =>
+                          x.id === p.id
+                            ? {
+                                ...x,
+                                horarios: [
+                                  { ...x.horarios?.[0], inicio: v, fin: x.horarios?.[0]?.fin || "08:00", dia: x.horarios?.[0]?.dia || "Domingo" },
+                                ],
+                              }
+                            : x
+                        ),
+                      }));
+                    }}
+                    placeholder="Inicio (HH:MM)"
+                  />
+                  <input
+                    className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                    value={p.horarios?.[0]?.fin || "08:00"}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setData((d) => ({
+                        ...d,
+                        puntos: d.puntos.map((x) =>
+                          x.id === p.id
+                            ? {
+                                ...x,
+                                horarios: [
+                                  { ...x.horarios?.[0], fin: v, inicio: x.horarios?.[0]?.inicio || "06:00", dia: x.horarios?.[0]?.dia || "Domingo" },
+                                ],
+                              }
+                            : x
+                        ),
+                      }));
+                    }}
+                    placeholder="Fin (HH:MM)"
+                  />
                 </div>
               </div>
             ))}
-            <div className="mt-4 flex justify-end">
-              <Btn onClick={nextStep} busy={saving}>Continuar</Btn>
-            </div>
-          </section>
-        )}
+          </div>
 
-        {/* PASO 3: Puntos (al menos 1) */}
-        {step === 3 && (
-          <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold font-display">Cobertura</h3>
-              <button className="px-3 h-9 rounded-lg bg-white/10 border border-white/15"
-                      onClick={()=>{
-                        const nuevo = {
-                          id: "pt" + Math.random().toString(36).slice(2,7),
-                          nombre: "Nuevo Punto",
-                          ruta: RUTAS[0],
-                          lat: 14.62, lon: -90.52,
-                          horarios: [{ dia: "Domingo", inicio: "06:00", fin: "08:00" }],
-                        };
-                        setData(d=>({...d, puntos: [...(d.puntos||[]), nuevo]}));
-                      }}>
-                Agregar punto
-              </button>
-            </div>
+          <NavRow onPrev={prevStep} onNext={nextStep} busy={saving} />
+        </SectionCard>
+      )}
 
-            <div className="mt-3 grid gap-3">
-              {(data.puntos || []).map((p, idx) => (
-                <div key={p.id} className="rounded-lg border border-white/10 p-3 bg-white/5">
-                  <div className="grid md:grid-cols-[1fr_1fr_.8fr_.8fr] gap-2">
-                    <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                           value={p.nombre} onChange={e=>{
-                             const v = e.target.value;
-                             setData(d=>({ ...d, puntos: d.puntos.map(x=>x.id===p.id?{...x, nombre:v}:x) }));
-                           }} placeholder="Nombre del punto" />
-                    <select className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                            value={p.ruta} onChange={e=>{
-                              const v = e.target.value;
-                              setData(d=>({ ...d, puntos: d.puntos.map(x=>x.id===p.id?{...x, ruta:v}:x) }));
-                            }}>
-                      {RUTAS.map(r=><option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                           value={p.lat} onChange={e=>{
-                             const v = e.target.value;
-                             setData(d=>({ ...d, puntos: d.puntos.map(x=>x.id===p.id?{...x, lat:Number(v)}:x) }));
-                           }} placeholder="Lat" />
-                    <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                           value={p.lon} onChange={e=>{
-                             const v = e.target.value;
-                             setData(d=>({ ...d, puntos: d.puntos.map(x=>x.id===p.id?{...x, lon:Number(v)}:x) }));
-                           }} placeholder="Lon" />
-                  </div>
-                  <div className="grid md:grid-cols-[1fr_1fr] gap-2 mt-2">
-                    <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                           value={p.horarios?.[0]?.inicio || "06:00"}
-                           onChange={e=>{
-                             const v = e.target.value;
-                             setData(d=>({ ...d, puntos: d.puntos.map(x=>x.id===p.id?{...x, horarios:[{...x.horarios?.[0], inicio:v, fin:x.horarios?.[0]?.fin||"08:00", dia:x.horarios?.[0]?.dia||"Domingo"}]}:x) }));
-                           }} placeholder="Inicio (HH:MM)" />
-                    <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                           value={p.horarios?.[0]?.fin || "08:00"}
-                           onChange={e=>{
-                             const v = e.target.value;
-                             setData(d=>({ ...d, puntos: d.puntos.map(x=>x.id===p.id?{...x, horarios:[{...x.horarios?.[0], fin:v, inicio:x.horarios?.[0]?.inicio||"06:00", dia:x.horarios?.[0]?.dia||"Domingo"}]}:x) }));
-                           }} placeholder="Fin (HH:MM)" />
-                  </div>
-                  <div className="mt-2 text-right">
-                    <button className="h-9 px-3 rounded-lg border border-white/15" onClick={()=>{
-                      setData(d=>({ ...d, puntos: d.puntos.filter(x=>x.id!==p.id) }));
-                    }}>Eliminar</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* ===== Paso 4: Pagos ===== */}
+      {step === 4 && (
+        <SectionCard title="Cobros" subtitle="Agregá al menos una cuenta para recibir tus pagos.">
+          <div className="flex justify-end">
+            <button
+              className="h-9 px-3 rounded-lg bg-white/10 text-white border border-white/15"
+              onClick={() =>
+                setData((d) => ({
+                  ...d,
+                  cuentas: [...(d.cuentas || []), { banco: "", tipo: "Cuenta Monetaria", numero: "" }],
+                }))
+              }
+              type="button"
+            >
+              Agregar cuenta
+            </button>
+          </div>
 
-            <div className="mt-4 flex justify-end">
-              <Btn onClick={nextStep} busy={saving}>Continuar</Btn>
-            </div>
-          </section>
-        )}
-
-        {/* PASO 4: Pagos (al menos 1 cuenta) */}
-        {step === 4 && (
-          <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold font-display">Cuentas de cobro</h3>
-              <button className="px-3 h-9 rounded-lg bg-white/10 border border-white/15"
-                      onClick={()=>{
-                        const nueva = { banco: "", tipo: "Cuenta Monetaria", numero: "" };
-                        setData(d=>({...d, pagos: { cuentas: [...(d.pagos?.cuentas||[]), nueva] }}));
-                      }}>
-                Agregar cuenta
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-3">
-              {(data.pagos?.cuentas || []).map((c, idx) => (
-                <div key={idx} className="rounded-lg border border-white/10 p-3 bg-white/5 grid md:grid-cols-3 gap-2">
-                  <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                         value={c.banco} onChange={e=>{
-                           const v=e.target.value;
-                           setData(d=>{
-                             const arr=[...(d.pagos?.cuentas||[])];
-                             arr[idx]={...arr[idx], banco:v}; return {...d, pagos:{cuentas:arr}};
-                           });
-                         }} placeholder="Banco / Emisor" />
-                  <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                         value={c.tipo} onChange={e=>{
-                           const v=e.target.value;
-                           setData(d=>{
-                             const arr=[...(d.pagos?.cuentas||[])];
-                             arr[idx]={...arr[idx], tipo:v}; return {...d, pagos:{cuentas:arr}};
-                           });
-                         }} placeholder="Tipo (Monetaria / Ahorro / Yape / etc.)" />
-                  <input className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
-                         value={c.numero} onChange={e=>{
-                           const v=e.target.value;
-                           setData(d=>{
-                             const arr=[...(d.pagos?.cuentas||[])];
-                             arr[idx]={...arr[idx], numero:v}; return {...d, pagos:{cuentas:arr}};
-                           });
-                         }} placeholder="Número / Alias" />
-                  <div className="md:col-span-3 text-right">
-                    <button className="h-9 px-3 rounded-lg border border-white/15"
-                            onClick={()=>{
-                              setData(d=>{
-                                const arr=[...(d.pagos?.cuentas||[])];
-                                arr.splice(idx,1); return {...d, pagos:{cuentas:arr}};
-                              });
-                            }}>Eliminar</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <Btn onClick={nextStep} busy={saving}>Continuar</Btn>
-            </div>
-          </section>
-        )}
-
-        {/* PASO 5: Final */}
-        {step === 5 && (
-          <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="font-bold font-display">Revisión</h3>
-            <ul className="text-sm text-slate-300 mt-2 space-y-1">
-              <li>Teléfono: {data.telefono || "—"}</li>
-              <li>Usuario: {data.username || "—"}</li>
-              <li>Listas de precios: {data.price_lists?.length || 0}</li>
-              <li>Puntos: {data.puntos?.length || 0}</li>
-              <li>Cuentas: {data.pagos?.cuentas?.length || 0}</li>
-            </ul>
-            {!isProfileComplete(data) && (
-              <div className="mt-3 text-yellow-300 text-sm">
-                Te faltan campos obligatorios. Completalos para terminar.
+          <div className="mt-3 grid gap-3">
+            {(data.cuentas || []).map((c, idx) => (
+              <div key={idx} className="rounded-xl border border-white/10 p-3 bg-white/5 grid md:grid-cols-3 gap-2">
+                <input
+                  className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                  value={c.banco}
+                  onChange={(e) =>
+                    setData((d) => {
+                      const arr = [...(d.cuentas || [])];
+                      arr[idx] = { ...arr[idx], banco: e.target.value };
+                      return { ...d, cuentas: arr };
+                    })
+                  }
+                  placeholder="Banco / Emisor"
+                />
+                <input
+                  className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                  value={c.tipo}
+                  onChange={(e) =>
+                    setData((d) => {
+                      const arr = [...(d.cuentas || [])];
+                      arr[idx] = { ...arr[idx], tipo: e.target.value };
+                      return { ...d, cuentas: arr };
+                    })
+                  }
+                  placeholder="Tipo (Monetaria / Ahorro / etc.)"
+                />
+                <input
+                  className="h-10 px-3 rounded-lg border border-white/15 bg-white/5 text-white"
+                  value={c.numero}
+                  onChange={(e) =>
+                    setData((d) => {
+                      const arr = [...(d.cuentas || [])];
+                      arr[idx] = { ...arr[idx], numero: e.target.value };
+                      return { ...d, cuentas: arr };
+                    })
+                  }
+                  placeholder="Número / Alias"
+                />
               </div>
-            )}
-            <div className="mt-4 flex justify-between">
-              <button className="px-4 h-11 rounded-xl bg-white/10 border border-white/15" onClick={()=>setStep(0)}>
-                Editar desde el inicio
-              </button>
-              <Btn onClick={finish} busy={saving}>Terminar y entrar al Studio</Btn>
+            ))}
+          </div>
+
+          <NavRow onPrev={prevStep} onNext={nextStep} busy={saving} />
+        </SectionCard>
+      )}
+
+      {/* ===== Paso 5: Final ===== */}
+      {step === 5 && (
+        <SectionCard title="Todo listo" subtitle="Revisá que no te falte nada.">
+          <ul className="text-sm text-slate-300 space-y-1">
+            <li>Teléfono: {data.telefono || "—"}</li>
+            <li>Usuario: {data.username || "—"}</li>
+            <li>Listas de precios: {data.price_lists?.length || 0}</li>
+            <li>Puntos: {data.puntos?.length || 0}</li>
+            <li>Cuentas: {data.cuentas?.length || 0}</li>
+          </ul>
+          {!isProfileComplete(data) && (
+            <div className="mt-3 text-amber-200 text-sm">
+              Te faltan campos obligatorios. Completalos para terminar.
             </div>
-          </section>
-        )}
+          )}
+          <div className="mt-4 flex justify-between">
+            <button
+              className="px-4 h-11 rounded-xl bg-white/10 text-white border border-white/15"
+              onClick={() => setStep(0)}
+            >
+              Editar desde el inicio
+            </button>
+            <button
+              className="px-4 h-11 rounded-xl bg-blue-600 text-white font-display font-bold disabled:opacity-50"
+              onClick={finish}
+              disabled={!isProfileComplete(data) || saving}
+            >
+              {saving ? "Guardando..." : "Terminar y entrar al Studio"}
+            </button>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* footer peque */}
+      <div className="mt-6 text-xs text-white/50">
+        <Link to="/studio/perfil" className="underline underline-offset-2">Ver mi perfil</Link>
       </div>
     </main>
   );
 }
 
-/* ============ UI helpers ============ */
+/* ======================= Subcomponentes UI ======================= */
+
+function SectionCard({ title, subtitle, children }) {
+  return (
+    <section className="mt-2">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="mb-3">
+          <h2 className="text-xl font-semibold">{title}</h2>
+          {subtitle && <p className="text-sm text-white/70">{subtitle}</p>}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
 function Field({ label, children }) {
   return (
     <label className="block">
@@ -560,14 +756,23 @@ function Field({ label, children }) {
     </label>
   );
 }
-function Btn({ children, busy, ...rest }) {
+function NavRow({ onPrev, onNext, nextLabel = "Continuar", busy }) {
   return (
-    <button
-      className="px-4 h-11 rounded-xl bg-blue-600 text-white font-display font-bold disabled:opacity-50"
-      disabled={busy}
-      {...rest}
-    >
-      {busy ? "Guardando..." : children}
-    </button>
+    <div className="mt-4 flex items-center justify-between">
+      <div>
+        {onPrev ? (
+          <button className="h-10 px-4 rounded-xl bg-white/10 text-white border border-white/15" onClick={onPrev}>
+            Atrás
+          </button>
+        ) : <span />}
+      </div>
+      <button
+        className="h-10 px-4 rounded-xl bg-blue-600 text-white font-display font-bold disabled:opacity-50"
+        onClick={onNext}
+        disabled={busy}
+      >
+        {busy ? "Guardando..." : nextLabel}
+      </button>
+    </div>
   );
 }
