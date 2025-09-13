@@ -59,10 +59,10 @@ export default function PhotoLightbox({
 
   // ── Ajustes de posicionamiento ──────────────────────────────────────────────
   // Más empuje hacia arriba para que el HUD NO tape nada.
-  const EXTRA_PUSH_UP = 55; // ← subido (antes era menor). Si querés más, aumentá este número.
+  const EXTRA_PUSH_UP = 65; // ← subido (antes era menor). Si querés más, aumentá este número.
   const captionPad = captionPosition === "bottom-centered" ? 80 : 24; // espacio del chip
   const bottomPad = (safeBottom || 0) + captionPad + EXTRA_PUSH_UP;   // empuja la imagen hacia arriba
-  const topPad = 15; // margen superior mínimo (dejamos más espacio arriba)
+  const topPad = 12; // margen superior mínimo (dejamos más espacio arriba)
 
   // Metadatos mínimos para el chip (no el HUD)
   const fileName = current?.meta?.fileName || current?.alt || "";
