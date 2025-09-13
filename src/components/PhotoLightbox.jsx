@@ -87,15 +87,12 @@ export default function PhotoLightbox({
     const item = list.children?.[i];
     if (!item) return;
 
-    // Posición del item relativo a la lista (no al viewport)
     const itemLeft  = item.offsetLeft;
     const itemWidth = item.offsetWidth;
-    // Centro deseado del contenedor visible
     const railVisibleCenter = rail.clientWidth / 2;
-    // Scroll objetivo para que el centro del item quede en el centro del rail
+
     let target = itemLeft - (railVisibleCenter - itemWidth / 2);
 
-    // Limitar el scroll (0 .. maxScroll)
     const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
     if (target < 0) target = 0;
     if (target > maxScroll) target = maxScroll;
@@ -103,15 +100,15 @@ export default function PhotoLightbox({
     rail.scrollTo({ left: Math.round(target), behavior });
   }, []);
 
-  // Al abrir: centrar sin animación (para evitar “brinco”)
+  // Al abrir: centrar sin animación
   const didMountRef = useRef(false);
   useEffect(() => {
     if (!showThumbnails || total === 0) return;
     if (!didMountRef.current) {
       didMountRef.current = true;
-      centerThumb(index, "instant"); // primer centrado “duro”
+      centerThumb(index, "instant");
     } else {
-      centerThumb(index, "smooth");  // siguientes cambios con animación
+      centerThumb(index, "smooth");
     }
   }, [index, total, showThumbnails, centerThumb]);
 
@@ -194,7 +191,7 @@ export default function PhotoLightbox({
         </>
       )}
 
-      {/* Carrusel full-width – miniatura ACTIVA siempre centrada */}
+      {/* Carrusel full-width – miniatura ACTIVA siempre centrada, sin scrollbar visible */}
       {showThumbnails && total > 1 && (
         <div
           className="absolute left-0 right-0 z-[3000]"
@@ -203,11 +200,11 @@ export default function PhotoLightbox({
         >
           <div
             ref={railRef}
-            className="w-screen overflow-x-auto overflow-y-hidden"
+            className="w-screen overflow-x-auto overflow-y-hidden no-scrollbar"
             style={{
               WebkitOverflowScrolling: "touch",
               padding: 8,
-              scrollSnapType: "x mandatory", // scroll-snap para alinear al centro al soltar
+              scrollSnapType: "x mandatory",
             }}
           >
             <div
@@ -226,7 +223,7 @@ export default function PhotoLightbox({
                     height: THUMB_SIZE,
                     minWidth: THUMB_SIZE,
                     minHeight: THUMB_SIZE,
-                    scrollSnapAlign: "center", // cada thumb “pide” quedar centrada
+                    scrollSnapAlign: "center",
                     scrollSnapStop: "always",
                   }}
                   onClick={() => onIndexChange?.(i)}
@@ -249,6 +246,17 @@ export default function PhotoLightbox({
       {preload.map((p, i) => (
         <link key={i} rel="preload" as="image" href={p} />
       ))}
+
+      {/* CSS para ocultar la barra de desplazamiento del carrusel (cross-browser) */}
+      <style>{`
+        .no-scrollbar {
+          -ms-overflow-style: none; /* IE y Edge antiguo */
+          scrollbar-width: none;    /* Firefox */
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;            /* Chrome, Safari, Edge (Chromium) */
+        }
+      `}</style>
     </div>
   );
 }
