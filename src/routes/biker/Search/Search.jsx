@@ -877,15 +877,14 @@ export default function BikerSearch() {
             <div className="min-w-[220px]">
               <label className="block text-xs font-medium text-slate-600">Hora</label>
               <DualSlider
-                min={MIN_STEP}
-                max={MAX_STEP}
-                a={horaA}
-                b={horaB}
-                onChangeA={(v) => setHoraA(v)}
-                onChangeB={(v) => setHoraB(v)}
-                formatValue={(s) => to12h(stepToTime24(s))}
-                width={280}
-              />
+              min={MIN_STEP}
+              max={MAX_STEP}
+              a={iniStep}
+              b={finStep}
+              onChangeA={setIniStep}
+              onChangeB={setFinStep}
+              width={260}
+            />
             </div>
 
             {/* RUTA */}
@@ -951,26 +950,22 @@ export default function BikerSearch() {
             {/* SEPARADOR */}
             <div className="hidden lg:block grow border-t lg:border-t-0 lg:border-l border-slate-200 h-7 lg:h-9 lg:mx-2" />
 
-            {/* CONTROLES: TAMAÑO + ASPECTO (solo UI, funcionalidad la conectamos luego) */}
+            {/* CONTROLES: Tamaño (12⇠4, default 6) + Aspecto */}
             <div className="flex items-end gap-3 ml-auto">
-              {/* Tamaño (12 ←→ 4 por fila; default 6) */}
+              {/* Tamaño (miniaturas) */}
               <div className="min-w-[220px]">
-                <label className="block text-xs font-medium text-slate-600">
-                  Tamaño (miniaturas)
-                </label>
+                <label className="block text-xs font-medium text-slate-600">Tamaño (miniaturas)</label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 w-7 text-right">12</span>
                   <input
                     type="range"
-                    min={4}
-                    max={12}
-                    step={1}
-                    defaultValue={6}
-                    className="w-40 [direction:rtl]" // izquierda=12, derecha=4 (visual)
+                    min="4"
+                    max="12"
+                    step="1"
+                    defaultValue="6"
+                    className="w-40 [direction:rtl]"  /* izquierda=12, derecha=4 */
                     onChange={(e) => {
-                      const ui = parseInt(e.target.value, 10); // 12..4 visual
-                      // (en el siguiente paso pasamos esto a SearchResults)
-                      console.log("[UI] tamaño por fila (visual):", ui);
+                      console.log("[UI] tamaño por fila (visual):", parseInt(e.target.value, 10));
                     }}
                   />
                   <span className="text-xs text-slate-500 w-7">4</span>
@@ -995,7 +990,7 @@ export default function BikerSearch() {
                 </select>
               </div>
             </div>
-          </div>
+          </div> 
         </div>
 
         {/* ======= RESULTADOS ======= */}
