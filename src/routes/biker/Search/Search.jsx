@@ -830,126 +830,169 @@ export default function BikerSearch() {
   const totalQ = useMemo(() => sel.size * 50, [sel]);
 
   return (
-    <div className="min-h-screen surface pb-28">
+    <div className="min-h-screen surface pb-12">
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* === Filtros sticky y colapsables (debajo del header) === */}
-        <div
-          className={`sticky top-[88px] z-30 border-b border-slate-200 transition-all duration-300 ${
-            hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
-          }`}
-        >
-          <div className="pt-3 pb-3">
-            <div className="flex flex-wrap items-end gap-3">
-              {/* FECHA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Fecha</label>
+        <div className="sticky top-[56px] z-40 bg-white/90 backdrop-blur border border-slate-200 rounded-2xl p-3 md:p-4 mb-4">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* INICIO */}
+            <a
+              href="/app"
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              title="Volver al inicio"
+            >
+              Inicio
+            </a>
+
+            {/* FECHA */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Fecha</label>
+              <input
+                type="date"
+                className="h-9 border rounded-lg px-2 bg-white"
+                value={toYmd(fecha) || ""}
+                onChange={(e) => {
+                  console.log("[UI] change fecha ->", e.target.value);
+                  const v = e.target.value ? new Date(e.target.value) : null;
+                  setFecha(v);
+                }}
+              />
+            </div>
+
+            {/* IGNORAR FECHA/HORA */}
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-slate-600">
                 <input
-                  type="date"
-                  className="h-9 border rounded-lg px-2 bg-white"
-                  value={toYmd(fecha) || ""}
+                  type="checkbox"
+                  checked={ignorarHora}
                   onChange={(e) => {
-                    console.log("[UI] change fecha ->", e.target.value);
-                    setFecha(e.target.value);
+                    console.log("[UI] change ignorarHora ->", e.target.checked);
+                    setIgnorarHora(e.target.checked);
                   }}
-                  disabled={ignorarHora}
-                  title={ignorarHora ? "Ignorando fecha/hora" : ""}
                 />
-              </div>
+                Ignorar fecha/hora
+              </label>
+            </div>
 
-              {/* HORA */}
-              <div className="min-w-[260px]">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
-                  <label className="flex items-center gap-1 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={ignorarHora}
-                      onChange={(e) => {
-                        console.log("[UI] change ignorarHora ->", e.target.checked);
-                        setIgnorarHora(e.target.checked);
-                      }}
-                    />
-                    Ignorar fecha/hora
-                  </label>
+            {/* RANGO HORA */}
+            <div className="min-w-[220px]">
+              <label className="block text-xs font-medium text-slate-600">Hora</label>
+              <DualSlider
+                min={MIN_STEP}
+                max={MAX_STEP}
+                a={horaA}
+                b={horaB}
+                onChangeA={(v) => setHoraA(v)}
+                onChangeB={(v) => setHoraB(v)}
+                formatValue={(s) => to12h(stepToTime24(s))}
+                width={280}
+              />
+            </div>
+
+            {/* RUTA */}
+            <div className="min-w-[220px]">
+              <label className="block text-xs font-medium text-slate-600">Ruta</label>
+              <select
+                className="h-9 border rounded-lg px-2 bg-white"
+                value={ruta}
+                onChange={(e) => {
+                  console.log("[UI] change ruta ->", e.target.value);
+                  setRuta(e.target.value);
+                  // limpiar puntos seleccionados cuando cambia la ruta
+                  setSelHotspots([]);
+                }}
+              >
+                {RUTAS_FIJAS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* FOTÓGRAFO(S) */}
+            <div className="min-w-[240px]">
+              <label className="block text-xs font-medium text-slate-600">Fotógrafo(s)</label>
+              <MultiSelectCheckbox
+                options={useMemo(() => {
+                  const base = rows.filter((r) => (r.rutas || []).includes(ruta));
+                  const set = new Set(base.flatMap((r) => (r.photographers || []).map((p) => String(p))));
+                  return Array.from(set)
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((p) => ({ value: p, label: p }));
+                }, [rows, ruta])}
+                value={selPhotogs}
+                onChange={(vals) => {
+                  console.log("[UI] change photogs ->", vals);
+                  setSelPhotogs(vals);
+                }}
+                placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
+              />
+            </div>
+
+            {/* PUNTO(S) */}
+            <div className="min-w-[240px]">
+              <label className="block text-xs font-medium text-slate-600">Punto(s)</label>
+              <MultiSelectCheckbox
+                options={useMemo(() => {
+                  const base = rows.filter((r) => (r.rutas || []).includes(ruta));
+                  const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
+                  const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
+                  return Array.from(set)
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((name) => ({ value: name, label: name }));
+                }, [rows, ruta, arrToCsv(selPhotogs)])}
+                value={selHotspots}
+                onChange={(vals) => {
+                  console.log("[UI] change puntos ->", vals);
+                  setSelHotspots(vals);
+                }}
+                placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
+              />
+            </div>
+
+            {/* SEPARADOR */}
+            <div className="hidden lg:block grow border-t lg:border-t-0 lg:border-l border-slate-200 h-7 lg:h-9 lg:mx-2" />
+
+            {/* CONTROLES: TAMAÑO + ASPECTO (solo UI, funcionalidad la conectamos luego) */}
+            <div className="flex items-end gap-3 ml-auto">
+              {/* Tamaño (12 ←→ 4 por fila; default 6) */}
+              <div className="min-w-[220px]">
+                <label className="block text-xs font-medium text-slate-600">
+                  Tamaño (miniaturas)
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 w-7 text-right">12</span>
+                  <input
+                    type="range"
+                    min={4}
+                    max={12}
+                    step={1}
+                    defaultValue={6}
+                    className="w-40 [direction:rtl]" // izquierda=12, derecha=4 (visual)
+                    onChange={(e) => {
+                      const ui = parseInt(e.target.value, 10); // 12..4 visual
+                      // (en el siguiente paso pasamos esto a SearchResults)
+                      console.log("[UI] tamaño por fila (visual):", ui);
+                    }}
+                  />
+                  <span className="text-xs text-slate-500 w-7">4</span>
                 </div>
-                <DualSlider
-                  min={MIN_STEP}
-                  max={MAX_STEP}
-                  a={iniStep}
-                  b={finStep}
-                  onChangeA={(v) => {
-                    console.log("[UI] change inicio ->", v, stepToTime24(v));
-                    setIniStep(v);
-                  }}
-                  onChangeB={(v) => {
-                    console.log("[UI] change fin ->", v, stepToTime24(v));
-                    setFinStep(v);
-                  }}
-                  width={260}
-                />
               </div>
 
-              {/* RUTA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Ruta</label>
+              {/* Aspecto */}
+              <div className="min-w-[160px]">
+                <label className="block text-xs font-medium text-slate-600">Aspecto</label>
                 <select
-                  className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
-                  value={ruta}
+                  className="h-9 border rounded-lg px-2 bg-white"
+                  defaultValue="auto"
                   onChange={(e) => {
-                    console.log("[UI] change ruta ->", e.target.value);
-                    setRuta(e.target.value);
+                    console.log("[UI] aspecto:", e.target.value);
                   }}
                 >
-                  <option value="Todos">Todas</option>
-                  {RUTAS_FIJAS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
+                  <option value="auto">Auto</option>
+                  <option value="16:9">16:9</option>
+                  <option value="4:3">4:3</option>
+                  <option value="1:1">1:1</option>
+                  <option value="9:16">9:16</option>
                 </select>
-              </div>
-
-              {/* FOTÓGRAFO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
-                <MultiSelectCheckbox
-                  options={useMemo(() => {
-                    const list = rows.filter((r) => (r.rutas || []).includes(ruta));
-                    return list
-                      .map((p) => ({
-                        value: p.id,
-                        label: resolver.photographerById.get(p.id)?.label || p.id,
-                      }))
-                      .sort((a, b) => a.label.localeCompare(b.label));
-                  }, [rows, ruta, resolver.photographerById])}
-                  value={selPhotogs}
-                  onChange={(vals) => {
-                    console.log("[UI] change photogs ->", vals);
-                    setSelPhotogs(vals);
-                  }}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
-                />
-              </div>
-
-              {/* PUNTO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
-                <MultiSelectCheckbox
-                  options={useMemo(() => {
-                    const base = rows.filter((r) => (r.rutas || []).includes(ruta));
-                    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
-                    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
-                    return Array.from(set)
-                      .sort((a, b) => a.localeCompare(b))
-                      .map((name) => ({ value: name, label: name }));
-                  }, [rows, ruta, arrToCsv(selPhotogs)])}
-                  value={selHotspots}
-                  onChange={(vals) => {
-                    console.log("[UI] change puntos ->", vals);
-                    setSelHotspots(vals);
-                  }}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
-                />
               </div>
             </div>
           </div>
