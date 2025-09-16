@@ -57,8 +57,8 @@ const to12h = (t24) => {
 const csvToArr = (v) => (!v ? [] : v.split(",").filter(Boolean));
 const arrToCsv = (a) => (Array.isArray(a) ? a.join(",") : "");
 
-/* ======= Dual Slider (reducido de ancho) ======= */
-function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
+/* ======= Dual Slider ======= */
+function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   const ref = React.useRef(null);
   const dragging = React.useRef(null);
   const clamp = (v) => Math.max(min, Math.min(max, v));
@@ -92,29 +92,31 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
 
   return (
     <div style={{ width }} className="select-none">
-      <div className="flex items-center justify-between text-[10px] text-slate-600 mb-1 font-mono">
+      <div className="flex items-center justify-between text-xs text-slate-600 mb-1 font-mono">
         <span>{to12h(stepToTime24(a))}</span>
         <span>{to12h(stepToTime24(b))}</span>
       </div>
-      <div ref={ref} className="relative h-7">
+      <div ref={ref} className="relative h-8">
         <div className="absolute inset-0 rounded-full bg-slate-200" />
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-blue-500"
+          className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full bg-blue-500"
           style={{ left: `${toPct(a)}%`, width: `${toPct(b) - toPct(a)}%` }}
         />
         <button
           type="button"
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-slate-300 bg-white shadow"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-slate-300 bg-white shadow"
           style={{ left: `${toPct(a)}%` }}
           onMouseDown={startDrag("a")}
           aria-label="Hora inicio"
+          title="Mover hora de inicio"
         />
         <button
           type="button"
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-slate-300 bg-white shadow"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-slate-300 bg-white shadow"
           style={{ left: `${toPct(b)}%` }}
           onMouseDown={startDrag("b")}
           aria-label="Hora final"
+          title="Mover hora final"
         />
       </div>
     </div>
@@ -294,7 +296,7 @@ export default function BikerSearch() {
 
   const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
 
-  // -------- filtros (una sola fila en md+, wrap en xs/sm) --------
+  // -------- filtros (una sola fila) --------
   const [fecha, setFecha] = useState(() => params.get("fecha") || new Date().toISOString().slice(0, 10));
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
@@ -304,15 +306,11 @@ export default function BikerSearch() {
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
   });
 
-  // Controles del visor (derecha)
-  const [cols, setCols] = useState(6);   // 6 por fila por defecto
-  const [showLabels, setShowLabels] = useState(false); // Aspecto eliminado
-
-  // Multi-selects
+  // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
   const [selHotspots, setSelHotspots] = useState(() => (params.get("punto") ? [params.get("punto")] : []));
 
-  // catálogos / resolver
+  // catálogos y resolutores
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [catalogReady, setCatalogReady] = useState(false);
@@ -321,11 +319,11 @@ export default function BikerSearch() {
     hotspotById: new Map(),
   });
 
-  // fotos
+  // fotos (buscador principal)
   const [allPhotos, setAllPhotos] = useState([]);
   const [allHasMore, setAllHasMore] = useState(false);
 
-  // Ocultar filtros al scrollear (buscador por encima)
+  // --- Ocultar filtros al hacer scroll (solo aquí) ---
   const [hideFilters, setHideFilters] = useState(false);
   useEffect(() => {
     let last = window.scrollY;
@@ -463,7 +461,7 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ================== Buscar fotos (igual que antes) ================== */
+  /* ================== Buscar fotos (robusto + logs) ================== */
   useEffect(() => {
     console.log("[UI] fecha seleccionada:", fecha);
   }, [fecha]);
@@ -492,6 +490,7 @@ export default function BikerSearch() {
           if (ignorarHora) {
             const { evIds } = await getEventsByRoute({ routeName: ruta });
             evIdsScope = evIds;
+            console.log("[BUSCAR] PHOTOGS: ignorarHora=TRUE, eventos x ruta:", evIdsScope.length);
           } else {
             const evIds = await getEventIdsByDateRouteAndPhotogs({
               fechaYmd: fechaParam,
@@ -499,6 +498,7 @@ export default function BikerSearch() {
               photographerIds: selPhotogs,
             });
             evIdsScope = evIds;
+            console.log("[BUSCAR] PHOTOGS: ignorarHora=FALSE, eventos x fecha+ruta:", evIdsScope.length, "fechaParam:", fechaParam);
           }
         }
 
@@ -512,7 +512,7 @@ export default function BikerSearch() {
           if (keep.length) routeIds = keep.map((r) => String(r.id));
         }
 
-        // Hotspots acotados al evento / ruta
+        // Hotspots acotados al evento
         let hotspotIds = [];
         if (selHotspots.length && evIdsScope.length) {
           const { data: hsScoped } = await supabase
@@ -523,18 +523,22 @@ export default function BikerSearch() {
           hotspotIds = (hsScoped || []).map((h) => String(h.id));
           const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          console.log("[BUSCAR] PHOTOGS: hotspots x evento:", hotspotIds.length, hotspotIds);
         } else if (routeIds.length && selHotspots.length) {
           const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
           hotspotIds = hs.map((h) => String(h.id));
           const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          console.log("[BUSCAR] PHOTOGS: hotspots x ruta:", hotspotIds.length, hotspotIds);
         } else if (routeIds.length) {
           const hs = await getHotspotsByRouteIds(routeIds);
           const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
         }
 
-        // A) fetchPhotos (si falla → B/C)
+        console.log("[BUSCAR] ruta:", ruta, "fechaParam:", fechaParam, "ignorarHora:", ignorarHora, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
+
+        // A) fetchPhotos (si falla/0 → B/C)
         let items = [];
         try {
           const resp = await fetchPhotos({
@@ -565,8 +569,9 @@ export default function BikerSearch() {
             });
           }
           items = normed;
+          console.log("[RESULT A] fetchPhotos items:", items.length);
         } catch (e) {
-          console.log("[fetchPhotos] error:", e?.message || e);
+          console.log("[RESULT A] fetchPhotos error:", e?.message || e);
         }
 
         // B/C) event_asset o Storage
@@ -576,6 +581,7 @@ export default function BikerSearch() {
             const { data: evFromRoutes } = await supabase.from("event_route").select("event_id").in("id", routeIds);
             const uniq = Array.from(new Set((evFromRoutes || []).map((r) => String(r.event_id)).filter(Boolean)));
             evIds.push(...uniq);
+            console.log("[RESULT B] eventos deducidos por routeIds:", evIds.length);
           }
 
           let scopedHotspotIds = [];
@@ -586,6 +592,7 @@ export default function BikerSearch() {
               .in("event_id", evIds)
               .in("name", selHotspots);
             scopedHotspotIds = (hsScoped || []).map((h) => String(h.id));
+            console.log("[RESULT B] hotspotIds (scoped):", scopedHotspotIds.length, scopedHotspotIds);
           }
 
           try {
@@ -613,6 +620,7 @@ export default function BikerSearch() {
                 });
               }
               items = tmp;
+              console.log("[RESULT B] event_asset items:", items.length);
             } else {
               const merged = [];
               for (const evId of evIds) {
@@ -628,12 +636,15 @@ export default function BikerSearch() {
                 );
               }
               items = merged;
+              console.log("[RESULT C] storage items:", items.length);
             }
           } catch (err) {
-            console.log("[event_asset] error, fallback storage:", err?.message || err);
+            console.log("[RESULT B] event_asset error, fallback storage:", err?.message || err);
             const merged = [];
             for (const evId of evIds) {
-              const listed = await listAssetsFromStorage(evId, { onlyHotspots: [] });
+              const listed = await listAssetsFromStorage(evId, {
+                onlyHotspots: [],
+              });
               merged.push(
                 ...listed.map((it) => ({
                   ...it,
@@ -643,11 +654,13 @@ export default function BikerSearch() {
               );
             }
             items = merged;
+            console.log("[RESULT C] storage items:", items.length);
           }
         }
 
         setAllHasMore(false);
         setAllPhotos(Array.isArray(items) ? items : []);
+        console.log("[RESULT FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
         return;
       }
 
@@ -655,19 +668,22 @@ export default function BikerSearch() {
       if (ruta === "Todos") {
         setAllPhotos([]);
         setAllHasMore(false);
+        console.log("[BUSCAR] NO-PHOTOG: ruta=Todos ⇒ 0");
         return;
       }
 
       let evIds = [];
-      let eventMap = new Map();
+      let eventMap = new Map(); // id -> photographer_id
       if (ignorarHora) {
         const r = await getEventsByRoute({ routeName: ruta });
         evIds = r.evIds;
         eventMap = r.eventMap;
+        console.log("[BUSCAR] NO-PHOTOG ignorarHora=TRUE, eventos x ruta:", evIds.length);
       } else {
         const r = await getEventsByDateAndRoute({ fechaYmd: fechaParam, routeName: ruta });
         evIds = r.evIds;
         eventMap = r.eventMap;
+        console.log("[BUSCAR] NO-PHOTOG ignorarHora=FALSE, eventos x fecha+ruta:", evIds.length, "fechaParam:", fechaParam);
       }
 
       let hotspotIds = [];
@@ -680,8 +696,10 @@ export default function BikerSearch() {
         hotspotIds = (hsScoped || []).map((h) => String(h.id));
         const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+        console.log("[BUSCAR] NO-PHOTOG hotspots x evento:", hotspotIds.length, hotspotIds);
       }
 
+      // event_asset / storage
       let items = [];
       try {
         let q = supabase
@@ -709,6 +727,7 @@ export default function BikerSearch() {
             });
           }
           items = tmp;
+          console.log("[RESULT NO-PHOTOG B] event_asset items:", items.length);
         } else {
           const merged = [];
           for (const evId of evIds) {
@@ -725,14 +744,16 @@ export default function BikerSearch() {
             );
           }
           items = merged;
+          console.log("[RESULT NO-PHOTOG C] storage items:", items.length);
         }
       } catch (e) {
-        console.log("[NO-PHOTOG] error general:", e?.message || e);
+        console.log("[RESULT NO-PHOTOG] error general:", e?.message || e);
         items = [];
       }
 
       setAllHasMore(false);
       setAllPhotos(Array.isArray(items) ? items : []);
+      console.log("[RESULT NO-PHOTOG FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
     } catch (e) {
       console.error("Buscar fotos:", e);
       setAllPhotos([]);
@@ -777,6 +798,17 @@ export default function BikerSearch() {
     return out;
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
+  useEffect(() => {
+    console.log(
+      "[FILTER] base:",
+      Array.isArray(allPhotos) ? allPhotos.length : 0,
+      "filtered:",
+      Array.isArray(filtered) ? filtered.length : 0,
+      "ignorarHora:",
+      ignorarHora
+    );
+  }, [allPhotos, filtered, ignorarHora]);
+
   /* ================== Paginación & selección ================== */
   const [page, setPage] = useState(1);
   const pageSize = 60;
@@ -799,126 +831,149 @@ export default function BikerSearch() {
 
   return (
     <div className="min-h-screen surface pb-28">
-      {/* ===== Barra full-bleed sticky (debajo del header, top-[88px] intacto) ===== */}
-      <div
-        className={`sticky top-[88px] z-20 transition-all duration-300 ${
-          hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
-        }`}
-      >
-        <div className="w-screen ml-[calc(50%-50vw)] border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-          <div className="px-3 sm:px-4 py-2">
-            {/* UNA FILA en md+, wrap en sm/xs (sin scroll horizontal) */}
-            <div className="flex md:flex-nowrap flex-wrap items-center gap-3">
+      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+        {/* === Filtros sticky y colapsables (debajo del header) === */}
+        <div
+          className={`sticky top-[88px] z-30 border-b border-slate-200 transition-all duration-300 ${
+            hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className="pt-3 pb-3">
+            <div className="flex flex-wrap items-end gap-3">
               {/* FECHA */}
-              <label className="inline-flex items-center gap-2 h-10">
-                <span className="text-xs font-medium text-slate-600">Fecha</span>
-                <input type="date" className="h-10 border rounded-lg px-2 bg-white" value={toYmd(fecha) || ""} onChange={(e)=>setFecha(e.target.value)} disabled={ignorarHora}/>
-              </label>
+              <div>
+                <label className="block text-sm font-medium text-slate-600">Fecha</label>
+                <input
+                  type="date"
+                  className="h-9 border rounded-lg px-2 bg-white"
+                  value={toYmd(fecha) || ""}
+                  onChange={(e) => {
+                    console.log("[UI] change fecha ->", e.target.value);
+                    setFecha(e.target.value);
+                  }}
+                  disabled={ignorarHora}
+                  title={ignorarHora ? "Ignorando fecha/hora" : ""}
+                />
+              </div>
 
-              {/* HORA (más compacta) */}
-              <div className="inline-flex items-center gap-2 h-10">
-                <span className="text-xs font-medium text-slate-600">Hora</span>
+              {/* HORA */}
+              <div className="min-w-[260px]">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
+                  <label className="flex items-center gap-1 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={ignorarHora}
+                      onChange={(e) => {
+                        console.log("[UI] change ignorarHora ->", e.target.checked);
+                        setIgnorarHora(e.target.checked);
+                      }}
+                    />
+                    Ignorar fecha/hora
+                  </label>
+                </div>
                 <DualSlider
                   min={MIN_STEP}
                   max={MAX_STEP}
                   a={iniStep}
                   b={finStep}
-                  onChangeA={setIniStep}
-                  onChangeB={setFinStep}
-                  width={200}
+                  onChangeA={(v) => {
+                    console.log("[UI] change inicio ->", v, stepToTime24(v));
+                    setIniStep(v);
+                  }}
+                  onChangeB={(v) => {
+                    console.log("[UI] change fin ->", v, stepToTime24(v));
+                    setFinStep(v);
+                  }}
+                  width={260}
                 />
               </div>
-
-              {/* IGNORAR HORA */}
-              <label className="inline-flex items-center gap-2 h-10 text-xs text-slate-700">
-                <input type="checkbox" checked={ignorarHora} onChange={(e)=>setIgnorarHora(e.target.checked)}/>
-                Ignorar fecha/hora
-              </label>
 
               {/* RUTA */}
-              <label className="inline-flex items-center gap-2 h-10">
-                <span className="text-xs font-medium text-slate-600">Ruta</span>
-                <select className="h-10 border rounded-lg px-2 bg-white min-w-[180px]" value={ruta} onChange={(e)=>setRuta(e.target.value)}>
+              <div>
+                <label className="block text-sm font-medium text-slate-600">Ruta</label>
+                <select
+                  className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
+                  value={ruta}
+                  onChange={(e) => {
+                    console.log("[UI] change ruta ->", e.target.value);
+                    setRuta(e.target.value);
+                  }}
+                >
                   <option value="Todos">Todas</option>
-                  {RUTAS_FIJAS.map((r) => (<option key={r} value={r}>{r}</option>))}
+                  {RUTAS_FIJAS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
                 </select>
-              </label>
-
-              {/* FOTÓGRAFO */}
-              <div className="inline-flex items-center gap-2 h-10">
-                <span className="text-xs font-medium text-slate-600">Fotógrafo</span>
-                <div className="min-w-[200px]">
-                  <MultiSelectCheckbox
-                    options={photogOptions}
-                    value={selPhotogs}
-                    onChange={setSelPhotogs}
-                    placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
-                  />
-                </div>
               </div>
 
-              {/* PUNTO */}
-              <div className="inline-flex items-center gap-2 h-10">
-                <span className="text-xs font-medium text-slate-600">Punto</span>
-                <div className="min-w-[200px]">
-                  <MultiSelectCheckbox
-                    options={hotspotOptions}
-                    value={selHotspots}
-                    onChange={setSelHotspots}
-                    placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
-                  />
-                </div>
-              </div>
-
-              {/* SEPARADOR */}
-              <div className="hidden md:block w-px h-8 bg-slate-200 mx-1" />
-
-              {/* TAMAÑO (más compacto) */}
-              <label className="inline-flex items-center gap-2 h-10 text-sm ml-auto">
-                <span className="text-slate-500">Tamaño</span>
-                <input
-                  type="range"
-                  min={4}
-                  max={12}
-                  step={1}
-                  value={cols}
-                  onChange={(e) => setCols(parseInt(e.target.value, 10))}
-                  className="w-[120px]"
+              {/* FOTÓGRAFO (multi) */}
+              <div className="min-w-[220px]">
+                <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
+                <MultiSelectCheckbox
+                  options={useMemo(() => {
+                    const list = rows.filter((r) => (r.rutas || []).includes(ruta));
+                    return list
+                      .map((p) => ({
+                        value: p.id,
+                        label: resolver.photographerById.get(p.id)?.label || p.id,
+                      }))
+                      .sort((a, b) => a.label.localeCompare(b.label));
+                  }, [rows, ruta, resolver.photographerById])}
+                  value={selPhotogs}
+                  onChange={(vals) => {
+                    console.log("[UI] change photogs ->", vals);
+                    setSelPhotogs(vals);
+                  }}
+                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
                 />
-                <span className="text-slate-400 text-xs hidden sm:inline">({cols})</span>
-              </label>
+              </div>
 
-              {/* MOSTRAR INFO */}
-              <label className="inline-flex items-center gap-2 h-10 text-sm">
-                <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
-                <span className="text-slate-500">Mostrar info</span>
-              </label>
+              {/* PUNTO (multi) */}
+              <div className="min-w-[220px]">
+                <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
+                <MultiSelectCheckbox
+                  options={useMemo(() => {
+                    const base = rows.filter((r) => (r.rutas || []).includes(ruta));
+                    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
+                    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
+                    return Array.from(set)
+                      .sort((a, b) => a.localeCompare(b))
+                      .map((name) => ({ value: name, label: name }));
+                  }, [rows, ruta, arrToCsv(selPhotogs)])}
+                  value={selHotspots}
+                  onChange={(vals) => {
+                    console.log("[UI] change puntos ->", vals);
+                    setSelHotspots(vals);
+                  }}
+                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ======= RESULTADOS full-bleed (sin contenedor centrado) ======= */}
-      <div className="w-screen ml-[calc(50%-50vw)] px-2 sm:px-4 pt-6">
-        {loading ? (
-          <div className="text-slate-500">Buscando fotos…</div>
-        ) : (
-          <SearchResults
-            paginatedPhotos={paginatedPhotos}
-            totalPhotos={totalPhotos}
-            onLoadMore={onLoadMore}
-            hasMorePhotos={hasMorePhotos}
-            onToggleSel={(id) => toggleSel(id)}
-            selected={sel}
-            resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
-            resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
-            totalQ={totalQ}
-            clearSel={clearSel}
-            /* controles (sin aspecto) */
-            cols={cols}
-            showLabels={showLabels}
-          />
-        )}
+        {/* ======= RESULTADOS ======= */}
+        <div className="mt-5">
+          {loading ? (
+            <div className="text-slate-500">Buscando fotos…</div>
+          ) : (
+            <SearchResults
+              paginatedPhotos={paginatedPhotos}
+              totalPhotos={totalPhotos}
+              onLoadMore={onLoadMore}
+              hasMorePhotos={hasMorePhotos}
+              onToggleSel={(id) => toggleSel(id)}
+              selected={sel}
+              resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
+              resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
+              totalQ={totalQ}
+              clearSel={clearSel}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

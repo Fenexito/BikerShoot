@@ -62,48 +62,57 @@ export default function SearchResults({
     return () => io.disconnect();
   }, [hasMorePhotos, onLoadMore, paginatedPhotos?.length]);
 
-  // ---------- Grid a ancho completo, sin recorte (object-contain) ----------
-  const gridTemplate = useMemo(() => {
-    const safeCols = Math.max(4, Math.min(12, parseInt(cols, 10) || 6));
-    return { gridTemplateColumns: `repeat(${safeCols}, minmax(0, 1fr))` };
-  }, [cols]);
+  // ---------- Masonry: column-count controlado por "cols" ----------
+  const columnCount = Math.max(4, Math.min(12, parseInt(cols, 10) || 6));
+  const masonryStyle = useMemo(
+    () => ({ columnCount, columnGap: "12px" }),
+    [columnCount]
+  );
 
   return (
-    <section className="w-screen ml-[calc(50%-50vw)]">
-      <div className="grid gap-2 sm:gap-3" style={gridTemplate}>
+    <section className="w-screen ml-[calc(50%-50vw)] px-3 sm:px-6">
+      {/* Masonry container */}
+      <div style={masonryStyle}>
         {(paginatedPhotos || []).map((item, idx) => {
           const isSel = selected?.has?.(item.id);
           const hsName = resolveHotspotName ? resolveHotspotName(item.hotspotId) : (item.hotspotId || "");
 
           return (
-            <div key={item.id} className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="relative bg-slate-100 cursor-zoom-in">
-                {/* Foto completa sin recorte */}
+            <article
+              key={item.id}
+              className="mb-3 break-inside-avoid rounded-xl overflow-hidden bg-white border border-slate-200 relative group"
+            >
+              {/* Foto completa sin recorte (se adapta al ALTO real) */}
+              <button
+                type="button"
+                className="w-full text-left bg-slate-100 cursor-zoom-in"
+                onClick={() => openLightbox(idx)}
+                title="Ver grande"
+              >
                 <img
                   src={item.url}
                   alt=""
                   loading="lazy"
                   decoding="async"
                   className="w-full h-auto block object-contain"
-                  onClick={() => openLightbox(idx)}
                   draggable={false}
                 />
+              </button>
 
-                {/* Botón seleccionar */}
-                <button
-                  type="button"
-                  className={
-                    "absolute top-2 left-2 z-10 h-8 px-2 rounded-md text-xs shadow " +
-                    (isSel
-                      ? "bg-blue-600 text-white"
-                      : "bg-white/90 text-slate-800 border border-slate-200")
-                  }
-                  onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
-                  title={isSel ? "Quitar de selección" : "Agregar a selección"}
-                >
-                  {isSel ? "Seleccionada" : "Elegir"}
-                </button>
-              </div>
+              {/* Botón seleccionar */}
+              <button
+                type="button"
+                className={
+                  "absolute top-2 left-2 z-10 h-8 px-2 rounded-md text-xs shadow " +
+                  (isSel
+                    ? "bg-blue-600 text-white"
+                    : "bg-white/90 text-slate-800 border border-slate-200")
+                }
+                onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
+                title={isSel ? "Quitar de selección" : "Agregar a selección"}
+              >
+                {isSel ? "Seleccionada" : "Elegir"}
+              </button>
 
               {showLabels && (
                 <div className="p-2 text-[12px] leading-tight text-slate-700">
@@ -111,7 +120,7 @@ export default function SearchResults({
                   <div className="truncate opacity-70">{hsName}</div>
                 </div>
               )}
-            </div>
+            </article>
           );
         })}
       </div>
