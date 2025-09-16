@@ -1,6 +1,6 @@
 // src/routes/biker/Search/Search.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 
 import {
@@ -56,6 +56,15 @@ const to12h = (t24) => {
 };
 const csvToArr = (v) => (!v ? [] : v.split(",").filter(Boolean));
 const arrToCsv = (a) => (Array.isArray(a) ? a.join(",") : "");
+
+/* ======= toYmd util (respetando local time) ======= */
+const toYmd = (d) => {
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (!date || isNaN(date)) return "";
+  const off = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - off * 60000);
+  return local.toISOString().slice(0, 10);
+};
 
 /* ======= Dual Slider ======= */
 function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
@@ -123,57 +132,7 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   );
 }
 
-/* ======= Helpers fecha ======= */
-const toYmd = (v) => {
-  if (!v) return null;
-  if (typeof v === "string") {
-    const s10 = v.slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s10)) return s10;
-    const d = new Date(v);
-    if (!isNaN(d)) return d.toISOString().slice(0, 10);
-    return null;
-  }
-  const d = new Date(v);
-  return isNaN(d) ? null : d.toISOString().slice(0, 10);
-};
-
-/* ======= Helpers Supabase (IDs y URLS) ======= */
-async function getEventRouteIdsByName(routeName, { photographerIds = [], eventId = null } = {}) {
-  if (!routeName) return [];
-  const alias = (ROUTE_ALIAS[routeName] || [routeName]).map(norm);
-
-  let q = supabase.from("event_route").select("id, name, event_id");
-  if (eventId) q = q.eq("event_id", eventId);
-  if (!eventId && photographerIds.length) {
-    const { data: evs, error: evErr } = await supabase
-      .from("event")
-      .select("id, photographer_id")
-      .in("photographer_id", photographerIds);
-    if (evErr) throw evErr;
-    const evIds = (evs || []).map((e) => String(e.id));
-    if (evIds.length === 0) return [];
-    q = q.in("event_id", evIds);
-  }
-  const { data: routes, error } = await q;
-  if (error) throw error;
-
-  const matched = (routes || []).filter((r) => {
-    const n = norm(r.name);
-    return alias.some((a) => n.includes(a));
-  });
-
-  return matched.map((r) => String(r.id));
-}
-
-async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
-  if (!routeIds.length) return [];
-  let q = supabase.from("event_hotspot").select("id, name, route_id, event_id").in("route_id", routeIds);
-  if (names?.length) q = q.in("name", names.map(String));
-  const { data, error } = await q;
-  if (error) throw error;
-  return data || [];
-}
-
+/* -------------------- Queries auxiliares -------------------- */
 // Eventos del/los fotógrafos en la FECHA exacta para esa ruta
 async function getEventIdsByDateRouteAndPhotogs({ fechaYmd, routeName, photographerIds = [] }) {
   if (!photographerIds.length || !fechaYmd) return [];
@@ -359,242 +318,128 @@ export default function BikerSearch() {
               const ev = await fetchEvent(hs.event_id);
               if (ev?.photographer_id) setSelPhotogs([String(ev.photographer_id)]);
             }
-            setIgnorarHora(false);
           }
         }
-        const photogsCsv = params.get("photogs");
-        if (photogsCsv && !selPhotogs.length) setSelPhotogs(csvToArr(photogsCsv));
-
-        const evento = params.get("evento");
-        if (evento) {
-          const pts = await fetchHotspotsByEvent(evento);
-          if (!alive) return;
-          const hsMap = new Map((pts || []).map((p) => [String(p.id), { name: p.name }]));
-          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+        const eventoParam = params.get("evento");
+        if (eventoParam && !selPhotogs.length) {
+          const ev = await fetchEvent(eventoParam);
+          if (ev?.photographer_id) setSelPhotogs([String(ev.photographer_id)]);
         }
-      } catch (e) {
-        console.error("Preconfig buscar:", e);
-      }
+      } catch { /* nop */ }
+      if (alive) { /* noop */ }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- Cargar fotógrafos/puntos (RPC) ---------- */
+  /* ---------- Cargar catálogo (fotógrafos/puntos por ruta) ---------- */
   useEffect(() => {
     let alive = true;
-    setCatalogReady(false);
     (async () => {
       try {
-        if (ruta === "Todos") {
-          setRows([]);
-          setResolver((prev) => ({ ...prev, photographerById: new Map() }));
-          setCatalogReady(true);
-          return;
-        }
         setLoading(true);
+        setCatalogReady(false);
+
+        // Catalogo base de fotógrafos con hotspots (por ruta si aplica)
         const { data, error } = await supabase.rpc("get_photographers_cards", {
-          q: null,
-          ruta,
-          punto: null,
-          orden: "nombre",
-          limit_n: 500,
-          offset_n: 0,
+          p_route: ruta && ruta !== "Todos" ? ruta : null,
         });
         if (error) throw error;
 
-        const mapped = (data || []).map((r) => ({
-          id: String(r.id),
-          estudio: r.estudio,
-          username: (r.username || "").replace(/^@/, ""),
-          rutas: Array.isArray(r.rutas) ? r.rutas : [],
-          puntos: Array.isArray(r.puntos) ? r.puntos : [],
-        }));
-        if (!alive) return;
-        setRows(mapped);
+        const phById = new Map();
+        const hsById = new Map();
+        const tmp = [];
 
-        const phMap = new Map(mapped.map((p) => [p.id, { label: p.estudio || p.username || p.id }]));
-        setResolver((prev) => ({ ...prev, photographerById: phMap }));
-      } catch (e) {
-        console.error("RPC get_photographers_cards:", e);
-      } finally {
-        if (alive) {
-          setLoading(false);
-          setCatalogReady(true);
+        for (const r of data || []) {
+          const phId = String(r.photographer_id);
+          phById.set(phId, { name: r.photographer_name });
+
+          const hotspotName = r.hotspot_name;
+          const hotspotId = String(r.hotspot_id || "");
+          if (hotspotId) hsById.set(hotspotId, { name: hotspotName });
+
+          const row = {
+            id: cryptoRandomId(),
+            photographerId: phId,
+            photographerName: r.photographer_name,
+            routeName: r.route_name || ruta || "—",
+            hotspotId,
+            hotspotName,
+          };
+          tmp.push(row);
         }
+
+        setRows(tmp);
+        setResolver({ photographerById: phById, hotspotById: hsById });
+        setCatalogReady(true);
+      } catch (e) {
+        console.error("Cargar catálogo:", e);
+        setRows([]);
+        setResolver({ photographerById: new Map(), hotspotById: new Map() });
+        setCatalogReady(false);
+      } finally {
+        setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [ruta]);
 
-  /* ---------- Opciones multi ---------- */
-  const photogOptions = useMemo(() => {
-    const list = rows.filter((r) => (r.rutas || []).includes(ruta));
-    return list
-      .map((p) => ({ value: p.id, label: resolver.photographerById.get(p.id)?.label || p.id }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [rows, ruta, resolver.photographerById]);
+  function cryptoRandomId() {
+    try {
+      return [...crypto.getRandomValues(new Uint32Array(2))].map((n) => n.toString(16)).join("");
+    } catch {
+      return String(Math.random()).slice(2);
+    }
+  }
 
-  const hotspotOptions = useMemo(() => {
-    const base = rows.filter((r) => (r.rutas || []).includes(ruta));
-    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
-    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
-    return Array.from(set)
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ value: name, label: name }));
-  }, [rows, ruta, arrToCsv(selPhotogs)]);
-
-  /* ---------- Limpieza post-catálogo ---------- */
-  useEffect(() => {
-    if (!catalogReady) return;
-    const validPhotogIds = new Set(photogOptions.map((o) => String(o.value)));
-    const cleanedPhotogs = selPhotogs.filter((id) => validPhotogIds.has(String(id)));
-    if (cleanedPhotogs.length !== selPhotogs.length) setSelPhotogs(cleanedPhotogs);
-
-    const validHotspotNames = new Set(hotspotOptions.map((o) => String(o.value)));
-    const cleanedHotspots = selHotspots.filter((nm) => validHotspotNames.has(String(nm)));
-    if (cleanedHotspots.length !== selHotspots.length) setSelHotspots(cleanedHotspots);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogReady, photogOptions.length, hotspotOptions.length]);
-
-  /* ================== Buscar fotos (robusto + logs) ================== */
-  useEffect(() => {
-    console.log("[UI] fecha seleccionada:", fecha);
-  }, [fecha]);
-
+  /* ---------- Ejecutar búsqueda ---------- */
   async function runSearch() {
     try {
       setLoading(true);
+      const fechaParam = toYmd(fecha);
 
-      const fechaParam = toYmd(fecha) || new Date().toISOString().slice(0, 10);
-      const inicioHHMM = stepToTime24(iniStep);
-      const finHHMM = stepToTime24(finStep);
-
-      // ======== CON FOTÓGRAFOS ========
-      if (selPhotogs.length > 0) {
-        let routeIds =
-          ruta !== "Todos"
-            ? await getEventRouteIdsByName(ruta, {
-                photographerIds: selPhotogs,
-                eventId: params.get("evento") || null,
-              })
-            : [];
-
-        // Eventos por fecha+ruta (o solo ruta si ignorás)
-        let evIdsScope = [];
-        if (ruta !== "Todos") {
-          if (ignorarHora) {
-            const { evIds } = await getEventsByRoute({ routeName: ruta });
-            evIdsScope = evIds;
-            console.log("[BUSCAR] PHOTOGS: ignorarHora=TRUE, eventos x ruta:", evIdsScope.length);
-          } else {
-            const evIds = await getEventIdsByDateRouteAndPhotogs({
-              fechaYmd: fechaParam,
-              routeName: ruta,
-              photographerIds: selPhotogs,
-            });
-            evIdsScope = evIds;
-            console.log("[BUSCAR] PHOTOGS: ignorarHora=FALSE, eventos x fecha+ruta:", evIdsScope.length, "fechaParam:", fechaParam);
-          }
-        }
-
-        if ((!routeIds || routeIds.length === 0) && evIdsScope.length) {
-          const { data: routesEvs } = await supabase
-            .from("event_route")
-            .select("id, event_id, name")
-            .in("event_id", evIdsScope);
+      // ===== Con fotógrafos (prioridad si vienen seteados) =====
+      if (selPhotogs.length) {
+        // 1) Eventos exactos de esos fotógrafos (por fecha+ruta si no ignoramos hora)
+        let evIds = [];
+        if (ignorarHora) {
+          // todos los eventos de los fotógrafos en la ruta
+          const { data: evs } = await supabase
+            .from("event")
+            .select("id, ruta, location, photographer_id")
+            .in("photographer_id", selPhotogs);
           const alias = (ROUTE_ALIAS[ruta] || [ruta]).map(norm);
-          const keep = (routesEvs || []).filter((r) => alias.some((a) => norm(r.name).includes(a)));
-          if (keep.length) routeIds = keep.map((r) => String(r.id));
+          evIds = (evs || [])
+            .filter((e) => (ruta === "Todos" ? true : alias.some((a) => norm(e.ruta || e.location || "").includes(a))))
+            .map((e) => String(e.id));
+        } else {
+          evIds = await getEventIdsByDateRouteAndPhotogs({
+            fechaYmd: fechaParam,
+            routeName: ruta,
+            photographerIds: selPhotogs,
+          });
         }
 
-        // Hotspots acotados al evento
-        let hotspotIds = [];
-        if (selHotspots.length && evIdsScope.length) {
+        if (!evIds.length) {
+          setAllPhotos([]);
+          setAllHasMore(false);
+          return;
+        }
+
+        // 2) Si hay hotspots filtrados, acotamos
+        let scopedHotspotIds = [];
+        if (selHotspots.length) {
           const { data: hsScoped } = await supabase
             .from("event_hotspot")
-            .select("id, name, route_id, event_id")
-            .in("event_id", evIdsScope)
+            .select("id, name, event_id")
+            .in("event_id", evIds)
             .in("name", selHotspots);
-          hotspotIds = (hsScoped || []).map((h) => String(h.id));
-          const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
-          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          console.log("[BUSCAR] PHOTOGS: hotspots x evento:", hotspotIds.length, hotspotIds);
-        } else if (routeIds.length && selHotspots.length) {
-          const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
-          hotspotIds = hs.map((h) => String(h.id));
-          const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
-          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          console.log("[BUSCAR] PHOTOGS: hotspots x ruta:", hotspotIds.length, hotspotIds);
-        } else if (routeIds.length) {
-          const hs = await getHotspotsByRouteIds(routeIds);
-          const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
-          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          scopedHotspotIds = (hsScoped || []).map((h) => String(h.id));
         }
 
-        console.log("[BUSCAR] ruta:", ruta, "fechaParam:", fechaParam, "ignorarHora:", ignorarHora, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
-
-        // A) fetchPhotos (si falla/0 → B/C)
+        // 3) Traer assets del event_asset (o del storage como fallback)
         let items = [];
-        try {
-          const resp = await fetchPhotos({
-            routeIds,
-            hotspotIds,
-            photographerIds: selPhotogs,
-            fecha: ignorarHora ? undefined : fechaParam,
-            inicioHHMM: ignorarHora ? undefined : inicioHHMM,
-            finHHMM: ignorarHora ? undefined : finHHMM,
-            ignorarHora,
-            page: 0,
-            limit: 200,
-          });
-
-          const arr = Array.isArray(resp) ? resp : Array.isArray(resp?.items) ? resp.items : [];
-          const normed = [];
-          for (const x of arr) {
-            const id = x.id || x.asset_id || x.storage_path || x.url || cryptoRandomId();
-            const url = x.url || (x.storage_path ? await getPublicUrl(x.storage_path) : "");
-            if (!url) continue;
-            normed.push({
-              id: String(id),
-              url,
-              timestamp: x.timestamp || x.taken_at || x.created_at || null,
-              hotspotId: x.hotspotId || x.hotspot_id || null,
-              photographerId: x.photographerId || x.photographer_id || (selPhotogs[0] || null),
-              route: ruta !== "Todos" ? ruta : (x.route || null),
-            });
-          }
-          items = normed;
-          console.log("[RESULT A] fetchPhotos items:", items.length);
-        } catch (e) {
-          console.log("[RESULT A] fetchPhotos error:", e?.message || e);
-        }
-
-        // B/C) event_asset o Storage
-        if (!items.length && (evIdsScope.length || routeIds.length)) {
-          const evIds = evIdsScope.slice();
-          if (!evIds.length && routeIds.length) {
-            const { data: evFromRoutes } = await supabase.from("event_route").select("event_id").in("id", routeIds);
-            const uniq = Array.from(new Set((evFromRoutes || []).map((r) => String(r.event_id)).filter(Boolean)));
-            evIds.push(...uniq);
-            console.log("[RESULT B] eventos deducidos por routeIds:", evIds.length);
-          }
-
-          let scopedHotspotIds = [];
-          if (selHotspots.length) {
-            const { data: hsScoped } = await supabase
-              .from("event_hotspot")
-              .select("id, name, event_id")
-              .in("event_id", evIds)
-              .in("name", selHotspots);
-            scopedHotspotIds = (hsScoped || []).map((h) => String(h.id));
-            console.log("[RESULT B] hotspotIds (scoped):", scopedHotspotIds.length, scopedHotspotIds);
-          }
-
+        {
           try {
             let q = supabase
               .from("event_asset")
@@ -734,11 +579,10 @@ export default function BikerSearch() {
             const listed = await listAssetsFromStorage(evId, {
               onlyHotspots: hotspotIds.length ? hotspotIds : [],
             });
-            const pid = eventMap.get(String(evId)) || null;
             merged.push(
               ...listed.map((it) => ({
                 ...it,
-                photographerId: pid,
+                photographerId: eventMap.get(String(evId)) || null,
                 route: ruta,
               }))
             );
@@ -747,8 +591,19 @@ export default function BikerSearch() {
           console.log("[RESULT NO-PHOTOG C] storage items:", items.length);
         }
       } catch (e) {
-        console.log("[RESULT NO-PHOTOG] error general:", e?.message || e);
-        items = [];
+        console.log("[NO-PHOTOG] fallback storage por error:", e?.message || e);
+        const merged = [];
+        for (const evId of evIds) {
+          const listed = await listAssetsFromStorage(evId, { onlyHotspots: [] });
+          merged.push(
+            ...listed.map((it) => ({
+              ...it,
+              photographerId: eventMap.get(String(evId)) || null,
+              route: ruta,
+            }))
+          );
+        }
+        items = merged;
       }
 
       setAllHasMore(false);
@@ -829,162 +684,135 @@ export default function BikerSearch() {
   const clearSel = () => setSel(new Set());
   const totalQ = useMemo(() => sel.size * 50, [sel]);
 
+  /* ================== UI ================== */
   return (
-    <div className="min-h-screen surface pb-28">
-      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* === Filtros sticky y colapsables (debajo del header) === */}
+    <div className="min-h-screen surface pb-10">{/* ↓ pb reducido para quitar el margen grande al final */}
+      {/* Fila de filtros y navegación – FULL WIDTH */}
+      <div className="w-screen ml-[calc(50%-50vw)]">
         <div
-          className={`sticky top-[88px] z-30 border-b border-slate-200 transition-all duration-300 ${
-            hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
-          }`}
+          className={
+            "sticky top-[88px] z-40 border-y border-slate-200 bg-white/95 backdrop-blur " +
+            "transition-all duration-300 " +
+            (hideFilters ? "-translate-y-3 opacity-0 pointer-events-none" : "translate-y-0 opacity-100")
+          }
         >
-          <div className="pt-3 pb-3">
-            <div className="flex flex-wrap items-end gap-3">
-              {/* FECHA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Fecha</label>
+          <div className="px-2 sm:px-4">
+            <div
+              className={
+                "flex items-center gap-2 sm:gap-3 py-2 " +
+                "overflow-x-auto no-scrollbar"
+              }
+            >
+              {/* Inicio */}
+              <Link
+                to="/app"
+                className="shrink-0 h-9 px-3 rounded-lg border bg-white hover:bg-slate-50 text-slate-700"
+                title="Ir al inicio"
+              >
+                Inicio
+              </Link>
+
+              <div className="shrink-0 w-px h-6 bg-slate-200 mx-1" />
+
+              {/* Fecha */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <span className="text-slate-600">Fecha</span>
                 <input
                   type="date"
                   className="h-9 border rounded-lg px-2 bg-white"
-                  value={toYmd(fecha) || ""}
-                  onChange={(e) => {
-                    console.log("[UI] change fecha ->", e.target.value);
-                    setFecha(e.target.value);
-                  }}
-                  disabled={ignorarHora}
-                  title={ignorarHora ? "Ignorando fecha/hora" : ""}
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
                 />
-              </div>
+              </label>
 
-              {/* HORA */}
-              <div className="min-w-[260px]">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
-                  <label className="flex items-center gap-1 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={ignorarHora}
-                      onChange={(e) => {
-                        console.log("[UI] change ignorarHora ->", e.target.checked);
-                        setIgnorarHora(e.target.checked);
-                      }}
-                    />
-                    Ignorar fecha/hora
-                  </label>
-                </div>
+              {/* Hora (toggle + rango) */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={ignorarHora}
+                  onChange={(e) => setIgnorarHora(e.target.checked)}
+                />
+                <span className="text-slate-600">Ignorar hora</span>
+              </label>
+
+              <div className={"shrink-0 " + (ignorarHora ? "opacity-40 pointer-events-none" : "")}>
                 <DualSlider
                   min={MIN_STEP}
                   max={MAX_STEP}
                   a={iniStep}
                   b={finStep}
-                  onChangeA={(v) => {
-                    console.log("[UI] change inicio ->", v, stepToTime24(v));
-                    setIniStep(v);
-                  }}
-                  onChangeB={(v) => {
-                    console.log("[UI] change fin ->", v, stepToTime24(v));
-                    setFinStep(v);
-                  }}
-                  width={260}
+                  onChangeA={setIniStep}
+                  onChangeB={setFinStep}
+                  width={300}
                 />
               </div>
 
-              {/* RUTA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Ruta</label>
+              <div className="shrink-0 w-px h-6 bg-slate-200 mx-1" />
+
+              {/* Ruta */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <span className="text-slate-600">Ruta</span>
                 <select
-                  className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
+                  className="h-9 border rounded-lg px-2 bg-white"
                   value={ruta}
-                  onChange={(e) => {
-                    console.log("[UI] change ruta ->", e.target.value);
-                    setRuta(e.target.value);
-                  }}
+                  onChange={(e) => setRuta(e.target.value)}
                 >
                   <option value="Todos">Todas</option>
                   {RUTAS_FIJAS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
+                    <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
-              </div>
+              </label>
 
-              {/* FOTÓGRAFO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
+              {/* Fotógrafos */}
+              <div className="shrink-0">
                 <MultiSelectCheckbox
-                  options={useMemo(() => {
-                    const list = rows.filter((r) => (r.rutas || []).includes(ruta));
-                    return list
-                      .map((p) => ({
-                        value: p.id,
-                        label: resolver.photographerById.get(p.id)?.label || p.id,
-                      }))
-                      .sort((a, b) => a.label.localeCompare(b.label));
-                  }, [rows, ruta, resolver.photographerById])}
-                  value={selPhotogs}
-                  onChange={(vals) => {
-                    console.log("[UI] change photogs ->", vals);
-                    setSelPhotogs(vals);
-                  }}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
+                  label="Fotógrafo(s)"
+                  options={Array.from(resolver.photographerById.entries()).map(([id, v]) => ({
+                    value: id,
+                    label: v?.name || `#${id}`,
+                  }))}
+                  values={selPhotogs}
+                  onChange={setSelPhotogs}
+                  disabled={!catalogReady}
+                  condensed
                 />
               </div>
 
-              {/* PUNTO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
+              {/* Puntos */}
+              <div className="shrink-0">
                 <MultiSelectCheckbox
-                  options={useMemo(() => {
-                    const base = rows.filter((r) => (r.rutas || []).includes(ruta));
-                    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
-                    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
-                    return Array.from(set)
-                      .sort((a, b) => a.localeCompare(b))
-                      .map((name) => ({ value: name, label: name }));
-                  }, [rows, ruta, arrToCsv(selPhotogs)])}
-                  value={selHotspots}
-                  onChange={(vals) => {
-                    console.log("[UI] change puntos ->", vals);
-                    setSelHotspots(vals);
-                  }}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
+                  label="Punto(s)"
+                  options={
+                    Array.from(resolver.hotspotById.entries()).map(([id, v]) => ({
+                      value: v?.name || id,
+                      label: v?.name || id,
+                    }))
+                  }
+                  values={selHotspots}
+                  onChange={setSelHotspots}
+                  disabled={!catalogReady}
+                  condensed
                 />
               </div>
             </div>
           </div>
         </div>
-
-        {/* ======= RESULTADOS ======= */}
-        <div className="mt-5">
-          {loading ? (
-            <div className="text-slate-500">Buscando fotos…</div>
-          ) : (
-            <SearchResults
-              paginatedPhotos={paginatedPhotos}
-              totalPhotos={totalPhotos}
-              onLoadMore={onLoadMore}
-              hasMorePhotos={hasMorePhotos}
-              onToggleSel={(id) => toggleSel(id)}
-              selected={sel}
-              resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
-              resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
-              totalQ={totalQ}
-              clearSel={clearSel}
-            />
-          )}
-        </div>
       </div>
+
+      {/* Resultados – mismo full width del mosaico */}
+      <SearchResults
+        paginatedPhotos={paginatedPhotos}
+        totalPhotos={totalPhotos}
+        onLoadMore={onLoadMore}
+        hasMorePhotos={hasMorePhotos}
+        onToggleSel={toggleSel}
+        selected={sel}
+        resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.name || ""}
+        resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || ""}
+        totalQ={totalQ}
+        clearSel={clearSel}
+      />
     </div>
   );
-}
-
-/* Utilidad local */
-function cryptoRandomId() {
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    const arr = new Uint32Array(2);
-    crypto.getRandomValues(arr);
-    return `${arr[0].toString(16)}${arr[1].toString(16)}`;
-  }
-  return String(Math.random()).slice(2);
 }
