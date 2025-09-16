@@ -24,9 +24,8 @@ export default function SearchResults({
   resolveHotspotName,
   totalQ,
   clearSel,
-  /* nuevos props controlados por el padre */
+  /* controlados por el padre */
   cols = 6,
-  aspectMode = "1:1",
   showLabels = false,
 }) {
   // ---------- Lightbox ----------
@@ -48,7 +47,7 @@ export default function SearchResults({
     }));
   }, [paginatedPhotos, resolvePhotographerName, resolveHotspotName]);
 
-  // ---------- Infinite scroll (sin contenedor con scroll) ----------
+  // ---------- Infinite scroll (un solo scroll: el de la página) ----------
   const sentinelRef = useRef(null);
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -63,41 +62,30 @@ export default function SearchResults({
     return () => io.disconnect();
   }, [hasMorePhotos, onLoadMore, paginatedPhotos?.length]);
 
-  // ---------- Aspect ratios ----------
-  const ratioClass =
-    aspectMode === "1:1" ? "aspect-square" :
-    aspectMode === "4:3" ? "aspect-[4/3]" :
-    aspectMode === "16:9" ? "aspect-video" :
-    aspectMode === "9:16" ? "aspect-[9/16]" :
-    "aspect-square";
-
-  // ---------- CSS grid con N columnas fijo (sin virtualizado) ----------
+  // ---------- Grid a ancho completo, sin recorte (object-contain) ----------
   const gridTemplate = useMemo(() => {
     const safeCols = Math.max(4, Math.min(12, parseInt(cols, 10) || 6));
     return { gridTemplateColumns: `repeat(${safeCols}, minmax(0, 1fr))` };
   }, [cols]);
 
   return (
-    <section>
-      {/* Grilla fluida, sin altura fija ni overflows raros */}
+    <section className="w-screen ml-[calc(50%-50vw)]">
       <div className="grid gap-2 sm:gap-3" style={gridTemplate}>
         {(paginatedPhotos || []).map((item, idx) => {
           const isSel = selected?.has?.(item.id);
           const hsName = resolveHotspotName ? resolveHotspotName(item.hotspotId) : (item.hotspotId || "");
 
           return (
-            <div key={item.id} className="group relative rounded-xl overflow-hidden bg-white border border-slate-200">
-              <div
-                className={`relative ${ratioClass} bg-slate-100 cursor-zoom-in`}
-                onClick={() => openLightbox(idx)}
-                title="Ver grande"
-              >
+            <div key={item.id} className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="relative bg-slate-100 cursor-zoom-in">
+                {/* Foto completa sin recorte */}
                 <img
                   src={item.url}
                   alt=""
                   loading="lazy"
                   decoding="async"
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="w-full h-auto block object-contain"
+                  onClick={() => openLightbox(idx)}
                   draggable={false}
                 />
 
@@ -128,7 +116,7 @@ export default function SearchResults({
         })}
       </div>
 
-      {/* Sentinel para cargar más (aparece al final del documento) */}
+      {/* Sentinel para cargar más */}
       <div ref={sentinelRef} className="h-10" />
 
       {/* Barra de selección */}

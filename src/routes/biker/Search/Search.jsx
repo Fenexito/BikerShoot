@@ -57,8 +57,8 @@ const to12h = (t24) => {
 const csvToArr = (v) => (!v ? [] : v.split(",").filter(Boolean));
 const arrToCsv = (a) => (Array.isArray(a) ? a.join(",") : "");
 
-/* ======= Dual Slider ======= */
-function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
+/* ======= Dual Slider (reducido de ancho) ======= */
+function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
   const ref = React.useRef(null);
   const dragging = React.useRef(null);
   const clamp = (v) => Math.max(min, Math.min(max, v));
@@ -92,31 +92,29 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
 
   return (
     <div style={{ width }} className="select-none">
-      <div className="flex items-center justify-between text-xs text-slate-600 mb-1 font-mono">
+      <div className="flex items-center justify-between text-[10px] text-slate-600 mb-1 font-mono">
         <span>{to12h(stepToTime24(a))}</span>
         <span>{to12h(stepToTime24(b))}</span>
       </div>
-      <div ref={ref} className="relative h-8">
+      <div ref={ref} className="relative h-7">
         <div className="absolute inset-0 rounded-full bg-slate-200" />
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full bg-blue-500"
+          className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-blue-500"
           style={{ left: `${toPct(a)}%`, width: `${toPct(b) - toPct(a)}%` }}
         />
         <button
           type="button"
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-slate-300 bg-white shadow"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-slate-300 bg-white shadow"
           style={{ left: `${toPct(a)}%` }}
           onMouseDown={startDrag("a")}
           aria-label="Hora inicio"
-          title="Mover hora de inicio"
         />
         <button
           type="button"
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full border border-slate-300 bg-white shadow"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-slate-300 bg-white shadow"
           style={{ left: `${toPct(b)}%` }}
           onMouseDown={startDrag("b")}
           aria-label="Hora final"
-          title="Mover hora final"
         />
       </div>
     </div>
@@ -296,7 +294,7 @@ export default function BikerSearch() {
 
   const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
 
-  // -------- filtros (una sola fila full-bleed) --------
+  // -------- filtros (una sola fila en md+, wrap en xs/sm) --------
   const [fecha, setFecha] = useState(() => params.get("fecha") || new Date().toISOString().slice(0, 10));
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
@@ -306,16 +304,15 @@ export default function BikerSearch() {
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
   });
 
-  // Controles del visor (en la barra derecha)
-  const [cols, setCols] = useState(6);                // 6 por fila por defecto
-  const [aspectMode, setAspectMode] = useState("1:1");
-  const [showLabels, setShowLabels] = useState(false);
+  // Controles del visor (derecha)
+  const [cols, setCols] = useState(6);   // 6 por fila por defecto
+  const [showLabels, setShowLabels] = useState(false); // Aspecto eliminado
 
-  // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
+  // Multi-selects
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
   const [selHotspots, setSelHotspots] = useState(() => (params.get("punto") ? [params.get("punto")] : []));
 
-  // catálogos y resolutores
+  // catálogos / resolver
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [catalogReady, setCatalogReady] = useState(false);
@@ -324,11 +321,11 @@ export default function BikerSearch() {
     hotspotById: new Map(),
   });
 
-  // fotos (buscador principal)
+  // fotos
   const [allPhotos, setAllPhotos] = useState([]);
   const [allHasMore, setAllHasMore] = useState(false);
 
-  // --- Ocultar filtros al hacer scroll (buscador por encima) ---
+  // Ocultar filtros al scrollear (buscador por encima)
   const [hideFilters, setHideFilters] = useState(false);
   useEffect(() => {
     let last = window.scrollY;
@@ -373,14 +370,17 @@ export default function BikerSearch() {
         const evento = params.get("evento");
         if (evento) {
           const pts = await fetchHotspotsByEvent(evento);
+          if (!alive) return;
           const hsMap = new Map((pts || []).map((p) => [String(p.id), { name: p.name }]));
-          if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
         }
       } catch (e) {
         console.error("Preconfig buscar:", e);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -428,7 +428,9 @@ export default function BikerSearch() {
         }
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [ruta]);
 
   /* ---------- Opciones multi ---------- */
@@ -461,7 +463,7 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ================== Buscar fotos ================== */
+  /* ================== Buscar fotos (igual que antes) ================== */
   useEffect(() => {
     console.log("[UI] fecha seleccionada:", fecha);
   }, [fecha]);
@@ -657,7 +659,7 @@ export default function BikerSearch() {
       }
 
       let evIds = [];
-      let eventMap = new Map(); // id -> photographer_id
+      let eventMap = new Map();
       if (ignorarHora) {
         const r = await getEventsByRoute({ routeName: ruta });
         evIds = r.evIds;
@@ -680,7 +682,6 @@ export default function BikerSearch() {
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
       }
 
-      // event_asset / storage
       let items = [];
       try {
         let q = supabase
@@ -798,31 +799,23 @@ export default function BikerSearch() {
 
   return (
     <div className="min-h-screen surface pb-28">
-      {/* ===== Barra full-bleed sticky (debajo del header) ===== */}
+      {/* ===== Barra full-bleed sticky (debajo del header, top-[88px] intacto) ===== */}
       <div
         className={`sticky top-[88px] z-20 transition-all duration-300 ${
           hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
         }`}
       >
-        {/* full-bleed */}
         <div className="w-screen ml-[calc(50%-50vw)] border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
           <div className="px-3 sm:px-4 py-2">
-            {/* UNA SOLA FILA: scroll-x si no cabe */}
-            <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap no-scrollbar">
+            {/* UNA FILA en md+, wrap en sm/xs (sin scroll horizontal) */}
+            <div className="flex md:flex-nowrap flex-wrap items-center gap-3">
               {/* FECHA */}
               <label className="inline-flex items-center gap-2 h-10">
                 <span className="text-xs font-medium text-slate-600">Fecha</span>
-                <input
-                  type="date"
-                  className="h-10 border rounded-lg px-2 bg-white"
-                  value={toYmd(fecha) || ""}
-                  onChange={(e) => setFecha(e.target.value)}
-                  disabled={ignorarHora}
-                  title={ignorarHora ? "Ignorando fecha/hora" : ""}
-                />
+                <input type="date" className="h-10 border rounded-lg px-2 bg-white" value={toYmd(fecha) || ""} onChange={(e)=>setFecha(e.target.value)} disabled={ignorarHora}/>
               </label>
 
-              {/* HORA */}
+              {/* HORA (más compacta) */}
               <div className="inline-flex items-center gap-2 h-10">
                 <span className="text-xs font-medium text-slate-600">Hora</span>
                 <DualSlider
@@ -832,37 +825,29 @@ export default function BikerSearch() {
                   b={finStep}
                   onChangeA={setIniStep}
                   onChangeB={setFinStep}
-                  width={260}
+                  width={200}
                 />
               </div>
 
               {/* IGNORAR HORA */}
               <label className="inline-flex items-center gap-2 h-10 text-xs text-slate-700">
-                <input type="checkbox" checked={ignorarHora} onChange={(e) => setIgnorarHora(e.target.checked)} />
+                <input type="checkbox" checked={ignorarHora} onChange={(e)=>setIgnorarHora(e.target.checked)}/>
                 Ignorar fecha/hora
               </label>
 
               {/* RUTA */}
               <label className="inline-flex items-center gap-2 h-10">
                 <span className="text-xs font-medium text-slate-600">Ruta</span>
-                <select
-                  className="h-10 border rounded-lg px-2 bg-white min-w-[200px]"
-                  value={ruta}
-                  onChange={(e) => setRuta(e.target.value)}
-                >
+                <select className="h-10 border rounded-lg px-2 bg-white min-w-[180px]" value={ruta} onChange={(e)=>setRuta(e.target.value)}>
                   <option value="Todos">Todas</option>
-                  {RUTAS_FIJAS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
+                  {RUTAS_FIJAS.map((r) => (<option key={r} value={r}>{r}</option>))}
                 </select>
               </label>
 
-              {/* FOTÓGRAFO (multi) */}
+              {/* FOTÓGRAFO */}
               <div className="inline-flex items-center gap-2 h-10">
                 <span className="text-xs font-medium text-slate-600">Fotógrafo</span>
-                <div className="min-w-[220px]">
+                <div className="min-w-[200px]">
                   <MultiSelectCheckbox
                     options={photogOptions}
                     value={selPhotogs}
@@ -872,10 +857,10 @@ export default function BikerSearch() {
                 </div>
               </div>
 
-              {/* PUNTO (multi) */}
+              {/* PUNTO */}
               <div className="inline-flex items-center gap-2 h-10">
                 <span className="text-xs font-medium text-slate-600">Punto</span>
-                <div className="min-w-[220px]">
+                <div className="min-w-[200px]">
                   <MultiSelectCheckbox
                     options={hotspotOptions}
                     value={selHotspots}
@@ -886,10 +871,10 @@ export default function BikerSearch() {
               </div>
 
               {/* SEPARADOR */}
-              <div className="inline-block w-px h-8 bg-slate-200 mx-1" />
+              <div className="hidden md:block w-px h-8 bg-slate-200 mx-1" />
 
-              {/* TAMAÑO */}
-              <label className="inline-flex items-center gap-2 h-10 text-sm">
+              {/* TAMAÑO (más compacto) */}
+              <label className="inline-flex items-center gap-2 h-10 text-sm ml-auto">
                 <span className="text-slate-500">Tamaño</span>
                 <input
                   type="range"
@@ -898,29 +883,14 @@ export default function BikerSearch() {
                   step={1}
                   value={cols}
                   onChange={(e) => setCols(parseInt(e.target.value, 10))}
-                  className="align-middle"
+                  className="w-[120px]"
                 />
-                <span className="text-slate-400 text-xs hidden sm:inline">({cols} por fila)</span>
-              </label>
-
-              {/* ASPECTO */}
-              <label className="inline-flex items-center gap-2 h-10 text-sm">
-                <span className="text-slate-500">Aspecto</span>
-                <select
-                  className="h-10 border rounded-md px-2 bg-white"
-                  value={aspectMode}
-                  onChange={(e) => setAspectMode(e.target.value)}
-                >
-                  <option value="1:1">1:1</option>
-                  <option value="16:9">16:9</option>
-                  <option value="4:3">4:3</option>
-                  <option value="9:16">9:16</option>
-                </select>
+                <span className="text-slate-400 text-xs hidden sm:inline">({cols})</span>
               </label>
 
               {/* MOSTRAR INFO */}
               <label className="inline-flex items-center gap-2 h-10 text-sm">
-                <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
+                <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
                 <span className="text-slate-500">Mostrar info</span>
               </label>
             </div>
@@ -928,8 +898,8 @@ export default function BikerSearch() {
         </div>
       </div>
 
-      {/* ======= RESULTADOS (flujo de página, sin scroll interno) ======= */}
-      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+      {/* ======= RESULTADOS full-bleed (sin contenedor centrado) ======= */}
+      <div className="w-screen ml-[calc(50%-50vw)] px-2 sm:px-4 pt-6">
         {loading ? (
           <div className="text-slate-500">Buscando fotos…</div>
         ) : (
@@ -944,9 +914,8 @@ export default function BikerSearch() {
             resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
             totalQ={totalQ}
             clearSel={clearSel}
-            /* controles de visor */
+            /* controles (sin aspecto) */
             cols={cols}
-            aspectMode={aspectMode}
             showLabels={showLabels}
           />
         )}
