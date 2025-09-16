@@ -306,6 +306,11 @@ export default function BikerSearch() {
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
   });
 
+  // Controles del visor (movidos aquí)
+  const [cols, setCols] = useState(12);                // Tamaño
+  const [aspectMode, setAspectMode] = useState("1:1"); // Aspecto
+  const [showLabels, setShowLabels] = useState(false); // Mostrar info
+
   // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
   const [selHotspots, setSelHotspots] = useState(() => (params.get("punto") ? [params.get("punto")] : []));
@@ -839,66 +844,52 @@ export default function BikerSearch() {
           }`}
         >
           <div className="pt-3 pb-3">
+            {/* ======= UNA SOLA BARRA (RESPONSIVA) ======= */}
             <div className="flex flex-wrap items-end gap-3">
               {/* FECHA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Fecha</label>
+              <div className="min-w-[150px]">
+                <label className="block text-xs font-medium text-slate-600">Fecha</label>
                 <input
                   type="date"
-                  className="h-9 border rounded-lg px-2 bg-white"
+                  className="h-9 border rounded-lg px-2 bg-white w-full"
                   value={toYmd(fecha) || ""}
-                  onChange={(e) => {
-                    console.log("[UI] change fecha ->", e.target.value);
-                    setFecha(e.target.value);
-                  }}
+                  onChange={(e) => setFecha(e.target.value)}
                   disabled={ignorarHora}
                   title={ignorarHora ? "Ignorando fecha/hora" : ""}
                 />
               </div>
 
-              {/* HORA */}
+              {/* HORA (DualSlider) */}
               <div className="min-w-[260px]">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
-                  <label className="flex items-center gap-1 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={ignorarHora}
-                      onChange={(e) => {
-                        console.log("[UI] change ignorarHora ->", e.target.checked);
-                        setIgnorarHora(e.target.checked);
-                      }}
-                    />
-                    Ignorar fecha/hora
-                  </label>
-                </div>
+                <label className="block text-xs font-medium text-slate-600">Hora (inicio–fin)</label>
                 <DualSlider
                   min={MIN_STEP}
                   max={MAX_STEP}
                   a={iniStep}
                   b={finStep}
-                  onChangeA={(v) => {
-                    console.log("[UI] change inicio ->", v, stepToTime24(v));
-                    setIniStep(v);
-                  }}
-                  onChangeB={(v) => {
-                    console.log("[UI] change fin ->", v, stepToTime24(v));
-                    setFinStep(v);
-                  }}
+                  onChangeA={setIniStep}
+                  onChangeB={setFinStep}
                   width={260}
                 />
               </div>
 
+              {/* IGNORAR HORA */}
+              <label className="flex items-center gap-2 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={ignorarHora}
+                  onChange={(e) => setIgnorarHora(e.target.checked)}
+                />
+                Ignorar fecha/hora
+              </label>
+
               {/* RUTA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Ruta</label>
+              <div className="min-w-[200px]">
+                <label className="block text-xs font-medium text-slate-600">Ruta</label>
                 <select
-                  className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
+                  className="h-9 border rounded-lg px-2 bg-white w-full"
                   value={ruta}
-                  onChange={(e) => {
-                    console.log("[UI] change ruta ->", e.target.value);
-                    setRuta(e.target.value);
-                  }}
+                  onChange={(e) => setRuta(e.target.value)}
                 >
                   <option value="Todos">Todas</option>
                   {RUTAS_FIJAS.map((r) => (
@@ -911,46 +902,67 @@ export default function BikerSearch() {
 
               {/* FOTÓGRAFO (multi) */}
               <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
+                <label className="block text-xs font-medium text-slate-600">Fotógrafo(s)</label>
                 <MultiSelectCheckbox
-                  options={useMemo(() => {
-                    const list = rows.filter((r) => (r.rutas || []).includes(ruta));
-                    return list
-                      .map((p) => ({
-                        value: p.id,
-                        label: resolver.photographerById.get(p.id)?.label || p.id,
-                      }))
-                      .sort((a, b) => a.label.localeCompare(b.label));
-                  }, [rows, ruta, resolver.photographerById])}
+                  options={photogOptions}
                   value={selPhotogs}
-                  onChange={(vals) => {
-                    console.log("[UI] change photogs ->", vals);
-                    setSelPhotogs(vals);
-                  }}
+                  onChange={setSelPhotogs}
                   placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
                 />
               </div>
 
               {/* PUNTO (multi) */}
               <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
+                <label className="block text-xs font-medium text-slate-600">Punto(s)</label>
                 <MultiSelectCheckbox
-                  options={useMemo(() => {
-                    const base = rows.filter((r) => (r.rutas || []).includes(ruta));
-                    const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
-                    const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
-                    return Array.from(set)
-                      .sort((a, b) => a.localeCompare(b))
-                      .map((name) => ({ value: name, label: name }));
-                  }, [rows, ruta, arrToCsv(selPhotogs)])}
+                  options={hotspotOptions}
                   value={selHotspots}
-                  onChange={(vals) => {
-                    console.log("[UI] change puntos ->", vals);
-                    setSelHotspots(vals);
-                  }}
+                  onChange={setSelHotspots}
                   placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
                 />
               </div>
+
+              {/* SEPARADOR FLEXIBLE */}
+              <div className="flex-1" />
+
+              {/* TAMAÑO */}
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-slate-500">Tamaño</span>
+                <input
+                  type="range"
+                  min={4}
+                  max={12}
+                  step={1}
+                  value={cols}
+                  onChange={(e) => setCols(parseInt(e.target.value, 10))}
+                />
+                <span className="text-slate-400 text-xs hidden sm:inline">({cols} por fila)</span>
+              </label>
+
+              {/* ASPECTO */}
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-slate-500">Aspecto</span>
+                <select
+                  className="h-9 border rounded-md px-2 bg-white"
+                  value={aspectMode}
+                  onChange={(e) => setAspectMode(e.target.value)}
+                >
+                  <option value="1:1">1:1</option>
+                  <option value="16:9">16:9</option>
+                  <option value="4:3">4:3</option>
+                  <option value="9:16">9:16</option>
+                </select>
+              </label>
+
+              {/* MOSTRAR INFO */}
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={showLabels}
+                  onChange={(e) => setShowLabels(e.target.checked)}
+                />
+                <span className="text-slate-500">Mostrar info</span>
+              </label>
             </div>
           </div>
         </div>
@@ -971,6 +983,10 @@ export default function BikerSearch() {
               resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
               totalQ={totalQ}
               clearSel={clearSel}
+              /* controles del visor (controlados) */
+              cols={cols}
+              aspectMode={aspectMode}
+              showLabels={showLabels}
             />
           )}
         </div>

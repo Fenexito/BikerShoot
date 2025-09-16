@@ -1,3 +1,4 @@
+// src/routes/biker/Search/SearchResults.jsx
 import React, { useMemo, useRef, useState } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { FixedSizeGrid as Grid } from "react-window";
@@ -16,7 +17,7 @@ const fmtTime = (iso) => {
 
 export default function SearchResults({
   paginatedPhotos,
-  totalPhotos,             // ya no mostramos contador
+  totalPhotos,
   onLoadMore,
   hasMorePhotos,
   onToggleSel,
@@ -25,11 +26,19 @@ export default function SearchResults({
   resolveHotspotName,
   totalQ,
   clearSel,
+  /* controles del visor (recibidos del padre) */
+  cols: colsProp,
+  aspectMode: aspectProp,
+  showLabels: showLabelsProp,
 }) {
-  // ---------- Controles ----------
-  const [cols, setCols] = useState(12);                // 12 (mín) ↔ 4 (máx)
-  const [aspectMode, setAspectMode] = useState("1:1"); // por defecto 1:1
-  const [showLabels, setShowLabels] = useState(false);
+  // Si por alguna razón no llegan los props, caemos a defaults internos
+  const [colsInternal, setColsInternal] = useState(colsProp ?? 12);
+  const [aspectInternal, setAspectInternal] = useState(aspectProp ?? "1:1");
+  const [showInternal, setShowInternal] = useState(!!showLabelsProp);
+
+  const cols = colsProp ?? colsInternal;
+  const aspectMode = aspectProp ?? aspectInternal;
+  const showLabels = typeof showLabelsProp === "boolean" ? showLabelsProp : showInternal;
 
   // ---------- Lightbox ----------
   const [lbOpen, setLbOpen] = useState(false);
@@ -54,42 +63,7 @@ export default function SearchResults({
 
   return (
     <section className="w-screen ml-[calc(50%-50vw)]">
-      {/* Toolbar de visual (solo los 3 controles que acordamos) */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm px-2 sm:px-4">
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2">
-            <span className="text-slate-500">Tamaño</span>
-            <input
-              type="range"
-              min={4}
-              max={12}
-              step={1}
-              value={cols}
-              onChange={(e) => setCols(parseInt(e.target.value, 10))}
-            />
-            <span className="text-slate-400 text-xs">({cols} por fila)</span>
-          </label>
-
-          <label className="flex items-center gap-2">
-            <span className="text-slate-500">Aspecto</span>
-            <select
-              className="h-8 border rounded-md px-2 bg-white"
-              value={aspectMode}
-              onChange={(e) => setAspectMode(e.target.value)}
-            >
-              <option value="1:1">1:1</option>
-              <option value="16:9">16:9</option>
-              <option value="4:3">4:3</option>
-              <option value="9:16">9:16</option>
-            </select>
-          </label>
-
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
-            <span className="text-slate-500">Mostrar info debajo</span>
-          </label>
-        </div>
-      </div>
+      {/* (Toolbar removida: ahora vive en Search.jsx) */}
 
       <div className="px-2 sm:px-4">
         <MosaicoVirtualized
