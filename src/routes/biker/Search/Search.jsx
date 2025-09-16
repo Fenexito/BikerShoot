@@ -829,155 +829,187 @@ export default function BikerSearch() {
   const clearSel = () => setSel(new Set());
   const totalQ = useMemo(() => sel.size * 50, [sel]);
 
+  /* ======= Controles de vista (migrados a la fila de filtros) ======= */
+  // Slider invertido 12 ← … → 4; por defecto queremos 4 por fila (pedido)
+  const [viewSliderPos, setViewSliderPos] = useState(8); // 0..8 → (12..4)
+  const [aspectMode, setAspectMode] = useState("1:1");
+  const [showLabels, setShowLabels] = useState(false);
+
   return (
     <div className="min-h-screen surface pb-28">
-      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* === Filtros sticky y colapsables (debajo del header) === */}
+      {/* ====== FILTROS A ANCHO COMPLETO (no se tapan con el header) ====== */}
+      <div className="w-screen ml-[calc(50%-50vw)]">
         <div
-          className={`sticky top-[88px] z-30 border-b border-slate-200 transition-all duration-300 ${
-            hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
-          }`}
+          className={
+            "sticky top-[148px] z-40 border-y border-slate-200 bg-white/95 backdrop-blur transition-all duration-300 " +
+            (hideFilters ? "-translate-y-3 opacity-0 pointer-events-none" : "translate-y-0 opacity-100")
+          }
         >
-          <div className="pt-3 pb-3">
-            <div className="flex flex-wrap items-end gap-3">
+          <div className="px-2 sm:px-3 lg:px-4">
+            <div
+              className="
+                flex flex-nowrap items-center gap-2 sm:gap-3 lg:gap-4 py-2
+                overflow-x-auto no-scrollbar
+              "
+            >
               {/* FECHA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Fecha</label>
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <span className="hidden xs:inline text-slate-600">Fecha</span>
                 <input
                   type="date"
-                  className="h-9 border rounded-lg px-2 bg-white"
+                  className="h-9 border rounded-lg px-2 bg-white min-w-[130px]"
                   value={toYmd(fecha) || ""}
-                  onChange={(e) => {
-                    console.log("[UI] change fecha ->", e.target.value);
-                    setFecha(e.target.value);
-                  }}
-                  disabled={ignorarHora}
-                  title={ignorarHora ? "Ignorando fecha/hora" : ""}
+                  onChange={(e) => setFecha(e.target.value)}
                 />
-              </div>
+              </label>
 
-              {/* HORA */}
-              <div className="min-w-[260px]">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-600">Hora (inicio–fin)</label>
-                  <label className="flex items-center gap-1 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={ignorarHora}
-                      onChange={(e) => {
-                        console.log("[UI] change ignorarHora ->", e.target.checked);
-                        setIgnorarHora(e.target.checked);
-                      }}
-                    />
-                    Ignorar fecha/hora
-                  </label>
-                </div>
+              {/* HORA (rango) */}
+              <div className={"shrink-0 " + (ignorarHora ? "opacity-40 pointer-events-none" : "")}>
                 <DualSlider
                   min={MIN_STEP}
                   max={MAX_STEP}
                   a={iniStep}
                   b={finStep}
-                  onChangeA={(v) => {
-                    console.log("[UI] change inicio ->", v, stepToTime24(v));
-                    setIniStep(v);
-                  }}
-                  onChangeB={(v) => {
-                    console.log("[UI] change fin ->", v, stepToTime24(v));
-                    setFinStep(v);
-                  }}
-                  width={260}
+                  onChangeA={setIniStep}
+                  onChangeB={setFinStep}
+                  width={220}
                 />
               </div>
 
+              {/* IGNORAR HORA */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={ignorarHora}
+                  onChange={(e) => setIgnorarHora(e.target.checked)}
+                />
+                <span className="hidden sm:inline text-slate-600">Ignorar hora</span>
+                <span className="sm:hidden text-slate-600">Ignorar</span>
+              </label>
+
               {/* RUTA */}
-              <div>
-                <label className="block text-sm font-medium text-slate-600">Ruta</label>
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <span className="hidden xs:inline text-slate-600">Ruta</span>
                 <select
-                  className="h-9 border rounded-lg px-2 bg-white min-w-[200px]"
+                  className="h-9 border rounded-lg px-2 bg-white min-w-[180px]"
                   value={ruta}
-                  onChange={(e) => {
-                    console.log("[UI] change ruta ->", e.target.value);
-                    setRuta(e.target.value);
-                  }}
+                  onChange={(e) => setRuta(e.target.value)}
                 >
                   <option value="Todos">Todas</option>
                   {RUTAS_FIJAS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
+                    <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
-              </div>
+              </label>
 
               {/* FOTÓGRAFO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Fotógrafo(s)</label>
+              <div className="shrink-0 min-w-[200px]">
                 <MultiSelectCheckbox
+                  label="Fotógrafo(s)"
                   options={useMemo(() => {
                     const list = rows.filter((r) => (r.rutas || []).includes(ruta));
                     return list
-                      .map((p) => ({
-                        value: p.id,
-                        label: resolver.photographerById.get(p.id)?.label || p.id,
-                      }))
+                      .map((p) => ({ value: p.id, label: resolver.photographerById.get(p.id)?.label || p.id }))
                       .sort((a, b) => a.label.localeCompare(b.label));
                   }, [rows, ruta, resolver.photographerById])}
-                  value={selPhotogs}
-                  onChange={(vals) => {
-                    console.log("[UI] change photogs ->", vals);
-                    setSelPhotogs(vals);
-                  }}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
+                  values={selPhotogs}
+                  onChange={setSelPhotogs}
                 />
               </div>
 
               {/* PUNTO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-sm font-medium text-slate-600">Punto(s)</label>
+              <div className="shrink-0 min-w-[200px]">
                 <MultiSelectCheckbox
+                  label="Punto(s)"
                   options={useMemo(() => {
                     const base = rows.filter((r) => (r.rutas || []).includes(ruta));
                     const filteredByPhotog = selPhotogs.length > 0 ? base.filter((r) => selPhotogs.includes(r.id)) : base;
                     const set = new Set(filteredByPhotog.flatMap((r) => (r.puntos || []).map((p) => String(p))));
-                    return Array.from(set)
-                      .sort((a, b) => a.localeCompare(b))
-                      .map((name) => ({ value: name, label: name }));
+                    return Array.from(set).sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name }));
                   }, [rows, ruta, arrToCsv(selPhotogs)])}
-                  value={selHotspots}
-                  onChange={(vals) => {
-                    console.log("[UI] change puntos ->", vals);
-                    setSelHotspots(vals);
-                  }}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
+                  values={selHotspots}
+                  onChange={setSelHotspots}
                 />
               </div>
+
+              {/* Separador */}
+              <div className="shrink-0 w-px h-6 bg-slate-200 mx-1" />
+
+              {/* TAMAÑO DE VISTA – 12 ← → 4 (default 4) */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <span className="hidden sm:inline text-slate-600">Tamaño</span>
+                <span className="sm:hidden text-slate-600">Cols</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={8}
+                  step={1}
+                  value={viewSliderPos}
+                  onChange={(e) => setViewSliderPos(parseInt(e.target.value, 10))}
+                  title="12 ←      → 4 por fila"
+                />
+                <span className="text-slate-400 text-xs">({12 - viewSliderPos} por fila)</span>
+              </label>
+
+              {/* ASPECTO */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <span className="hidden sm:inline text-slate-600">Aspecto</span>
+                <span className="sm:hidden text-slate-600">Aspect</span>
+                <select
+                  className="h-9 border rounded-lg px-2 bg-white"
+                  value={aspectMode}
+                  onChange={(e) => setAspectMode(e.target.value)}
+                >
+                  <option value="1:1">1:1</option>
+                  <option value="16:9">16:9</option>
+                  <option value="4:3">4:3</option>
+                  <option value="9:16">9:16</option>
+                </select>
+              </label>
+
+              {/* MOSTRAR INFO DEBAJO */}
+              <label className="shrink-0 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={showLabels}
+                  onChange={(e) => setShowLabels(e.target.checked)}
+                />
+                <span className="hidden sm:inline text-slate-600">Mostrar info debajo</span>
+                <span className="sm:hidden text-slate-600">Info</span>
+              </label>
             </div>
           </div>
         </div>
-
-        {/* ======= RESULTADOS ======= */}
-        <div className="mt-5">
-          {loading ? (
-            <div className="text-slate-500">Buscando fotos…</div>
-          ) : (
-            <SearchResults
-              paginatedPhotos={paginatedPhotos}
-              totalPhotos={totalPhotos}
-              onLoadMore={onLoadMore}
-              hasMorePhotos={hasMorePhotos}
-              onToggleSel={(id) => toggleSel(id)}
-              selected={sel}
-              resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
-              resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
-              totalQ={totalQ}
-              clearSel={clearSel}
-            />
-          )}
-        </div>
       </div>
-    </div>
-  );
-}
+
+      {/* ======= RESULTADOS ======= */}
+      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+         <div className="mt-5">
+           {loading ? (
+             <div className="text-slate-500">Buscando fotos…</div>
+           ) : (
+             <SearchResults
+               paginatedPhotos={paginatedPhotos}
+               totalPhotos={totalPhotos}
+               onLoadMore={onLoadMore}
+               hasMorePhotos={hasMorePhotos}
+               onToggleSel={(id) => toggleSel(id)}
+               selected={sel}
+               resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
+               resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
+               totalQ={totalQ}
+               clearSel={clearSel}
+              /* Paso 2: cablearemos estos 3 en SearchResults */
+              colsExternal={12 - viewSliderPos}
+              aspectExternal={aspectMode}
+              showLabelsExternal={showLabels}
+             />
+           )}
+         </div>
+      </div>
+     </div>
+   );
+ }
 
 /* Utilidad local */
 function cryptoRandomId() {
