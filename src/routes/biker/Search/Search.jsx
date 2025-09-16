@@ -58,7 +58,7 @@ const csvToArr = (v) => (!v ? [] : v.split(",").filter(Boolean));
 const arrToCsv = (a) => (Array.isArray(a) ? a.join(",") : "");
 
 /* ======= Dual Slider (compacto) ======= */
-function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
+function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 260 }) {
   const ref = React.useRef(null);
   const dragging = React.useRef(null);
   const clamp = (v) => Math.max(min, Math.min(max, v));
@@ -92,7 +92,7 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
 
   return (
     <div style={{ width }} className="select-none">
-      <div className="flex items-center justify-between text-[10px] text-slate-600 mb-1 font-mono">
+      <div className="flex items-center justify-between text-[11px] leading-none text-slate-600 mb-1 font-mono">
         <span>{to12h(stepToTime24(a))}</span>
         <span>{to12h(stepToTime24(b))}</span>
       </div>
@@ -108,6 +108,7 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
           style={{ left: `${toPct(a)}%` }}
           onMouseDown={startDrag("a")}
           aria-label="Hora inicio"
+          title="Hora inicio"
         />
         <button
           type="button"
@@ -115,6 +116,7 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
           style={{ left: `${toPct(b)}%` }}
           onMouseDown={startDrag("b")}
           aria-label="Hora final"
+          title="Hora final"
         />
       </div>
     </div>
@@ -294,7 +296,7 @@ export default function BikerSearch() {
 
   const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
 
-  // -------- filtros --------
+  // -------- filtros (una sola fila) --------
   const [fecha, setFecha] = useState(() => params.get("fecha") || new Date().toISOString().slice(0, 10));
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
@@ -304,15 +306,11 @@ export default function BikerSearch() {
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
   });
 
-  // Controles del visor (derecha)
-  const [cols, setCols] = useState(6);        // 6 por fila por defecto
-  const [showLabels, setShowLabels] = useState(false); // Sin aspecto
-
-  // Multi-selects
+  // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
   const [selHotspots, setSelHotspots] = useState(() => (params.get("punto") ? [params.get("punto")] : []));
 
-  // catálogos / resolver
+  // catálogos y resolutores
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [catalogReady, setCatalogReady] = useState(false);
@@ -321,9 +319,19 @@ export default function BikerSearch() {
     hotspotById: new Map(),
   });
 
-  // fotos
+  // fotos (buscador principal)
   const [allPhotos, setAllPhotos] = useState([]);
   const [allHasMore, setAllHasMore] = useState(false);
+
+  // --- “fijo cuando pasa header”: sin sticky, se vuelve fixed al top cuando scrollY >= 88 ---
+  const [pinned, setPinned] = useState(false);
+  useEffect(() => {
+    const HEADER_H = 88;
+    const onScroll = () => setPinned(window.scrollY >= HEADER_H);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   /* ---------- Prefill si venís de ?hotspot/?evento ---------- */
   useEffect(() => {
@@ -447,7 +455,11 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ================== Buscar fotos (robusto) ================== */
+  /* ================== Buscar fotos (robusto + logs) ================== */
+  useEffect(() => {
+    console.log("[UI] fecha seleccionada:", fecha);
+  }, [fecha]);
+
   async function runSearch() {
     try {
       setLoading(true);
@@ -472,6 +484,7 @@ export default function BikerSearch() {
           if (ignorarHora) {
             const { evIds } = await getEventsByRoute({ routeName: ruta });
             evIdsScope = evIds;
+            console.log("[BUSCAR] PHOTOGS: ignorarHora=TRUE, eventos x ruta:", evIdsScope.length);
           } else {
             const evIds = await getEventIdsByDateRouteAndPhotogs({
               fechaYmd: fechaParam,
@@ -479,6 +492,7 @@ export default function BikerSearch() {
               photographerIds: selPhotogs,
             });
             evIdsScope = evIds;
+            console.log("[BUSCAR] PHOTOGS: ignorarHora=FALSE, eventos x fecha+ruta:", evIdsScope.length, "fechaParam:", fechaParam);
           }
         }
 
@@ -503,16 +517,20 @@ export default function BikerSearch() {
           hotspotIds = (hsScoped || []).map((h) => String(h.id));
           const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          console.log("[BUSCAR] PHOTOGS: hotspots x evento:", hotspotIds.length, hotspotIds);
         } else if (routeIds.length && selHotspots.length) {
           const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
           hotspotIds = hs.map((h) => String(h.id));
           const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          console.log("[BUSCAR] PHOTOGS: hotspots x ruta:", hotspotIds.length, hotspotIds);
         } else if (routeIds.length) {
           const hs = await getHotspotsByRouteIds(routeIds);
           const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
         }
+
+        console.log("[BUSCAR] ruta:", ruta, "fechaParam:", fechaParam, "ignorarHora:", ignorarHora, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
 
         // A) fetchPhotos (si falla/0 → B/C)
         let items = [];
@@ -545,8 +563,9 @@ export default function BikerSearch() {
             });
           }
           items = normed;
+          console.log("[RESULT A] fetchPhotos items:", items.length);
         } catch (e) {
-          // silent; caemos a B/C
+          console.log("[RESULT A] fetchPhotos error:", e?.message || e);
         }
 
         // B/C) event_asset o Storage
@@ -556,6 +575,7 @@ export default function BikerSearch() {
             const { data: evFromRoutes } = await supabase.from("event_route").select("event_id").in("id", routeIds);
             const uniq = Array.from(new Set((evFromRoutes || []).map((r) => String(r.event_id)).filter(Boolean)));
             evIds.push(...uniq);
+            console.log("[RESULT B] eventos deducidos por routeIds:", evIds.length);
           }
 
           let scopedHotspotIds = [];
@@ -566,6 +586,7 @@ export default function BikerSearch() {
               .in("event_id", evIds)
               .in("name", selHotspots);
             scopedHotspotIds = (hsScoped || []).map((h) => String(h.id));
+            console.log("[RESULT B] hotspotIds (scoped):", scopedHotspotIds.length, scopedHotspotIds);
           }
 
           try {
@@ -593,6 +614,7 @@ export default function BikerSearch() {
                 });
               }
               items = tmp;
+              console.log("[RESULT B] event_asset items:", items.length);
             } else {
               const merged = [];
               for (const evId of evIds) {
@@ -608,8 +630,10 @@ export default function BikerSearch() {
                 );
               }
               items = merged;
+              console.log("[RESULT C] storage items:", items.length);
             }
           } catch (err) {
+            console.log("[RESULT B] event_asset error, fallback storage:", err?.message || err);
             const merged = [];
             for (const evId of evIds) {
               const listed = await listAssetsFromStorage(evId, {
@@ -624,11 +648,13 @@ export default function BikerSearch() {
               );
             }
             items = merged;
+            console.log("[RESULT C] storage items:", items.length);
           }
         }
 
         setAllHasMore(false);
         setAllPhotos(Array.isArray(items) ? items : []);
+        console.log("[RESULT FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
         return;
       }
 
@@ -636,6 +662,7 @@ export default function BikerSearch() {
       if (ruta === "Todos") {
         setAllPhotos([]);
         setAllHasMore(false);
+        console.log("[BUSCAR] NO-PHOTOG: ruta=Todos ⇒ 0");
         return;
       }
 
@@ -645,10 +672,12 @@ export default function BikerSearch() {
         const r = await getEventsByRoute({ routeName: ruta });
         evIds = r.evIds;
         eventMap = r.eventMap;
+        console.log("[BUSCAR] NO-PHOTOG ignorarHora=TRUE, eventos x ruta:", evIds.length);
       } else {
         const r = await getEventsByDateAndRoute({ fechaYmd: fechaParam, routeName: ruta });
         evIds = r.evIds;
         eventMap = r.eventMap;
+        console.log("[BUSCAR] NO-PHOTOG ignorarHora=FALSE, eventos x fecha+ruta:", evIds.length, "fechaParam:", fechaParam);
       }
 
       let hotspotIds = [];
@@ -661,6 +690,7 @@ export default function BikerSearch() {
         hotspotIds = (hsScoped || []).map((h) => String(h.id));
         const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+        console.log("[BUSCAR] NO-PHOTOG hotspots x evento:", hotspotIds.length, hotspotIds);
       }
 
       // event_asset / storage
@@ -691,6 +721,7 @@ export default function BikerSearch() {
             });
           }
           items = tmp;
+          console.log("[RESULT NO-PHOTOG B] event_asset items:", items.length);
         } else {
           const merged = [];
           for (const evId of evIds) {
@@ -707,13 +738,16 @@ export default function BikerSearch() {
             );
           }
           items = merged;
+          console.log("[RESULT NO-PHOTOG C] storage items:", items.length);
         }
       } catch (e) {
+        console.log("[RESULT NO-PHOTOG] error general:", e?.message || e);
         items = [];
       }
 
       setAllHasMore(false);
       setAllPhotos(Array.isArray(items) ? items : []);
+      console.log("[RESULT NO-PHOTOG FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
     } catch (e) {
       console.error("Buscar fotos:", e);
       setAllPhotos([]);
@@ -758,6 +792,17 @@ export default function BikerSearch() {
     return out;
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
+  useEffect(() => {
+    console.log(
+      "[FILTER] base:",
+      Array.isArray(allPhotos) ? allPhotos.length : 0,
+      "filtered:",
+      Array.isArray(filtered) ? filtered.length : 0,
+      "ignorarHora:",
+      ignorarHora
+    );
+  }, [allPhotos, filtered, ignorarHora]);
+
   /* ================== Paginación & selección ================== */
   const [page, setPage] = useState(1);
   const pageSize = 60;
@@ -778,103 +823,106 @@ export default function BikerSearch() {
   const clearSel = () => setSel(new Set());
   const totalQ = useMemo(() => sel.size * 50, [sel]);
 
+  // Altura aproximada de la barra (para spacer cuando está fixed)
+  const FILTER_BAR_H = 64;
+
   return (
     <div className="min-h-screen surface pb-28">
-      {/* ===== Header Search debe ir por encima (z-40) y esta barra abajo (z-30) ===== */}
-      {/* ===== Barra de filtros: full-bleed, una fila, sticky y con márgenes ===== */}
-      <div className="hidden md:block sticky top-[104px] z-30">
-        <div className="w-screen ml-[calc(50%-50vw)] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-slate-200">
-          <div className="px-3 sm:px-6 py-3">
-            {/* UNA SOLA FILA (sin scroll horizontal): comprimimos anchos y prevenimos overflow */}
-            <div className="flex flex-nowrap items-center gap-3 overflow-x-hidden">
-              {/* FECHA */}
-              <label className="inline-flex items-center gap-2 h-10 shrink-0">
-                <span className="text-xs font-medium text-slate-600">Fecha</span>
-                <input type="date" className="h-10 border rounded-lg px-2 bg-white w-[150px]" value={toYmd(fecha) || ""} onChange={(e)=>setFecha(e.target.value)} disabled={ignorarHora}/>
-              </label>
+      {/* ===== Barra de filtros: full-bleed, NO sticky; se fija (fixed) al pasar el header ===== */}
+      <div className={`w-screen ml-[calc(50%-50vw)] ${pinned ? "fixed top-0 left-0 right-0 z-30" : ""} bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-slate-200`}>
+        <div className="px-3 sm:px-6 py-3">
+          {/* UNA SOLA FILA: sin scroll horizontal ni vertical */}
+          <div className="flex flex-nowrap items-center gap-3 overflow-x-hidden overflow-y-hidden">
+            {/* FECHA */}
+            <label className="inline-flex items-center gap-2 h-10 shrink-0">
+              <span className="text-sm font-medium text-slate-700">Fecha</span>
+              <input
+                type="date"
+                className="h-10 border rounded-lg px-2 bg-white w-[150px]"
+                value={toYmd(fecha) || ""}
+                onChange={(e) => setFecha(e.target.value)}
+                disabled={ignorarHora}
+                title={ignorarHora ? "Ignorando fecha/hora" : ""}
+              />
+            </label>
 
-              {/* HORA (compacta) */}
-              <div className="inline-flex items-center gap-2 h-10 shrink-0">
-                <span className="text-xs font-medium text-slate-600">Hora</span>
-                <DualSlider
-                  min={MIN_STEP}
-                  max={MAX_STEP}
-                  a={iniStep}
-                  b={finStep}
-                  onChangeA={setIniStep}
-                  onChangeB={setFinStep}
-                  width={180}
-                />
-              </div>
-
-              {/* IGNORAR HORA */}
-              <label className="inline-flex items-center gap-2 h-10 text-xs text-slate-700 shrink-0">
-                <input type="checkbox" checked={ignorarHora} onChange={(e)=>setIgnorarHora(e.target.checked)}/>
-                Ignorar fecha/hora
-              </label>
-
-              {/* RUTA */}
-              <label className="inline-flex items-center gap-2 h-10 shrink">
-                <span className="text-xs font-medium text-slate-600">Ruta</span>
-                <select className="h-10 border rounded-lg px-2 bg-white min-w-[160px] w-[180px]" value={ruta} onChange={(e)=>setRuta(e.target.value)}>
-                  <option value="Todos">Todas</option>
-                  {RUTAS_FIJAS.map((r) => (<option key={r} value={r}>{r}</option>))}
-                </select>
-              </label>
-
-              {/* FOTÓGRAFO */}
-              <div className="inline-flex items-center gap-2 h-10 shrink">
-                <span className="text-xs font-medium text-slate-600">Fotógrafo</span>
-                <div className="min-w-[180px] w-[200px]">
-                  <MultiSelectCheckbox
-                    options={photogOptions}
-                    value={selPhotogs}
-                    onChange={setSelPhotogs}
-                    placeholder={ruta === "Todos" ? "Elegí una ruta" : "Seleccionar"}
-                  />
-                </div>
-              </div>
-
-              {/* PUNTO */}
-              <div className="inline-flex items-center gap-2 h-10 shrink">
-                <span className="text-xs font-medium text-slate-600">Punto</span>
-                <div className="min-w-[180px] w-[200px]">
-                  <MultiSelectCheckbox
-                    options={hotspotOptions}
-                    value={selHotspots}
-                    onChange={setSelHotspots}
-                    placeholder={ruta === "Todos" ? "Elegí una ruta" : "Seleccionar"}
-                  />
-                </div>
-              </div>
-
-              {/* SEPARADOR */}
-              <div className="hidden xl:block w-px h-8 bg-slate-200 mx-1 shrink-0" />
-
-              {/* TAMAÑO (columnas) */}
-              <label className="inline-flex items-center gap-2 h-10 text-sm ml-auto shrink-0">
-                <span className="text-slate-500">Tamaño</span>
-                <input
-                  type="range"
-                  min={4}
-                  max={12}
-                  step={1}
-                  value={cols}
-                  onChange={(e) => setCols(parseInt(e.target.value, 10))}
-                  className="w-[100px]"
-                />
-                <span className="text-slate-400 text-xs hidden lg:inline">({cols} col.)</span>
-              </label>
-
-              {/* MOSTRAR INFO */}
-              <label className="inline-flex items-center gap-2 h-10 text-sm shrink-0">
-                <input type="checkbox" checked={showLabels} onChange={(e)=>setShowLabels(e.target.checked)} />
-                <span className="text-slate-500 whitespace-nowrap">Mostrar info</span>
-              </label>
+            {/* HORA */}
+            <div className="inline-flex items-center gap-2 h-10 shrink-0">
+              <span className="text-sm font-medium text-slate-700">Hora</span>
+              <DualSlider
+                min={MIN_STEP}
+                max={MAX_STEP}
+                a={iniStep}
+                b={finStep}
+                onChangeA={setIniStep}
+                onChangeB={setFinStep}
+                width={180}
+              />
             </div>
+
+            {/* IGNORAR HORA */}
+            <label className="inline-flex items-center gap-2 h-10 text-sm text-slate-700 shrink-0">
+              <input
+                type="checkbox"
+                checked={ignorarHora}
+                onChange={(e) => setIgnorarHora(e.target.checked)}
+              />
+              Ignorar fecha/hora
+            </label>
+
+            {/* RUTA */}
+            <label className="inline-flex items-center gap-2 h-10 shrink">
+              <span className="text-sm font-medium text-slate-700">Ruta</span>
+              <select
+                className="h-10 border rounded-lg px-2 bg-white min-w-[160px] w-[180px]"
+                value={ruta}
+                onChange={(e) => setRuta(e.target.value)}
+              >
+                <option value="Todos">Todas</option>
+                {RUTAS_FIJAS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* FOTÓGRAFO */}
+            <div className="inline-flex items-center gap-2 h-10 shrink">
+              <span className="text-sm font-medium text-slate-700">Fotógrafo</span>
+              <div className="min-w-[180px] w-[200px]">
+                <MultiSelectCheckbox
+                  options={photogOptions}
+                  value={selPhotogs}
+                  onChange={setSelPhotogs}
+                  placeholder={ruta === "Todos" ? "Elegí una ruta" : "Seleccionar"}
+                />
+              </div>
+            </div>
+
+            {/* PUNTO */}
+            <div className="inline-flex items-center gap-2 h-10 shrink">
+              <span className="text-sm font-medium text-slate-700">Punto</span>
+              <div className="min-w-[180px] w-[200px]">
+                <MultiSelectCheckbox
+                  options={hotspotOptions}
+                  value={selHotspots}
+                  onChange={setSelHotspots}
+                  placeholder={ruta === "Todos" ? "Elegí una ruta" : "Seleccionar"}
+                />
+              </div>
+            </div>
+
+            {/* SEPARADOR */}
+            <div className="hidden xl:block w-px h-8 bg-slate-200 mx-1 shrink-0" />
+
+            {/* (Tu toolbar de Tamaño/Aspecto/Info vive dentro de SearchResults en tu proyecto actual) */}
           </div>
         </div>
       </div>
+
+      {/* Spacer para que el contenido no “salte” cuando la barra está fixed */}
+      {pinned && <div style={{ height: FILTER_BAR_H }} />}
 
       {/* ======= RESULTADOS full-bleed con márgenes laterales ======= */}
       <div className="w-screen ml-[calc(50%-50vw)] px-3 sm:px-6 pt-6">
@@ -892,9 +940,6 @@ export default function BikerSearch() {
             resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
             totalQ={totalQ}
             clearSel={clearSel}
-            /* controles (sin aspecto) */
-            cols={cols}
-            showLabels={showLabels}
           />
         )}
       </div>
