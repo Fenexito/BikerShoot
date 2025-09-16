@@ -296,7 +296,7 @@ export default function BikerSearch() {
 
   const forcedFromEvent = !!(params.get("evento") || params.get("hotspot") || params.get("punto"));
 
-  // -------- filtros (una sola fila) --------
+  // -------- filtros (una sola fila full-bleed) --------
   const [fecha, setFecha] = useState(() => params.get("fecha") || new Date().toISOString().slice(0, 10));
   const [iniStep, setIniStep] = useState(() => clampStep(timeToStep(params.get("inicio") || "06:00")));
   const [finStep, setFinStep] = useState(() => clampStep(timeToStep(params.get("fin") || "12:00")));
@@ -306,10 +306,10 @@ export default function BikerSearch() {
     return r && RUTAS_FIJAS.includes(r) ? r : "Todos";
   });
 
-  // Controles del visor (movidos aquí)
-  const [cols, setCols] = useState(12);                // Tamaño
-  const [aspectMode, setAspectMode] = useState("1:1"); // Aspecto
-  const [showLabels, setShowLabels] = useState(false); // Mostrar info
+  // Controles del visor (en la barra derecha)
+  const [cols, setCols] = useState(6);                // 6 por fila por defecto
+  const [aspectMode, setAspectMode] = useState("1:1");
+  const [showLabels, setShowLabels] = useState(false);
 
   // Multi-selects (fotógrafo: IDs, punto: NOMBRES)
   const [selPhotogs, setSelPhotogs] = useState(() => csvToArr(params.get("photogs")));
@@ -328,7 +328,7 @@ export default function BikerSearch() {
   const [allPhotos, setAllPhotos] = useState([]);
   const [allHasMore, setAllHasMore] = useState(false);
 
-  // --- Ocultar filtros al hacer scroll (solo aquí) ---
+  // --- Ocultar filtros al hacer scroll (buscador por encima) ---
   const [hideFilters, setHideFilters] = useState(false);
   useEffect(() => {
     let last = window.scrollY;
@@ -373,17 +373,14 @@ export default function BikerSearch() {
         const evento = params.get("evento");
         if (evento) {
           const pts = await fetchHotspotsByEvent(evento);
-          if (!alive) return;
           const hsMap = new Map((pts || []).map((p) => [String(p.id), { name: p.name }]));
-          setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
+          if (alive) setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
         }
       } catch (e) {
         console.error("Preconfig buscar:", e);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -431,9 +428,7 @@ export default function BikerSearch() {
         }
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [ruta]);
 
   /* ---------- Opciones multi ---------- */
@@ -466,7 +461,7 @@ export default function BikerSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogReady, photogOptions.length, hotspotOptions.length]);
 
-  /* ================== Buscar fotos (robusto + logs) ================== */
+  /* ================== Buscar fotos ================== */
   useEffect(() => {
     console.log("[UI] fecha seleccionada:", fecha);
   }, [fecha]);
@@ -495,7 +490,6 @@ export default function BikerSearch() {
           if (ignorarHora) {
             const { evIds } = await getEventsByRoute({ routeName: ruta });
             evIdsScope = evIds;
-            console.log("[BUSCAR] PHOTOGS: ignorarHora=TRUE, eventos x ruta:", evIdsScope.length);
           } else {
             const evIds = await getEventIdsByDateRouteAndPhotogs({
               fechaYmd: fechaParam,
@@ -503,7 +497,6 @@ export default function BikerSearch() {
               photographerIds: selPhotogs,
             });
             evIdsScope = evIds;
-            console.log("[BUSCAR] PHOTOGS: ignorarHora=FALSE, eventos x fecha+ruta:", evIdsScope.length, "fechaParam:", fechaParam);
           }
         }
 
@@ -517,7 +510,7 @@ export default function BikerSearch() {
           if (keep.length) routeIds = keep.map((r) => String(r.id));
         }
 
-        // Hotspots acotados al evento
+        // Hotspots acotados al evento / ruta
         let hotspotIds = [];
         if (selHotspots.length && evIdsScope.length) {
           const { data: hsScoped } = await supabase
@@ -528,22 +521,18 @@ export default function BikerSearch() {
           hotspotIds = (hsScoped || []).map((h) => String(h.id));
           const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          console.log("[BUSCAR] PHOTOGS: hotspots x evento:", hotspotIds.length, hotspotIds);
         } else if (routeIds.length && selHotspots.length) {
           const hs = await getHotspotsByRouteIds(routeIds, { names: selHotspots });
           hotspotIds = hs.map((h) => String(h.id));
           const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-          console.log("[BUSCAR] PHOTOGS: hotspots x ruta:", hotspotIds.length, hotspotIds);
         } else if (routeIds.length) {
           const hs = await getHotspotsByRouteIds(routeIds);
           const hsMap = new Map(hs.map((h) => [String(h.id), { name: h.name }]));
           setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
         }
 
-        console.log("[BUSCAR] ruta:", ruta, "fechaParam:", fechaParam, "ignorarHora:", ignorarHora, "routeIds:", routeIds, "hotspotIds:", hotspotIds, "photogs:", selPhotogs);
-
-        // A) fetchPhotos (si falla/0 → B/C)
+        // A) fetchPhotos (si falla → B/C)
         let items = [];
         try {
           const resp = await fetchPhotos({
@@ -574,9 +563,8 @@ export default function BikerSearch() {
             });
           }
           items = normed;
-          console.log("[RESULT A] fetchPhotos items:", items.length);
         } catch (e) {
-          console.log("[RESULT A] fetchPhotos error:", e?.message || e);
+          console.log("[fetchPhotos] error:", e?.message || e);
         }
 
         // B/C) event_asset o Storage
@@ -586,7 +574,6 @@ export default function BikerSearch() {
             const { data: evFromRoutes } = await supabase.from("event_route").select("event_id").in("id", routeIds);
             const uniq = Array.from(new Set((evFromRoutes || []).map((r) => String(r.event_id)).filter(Boolean)));
             evIds.push(...uniq);
-            console.log("[RESULT B] eventos deducidos por routeIds:", evIds.length);
           }
 
           let scopedHotspotIds = [];
@@ -597,7 +584,6 @@ export default function BikerSearch() {
               .in("event_id", evIds)
               .in("name", selHotspots);
             scopedHotspotIds = (hsScoped || []).map((h) => String(h.id));
-            console.log("[RESULT B] hotspotIds (scoped):", scopedHotspotIds.length, scopedHotspotIds);
           }
 
           try {
@@ -625,7 +611,6 @@ export default function BikerSearch() {
                 });
               }
               items = tmp;
-              console.log("[RESULT B] event_asset items:", items.length);
             } else {
               const merged = [];
               for (const evId of evIds) {
@@ -641,15 +626,12 @@ export default function BikerSearch() {
                 );
               }
               items = merged;
-              console.log("[RESULT C] storage items:", items.length);
             }
           } catch (err) {
-            console.log("[RESULT B] event_asset error, fallback storage:", err?.message || err);
+            console.log("[event_asset] error, fallback storage:", err?.message || err);
             const merged = [];
             for (const evId of evIds) {
-              const listed = await listAssetsFromStorage(evId, {
-                onlyHotspots: [],
-              });
+              const listed = await listAssetsFromStorage(evId, { onlyHotspots: [] });
               merged.push(
                 ...listed.map((it) => ({
                   ...it,
@@ -659,13 +641,11 @@ export default function BikerSearch() {
               );
             }
             items = merged;
-            console.log("[RESULT C] storage items:", items.length);
           }
         }
 
         setAllHasMore(false);
         setAllPhotos(Array.isArray(items) ? items : []);
-        console.log("[RESULT FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
         return;
       }
 
@@ -673,7 +653,6 @@ export default function BikerSearch() {
       if (ruta === "Todos") {
         setAllPhotos([]);
         setAllHasMore(false);
-        console.log("[BUSCAR] NO-PHOTOG: ruta=Todos ⇒ 0");
         return;
       }
 
@@ -683,12 +662,10 @@ export default function BikerSearch() {
         const r = await getEventsByRoute({ routeName: ruta });
         evIds = r.evIds;
         eventMap = r.eventMap;
-        console.log("[BUSCAR] NO-PHOTOG ignorarHora=TRUE, eventos x ruta:", evIds.length);
       } else {
         const r = await getEventsByDateAndRoute({ fechaYmd: fechaParam, routeName: ruta });
         evIds = r.evIds;
         eventMap = r.eventMap;
-        console.log("[BUSCAR] NO-PHOTOG ignorarHora=FALSE, eventos x fecha+ruta:", evIds.length, "fechaParam:", fechaParam);
       }
 
       let hotspotIds = [];
@@ -701,7 +678,6 @@ export default function BikerSearch() {
         hotspotIds = (hsScoped || []).map((h) => String(h.id));
         const hsMap = new Map((hsScoped || []).map((h) => [String(h.id), { name: h.name }]));
         setResolver((prev) => ({ ...prev, hotspotById: hsMap }));
-        console.log("[BUSCAR] NO-PHOTOG hotspots x evento:", hotspotIds.length, hotspotIds);
       }
 
       // event_asset / storage
@@ -732,7 +708,6 @@ export default function BikerSearch() {
             });
           }
           items = tmp;
-          console.log("[RESULT NO-PHOTOG B] event_asset items:", items.length);
         } else {
           const merged = [];
           for (const evId of evIds) {
@@ -749,16 +724,14 @@ export default function BikerSearch() {
             );
           }
           items = merged;
-          console.log("[RESULT NO-PHOTOG C] storage items:", items.length);
         }
       } catch (e) {
-        console.log("[RESULT NO-PHOTOG] error general:", e?.message || e);
+        console.log("[NO-PHOTOG] error general:", e?.message || e);
         items = [];
       }
 
       setAllHasMore(false);
       setAllPhotos(Array.isArray(items) ? items : []);
-      console.log("[RESULT NO-PHOTOG FINAL] allPhotos:", Array.isArray(items) ? items.length : 0);
     } catch (e) {
       console.error("Buscar fotos:", e);
       setAllPhotos([]);
@@ -803,17 +776,6 @@ export default function BikerSearch() {
     return out;
   }, [allPhotos, fecha, iniStep, finStep, ignorarHora]);
 
-  useEffect(() => {
-    console.log(
-      "[FILTER] base:",
-      Array.isArray(allPhotos) ? allPhotos.length : 0,
-      "filtered:",
-      Array.isArray(filtered) ? filtered.length : 0,
-      "ignorarHora:",
-      ignorarHora
-    );
-  }, [allPhotos, filtered, ignorarHora]);
-
   /* ================== Paginación & selección ================== */
   const [page, setPage] = useState(1);
   const pageSize = 60;
@@ -836,32 +798,33 @@ export default function BikerSearch() {
 
   return (
     <div className="min-h-screen surface pb-28">
-      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {/* === Filtros sticky y colapsables (debajo del header) === */}
-        <div
-          className={`sticky top-[88px] z-30 border-b border-slate-200 transition-all duration-300 ${
-            hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
-          }`}
-        >
-          <div className="pt-3 pb-3">
-            {/* ======= UNA SOLA BARRA (RESPONSIVA) ======= */}
-            <div className="flex flex-wrap items-end gap-3">
+      {/* ===== Barra full-bleed sticky (debajo del header) ===== */}
+      <div
+        className={`sticky top-[88px] z-20 transition-all duration-300 ${
+          hideFilters ? "-translate-y-full opacity-0" : "opacity-100"
+        }`}
+      >
+        {/* full-bleed */}
+        <div className="w-screen ml-[calc(50%-50vw)] border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="px-3 sm:px-4 py-2">
+            {/* UNA SOLA FILA: scroll-x si no cabe */}
+            <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap no-scrollbar">
               {/* FECHA */}
-              <div className="min-w-[150px]">
-                <label className="block text-xs font-medium text-slate-600">Fecha</label>
+              <label className="inline-flex items-center gap-2 h-10">
+                <span className="text-xs font-medium text-slate-600">Fecha</span>
                 <input
                   type="date"
-                  className="h-9 border rounded-lg px-2 bg-white w-full"
+                  className="h-10 border rounded-lg px-2 bg-white"
                   value={toYmd(fecha) || ""}
                   onChange={(e) => setFecha(e.target.value)}
                   disabled={ignorarHora}
                   title={ignorarHora ? "Ignorando fecha/hora" : ""}
                 />
-              </div>
+              </label>
 
-              {/* HORA (DualSlider) */}
-              <div className="min-w-[260px]">
-                <label className="block text-xs font-medium text-slate-600">Hora (inicio–fin)</label>
+              {/* HORA */}
+              <div className="inline-flex items-center gap-2 h-10">
+                <span className="text-xs font-medium text-slate-600">Hora</span>
                 <DualSlider
                   min={MIN_STEP}
                   max={MAX_STEP}
@@ -874,20 +837,16 @@ export default function BikerSearch() {
               </div>
 
               {/* IGNORAR HORA */}
-              <label className="flex items-center gap-2 text-xs text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={ignorarHora}
-                  onChange={(e) => setIgnorarHora(e.target.checked)}
-                />
+              <label className="inline-flex items-center gap-2 h-10 text-xs text-slate-700">
+                <input type="checkbox" checked={ignorarHora} onChange={(e) => setIgnorarHora(e.target.checked)} />
                 Ignorar fecha/hora
               </label>
 
               {/* RUTA */}
-              <div className="min-w-[200px]">
-                <label className="block text-xs font-medium text-slate-600">Ruta</label>
+              <label className="inline-flex items-center gap-2 h-10">
+                <span className="text-xs font-medium text-slate-600">Ruta</span>
                 <select
-                  className="h-9 border rounded-lg px-2 bg-white w-full"
+                  className="h-10 border rounded-lg px-2 bg-white min-w-[200px]"
                   value={ruta}
                   onChange={(e) => setRuta(e.target.value)}
                 >
@@ -898,35 +857,39 @@ export default function BikerSearch() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </label>
 
               {/* FOTÓGRAFO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-xs font-medium text-slate-600">Fotógrafo(s)</label>
-                <MultiSelectCheckbox
-                  options={photogOptions}
-                  value={selPhotogs}
-                  onChange={setSelPhotogs}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
-                />
+              <div className="inline-flex items-center gap-2 h-10">
+                <span className="text-xs font-medium text-slate-600">Fotógrafo</span>
+                <div className="min-w-[220px]">
+                  <MultiSelectCheckbox
+                    options={photogOptions}
+                    value={selPhotogs}
+                    onChange={setSelPhotogs}
+                    placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar fotógrafo(s)"}
+                  />
+                </div>
               </div>
 
               {/* PUNTO (multi) */}
-              <div className="min-w-[220px]">
-                <label className="block text-xs font-medium text-slate-600">Punto(s)</label>
-                <MultiSelectCheckbox
-                  options={hotspotOptions}
-                  value={selHotspots}
-                  onChange={setSelHotspots}
-                  placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
-                />
+              <div className="inline-flex items-center gap-2 h-10">
+                <span className="text-xs font-medium text-slate-600">Punto</span>
+                <div className="min-w-[220px]">
+                  <MultiSelectCheckbox
+                    options={hotspotOptions}
+                    value={selHotspots}
+                    onChange={setSelHotspots}
+                    placeholder={ruta === "Todos" ? "Elegí una ruta primero" : "Seleccionar punto(s)"}
+                  />
+                </div>
               </div>
 
-              {/* SEPARADOR FLEXIBLE */}
-              <div className="flex-1" />
+              {/* SEPARADOR */}
+              <div className="inline-block w-px h-8 bg-slate-200 mx-1" />
 
               {/* TAMAÑO */}
-              <label className="flex items-center gap-2 text-sm">
+              <label className="inline-flex items-center gap-2 h-10 text-sm">
                 <span className="text-slate-500">Tamaño</span>
                 <input
                   type="range"
@@ -935,15 +898,16 @@ export default function BikerSearch() {
                   step={1}
                   value={cols}
                   onChange={(e) => setCols(parseInt(e.target.value, 10))}
+                  className="align-middle"
                 />
                 <span className="text-slate-400 text-xs hidden sm:inline">({cols} por fila)</span>
               </label>
 
               {/* ASPECTO */}
-              <label className="flex items-center gap-2 text-sm">
+              <label className="inline-flex items-center gap-2 h-10 text-sm">
                 <span className="text-slate-500">Aspecto</span>
                 <select
-                  className="h-9 border rounded-md px-2 bg-white"
+                  className="h-10 border rounded-md px-2 bg-white"
                   value={aspectMode}
                   onChange={(e) => setAspectMode(e.target.value)}
                 >
@@ -955,41 +919,37 @@ export default function BikerSearch() {
               </label>
 
               {/* MOSTRAR INFO */}
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={showLabels}
-                  onChange={(e) => setShowLabels(e.target.checked)}
-                />
+              <label className="inline-flex items-center gap-2 h-10 text-sm">
+                <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
                 <span className="text-slate-500">Mostrar info</span>
               </label>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* ======= RESULTADOS ======= */}
-        <div className="mt-5">
-          {loading ? (
-            <div className="text-slate-500">Buscando fotos…</div>
-          ) : (
-            <SearchResults
-              paginatedPhotos={paginatedPhotos}
-              totalPhotos={totalPhotos}
-              onLoadMore={onLoadMore}
-              hasMorePhotos={hasMorePhotos}
-              onToggleSel={(id) => toggleSel(id)}
-              selected={sel}
-              resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
-              resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
-              totalQ={totalQ}
-              clearSel={clearSel}
-              /* controles del visor (controlados) */
-              cols={cols}
-              aspectMode={aspectMode}
-              showLabels={showLabels}
-            />
-          )}
-        </div>
+      {/* ======= RESULTADOS (flujo de página, sin scroll interno) ======= */}
+      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        {loading ? (
+          <div className="text-slate-500">Buscando fotos…</div>
+        ) : (
+          <SearchResults
+            paginatedPhotos={paginatedPhotos}
+            totalPhotos={totalPhotos}
+            onLoadMore={onLoadMore}
+            hasMorePhotos={hasMorePhotos}
+            onToggleSel={(id) => toggleSel(id)}
+            selected={sel}
+            resolvePhotographerName={(id) => resolver.photographerById.get(String(id))?.label || id || "—"}
+            resolveHotspotName={(id) => resolver.hotspotById.get(String(id))?.name || id || "—"}
+            totalQ={totalQ}
+            clearSel={clearSel}
+            /* controles de visor */
+            cols={cols}
+            aspectMode={aspectMode}
+            showLabels={showLabels}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,5 @@
 // src/routes/biker/Search/SearchResults.jsx
-import React, { useMemo, useRef, useState } from "react";
-import AutoSizer from "react-virtualized-auto-sizer";
-import { FixedSizeGrid as Grid } from "react-window";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import PhotoLightbox from "../../../components/PhotoLightbox.jsx";
 import { useCart } from "../../../state/CartContext.jsx";
 
@@ -26,27 +24,16 @@ export default function SearchResults({
   resolveHotspotName,
   totalQ,
   clearSel,
-  /* controles del visor (recibidos del padre) */
-  cols: colsProp,
-  aspectMode: aspectProp,
-  showLabels: showLabelsProp,
+  /* nuevos props controlados por el padre */
+  cols = 6,
+  aspectMode = "1:1",
+  showLabels = false,
 }) {
-  // Si por alguna razón no llegan los props, caemos a defaults internos
-  const [colsInternal, setColsInternal] = useState(colsProp ?? 12);
-  const [aspectInternal, setAspectInternal] = useState(aspectProp ?? "1:1");
-  const [showInternal, setShowInternal] = useState(!!showLabelsProp);
-
-  const cols = colsProp ?? colsInternal;
-  const aspectMode = aspectProp ?? aspectInternal;
-  const showLabels = typeof showLabelsProp === "boolean" ? showLabelsProp : showInternal;
-
   // ---------- Lightbox ----------
   const [lbOpen, setLbOpen] = useState(false);
   const [lbIndex, setLbIndex] = useState(0);
   const openLightbox = (idx) => { setLbIndex(idx); setLbOpen(true); };
   const closeLightbox = () => setLbOpen(false);
-
-  const effAspect = useMemo(() => aspectMode, [aspectMode]);
 
   const images = useMemo(() => {
     return (paginatedPhotos || []).map((p) => ({
@@ -61,25 +48,88 @@ export default function SearchResults({
     }));
   }, [paginatedPhotos, resolvePhotographerName, resolveHotspotName]);
 
-  return (
-    <section className="w-screen ml-[calc(50%-50vw)]">
-      {/* (Toolbar removida: ahora vive en Search.jsx) */}
+  // ---------- Infinite scroll (sin contenedor con scroll) ----------
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const ent = entries[0];
+        if (ent.isIntersecting && hasMorePhotos) onLoadMore?.();
+      },
+      { root: null, rootMargin: "1200px 0px", threshold: 0.01 }
+    );
+    io.observe(sentinelRef.current);
+    return () => io.disconnect();
+  }, [hasMorePhotos, onLoadMore, paginatedPhotos?.length]);
 
-      <div className="px-2 sm:px-4">
-        <MosaicoVirtualized
-          data={paginatedPhotos || []}
-          loadMore={onLoadMore}
-          hasMore={!!hasMorePhotos}
-          onToggleSel={onToggleSel}
-          selected={selected}
-          onOpenLightbox={openLightbox}
-          aspect={effAspect}
-          colsTarget={cols}
-          showLabels={showLabels}
-          resolvePhotographerName={resolvePhotographerName}
-          resolveHotspotName={resolveHotspotName}
-        />
+  // ---------- Aspect ratios ----------
+  const ratioClass =
+    aspectMode === "1:1" ? "aspect-square" :
+    aspectMode === "4:3" ? "aspect-[4/3]" :
+    aspectMode === "16:9" ? "aspect-video" :
+    aspectMode === "9:16" ? "aspect-[9/16]" :
+    "aspect-square";
+
+  // ---------- CSS grid con N columnas fijo (sin virtualizado) ----------
+  const gridTemplate = useMemo(() => {
+    const safeCols = Math.max(4, Math.min(12, parseInt(cols, 10) || 6));
+    return { gridTemplateColumns: `repeat(${safeCols}, minmax(0, 1fr))` };
+  }, [cols]);
+
+  return (
+    <section>
+      {/* Grilla fluida, sin altura fija ni overflows raros */}
+      <div className="grid gap-2 sm:gap-3" style={gridTemplate}>
+        {(paginatedPhotos || []).map((item, idx) => {
+          const isSel = selected?.has?.(item.id);
+          const hsName = resolveHotspotName ? resolveHotspotName(item.hotspotId) : (item.hotspotId || "");
+
+          return (
+            <div key={item.id} className="group relative rounded-xl overflow-hidden bg-white border border-slate-200">
+              <div
+                className={`relative ${ratioClass} bg-slate-100 cursor-zoom-in`}
+                onClick={() => openLightbox(idx)}
+                title="Ver grande"
+              >
+                <img
+                  src={item.url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  draggable={false}
+                />
+
+                {/* Botón seleccionar */}
+                <button
+                  type="button"
+                  className={
+                    "absolute top-2 left-2 z-10 h-8 px-2 rounded-md text-xs shadow " +
+                    (isSel
+                      ? "bg-blue-600 text-white"
+                      : "bg-white/90 text-slate-800 border border-slate-200")
+                  }
+                  onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
+                  title={isSel ? "Quitar de selección" : "Agregar a selección"}
+                >
+                  {isSel ? "Seleccionada" : "Elegir"}
+                </button>
+              </div>
+
+              {showLabels && (
+                <div className="p-2 text-[12px] leading-tight text-slate-700">
+                  <div className="truncate">{fmtDate(item.timestamp)} {fmtTime(item.timestamp)}</div>
+                  <div className="truncate opacity-70">{hsName}</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Sentinel para cargar más (aparece al final del documento) */}
+      <div ref={sentinelRef} className="h-10" />
 
       {/* Barra de selección */}
       {typeof totalQ === "number" && selected?.size > 0 && (
@@ -122,121 +172,6 @@ export default function SearchResults({
         </>
       )}
     </section>
-  );
-}
-
-/* -------------------- Grilla virtualizada -------------------- */
-function MosaicoVirtualized({
-  data, loadMore, hasMore, onToggleSel, selected, onOpenLightbox,
-  aspect, colsTarget, showLabels, resolvePhotographerName, resolveHotspotName
-}) {
-  const lastRowSeen = useRef(-1);
-
-  return (
-    <div className="h-[78vh] md:h-[80vh] lg:h-[82vh] xl:h-[86vh] rounded-2xl border bg-white pb-2">
-      <AutoSizer>
-        {({ width, height }) => {
-          const GAP = 8;
-
-          // Ensanchamos cuando el aspecto es 16:9 (menos columnas efectivas => thumbs más anchas)
-          const baseCols = Math.max(4, Math.min(colsTarget, 12));
-          const widthBoost = aspect === "16:9" ? 0.75 : 1; // 16:9 = ~25% menos columnas
-          const cols = Math.max(4, Math.floor(baseCols * widthBoost));
-
-          const cellW = Math.floor((width - GAP * (cols + 1)) / cols);
-
-          const ratio = aspect === "1:1" ? 1
-            : aspect === "4:3" ? 3/4
-            : aspect === "16:9" ? 9/16
-            : aspect === "9:16" ? 16/9
-            : 1;
-
-          const labelH = showLabels ? 42 : 0;
-          const imgH = Math.round(cellW * ratio);
-          const cellH = imgH + labelH;
-
-          const columnWidth = cellW + GAP;
-          const rowHeight = cellH + GAP;
-          const rowCount = Math.ceil(data.length / cols);
-
-          return (
-            <Grid
-              columnCount={cols}
-              columnWidth={columnWidth}
-              height={height}
-              rowCount={rowCount}
-              rowHeight={rowHeight}
-              width={width}
-              style={{ overflowX: "hidden" }}
-              onItemsRendered={({ visibleRowStopIndex }) => {
-                if (visibleRowStopIndex !== lastRowSeen.current) {
-                  lastRowSeen.current = visibleRowStopIndex;
-                  if (hasMore && visibleRowStopIndex >= rowCount - 1) loadMore?.();
-                }
-              }}
-            >
-              {({ columnIndex, rowIndex, style }) => {
-                const idx = rowIndex * cols + columnIndex;
-                const item = data[idx];
-                if (!item) return <div style={style} />;
-                const isSel = selected?.has?.(item.id);
-                const hsName = resolveHotspotName ? resolveHotspotName(item.hotspotId) : (item.hotspotId || "");
-
-                return (
-                  <div style={style} className="p-2">
-                    <div
-                      className={
-                        "group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 transition-shadow " +
-                        (isSel ? "ring-4 ring-blue-600 shadow-[0_0_0_4px_rgba(59,130,246,0.35)]" : "hover:shadow-md")
-                      }
-                    >
-                      {isSel && (
-                        <div className="absolute top-2 left-2 z-10 h-7 px-2 rounded-md bg-blue-600 text-white text-xs shadow">
-                          Seleccionada
-                        </div>
-                      )}
-                      {!isSel && (
-                        <button
-                          type="button"
-                          className="absolute z-10 top-2 left-2 h-7 px-2 rounded-md bg-white/90 text-xs border border-slate-200 shadow-sm"
-                          onClick={(e) => { e.stopPropagation(); onToggleSel?.(item.id); }}
-                          title="Agregar a selección"
-                        >
-                          Elegir
-                        </button>
-                      )}
-
-                      <div
-                        className="w-full bg-slate-200 cursor-zoom-in"
-                        style={{ height: imgH }}
-                        onClick={() => onOpenLightbox(idx)}
-                        title="Ver grande"
-                      >
-                        <img
-                          src={item.url}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                          draggable={false}
-                        />
-                      </div>
-
-                      {showLabels && (
-                        <div className="p-2 text-[12px] leading-tight text-slate-700">
-                          <div className="truncate">{fmtDate(item.timestamp)} {fmtTime(item.timestamp)}</div>
-                          <div className="truncate opacity-70">{hsName}</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              }}
-            </Grid>
-          );
-        }}
-      </AutoSizer>
-    </div>
   );
 }
 
