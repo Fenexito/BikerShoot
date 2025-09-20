@@ -15,6 +15,35 @@ export default function HeaderUser() {
 
   const isSearchRoute = location.pathname.startsWith("/app/buscar");
 
+  // Ir al inicio con animación rápida (smooth) y fallback
+  const goTop = () => {
+    // Respeta accesibilidad
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    // Soporte nativo
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    } catch (_) {
+      // Algunos navegadores viejitos no soportan smooth
+    }
+    // Fallback manual (easeOutCubic ~350ms)
+    const start = window.scrollY || window.pageYOffset || 0;
+    const duration = 350;
+    const startTime = performance.now();
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+      const y = Math.round(start * (1 - easeOutCubic(t)));
+      window.scrollTo(0, y);
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+
   useEffect(() => {
     if (!isSearchRoute) {
       setHideOnScroll(false);
@@ -23,10 +52,14 @@ export default function HeaderUser() {
     let last = window.scrollY;
     const onScroll = () => {
       const y = window.scrollY;
-      const goingDown = y > last + 6;
-      const goingUp = y < last - 6;
-      if (goingDown && y > 120) setHideOnScroll(true);
-      else if (goingUp || y <= 10) setHideOnScroll(false);
+      // Ocultar al pasar cierto umbral scrolleando hacia abajo…
+     if (y > 120) {
+       setHideOnScroll(true);
+     }
+     // …y mostrar ÚNICAMENTE cuando volvés al inicio (top).
+     else if (y <= 10) {
+       setHideOnScroll(false);
+     }
       last = y;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -41,6 +74,7 @@ export default function HeaderUser() {
   }
 
   return (
+    <>
     <header
       className={
         "sticky top-4 z-50 px-4 transition-transform duration-300 " +
@@ -139,5 +173,30 @@ export default function HeaderUser() {
         </div>
       </div>
     </header>
+    {/* Botón flotante "INICIO" (solo en buscar y cuando el header esté oculto) */}
+    {isSearchRoute && hideOnScroll && (
+      <button
+        onClick={goTop}
+        title="Ir al inicio"
+        className="
+          fixed bottom-4 right-4 z-[60]
+          inline-flex items-center gap-2
+          rounded-full px-4 py-2
+          bg-blue-600 text-white font-bold shadow-lg
+          hover:bg-blue-700 active:scale-95
+          transition
+        "
+        // Un pelito de padding para evitar chocar con la barra de gestos en móviles
+        style={{ paddingBottom: `calc(0.5rem + env(safe-area-inset-bottom, 0px))` }}
+      >
+        <span className="text-sm tracking-wide">INICIO</span>
+        {/* Flecha hacia arriba */}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             className="h-5 w-5" fill="currentColor" aria-hidden="true">
+          <path d="M12 4l-7 7h4v7h6v-7h4l-7-7z" />
+        </svg>
+      </button>
+    )}
+    </>
   );
 }
