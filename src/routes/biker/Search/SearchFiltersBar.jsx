@@ -9,10 +9,10 @@ import {
 
 export default function SearchFiltersBar({
   pinned,
+  // filtros
   fecha, setFecha,
   iniStep, setIniStep,
   finStep, setFinStep,
-  ignorarHora, setIgnorarHora,
   ruta, setRuta,
   photogOptions,
   selPhotogs, setSelPhotogs,
@@ -27,15 +27,28 @@ export default function SearchFiltersBar({
 }) {
   const disableBuscar = searching || ruta === "Todos";
 
+  // 💡 Clave para matar el scroll X:
+  // - Nada de w-screen ni calc(50%-50vw).
+  // - En pinned usamos fixed + inset-x-0 (ocupa el ancho real de la página),
+  //   con max-w-[100vw] y overflow-x: clip por seguridad.
+  // - En no pinned usamos w-full y flujo normal.
+  const outerClass = pinned
+    ? "fixed inset-x-0 top-0 z-[600] max-w-[100vw]"
+    : "relative z-[600] w-full";
+
   return (
     <div
-      className={
-        `w-screen ml-[calc(50%-50vw)]
-         ${pinned ? "fixed top-0 left-0 right-0 z-[600]" : "relative z-[600]"}
-         bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80
-         border-b border-slate-200`
-      }
-      style={{ overflow: "visible" }} // no cortar dropdowns/menus
+      className={`
+        ${outerClass}
+        bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80
+        border-b border-slate-200
+        box-border
+      `}
+      style={{
+        // permitir dropdowns hacia fuera pero sin desbordar horizontal:
+        overflowY: "visible",
+        overflowX: "clip",
+      }}
     >
       <div className="px-3 sm:px-6 py-2 pointer-events-auto">
         {/* NOTA: z-[601] mantiene a los controles sobre el contenido, pero debajo del Lightbox */}
@@ -48,35 +61,7 @@ export default function SearchFiltersBar({
               className="h-9 border rounded-lg px-2 bg-white w-[150px] max-w-full"
               value={fecha || ""}
               onChange={(e) => setFecha(e.target.value)}
-              disabled={ignorarHora}
-              title={ignorarHora ? "Ignorando fecha/hora" : ""}
             />
-          </Field>
-
-          {/* HORA (estilo original) */}
-          <Field label="Hora" className="min-w-[220px]">
-            <DualSlider
-              min={MIN_STEP}
-              max={MAX_STEP}
-              a={iniStep}
-              b={finStep}
-              onChangeA={setIniStep}
-              onChangeB={setFinStep}
-              width={220}
-            />
-          </Field>
-
-          {/* IGNORAR HORA */}
-          <Field label="Ignorar hora" className="min-w-[160px]">
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700 h-9">
-              <input
-                id="f-ignorar"
-                type="checkbox"
-                checked={ignorarHora}
-                onChange={(e) => setIgnorarHora(e.target.checked)}
-              />
-              <span>Aplicar sin fecha/hora</span>
-            </label>
           </Field>
 
           {/* RUTA */}
@@ -94,9 +79,21 @@ export default function SearchFiltersBar({
             </select>
           </Field>
 
+          {/* HORA (doble deslizador original) */}
+          <Field label="Hora" className="min-w-[220px]">
+            <DualSlider
+              min={MIN_STEP}
+              max={MAX_STEP}
+              a={iniStep}
+              b={finStep}
+              onChangeA={setIniStep}
+              onChangeB={setFinStep}
+              width={220}
+            />
+          </Field>
+
           {/* FOTÓGRAFO */}
           <Field label="Fotógrafo" className="min-w-[200px]">
-            {/* Wrapper con z mayor que la barra para que el menú caiga sobre el grid */}
             <div className="relative z-[650] h-9 flex items-center">
               <div className="w-[200px] max-w-full">
                 <MultiSelectCheckbox
@@ -190,8 +187,8 @@ function Field({ label, className = "", children }) {
   );
 }
 
-/* ======= Dual Slider (estilo original) ======= */
-function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
+/* ======= Dual Slider (puro JS, con labels 12h) ======= */
+function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 220 }) {
   const ref = React.useRef(null);
   const dragging = React.useRef(null);
   const clamp = (v) => Math.max(min, Math.min(max, v));
@@ -207,50 +204,64 @@ function DualSlider({ min, max, a, b, onChangeA, onChangeB, width = 200 }) {
       if (dragging.current === "a") onChangeA(Math.min(val, b - 1));
       else onChangeB(Math.max(val, a + 1));
     },
-    [a, b, min, max, onChangeA, onChangeB]
+    [min, max, a, b, onChangeA, onChangeB]
   );
 
-  const stop = React.useCallback(() => {
-    dragging.current = null;
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", stop);
-  }, [onMove]);
-
-  const startDrag = (which) => (ev) => {
-    dragging.current = which;
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", stop);
-    ev.preventDefault();
+  const onPointerDown = (key) => (ev) => {
+    dragging.current = key;
+    try {
+      const tgt = ev.target;
+      if (tgt && typeof tgt.setPointerCapture === "function") {
+        tgt.setPointerCapture(ev.pointerId);
+      }
+    } catch (_) {}
   };
+  const onPointerUp = () => { dragging.current = null; };
 
   return (
     <div style={{ width }} className="select-none">
-      <div className="flex items-center justify-between text-[11px] leading-none text-slate-600 mb-1 font-mono">
+      <div
+        ref={ref}
+        className="h-2 rounded bg-slate-200 relative"
+        onPointerMove={onMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {/* pista activa */}
+        <div
+          className="absolute h-2 bg-blue-500 rounded"
+          style={{
+            left: `${toPct(a)}%`,
+            width: `${Math.max(0, toPct(b) - toPct(a))}%`,
+          }}
+        />
+        {/* pulgar A */}
+        <div
+          role="slider"
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={a}
+          tabIndex={0}
+          className="absolute -top-1 size-4 rounded-full bg-white border border-slate-300 shadow cursor-pointer touch-none"
+          style={{ left: `calc(${toPct(a)}% - 8px)` }}
+          onPointerDown={onPointerDown("a")}
+        />
+        {/* pulgar B */}
+        <div
+          role="slider"
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={b}
+          tabIndex={0}
+          className="absolute -top-1 size-4 rounded-full bg-white border border-slate-300 shadow cursor-pointer touch-none"
+          style={{ left: `calc(${toPct(b)}% - 8px)` }}
+          onPointerDown={onPointerDown("b")}
+        />
+      </div>
+      {/* Etiquetas de hora (12h) */}
+      <div className="mt-1 text-[11px] text-slate-600 flex justify-between tabular-nums">
         <span>{to12h(stepToTime24(a))}</span>
         <span>{to12h(stepToTime24(b))}</span>
-      </div>
-      <div ref={ref} className="relative h-7">
-        <div className="absolute inset-0 rounded-full bg-slate-200" />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-blue-500"
-          style={{ left: `${toPct(a)}%`, width: `${toPct(b) - toPct(a)}%` }}
-        />
-        <button
-          type="button"
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-slate-300 bg-white shadow"
-          style={{ left: `${toPct(a)}%` }}
-          onMouseDown={startDrag("a")}
-          aria-label="Hora inicio"
-          title="Hora inicio"
-        />
-        <button
-          type="button"
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border border-slate-300 bg-white shadow"
-          style={{ left: `${toPct(b)}%` }}
-          onMouseDown={startDrag("b")}
-          aria-label="Hora final"
-          title="Hora final"
-        />
       </div>
     </div>
   );

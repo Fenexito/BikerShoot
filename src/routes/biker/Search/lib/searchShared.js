@@ -23,7 +23,7 @@ export const norm = (s) =>
 
 /* ================== Tiempo (step de 15min) ================== */
 export const MIN_STEP = 5 * 4;  // 05:00
-export const MAX_STEP = 15 * 4; // 15:00
+export const MAX_STEP = 13 * 4; // 13:00
 export const clampStep = (s) => Math.max(MIN_STEP, Math.min(MAX_STEP, Number(s) || MIN_STEP));
 export const timeToStep = (t = "06:00") => {
   const [h, m] = (t || "00:00").split(":").map((n) => parseInt(n || "0", 10));
@@ -140,11 +140,17 @@ export async function getEventRouteIdsByName(routeName, { photographerIds = [], 
 
 export async function getHotspotsByRouteIds(routeIds = [], { names = [] } = {}) {
   if (!routeIds.length) return [];
-  let q = supabase.from("event_hotspot").select("id, name, route_id, event_id").in("route_id", routeIds);
-  if (names?.length) q = q.in("name", names.map(String));
-  const { data, error } = await q;
+  const { data, error } = await supabase
+    .from("event_hotspot")
+    .select("id, name, route_id, event_id")
+    .in("route_id", routeIds);
   if (error) throw error;
-  return data || [];
+  let rows = data || [];
+  if (names?.length) {
+    const wanted = new Set(names.map((s) => norm(String(s))));
+    rows = rows.filter((h) => wanted.has(norm(h.name)));
+  }
+  return rows;
 }
 
 // Eventos del/los fotógrafos en la FECHA exacta para esa ruta

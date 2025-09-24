@@ -1,11 +1,10 @@
 import React, { useEffect } from 'react'
-import { Routes, Route, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Routes, Route, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom'
 import HeaderPublic from './components/HeaderPublic.jsx'
 import HeaderUser from './components/HeaderUser.jsx'
 import HeaderStudio from './components/HeaderStudio.jsx'
 import Footer from './components/Footer.jsx'
-import { CartProvider, useCart } from './state/CartContext.jsx'
-import Drawer from './components/ui/Drawer.jsx'
+import { CartProvider, useCart, CartDrawerRoot } from './state/CartContext.jsx'
 import ModalHost from './components/ui/Modal.jsx'
 import Toaster from './components/ui/Toaster.jsx'
 import { isAuthPath, isUserPortal, isStudioPortal, isDarkRoute } from './lib/utils.js'
@@ -120,37 +119,10 @@ function LayoutShell(){
       {!hideChrome && !adminPortal && (userPortal ? <HeaderUser/> : studioPortal ? <HeaderStudio/> : <HeaderPublic/>)}
       <Outlet />
       {!hideChrome && !userPortal && !studioPortal && !adminPortal && <Footer/>}
-      {userPortal && <CartDrawer/>}
+      {userPortal && <CartDrawerRoot/>}
       <ModalHost dark={dark} />
       <Toaster dark={dark} />
     </div>
-  )
-}
-
-function CartDrawer(){
-  const { open, setOpen, items, removeItem, total } = useCart()
-  return (
-    <Drawer open={open} onClose={()=>setOpen(false)} side='right'>
-      <div className='flex items-center justify-between p-4 border-b'>
-        <h3 className='font-black text-lg'>Tu carrito</h3>
-        <button onClick={()=>setOpen(false)} className='w-9 h-9 grid place-items-center rounded-lg border'>✕</button>
-      </div>
-      <div className='p-4 space-y-3 overflow-auto h-[calc(100%-160px)]'>
-        {items.length===0 && <div className='text-slate-500'>Tu carrito está vacío.</div>}
-        {items.map(it => (
-          <div key={it.id} className='flex items-center gap-3 border rounded-xl p-3'>
-            <div className='w-16 h-16 bg-slate-200 rounded-lg overflow-hidden'><img src={it.img} alt='' className='w-full h-full object-cover'/></div>
-            <div className='flex-1'><div className='font-semibold'>{it.name}</div><div className='text-sm text-slate-500'>x{it.qty||1}</div></div>
-            <div className='font-bold'>${(it.price*(it.qty||1)).toFixed(2)}</div>
-            <button onClick={()=>removeItem(it.id)} className='w-9 h-9 grid place-items-center rounded-lg border'>✕</button>
-          </div>
-        ))}
-      </div>
-      <div className='p-4 border-t'>
-        <div className='flex items-center justify-between font-bold text-lg'><span>Total</span><span>${total.toFixed(2)}</span></div>
-        <a href='/app/checkout' className='block text-center mt-3 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold'>Ir al checkout</a>
-      </div>
-    </Drawer>
   )
 }
 
@@ -161,6 +133,7 @@ export default function App(){
         <Route element={<LayoutShell/>}>
           {/* públicas */}
           <Route index element={<Home/>}/>
+          <Route path="/checkout" element={<Navigate to="/app/checkout" replace />} />
           <Route path='/login' element={<Login/>}/>
           <Route path='/login-fotografo' element={<LoginPhotographer/>}/>
           <Route path='/signup' element={<Signup/>}/>
