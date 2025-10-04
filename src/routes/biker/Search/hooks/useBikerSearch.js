@@ -142,6 +142,60 @@ export function useSearchCatalog({
   const [photogOptions, setPhotogOptions] = React.useState([]);
   const [hotspotOptions, setHotspotOptions] = React.useState([]);
 
+  // === HOTFIX: asegurar que los SELECTS muestren la selección inicial aunque las opciones tarden en llegar ===
+  React.useEffect(() => {
+    if (!Array.isArray(selPhotogs) || selPhotogs.length === 0) return;
+    setPhotogOptions((prev) => {
+      const prevArr = Array.isArray(prev) ? prev : [];
+      const seen = new Set(prevArr.map(o => String(o.value)));
+      let changed = false;
+      const next = [...prevArr];
+      for (const id of selPhotogs) {
+        const k = String(id);
+        if (!seen.has(k)) {
+          // Evitar que se vea el ID crudo: usar label provisional
+          next.push({ value: k, label: "Cargando…" });
+          seen.add(k);
+          changed = true;
+        }
+      }
+      if (!changed) return prevArr;
+      const dedup = [];
+      const seen2 = new Set();
+      for (const o of next) {
+        const v = String(o.value);
+        if (!seen2.has(v)) { seen2.add(v); dedup.push(o); }
+      }
+      return dedup;
+    });
+  }, [selPhotogs]);
+
+  React.useEffect(() => {
+    if (!Array.isArray(selHotspots) || selHotspots.length === 0) return;
+    setHotspotOptions((prev) => {
+      const prevArr = Array.isArray(prev) ? prev : [];
+      const seen = new Set(prevArr.map(o => String(o.value)));
+      let changed = false;
+      const next = [...prevArr];
+      for (const name of selHotspots) {
+        const k = String(name);
+        if (!seen.has(k)) {
+          next.push({ value: k, label: "Cargando…" });
+          seen.add(k);
+          changed = true;
+        }
+      }
+      if (!changed) return prevArr;
+      const dedup = [];
+      const seen2 = new Set();
+      for (const o of next) {
+        const v = String(o.value);
+        if (!seen2.has(v)) { seen2.add(v); dedup.push(o); }
+      }
+      return dedup;
+    });
+  }, [selHotspots]);
+
   // Opciones reales según FECHA+RUTA con fotos (incluye fallback a Storage)
   React.useEffect(() => {
     let alive = true;
@@ -244,66 +298,24 @@ export function useSearchCatalog({
     return () => { alive = false; };
   }, [ruta, fecha, arrToCsv(selPhotogs), rows.length, setResolver]);
 
-  // ====== INYECTAR OPCIONES FALTANTES SI YA HAY SELECCIÓN (desde evento) ======
-  // Esto asegura que los combos MUESTREN el valor seleccionado aunque todavía
-  // no aparezca en las opciones calculadas por fecha/ruta.
-  React.useEffect(() => {
-    if (!selPhotogs?.length) return;
-    setPhotogOptions((prev) => {
-      const byId = new Map(prev.map(o => [String(o.value), o.label]));
-      let changed = false;
-      const labelFromRows = new Map(rows.map(r => [String(r.id), r.estudio || r.username || r.id]));
-      const next = [...prev];
-      for (const id of selPhotogs) {
-        const k = String(id);
-        if (!byId.has(k)) {
-          next.push({ value: k, label: labelFromRows.get(k) || k });
-          changed = true;
-        }
-      }
-      if (!changed) return prev;
-      // dedupe
-      const seen = new Set();
-      return next.filter(o => (seen.has(String(o.value)) ? false : (seen.add(String(o.value)), true)));
-    });
-  }, [selPhotogs, rows]);
-
-  React.useEffect(() => {
-    if (!selHotspots?.length) return;
-    setHotspotOptions((prev) => {
-      const inPrev = new Set(prev.map(o => String(o.value)));
-      let changed = false;
-      const next = [...prev];
-      for (const nm of selHotspots) {
-        const k = String(nm);
-        if (!inPrev.has(k)) {
-          next.push({ value: k, label: k });
-          changed = true;
-        }
-      }
-      if (!changed) return prev;
-      // dedupe
-      const seen = new Set();
-      return next.filter(o => (seen.has(String(o.value)) ? false : (seen.add(String(o.value)), true)));
-    });
-  }, [selHotspots]);
-
-  // ====== Limpieza de selecciones inválidas (pero NO si venís de evento) ======
+  // ====== Revalidar selecciones SOLO cuando cambia el "scope" (fecha/ruta) ======
+  const scopeRef = React.useRef(`${fecha}__${ruta}`);
   React.useEffect(() => {
     if (!catalogReady) return;
-
-    // Si venimos desde /event o /?hotspot/?punto, NO limpiamos para que se vea elegido.
-    if (fromEventParams) return;
+    const key = `${fecha}__${ruta}`;
+    const scopeChanged = key !== scopeRef.current;
+    scopeRef.current = key;
+    if (!scopeChanged) return; // no barrer por re-render de opciones durante BUSCAR
 
     const validPhotogIds = new Set(photogOptions.map((o) => String(o.value)));
-    const cleanedPhotogs = selPhotogs.filter((id) => validPhotogIds.has(String(id)));
-    if (cleanedPhotogs.length !== selPhotogs.length) setSelPhotogs(cleanedPhotogs);
+    const keepPhotogs = selPhotogs.filter((id) => validPhotogIds.has(String(id)));
+    if (keepPhotogs.length !== selPhotogs.length) setSelPhotogs(keepPhotogs);
 
     const validHotspotNames = new Set(hotspotOptions.map((o) => String(o.value)));
-    const cleanedHotspots = selHotspots.filter((nm) => validHotspotNames.has(String(nm)));
-    if (cleanedHotspots.length !== selHotspots.length) setSelHotspots(cleanedHotspots);
+    const keepHotspots = selHotspots.filter((nm) => validHotspotNames.has(String(nm)));
+    if (keepHotspots.length !== selHotspots.length) setSelHotspots(keepHotspots);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogReady, photogOptions.length, hotspotOptions.length, fromEventParams]);
+  }, [catalogReady, fecha, ruta]);
 
   const mergeHotspotNamesIntoResolver = React.useCallback((hsMapByIdToName) => {
     setResolver((prev) => ({ ...prev, hotspotById: new Map(hsMapByIdToName) }));

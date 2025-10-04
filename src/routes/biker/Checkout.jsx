@@ -134,32 +134,45 @@ export default function Checkout() {
         let email = u?.email || "";
         let phone = pickPhone(u?.user_metadata) || "";
 
-        // Intentar en "profiles"
+        // Intentar en "biker_profile"
         let profile = null;
         try {
           const { data } = await supabase
-            .from("profiles")
+            .from("biker_profile")
             .select("*")
-            .eq("id", uid)
+            .eq("user_id", uid)
             .maybeSingle();
           if (data) profile = data;
         } catch {}
-        // Intentar en "biker_profile"
+        // Intentar en "perfil" (tabla general), si no se encontró en biker_profile
         if (!profile) {
           try {
             const { data } = await supabase
-              .from("biker_profile")
+              .from("perfil")
               .select("*")
-              .eq("user_id", uid)
+              .eq("id", uid)
               .maybeSingle();
             if (data) profile = data;
           } catch {}
         }
 
         if (profile) {
-          name = pickName(profile) || name || "";
-          email = profile.email || email || "";
-          const p2 = pickPhone(profile);
+          // Nombre: biker_profile.nombre | perfil.display_name | otros campos
+          name =
+            profile.nombre ||
+            profile.display_name ||
+            pickName(profile) ||
+            name ||
+            "";
+          // Email: biker_profile.correo | perfil.email | auth.email
+          email = profile.correo || profile.email || email || "";
+          // Teléfono/WhatsApp: biker_profile.telefono | perfil.phone | otros alias
+          const p2 =
+            profile.telefono ||
+            profile.phone ||
+            profile.whatsapp ||
+            pickPhone(profile) ||
+            "";
           phone = p2 || phone || "";
         }
 
@@ -233,7 +246,7 @@ export default function Checkout() {
     return result;
   }, [grouped, subTotalQ, discountQ]);
 
-  // ====== Bancos por fotógrafo (si tenés en la tabla photographer_profile) ======
+  // ====== Bancos por fotógrafo (photographer_profile.pagos + telefono) ======
   const [bankByPhotog, setBankByPhotog] = useState(new Map());
   const visiblePids = useMemo(() => vendorTotals.map((g) => g.pid).filter(Boolean), [vendorTotals]);
 
@@ -244,25 +257,29 @@ export default function Checkout() {
       try {
         const { data, error } = await supabase
           .from("photographer_profile")
-          .select("user_id, bank_accounts, payment_info, whatsapp, phone, phone_wa")
+          .select("user_id, pagos, telefono, whatsapp, phone, phone_wa, correo")
           .in("user_id", visiblePids);
         if (error) throw error;
         const map = new Map();
         for (const row of data || []) {
-          // Estructura flexible: bank_accounts (array) o payment_info (obj)
+          // Normalizar 'pagos' → array de cuentas
           let cuentas = [];
-          if (Array.isArray(row?.bank_accounts)) cuentas = row.bank_accounts;
-          else if (row?.payment_info && typeof row.payment_info === "object") {
-            // intenta normalizar
-            const pi = row.payment_info;
-            cuentas = Array.isArray(pi?.accounts) ? pi.accounts : [];
+          const pagos = row?.pagos;
+          if (Array.isArray(pagos)) {
+            cuentas = pagos;
+          } else if (pagos && typeof pagos === "object") {
+            if (Array.isArray(pagos.accounts)) cuentas = pagos.accounts;
+            else if (pagos.banco || pagos.cuenta || pagos.nombre) cuentas = [pagos];
           }
-          const wa =
+          // WhatsApp/telefono del fotógrafo
+          const waRaw =
+            row?.telefono ||
             row?.phone_wa ||
             row?.whatsapp ||
             row?.phone ||
-            null;
-          map.set(String(row.user_id), { cuentas, whatsapp: String(wa || "").replace(/\D/g, "") });
+            "";
+          const waDigits = String(waRaw || "").replace(/\D/g, "");
+          map.set(String(row.user_id), { cuentas, whatsapp: waDigits });
         }
         if (alive) setBankByPhotog(map);
       } catch {
@@ -616,7 +633,12 @@ export default function Checkout() {
               {vendorTotals.map((g) => {
                 const bank = bankByPhotog.get(String(g.pid)) || { cuentas: [], whatsapp: "" };
                 const cuentas = Array.isArray(bank.cuentas) ? bank.cuentas : [];
-                const waTo = bank.whatsapp ? `https://wa.me/502${bank.whatsapp.replace(/\D/g, "")}` : null;
+                // si son 8 dígitos chapines, anteponer +502; si ya trae prefijo, respetarlo
+                let waTo = null;
+                if (bank.whatsapp) {
+                  const d = String(bank.whatsapp).replace(/\D/g, "");
+                  waTo = d.length === 8 ? `https://wa.me/502${d}` : `https://wa.me/${d}`;
+                }
                 const [file, setFile] = useState(null);
                 const [sending, setSending] = useState(false);
                 const [sent, setSent] = useState(false);

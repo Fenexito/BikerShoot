@@ -56,7 +56,7 @@ export default function BikerSearch() {
     loading, runSearch,
     paginatedPhotos, totalPhotos, hasMorePhotos, onLoadMore,
     selected, onToggleSel, clearSel, totalQ,
-    resetPhotos, // ⟵ NUEVO
+    resetPhotos,
   } = useSearchPhotos({
     fecha, iniStep, finStep,
     ruta, selPhotogs, selHotspots,
@@ -66,7 +66,7 @@ export default function BikerSearch() {
   // ===== Estado para saber si ya se hizo una búsqueda =====
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Prefill cuando vienen params (?hotspot/?punto/?evento/photogs)
+  // ===== Prefill cuando vienen params (?hotspot/?punto/?evento/photogs) =====
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -75,30 +75,49 @@ export default function BikerSearch() {
         if (hotspotParam) {
           const hs = await fetchHotspot(hotspotParam);
           if (hs) {
+            // Ruta
             if (!params.get("ruta") && hs.route_id) {
-              const { data: rname } = { data: await getRouteName(hs.route_id) };
-              const name = rname || await getRouteName(hs.route_id);
+              const name = await getRouteName(hs.route_id);
               if (name && RUTAS_FIJAS.includes(name)) setRuta(name);
             }
+            // Horas
             if (!params.get("inicio") && hs.horaIni) setIniStep(clampStep(timeToStep(hs.horaIni)));
             if (!params.get("fin") && hs.horaFin) setFinStep(clampStep(timeToStep(hs.horaFin)));
-            if (!params.get("punto") && hs.name) setSelHotspots([String(hs.name)]);
+
+            // Punto: usar ID, no nombre (para que el select muestre seleccionado)
+            if (!params.get("punto") && hs.id) setSelHotspots([String(hs.id)]);
+
+            // Fotógrafo: desde el evento del hotspot si no hay selección aún
             if (!selPhotogs.length && hs.event_id) {
               const ev = await fetchEvent(hs.event_id);
-              if (ev?.photographer_id) setSelPhotogs([String(ev.photographer_id)]);
+              if (ev?.photographer_id) {
+                const pid = String(ev.photographer_id);
+                setSelPhotogs([pid]);
+                // 🚑 Inyectar label provisional para que NO se vea el ID crudo
+                setResolver((prev) => {
+                  const map = new Map(prev.photographerById);
+                  // Mostrá algo decente en lo que llega el catálogo
+                  if (!map.has(pid)) map.set(pid, { label: "Cargando…" });
+                  return { ...prev, photographerById: map };
+                });
+              }
             }
           }
         }
 
+        // Fotógrafos por CSV directo en la URL (p. ej. ?photogs=a,b,c)
         const photogsCsv = params.get("photogs");
-        if (photogsCsv && !selPhotogs.length) setSelPhotogs(photogsCsv.split(",").filter(Boolean));
+        if (photogsCsv && !selPhotogs.length) {
+          setSelPhotogs(photogsCsv.split(",").map(String).filter(Boolean));
+        }
 
+        // Resolver de hotspots por evento (para mostrar nombres bonitos de una vez)
         const evento = params.get("evento");
         if (evento) {
           const pts = await fetchHotspotsByEvent(evento);
           if (!alive) return;
-          const hsMapByName = new Map((pts || []).map((p) => [String(p.id), { name: p.name }]));
-          mergeHotspotNamesIntoResolver(hsMapByName);
+          const hsMapById = new Map((pts || []).map((p) => [String(p.id), { name: p.name }]));
+          mergeHotspotNamesIntoResolver(hsMapById);
         }
       } catch (e) {
         console.error("Preconfig buscar:", e);
@@ -116,6 +135,7 @@ export default function BikerSearch() {
     const cameFrom = params.get("evento") || params.get("hotspot") || params.get("punto");
     if (!cameFrom) return;
 
+    // Esperar a que termine el catálogo (para que el UI ya pueda renderizar labels)
     if (loadingCatalog) return;
 
     const hasRoute = ruta && ruta !== "Todos";
@@ -138,20 +158,17 @@ export default function BikerSearch() {
   ]);
 
   // ===== Reinicio automático si el usuario cambia FECHA o RUTA =====
+  // Reiniciar SOLO la búsqueda (grid/estado), NO los filtros seleccionados.
   useEffect(() => {
-    // Limpiar selecciones dependientes
-    setSelPhotogs([]);
-    setSelHotspots([]);
-    // Limpiar resultados renderizados (fotos)
-    resetPhotos();              // ⟵ aquí vaciamos el grid
-    // “Reiniciar” flujo (oculta resultados anteriores y muestra guía)
-    setHasSearched(false);
+    resetPhotos();           // vacía el grid/paginación
+    setHasSearched(false);   // muestra el mensaje guiado hasta que den BUSCAR
+    // NO tocar: selPhotogs / selHotspots  ⟵ se mantienen intactos
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fecha, ruta]);
 
   const onSubmitSearch = () => {
     setHasSearched(true);
-    resetPhotos(); // opcional: asegura que no parpadeen resultados viejos
+    resetPhotos(); // asegura que no parpadeen resultados viejos
     runSearch();
   };
 
