@@ -1,57 +1,76 @@
-@import "leaflet/dist/leaflet.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body { @apply font-sans; }
-:root{
-  --container: 1200px;
-}
-
-.container-max{ max-width: var(--container); margin-left:auto; margin-right:auto; }
-
-@supports (padding: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-/* ===== Fix selects/inputs en páginas oscuras (Studio) ===== */
 @layer base {
-  /* Controles de formulario dentro del layout oscuro */
-  .bg-studio-bg select,
-  .bg-studio-bg textarea,
-  .bg-studio-bg input[type="text"],
-  .bg-studio-bg input[type="email"],
-  .bg-studio-bg input[type="password"],
-  .bg-studio-bg input[type="number"],
-  .bg-studio-bg input[type="search"],
-  .bg-studio-bg input[type="url"],
-  .bg-studio-bg input[type="tel"],
-  .bg-studio-bg input[type="date"],
-  .bg-studio-bg input[type="time"] {
-    @apply bg-[#111319] text-slate-100 placeholder:text-slate-400 border-white/10;
+  body {
+    @apply bg-background text-foreground antialiased;
   }
+}
 
-  /* Opciones del <select> (el menú desplegable) */
-  .bg-studio-bg option {
-    @apply bg-[#111319] text-slate-100;
-  }
+/* ---------- Flat Design (público / biker) — paleta única, modo claro ---------- */
+:root,
+.theme-flat {
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #10b981;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #f59e0b;
+  --color-accent-foreground: #111827;
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-hover: #d1d5db;
+  --color-input: #f3f4f6;
+  --color-card: #ffffff;
+  --color-card-foreground: #111827;
+  --color-ring: #3b82f6;
 
-  /* Focus/hover con mejor contraste */
-  .bg-studio-bg select:focus,
-  .bg-studio-bg textarea:focus,
-  .bg-studio-bg input:focus {
-    @apply outline-none ring-2 ring-blue-500/40 border-blue-500/50;
-  }
+  font-family: 'Outfit', sans-serif;
+}
 
-  /* Quitar el autofill amarillo de Chrome en oscuro */
-  .bg-studio-bg input:-webkit-autofill,
-  .bg-studio-bg input:-webkit-autofill:hover,
-  .bg-studio-bg input:-webkit-autofill:focus {
-    -webkit-text-fill-color: #e5e7eb;
-    -webkit-box-shadow: 0 0 0px 1000px #111319 inset;
-    transition: background-color 9999s ease-in-out 0s;
-  }
+/* ---------- Bold Typography (studio / fotógrafo) — claro y oscuro ---------- */
+.theme-studio {
+  --color-background: #fafafa;
+  --color-foreground: #0a0a0a;
+  --color-muted: #f0f0f0;
+  --color-muted-foreground: #6b6b6b;
+  --color-accent: #ff3d00;
+  --color-accent-foreground: #fafafa;
+  --color-border: #e5e5e5;
+  --color-border-hover: #b8b8b8;
+  --color-input: #f0f0f0;
+  --color-card: #f5f5f5;
+  --color-card-foreground: #0a0a0a;
+  --color-ring: #ff3d00;
+  --color-primary: var(--color-foreground);
+  --color-primary-foreground: var(--color-background);
+  --color-secondary: var(--color-muted);
+  --color-secondary-foreground: var(--color-foreground);
+
+  font-family: 'Inter Tight', Inter, system-ui, sans-serif;
+}
+
+.theme-studio.dark {
+  --color-background: #0a0a0a;
+  --color-foreground: #fafafa;
+  --color-muted: #1a1a1a;
+  --color-muted-foreground: #737373;
+  --color-accent: #ff3d00;
+  --color-accent-foreground: #0a0a0a;
+  --color-border: #262626;
+  --color-border-hover: #3f3f3f;
+  --color-input: #1a1a1a;
+  --color-card: #0f0f0f;
+  --color-card-foreground: #fafafa;
+  --color-ring: #ff3d00;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+.theme-studio * {
+  border-radius: 0 !important;
 }

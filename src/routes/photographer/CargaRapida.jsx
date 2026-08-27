@@ -1,1 +1,0 @@
-export default function StudioCargaRapida(){return <main className='container-max px-5 py-8 text-white'><h1 className='text-3xl font-black'>Carga rápida</h1></main>}
