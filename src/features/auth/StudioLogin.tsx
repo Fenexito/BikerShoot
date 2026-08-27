@@ -46,6 +46,9 @@ export function StudioLogin() {
         <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Correo" type="email" placeholder="tu@estudio.com" error={errors.email?.message} {...register('email')} />
           <Input label="Contraseña" type="password" placeholder="••••••••" error={errors.password?.message} {...register('password')} />
+          <Link to="/studio/forgot-password" className="-mt-3 self-end font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-accent">
+            ¿Olvidaste tu contraseña?
+          </Link>
 
           {formError && <p className="text-sm text-accent">{formError}</p>}
 

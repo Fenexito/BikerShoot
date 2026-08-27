@@ -8,7 +8,16 @@ import { Toaster } from '../ui/overlays/Toaster'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
 
-const AUTH_PATHS = ['/login', '/signup', '/studio/login', '/studio/signup']
+const AUTH_PATHS = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/studio/login',
+  '/studio/signup',
+  '/studio/forgot-password',
+  '/studio/onboarding',
+]
 
 export function PortalLayout() {
   const { pathname } = useLocation()

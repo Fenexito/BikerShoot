@@ -46,6 +46,9 @@ export function BikerLogin() {
         <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Correo" type="email" placeholder="tu@correo.com" error={errors.email?.message} {...register('email')} />
           <Input label="Contraseña" type="password" placeholder="••••••••" error={errors.password?.message} {...register('password')} />
+          <Link to="/forgot-password" className="-mt-2 self-end text-sm font-medium text-primary">
+            ¿Olvidaste tu contraseña?
+          </Link>
 
           {formError && <p className="text-sm text-red-600">{formError}</p>}
 
