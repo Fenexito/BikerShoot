@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '../../ui/studio/Button'
 import { Input } from '../../ui/studio/Input'
+import { GoogleIcon } from '../../ui/shared/GoogleIcon'
 import { useAuth } from './AuthContext'
 
 const schema = z.object({
@@ -14,9 +15,20 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export function StudioLogin() {
-  const { signIn } = useAuth()
+  const { signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [formError, setFormError] = useState<string | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const onGoogle = async () => {
+    setFormError(null)
+    setGoogleLoading(true)
+    const { error } = await signInWithGoogle('studio')
+    if (error) {
+      setFormError(error)
+      setGoogleLoading(false)
+    }
+  }
 
   const {
     register,
@@ -56,6 +68,15 @@ export function StudioLogin() {
             Entrar
           </Button>
         </form>
+
+        <div className="my-8 flex items-center gap-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />o<span className="h-px flex-1 bg-border" />
+        </div>
+
+        <Button variant="secondary" size="lg" onClick={onGoogle} loading={googleLoading} className="w-full justify-center">
+          <GoogleIcon className="h-5 w-5" />
+          Continuar con Google
+        </Button>
 
         <p className="mt-8 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
           ¿No tienes cuenta? <Link to="/studio/signup" className="text-accent">Regístrate</Link>

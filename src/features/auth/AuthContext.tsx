@@ -24,6 +24,7 @@ interface AuthState {
     displayName: string,
   ) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>
   signIn: (email: string, password: string, portal: 'biker' | 'studio') => Promise<{ error: string | null }>
+  signInWithGoogle: (portal: 'biker' | 'studio') => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
@@ -95,6 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
+  async function signInWithGoogle(portal: 'biker' | 'studio') {
+    const intendedRole = portal === 'biker' ? 'biker' : 'photographer'
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback?role=${intendedRole}` },
+    })
+    return { error: error?.message ?? null }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
   }
@@ -124,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         requestPasswordReset,
         updatePassword,

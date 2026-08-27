@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
+import { GoogleIcon } from '../../ui/shared/GoogleIcon'
 import { useAuth } from './AuthContext'
 
 const schema = z.object({
@@ -14,9 +15,20 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export function BikerLogin() {
-  const { signIn } = useAuth()
+  const { signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
   const [formError, setFormError] = useState<string | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const onGoogle = async () => {
+    setFormError(null)
+    setGoogleLoading(true)
+    const { error } = await signInWithGoogle('biker')
+    if (error) {
+      setFormError(error)
+      setGoogleLoading(false)
+    }
+  }
 
   const {
     register,
@@ -56,6 +68,15 @@ export function BikerLogin() {
             Iniciar sesión
           </Button>
         </form>
+
+        <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />o continúa con<span className="h-px flex-1 bg-border" />
+        </div>
+
+        <Button variant="secondary" size="lg" onClick={onGoogle} loading={googleLoading} className="w-full">
+          <GoogleIcon className="h-5 w-5" />
+          Continuar con Google
+        </Button>
 
         <p className="mt-6 text-sm text-muted-foreground">
           ¿No tienes cuenta? <Link to="/signup" className="font-semibold text-primary">Crear cuenta</Link>

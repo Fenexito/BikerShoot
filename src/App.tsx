@@ -19,6 +19,7 @@ import { StudioOnboarding } from './features/photographer/StudioOnboarding'
 import { StudioProfilePage } from './features/photographer/StudioProfilePage'
 import { RequireAdmin } from './features/admin/RequireAdmin'
 import { ApprovePhotographers } from './features/admin/ApprovePhotographers'
+import { AuthCallback } from './features/auth/AuthCallback'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
       {/* Muestras de los dos sistemas de diseño — temporal, para validar antes de aplicar al sitio */}
       <Route path="/style-sample/studio" element={<StudioSample />} />
       <Route path="/style-sample/flat" element={<FlatSample />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
       <Route element={<PortalLayout />}>
         {/* Público */}
