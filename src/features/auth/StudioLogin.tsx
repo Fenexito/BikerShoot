@@ -26,7 +26,7 @@ export function StudioLogin() {
 
   const onSubmit = async (values: FormValues) => {
     setFormError(null)
-    const { error } = await signIn(values.email, values.password)
+    const { error } = await signIn(values.email, values.password, 'studio')
     if (error) {
       setFormError(error)
       return

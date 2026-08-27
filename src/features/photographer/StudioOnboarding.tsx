@@ -50,6 +50,17 @@ export function StudioOnboarding() {
     }
 
     await refreshProfile()
+
+    // Actualiza la caché de inmediato (en vez de solo invalidar) para que el guard
+    // de /studio lea onboarding_completed:true ya en el primer render, sin esperar
+    // a que termine un refetch en segundo plano — evita que te regrese al onboarding.
+    queryClient.setQueryData(['photographer_details', user.id], (old: unknown) => ({
+      ...(old as object),
+      bio: values.bio,
+      city: values.city,
+      whatsapp: values.whatsapp,
+      onboarding_completed: true,
+    }))
     queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
     navigate('/studio')
   }

@@ -23,7 +23,7 @@ interface AuthState {
     role: Role,
     displayName: string,
   ) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signIn: (email: string, password: string, portal: 'biker' | 'studio') => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
@@ -70,9 +70,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null, needsEmailConfirmation: !error && !data.session }
   }
 
-  async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
+  async function signIn(email: string, password: string, portal: 'biker' | 'studio') {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message }
+
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
+
+    const allowedRoles: Role[] = portal === 'biker' ? ['biker', 'admin'] : ['photographer', 'admin']
+
+    if (prof && !allowedRoles.includes(prof.role as Role)) {
+      await supabase.auth.signOut()
+      return {
+        error:
+          portal === 'biker'
+            ? 'Esta cuenta es de fotógrafo. Inicia sesión en MotoShots Studio.'
+            : 'Esta cuenta es de biker. Inicia sesión en el sitio principal.',
+      }
+    }
+
+    return { error: null }
   }
 
   async function signOut() {

@@ -26,7 +26,7 @@ export function BikerLogin() {
 
   const onSubmit = async (values: FormValues) => {
     setFormError(null)
-    const { error } = await signIn(values.email, values.password)
+    const { error } = await signIn(values.email, values.password, 'biker')
     if (error) {
       setFormError(error)
       return
