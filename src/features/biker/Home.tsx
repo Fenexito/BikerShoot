@@ -5,7 +5,6 @@ import { events, photographers } from '../../data/mockPhotos'
 import { EventCard } from './components/EventCard'
 import { PhotographerCard } from './components/PhotographerCard'
 import { Button } from '../../ui/flat/Button'
-import { Input } from '../../ui/flat/Input'
 
 export function Home() {
   const { profile } = useAuth()
