@@ -103,6 +103,116 @@ export const photos: Photo[] = events.flatMap((event, eIdx) => {
   }))
 })
 
+// ---------- Rutas y puntos (para el Mapa) ----------
+// Cada ruta es un corredor real de salida de rodada; cada punto es un lugar
+// donde un fotógrafo se paró a cierta hora. El biker filtra por ruta + franja
+// horaria para descartar de una vez los puntos que no le aplican.
+
+export interface RouteInfo {
+  id: string
+  from: string
+  to: string
+}
+
+export interface RoutePoint {
+  id: string
+  routeId: string
+  eventId: string
+  photographerId: string
+  label: string
+  lat: number
+  lng: number
+  timeStart: string // "05:30"
+  timeEnd: string // "06:00"
+  photoCount: number
+}
+
+export const routes: RouteInfo[] = [
+  { id: 'r1', from: 'Guatemala', to: 'Antigua' },
+  { id: 'r2', from: 'Guatemala', to: 'Escuintla' },
+  { id: 'r3', from: 'Guatemala', to: 'Chimaltenango' },
+  { id: 'r4', from: 'Chimaltenango', to: 'Quetzaltenango' },
+]
+
+const ROUTE_COORDS: Record<string, [number, number][]> = {
+  // Guatemala -> Antigua (CA-1 / RN-14)
+  r1: [
+    [14.6134, -90.5673],
+    [14.5934, -90.6312],
+    [14.5788, -90.6839],
+    [14.5586, -90.7295],
+  ],
+  // Guatemala -> Escuintla (CA-9 sur, ruta al Pacífico)
+  r2: [
+    [14.5842, -90.5501],
+    [14.4917, -90.6103],
+    [14.3921, -90.6934],
+    [14.3050, -90.785],
+  ],
+  // Guatemala -> Chimaltenango (CA-1 poniente)
+  r3: [
+    [14.6201, -90.5989],
+    [14.6389, -90.6812],
+    [14.6524, -90.7601],
+    [14.6611, -90.8207],
+  ],
+  // Chimaltenango -> Quetzaltenango (CA-1 occidente)
+  r4: [
+    [14.6611, -90.8207],
+    [14.7423, -91.0512],
+    [14.8012, -91.2934],
+    [14.8508, -91.5186],
+  ],
+}
+
+const CHECKPOINT_LABELS = ['Salida', 'Km 15', 'Km 32', 'Llegada']
+const TIME_WINDOWS: [string, string][] = [
+  ['05:00', '05:30'],
+  ['05:30', '06:00'],
+  ['06:00', '06:30'],
+  ['06:30', '07:00'],
+]
+
+export const routePoints: RoutePoint[] = routes.flatMap((route, rIdx) => {
+  const coords = ROUTE_COORDS[route.id]
+  const event = events[rIdx % events.length]
+  const secondEvent = events[(rIdx + 3) % events.length]
+
+  return coords.map((coord, i) => {
+    const useSecond = i >= 2
+    const ev = useSecond ? secondEvent : event
+    return {
+      id: `${route.id}-pt${i + 1}`,
+      routeId: route.id,
+      eventId: ev.id,
+      photographerId: ev.photographerId,
+      label: `${CHECKPOINT_LABELS[i]} — ${route.from} → ${route.to}`,
+      lat: coord[0],
+      lng: coord[1],
+      timeStart: TIME_WINDOWS[i][0],
+      timeEnd: TIME_WINDOWS[i][1],
+      photoCount: 120 + Math.floor(rand() * 1600),
+    }
+  })
+})
+
+export function getRouteById(id: string) {
+  return routes.find((r) => r.id === id)
+}
+
+function timeToMinutes(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+
+export function pointMatchesTime(point: RoutePoint, afterTime?: string, beforeTime?: string) {
+  if (!afterTime && !beforeTime) return true
+  const start = timeToMinutes(point.timeStart)
+  if (afterTime && start < timeToMinutes(afterTime)) return false
+  if (beforeTime && start > timeToMinutes(beforeTime)) return false
+  return true
+}
+
 export function thumbUrl(seed: string, w = 400, h = 500) {
   return `https://picsum.photos/seed/${seed}/${w}/${h}`
 }

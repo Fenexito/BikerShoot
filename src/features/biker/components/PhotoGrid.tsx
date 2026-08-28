@@ -4,7 +4,7 @@ import { getEventById, getPhotographerById } from '../../../data/mockPhotos'
 import { PhotoCard } from './PhotoCard'
 import { Skeleton } from '../../../ui/flat/Skeleton'
 
-const BATCH_SIZE = 24
+const BATCH_SIZE = 36
 
 interface PhotoGridProps {
   photos: Photo[]
@@ -55,7 +55,7 @@ export function PhotoGrid({ photos, onOpenPhoto }: PhotoGridProps) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:gap-3">
         {visible.map((photo) => {
           const event = getEventById(photo.eventId)
           const photographer = getPhotographerById(photo.photographerId)

@@ -14,6 +14,7 @@ export function HeaderUser() {
         </Link>
         <nav className="hidden gap-6 text-sm font-medium text-foreground md:flex">
           <Link to="/app/buscar">Buscar fotos</Link>
+          <Link to="/app/mapa">Mapa</Link>
           <Link to="/app/eventos">Eventos</Link>
           <Link to="/app/fotografos">Fotógrafos</Link>
           <Link to="/app/historial">Mis compras</Link>

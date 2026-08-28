@@ -58,7 +58,7 @@ export function Search() {
   ].filter(Boolean) as { key: string; label: string }[]
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 font-flat md:px-8">
+    <div className="mx-auto max-w-[1800px] px-4 py-8 font-flat md:px-8">
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Buscar fotos</h1>
       <p className="mb-6 text-muted-foreground">{results.length} fotos encontradas</p>
 

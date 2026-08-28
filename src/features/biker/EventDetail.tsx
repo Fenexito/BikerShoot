@@ -41,7 +41,7 @@ export function EventDetail() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 md:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-muted p-5">
           <Link to={`/app/fotografos/${event.photographerId}`} className="flex items-center gap-3">
             <img src={thumbUrl(photographer?.avatarSeed ?? '', 48, 48)} alt="" className="h-12 w-12 rounded-full object-cover" />

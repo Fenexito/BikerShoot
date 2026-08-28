@@ -1,0 +1,141 @@
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import {
+  routes,
+  routePoints,
+  getEventById,
+  getPhotographerById,
+  pointMatchesTime,
+  thumbUrl,
+  type RoutePoint,
+} from '../../data/mockPhotos'
+import { Select } from '../../ui/flat/Select'
+import { Button } from '../../ui/flat/Button'
+
+const TIME_PRESETS = [
+  { label: 'Cualquier hora', after: undefined, before: undefined },
+  { label: 'Madrugada (5:00 - 6:00)', after: '05:00', before: '06:00' },
+  { label: 'Amanecer (6:00 - 7:00)', after: '06:00', before: '07:00' },
+]
+
+function makeIcon(active: boolean, selected: boolean) {
+  const size = selected ? 26 : 18
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${size}px;height:${size}px;border-radius:9999px;
+      background:${active ? '#3B82F6' : '#9CA3AF'};
+      opacity:${active ? 1 : 0.45};
+      border:3px solid white;
+      box-shadow:0 1px 4px rgba(0,0,0,.35);
+      transition:all .2s;
+    "></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  })
+}
+
+function FlyToRoute({ points }: { points: RoutePoint[] }) {
+  const map = useMap()
+  useMemo(() => {
+    if (points.length === 0) return
+    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]))
+    map.flyToBounds(bounds, { padding: [60, 60], duration: 0.6 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.map((p) => p.id).join(',')])
+  return null
+}
+
+export function RouteMap() {
+  const [routeId, setRouteId] = useState('')
+  const [timePreset, setTimePreset] = useState(0)
+  const [selected, setSelected] = useState<RoutePoint | null>(null)
+
+  const preset = TIME_PRESETS[timePreset]
+
+  const activePoints = useMemo(
+    () =>
+      routePoints.filter((p) => {
+        if (routeId && p.routeId !== routeId) return false
+        return pointMatchesTime(p, preset.after, preset.before)
+      }),
+    [routeId, preset],
+  )
+
+  const routeFilteredPoints = routeId ? routePoints.filter((p) => p.routeId === routeId) : routePoints
+  const activeIds = new Set(activePoints.map((p) => p.id))
+
+  return (
+    <div className="relative font-flat" style={{ height: 'calc(100vh - 64px)' }}>
+      {/* Panel de filtros */}
+      <div className="absolute left-4 right-4 top-4 z-[500] flex flex-wrap items-center gap-3 rounded-lg bg-background/95 p-4 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
+        <div className="w-full">
+          <h1 className="text-lg font-bold tracking-tight">Mapa de puntos</h1>
+          <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos de tu ruta y horario de salida.</p>
+        </div>
+        <Select value={routeId} onChange={(e) => setRouteId(e.target.value)} className="flex-1">
+          <option value="">Toda ruta</option>
+          {routes.map((r) => (
+            <option key={r.id} value={r.id}>{r.from} → {r.to}</option>
+          ))}
+        </Select>
+        <Select value={timePreset} onChange={(e) => setTimePreset(Number(e.target.value))} className="flex-1">
+          {TIME_PRESETS.map((t, i) => (
+            <option key={t.label} value={i}>{t.label}</option>
+          ))}
+        </Select>
+        <p className="w-full text-xs font-semibold text-primary">
+          {activePoints.length} de {routeFilteredPoints.length} puntos coinciden con tu ruta y hora
+        </p>
+      </div>
+
+      <MapContainer
+        center={[14.6349, -90.5069]}
+        zoom={10}
+        scrollWheelZoom
+        style={{ height: '100%', width: '100%' }}
+      >
+        <TileLayer
+          attribution='&copy; OpenStreetMap &copy; CARTO'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        />
+        <FlyToRoute points={routeFilteredPoints} />
+        {routeFilteredPoints.map((point) => {
+          const isActive = activeIds.has(point.id)
+          const event = getEventById(point.eventId)
+          const photographer = getPhotographerById(point.photographerId)
+          return (
+            <Marker
+              key={point.id}
+              position={[point.lat, point.lng]}
+              icon={makeIcon(isActive, selected?.id === point.id)}
+              eventHandlers={{ click: () => setSelected(point) }}
+            >
+              <Popup>
+                <div className="w-56 font-flat">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {point.timeStart} - {point.timeEnd}
+                  </p>
+                  <p className="font-bold">{point.label}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <img src={thumbUrl(photographer?.avatarSeed ?? '', 40, 40)} alt="" className="h-8 w-8 rounded-full object-cover" />
+                    <div>
+                      <p className="text-sm font-semibold">{photographer?.name}</p>
+                      <p className="text-xs text-muted-foreground">{point.photoCount} fotos en este punto</p>
+                    </div>
+                  </div>
+                  <Link to={`/app/eventos/${event?.id}`}>
+                    <Button size="sm" className="mt-3 w-full">Ver fotos de este punto</Button>
+                  </Link>
+                </div>
+              </Popup>
+            </Marker>
+          )
+        })}
+      </MapContainer>
+    </div>
+  )
+}
