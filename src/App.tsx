@@ -27,6 +27,12 @@ import { Favorites as BikerFavorites } from './features/biker/Favorites'
 import { RouteMap } from './features/biker/RouteMap'
 import { StudioOnboarding } from './features/photographer/StudioOnboarding'
 import { StudioProfilePage } from './features/photographer/StudioProfilePage'
+import { StudioHome } from './features/photographer/StudioHome'
+import { StudioEvents } from './features/photographer/StudioEvents'
+import { StudioEventEditor } from './features/photographer/StudioEventEditor'
+import { StudioUpload } from './features/photographer/StudioUpload'
+import { StudioOrders } from './features/photographer/StudioOrders'
+import { StudioOrderDetail } from './features/photographer/StudioOrderDetail'
 import { RequireAdmin } from './features/admin/RequireAdmin'
 import { ApprovePhotographers } from './features/admin/ApprovePhotographers'
 import { AuthCallback } from './features/auth/AuthCallback'
@@ -71,11 +77,13 @@ export default function App() {
 
         {/* Fotógrafo (requiere sesión de studio) */}
         <Route path="/studio/onboarding" element={<RequireStudio skipOnboardingCheck><StudioOnboarding /></RequireStudio>} />
-        <Route path="/studio" element={<RequireStudio><PlaceholderPage title="Portal Fotógrafo" /></RequireStudio>} />
-        <Route path="/studio/eventos" element={<RequireStudio><PlaceholderPage title="Eventos (studio)" /></RequireStudio>} />
-        <Route path="/studio/pedidos" element={<RequireStudio><PlaceholderPage title="Pedidos" /></RequireStudio>} />
+        <Route path="/studio" element={<RequireStudio><StudioHome /></RequireStudio>} />
+        <Route path="/studio/eventos" element={<RequireStudio><StudioEvents /></RequireStudio>} />
+        <Route path="/studio/eventos/:id" element={<RequireStudio><StudioEventEditor /></RequireStudio>} />
+        <Route path="/studio/pedidos" element={<RequireStudio><StudioOrders /></RequireStudio>} />
+        <Route path="/studio/pedidos/:id" element={<RequireStudio><StudioOrderDetail /></RequireStudio>} />
         <Route path="/studio/estadisticas" element={<RequireStudio><PlaceholderPage title="Estadísticas" /></RequireStudio>} />
-        <Route path="/studio/carga-rapida" element={<RequireStudio><PlaceholderPage title="Carga rápida" /></RequireStudio>} />
+        <Route path="/studio/carga-rapida" element={<RequireStudio><StudioUpload /></RequireStudio>} />
         <Route path="/studio/perfil" element={<RequireStudio><StudioProfilePage /></RequireStudio>} />
 
         {/* Admin */}
