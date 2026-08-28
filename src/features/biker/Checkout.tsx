@@ -1,0 +1,135 @@
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useCartStore } from '../cart/cartStore'
+import { thumbUrl } from '../../data/mockPhotos'
+import { Button } from '../../ui/flat/Button'
+import { Card } from '../../ui/flat/Card'
+import { cn } from '../../lib/cn'
+
+const BUNDLE_THRESHOLD = 5
+const BUNDLE_DISCOUNT = 0.15
+
+export function Checkout() {
+  const items = useCartStore((s) => s.items)
+  const remove = useCartStore((s) => s.remove)
+  const clear = useCartStore((s) => s.clear)
+  const navigate = useNavigate()
+  const [method, setMethod] = useState<'tarjeta' | 'transferencia'>('tarjeta')
+  const [placing, setPlacing] = useState(false)
+
+  const { subtotal, discount } = useMemo(() => {
+    const byEvent = new Map<string, number>()
+    for (const item of items) byEvent.set(item.eventId, (byEvent.get(item.eventId) ?? 0) + item.price)
+
+    let discountTotal = 0
+    const countByEvent = new Map<string, number>()
+    for (const item of items) countByEvent.set(item.eventId, (countByEvent.get(item.eventId) ?? 0) + 1)
+    for (const [eventId, count] of countByEvent) {
+      if (count >= BUNDLE_THRESHOLD) discountTotal += (byEvent.get(eventId) ?? 0) * BUNDLE_DISCOUNT
+    }
+
+    const subtotal = items.reduce((sum, i) => sum + i.price, 0)
+    return { subtotal, discount: discountTotal }
+  }, [items])
+
+  const total = subtotal - discount
+
+  function placeOrder() {
+    setPlacing(true)
+    setTimeout(() => {
+      clear()
+      navigate('/app/pedido-confirmado', { state: { total, count: items.length } })
+    }, 900)
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center font-flat">
+        <span className="text-5xl">🛒</span>
+        <h1 className="text-2xl font-bold tracking-tight">Tu carrito está vacío</h1>
+        <p className="text-muted-foreground">Busca tus fotos y agrégalas aquí para comprarlas.</p>
+        <Link to="/app/buscar">
+          <Button size="lg" className="mt-4">Buscar fotos</Button>
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-10 font-flat md:px-8">
+      <h1 className="mb-8 text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
+
+      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-3">
+          {items.map((item) => (
+            <div key={item.photoId} className="flex items-center gap-4 rounded-lg bg-muted p-3">
+              <img src={thumbUrl(item.seed, 100, 125)} alt="" className="h-16 w-14 rounded object-cover" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">{item.eventTitle}</p>
+                <p className="text-sm text-muted-foreground">{item.photographerName}</p>
+              </div>
+              <p className="font-bold">Q{item.price}</p>
+              <button
+                onClick={() => remove(item.photoId)}
+                className="text-sm text-muted-foreground hover:text-red-600"
+                aria-label="Quitar"
+              >
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-5">
+          <Card>
+            <h2 className="mb-4 font-bold">Resumen</h2>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{items.length} fotos</span>
+              <span>Q{subtotal.toFixed(2)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="mt-1 flex justify-between text-sm text-secondary">
+                <span>Descuento por volumen</span>
+                <span>-Q{discount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="mt-3 flex justify-between border-t border-border pt-3 text-lg font-bold">
+              <span>Total</span>
+              <span>Q{total.toFixed(2)}</span>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="mb-4 font-bold">Método de pago</h2>
+            <div className="flex flex-col gap-2">
+              {(['tarjeta', 'transferencia'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMethod(m)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-md border-2 px-4 py-3 text-left text-sm font-medium transition-colors',
+                    method === m ? 'border-primary bg-blue-50' : 'border-transparent bg-muted',
+                  )}
+                >
+                  <span className={cn('flex h-4 w-4 items-center justify-center rounded-full border-2', method === m ? 'border-primary' : 'border-border')}>
+                    {method === m && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  {m === 'tarjeta' ? '💳 Tarjeta de crédito/débito' : '🏦 Transferencia bancaria'}
+                </button>
+              ))}
+            </div>
+            {method === 'transferencia' && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Después de confirmar, subes tu comprobante y el fotógrafo verifica el pago. (Disponible en la próxima fase)
+              </p>
+            )}
+          </Card>
+
+          <Button size="lg" loading={placing} onClick={placeOrder}>
+            Confirmar y pagar Q{total.toFixed(2)}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

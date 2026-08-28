@@ -15,6 +15,15 @@ import { ResetPassword } from './features/auth/ResetPassword'
 import { RequireBiker } from './features/auth/RequireBiker'
 import { RequireStudio } from './features/auth/RequireStudio'
 import { BikerProfilePage } from './features/biker/BikerProfilePage'
+import { Home as BikerHome } from './features/biker/Home'
+import { Search as BikerSearch } from './features/biker/Search'
+import { Events as BikerEvents } from './features/biker/Events'
+import { EventDetail as BikerEventDetail } from './features/biker/EventDetail'
+import { PhotographersList } from './features/biker/PhotographersList'
+import { PhotographerProfile } from './features/biker/PhotographerProfile'
+import { Checkout as BikerCheckout } from './features/biker/Checkout'
+import { OrderSuccess } from './features/biker/OrderSuccess'
+import { Favorites as BikerFavorites } from './features/biker/Favorites'
 import { StudioOnboarding } from './features/photographer/StudioOnboarding'
 import { StudioProfilePage } from './features/photographer/StudioProfilePage'
 import { RequireAdmin } from './features/admin/RequireAdmin'
@@ -46,12 +55,17 @@ export default function App() {
         <Route path="/changelog" element={<ChangelogPage />} />
 
         {/* Biker (requiere sesión) */}
-        <Route path="/app" element={<RequireBiker><PlaceholderPage title="Portal Biker" /></RequireBiker>} />
-        <Route path="/app/buscar" element={<RequireBiker><PlaceholderPage title="Buscar fotos" /></RequireBiker>} />
-        <Route path="/app/fotografos" element={<RequireBiker><PlaceholderPage title="Fotógrafos (biker)" /></RequireBiker>} />
+        <Route path="/app" element={<RequireBiker><BikerHome /></RequireBiker>} />
+        <Route path="/app/buscar" element={<RequireBiker><BikerSearch /></RequireBiker>} />
+        <Route path="/app/eventos" element={<RequireBiker><BikerEvents /></RequireBiker>} />
+        <Route path="/app/eventos/:id" element={<RequireBiker><BikerEventDetail /></RequireBiker>} />
+        <Route path="/app/fotografos" element={<RequireBiker><PhotographersList /></RequireBiker>} />
+        <Route path="/app/fotografos/:id" element={<RequireBiker><PhotographerProfile /></RequireBiker>} />
+        <Route path="/app/favoritos" element={<RequireBiker><BikerFavorites /></RequireBiker>} />
         <Route path="/app/historial" element={<RequireBiker><PlaceholderPage title="Historial" /></RequireBiker>} />
         <Route path="/app/perfil" element={<RequireBiker><BikerProfilePage /></RequireBiker>} />
-        <Route path="/app/checkout" element={<RequireBiker><PlaceholderPage title="Carrito / Checkout" /></RequireBiker>} />
+        <Route path="/app/checkout" element={<RequireBiker><BikerCheckout /></RequireBiker>} />
+        <Route path="/app/pedido-confirmado" element={<RequireBiker><OrderSuccess /></RequireBiker>} />
 
         {/* Fotógrafo (requiere sesión de studio) */}
         <Route path="/studio/onboarding" element={<RequireStudio skipOnboardingCheck><StudioOnboarding /></RequireStudio>} />

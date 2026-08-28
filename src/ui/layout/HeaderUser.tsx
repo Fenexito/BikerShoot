@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
+import { useCartStore } from '../../features/cart/cartStore'
 
 export function HeaderUser() {
   const { signOut } = useAuth()
+  const itemCount = useCartStore((s) => s.items.length)
 
   return (
     <header className="border-b border-border bg-background">
@@ -12,12 +14,21 @@ export function HeaderUser() {
         </Link>
         <nav className="hidden gap-6 text-sm font-medium text-foreground md:flex">
           <Link to="/app/buscar">Buscar fotos</Link>
+          <Link to="/app/eventos">Eventos</Link>
           <Link to="/app/fotografos">Fotógrafos</Link>
           <Link to="/app/historial">Mis compras</Link>
         </nav>
         <div className="flex items-center gap-4 text-sm">
-          <Link to="/app/checkout" aria-label="Carrito" className="text-foreground">
+          <Link to="/app/favoritos" aria-label="Favoritos" className="text-foreground">
+            ♡
+          </Link>
+          <Link to="/app/checkout" aria-label="Carrito" className="relative text-foreground">
             🛒
+            {itemCount > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                {itemCount}
+              </span>
+            )}
           </Link>
           <Link to="/app/perfil" aria-label="Perfil" className="text-foreground">
             👤
