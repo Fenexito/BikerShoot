@@ -4,17 +4,17 @@ import { useAuth } from '../auth/AuthContext'
 import { useEvent } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
-import { MapPointPicker } from './components/MapPointPicker'
+import { RoutePointPicker, type AddedPoint } from './components/RoutePointPicker'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
 import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
 
-const GUATEMALA_CENTER = { lat: 14.6349, lng: -90.5069 }
 const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración'] as const
 
 interface LocalPoint {
   id: string
+  routePointId: string | null
   label: string
   lat: number
   lng: number
@@ -52,6 +52,7 @@ export function StudioEventEditor() {
       setPoints(
         existing.event_points.map((pt) => ({
           id: pt.id,
+          routePointId: pt.route_point_id,
           label: pt.label,
           lat: pt.lat,
           lng: pt.lng,
@@ -62,22 +63,11 @@ export function StudioEventEditor() {
     }
   }, [existing])
 
-  const [newLat, setNewLat] = useState(GUATEMALA_CENTER.lat)
-  const [newLng, setNewLng] = useState(GUATEMALA_CENTER.lng)
-  const [newLabel, setNewLabel] = useState('')
-  const [newStart, setNewStart] = useState('05:00')
-  const [newEnd, setNewEnd] = useState('05:30')
-
-  function addPoint() {
-    if (!newLabel.trim()) {
-      push({ type: 'error', title: 'Ponle un nombre al punto' })
-      return
-    }
+  function addPoint(pt: AddedPoint) {
     setPoints((p) => [
       ...p,
-      { id: `local-${Date.now()}`, label: newLabel, lat: newLat, lng: newLng, timeStart: newStart, timeEnd: newEnd },
+      { id: `local-${Date.now()}`, routePointId: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, timeStart: pt.timeStart, timeEnd: pt.timeEnd },
     ])
-    setNewLabel('')
   }
 
   function removePoint(pointId: string) {
@@ -129,6 +119,7 @@ export function StudioEventEditor() {
       const { error: pointsError } = await supabase.from('event_points').insert(
         points.map((pt) => ({
           event_id: eventId,
+          route_point_id: pt.routePointId,
           label: pt.label,
           lat: pt.lat,
           lng: pt.lng,
@@ -206,21 +197,8 @@ export function StudioEventEditor() {
           </div>
         )}
 
-        <div className="mt-6 border border-border p-5">
-          <p className="mb-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
-            Haz clic en el mapa para marcar el punto
-          </p>
-          <MapPointPicker lat={newLat} lng={newLng} onPick={(lat, lng) => { setNewLat(lat); setNewLng(lng) }} />
-          <div className="mt-4 grid gap-3 sm:grid-cols-4">
-            <div className="sm:col-span-2">
-              <Input label="Nombre del punto" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. Km 15" />
-            </div>
-            <Input label="Hora inicio" type="time" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
-            <Input label="Hora fin" type="time" value={newEnd} onChange={(e) => setNewEnd(e.target.value)} />
-          </div>
-          <Button variant="ghost" className="mt-3" onClick={addPoint}>
-            + Agregar este punto
-          </Button>
+        <div className="mt-6">
+          <RoutePointPicker onAdd={addPoint} />
         </div>
       </section>
 

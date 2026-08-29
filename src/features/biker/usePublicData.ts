@@ -9,6 +9,7 @@ export interface PublicEvent extends DbEvent {
 export interface PublicPhoto extends DbPhoto {
   event: { title: string; city: string; category: string } | null
   photographer: { display_name: string } | null
+  point: { route_point: { route_id: string } | null } | null
 }
 
 export interface MapPoint extends DbEventPoint {
@@ -19,6 +20,7 @@ export interface MapPoint extends DbEventPoint {
     photographer_id: string
     photographer: { display_name: string } | null
   } | null
+  route_point: { route_id: string } | null
 }
 
 export interface SearchFilters {
@@ -29,6 +31,7 @@ export interface SearchFilters {
   photographerId?: string
   eventId?: string
   pointId?: string
+  routeId?: string
   sort?: 'relevancia' | 'precio-asc' | 'precio-desc'
 }
 
@@ -157,7 +160,7 @@ export function useSearchPhotos(filters: SearchFilters) {
     queryFn: async (): Promise<PublicPhoto[]> => {
       const { data, error } = await supabase
         .from('photos')
-        .select('*, event:events(title, city, category), photographer:profiles(display_name)')
+        .select('*, event:events(title, city, category), photographer:profiles(display_name), point:event_points(route_point:route_points(route_id))')
       if (error) throw error
       return (data as unknown as PublicPhoto[]) ?? []
     },
@@ -166,6 +169,7 @@ export function useSearchPhotos(filters: SearchFilters) {
         if (filters.photographerId && p.photographer_id !== filters.photographerId) return false
         if (filters.eventId && p.event_id !== filters.eventId) return false
         if (filters.pointId && p.point_id !== filters.pointId) return false
+        if (filters.routeId && p.point?.route_point?.route_id !== filters.routeId) return false
         if (filters.motoBrand && p.moto_brand !== filters.motoBrand) return false
         if (filters.city && p.event?.city !== filters.city) return false
         if (filters.category && p.event?.category !== filters.category) return false
@@ -203,7 +207,7 @@ export function useMapPoints() {
     queryFn: async (): Promise<MapPoint[]> => {
       const { data, error } = await supabase
         .from('event_points')
-        .select('*, event:events(id, title, city, photographer_id, photographer:profiles(display_name))')
+        .select('*, event:events(id, title, city, photographer_id, photographer:profiles(display_name)), route_point:route_points(route_id)')
       if (error) throw error
       return (data as unknown as MapPoint[]) ?? []
     },

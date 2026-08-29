@@ -12,6 +12,20 @@ export interface DbEventPoint {
   lng: number
   time_start: string
   time_end: string
+  route_point_id: string | null
+}
+
+export interface DbRoute {
+  id: string
+  name: string
+}
+
+export interface DbRoutePoint {
+  id: string
+  route_id: string
+  label: string
+  lat: number
+  lng: number
 }
 
 export interface DbEvent {

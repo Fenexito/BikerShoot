@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useBikerDetails } from './useBikerDetails'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type SearchFilters } from './usePublicData'
+import { useRoutes } from '../shared/useRoutes'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { Select } from '../../ui/flat/Select'
@@ -15,6 +16,7 @@ export function Search() {
   const { data: bikerDetails } = useBikerDetails(user?.id)
   const { data: events = [] } = usePublicEvents()
   const { data: photographers = [] } = useApprovedPhotographers()
+  const { data: routes = [] } = useRoutes()
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
@@ -23,6 +25,7 @@ export function Search() {
   const category = searchParams.get('categoria') ?? ''
   const motoBrand = searchParams.get('marca') ?? ''
   const photographerId = searchParams.get('fotografo') ?? ''
+  const routeId = searchParams.get('ruta') ?? ''
   const sort = (searchParams.get('orden') as SearchFilters['sort']) ?? 'relevancia'
   const onlyMyBrand = searchParams.get('mi_moto') === '1'
 
@@ -41,6 +44,7 @@ export function Search() {
     category: category || undefined,
     motoBrand: effectiveBrand || undefined,
     photographerId: photographerId || undefined,
+    routeId: routeId || undefined,
     sort,
   })
 
@@ -67,6 +71,7 @@ export function Search() {
     motoBrand && !onlyMyBrand && { key: 'marca', label: motoBrand },
     onlyMyBrand && bikerDetails?.moto_brand && { key: 'mi_moto', label: `Mi moto: ${bikerDetails.moto_brand}` },
     photographerId && { key: 'fotografo', label: photographers.find((p) => p.id === photographerId)?.display_name ?? '' },
+    routeId && { key: 'ruta', label: routes.find((r) => r.id === routeId)?.name ?? '' },
   ].filter(Boolean) as { key: string; label: string }[]
 
   return (
@@ -82,6 +87,13 @@ export function Search() {
             placeholder="Evento, ciudad, fotógrafo..."
             className="h-12 rounded-md border-2 border-transparent bg-muted px-4 text-sm outline-none transition-colors duration-200 focus:border-primary focus:bg-background"
           />
+
+          <Select label="Ruta" value={routeId} onChange={(e) => setParam('ruta', e.target.value || undefined)}>
+            <option value="">Todas</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
 
           <Select label="Ciudad" value={city} onChange={(e) => setParam('ciudad', e.target.value || undefined)}>
             <option value="">Todas</option>

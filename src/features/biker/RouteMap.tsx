@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMapPoints, pointMatchesTime } from './usePublicData'
+import { useRoutes } from '../shared/useRoutes'
 import { Select } from '../../ui/flat/Select'
 import { Button } from '../../ui/flat/Button'
 import type { MapPoint } from './usePublicData'
@@ -46,13 +47,16 @@ function FlyToPoints({ points }: { points: MapPoint[] }) {
 
 export function RouteMap() {
   const { data: points = [] } = useMapPoints()
+  const { data: routes = [] } = useRoutes()
+  const [routeId, setRouteId] = useState('')
   const [city, setCity] = useState('')
   const [timePreset, setTimePreset] = useState(0)
 
   const preset = TIME_PRESETS[timePreset]
-  const cities = useMemo(() => Array.from(new Set(points.map((p) => p.event?.city).filter(Boolean))) as string[], [points])
+  const routeFilteredPoints = routeId ? points.filter((p) => p.route_point?.route_id === routeId) : points
+  const cities = useMemo(() => Array.from(new Set(routeFilteredPoints.map((p) => p.event?.city).filter(Boolean))) as string[], [routeFilteredPoints])
 
-  const cityFilteredPoints = city ? points.filter((p) => p.event?.city === city) : points
+  const cityFilteredPoints = city ? routeFilteredPoints.filter((p) => p.event?.city === city) : routeFilteredPoints
   const activePoints = cityFilteredPoints.filter((p) => pointMatchesTime(p, preset.after, preset.before))
   const activeIds = new Set(activePoints.map((p) => p.id))
 
@@ -63,6 +67,12 @@ export function RouteMap() {
           <h1 className="text-lg font-bold tracking-tight">Mapa de puntos</h1>
           <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
         </div>
+        <Select value={routeId} onChange={(e) => { setRouteId(e.target.value); setCity('') }} className="flex-1">
+          <option value="">Toda ruta</option>
+          {routes.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </Select>
         <Select value={city} onChange={(e) => setCity(e.target.value)} className="flex-1">
           <option value="">Toda ciudad</option>
           {cities.map((c) => (
