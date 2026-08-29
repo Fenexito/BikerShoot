@@ -1,31 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import type { DbEvent } from '../../types/db'
 
-export interface DbEventPoint {
-  id: string
-  event_id: string
-  label: string
-  lat: number
-  lng: number
-  time_start: string
-  time_end: string
-}
-
-export interface DbEvent {
-  id: string
-  photographer_id: string
-  title: string
-  category: 'Rodada' | 'Pista' | 'Exhibición' | 'Concentración'
-  city: string
-  venue: string | null
-  event_date: string
-  price_per_photo: number
-  description: string | null
-  status: 'activo' | 'cerrado'
-  cover_path: string | null
-  created_at: string
-  event_points: DbEventPoint[]
-}
+export type { DbEvent, DbEventPoint } from '../../types/db'
 
 export function useMyEvents(photographerId: string | undefined) {
   return useQuery({

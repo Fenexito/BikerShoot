@@ -3,17 +3,12 @@ import { Link } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import {
-  routes,
-  routePoints,
-  getEventById,
-  getPhotographerById,
-  pointMatchesTime,
-  thumbUrl,
-  type RoutePoint,
-} from '../../data/mockPhotos'
+import { useMapPoints, pointMatchesTime } from './usePublicData'
 import { Select } from '../../ui/flat/Select'
 import { Button } from '../../ui/flat/Button'
+import type { MapPoint } from './usePublicData'
+
+const GUATEMALA_CENTER: [number, number] = [14.6349, -90.5069]
 
 const TIME_PRESETS = [
   { label: 'Cualquier hora', after: undefined, before: undefined },
@@ -21,8 +16,8 @@ const TIME_PRESETS = [
   { label: 'Amanecer (6:00 - 7:00)', after: '06:00', before: '07:00' },
 ]
 
-function makeIcon(active: boolean, selected: boolean) {
-  const size = selected ? 26 : 18
+function makeIcon(active: boolean) {
+  const size = active ? 22 : 16
   return L.divIcon({
     className: '',
     html: `<div style="
@@ -38,7 +33,7 @@ function makeIcon(active: boolean, selected: boolean) {
   })
 }
 
-function FlyToRoute({ points }: { points: RoutePoint[] }) {
+function FlyToPoints({ points }: { points: MapPoint[] }) {
   const map = useMap()
   useMemo(() => {
     if (points.length === 0) return
@@ -50,36 +45,28 @@ function FlyToRoute({ points }: { points: RoutePoint[] }) {
 }
 
 export function RouteMap() {
-  const [routeId, setRouteId] = useState('')
+  const { data: points = [] } = useMapPoints()
+  const [city, setCity] = useState('')
   const [timePreset, setTimePreset] = useState(0)
-  const [selected, setSelected] = useState<RoutePoint | null>(null)
 
   const preset = TIME_PRESETS[timePreset]
+  const cities = useMemo(() => Array.from(new Set(points.map((p) => p.event?.city).filter(Boolean))) as string[], [points])
 
-  const activePoints = useMemo(
-    () =>
-      routePoints.filter((p) => {
-        if (routeId && p.routeId !== routeId) return false
-        return pointMatchesTime(p, preset.after, preset.before)
-      }),
-    [routeId, preset],
-  )
-
-  const routeFilteredPoints = routeId ? routePoints.filter((p) => p.routeId === routeId) : routePoints
+  const cityFilteredPoints = city ? points.filter((p) => p.event?.city === city) : points
+  const activePoints = cityFilteredPoints.filter((p) => pointMatchesTime(p, preset.after, preset.before))
   const activeIds = new Set(activePoints.map((p) => p.id))
 
   return (
     <div className="relative font-flat" style={{ height: 'calc(100vh - 64px)' }}>
-      {/* Panel de filtros */}
       <div className="absolute left-4 right-4 top-4 z-[500] flex flex-wrap items-center gap-3 rounded-lg bg-background/95 p-4 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
         <div className="w-full">
           <h1 className="text-lg font-bold tracking-tight">Mapa de puntos</h1>
-          <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos de tu ruta y horario de salida.</p>
+          <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
         </div>
-        <Select value={routeId} onChange={(e) => setRouteId(e.target.value)} className="flex-1">
-          <option value="">Toda ruta</option>
-          {routes.map((r) => (
-            <option key={r.id} value={r.id}>{r.from} → {r.to}</option>
+        <Select value={city} onChange={(e) => setCity(e.target.value)} className="flex-1">
+          <option value="">Toda ciudad</option>
+          {cities.map((c) => (
+            <option key={c} value={c}>{c}</option>
           ))}
         </Select>
         <Select value={timePreset} onChange={(e) => setTimePreset(Number(e.target.value))} className="flex-1">
@@ -88,48 +75,32 @@ export function RouteMap() {
           ))}
         </Select>
         <p className="w-full text-xs font-semibold text-primary">
-          {activePoints.length} de {routeFilteredPoints.length} puntos coinciden con tu ruta y hora
+          {activePoints.length} de {cityFilteredPoints.length} puntos coinciden con tu horario
         </p>
       </div>
 
-      <MapContainer
-        center={[14.6349, -90.5069]}
-        zoom={10}
-        scrollWheelZoom
-        style={{ height: '100%', width: '100%' }}
-      >
+      <MapContainer center={GUATEMALA_CENTER} zoom={9} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
         <TileLayer
           attribution='&copy; OpenStreetMap &copy; CARTO'
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
-        <FlyToRoute points={routeFilteredPoints} />
-        {routeFilteredPoints.map((point) => {
+        <FlyToPoints points={cityFilteredPoints} />
+        {cityFilteredPoints.map((point) => {
           const isActive = activeIds.has(point.id)
-          const event = getEventById(point.eventId)
-          const photographer = getPhotographerById(point.photographerId)
           return (
-            <Marker
-              key={point.id}
-              position={[point.lat, point.lng]}
-              icon={makeIcon(isActive, selected?.id === point.id)}
-              eventHandlers={{ click: () => setSelected(point) }}
-            >
+            <Marker key={point.id} position={[point.lat, point.lng]} icon={makeIcon(isActive)}>
               <Popup>
                 <div className="w-56 font-flat">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {point.timeStart} - {point.timeEnd}
+                    {point.time_start.slice(0, 5)} - {point.time_end.slice(0, 5)}
                   </p>
                   <p className="font-bold">{point.label}</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <img src={thumbUrl(photographer?.avatarSeed ?? '', 40, 40)} alt="" className="h-8 w-8 rounded-full object-cover" />
-                    <div>
-                      <p className="text-sm font-semibold">{photographer?.name}</p>
-                      <p className="text-xs text-muted-foreground">{point.photoCount} fotos en este punto</p>
-                    </div>
-                  </div>
-                  <Link to={`/app/eventos/${event?.id}`}>
-                    <Button size="sm" className="mt-3 w-full">Ver fotos de este punto</Button>
-                  </Link>
+                  <p className="text-sm text-muted-foreground">{point.event?.photographer?.display_name}</p>
+                  {point.event && (
+                    <Link to={`/app/eventos/${point.event.id}`}>
+                      <Button size="sm" className="mt-3 w-full">Ver fotos de este punto</Button>
+                    </Link>
+                  )}
                 </div>
               </Popup>
             </Marker>

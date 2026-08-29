@@ -1,15 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import type { Photo } from '../../../data/mockPhotos'
-import { thumbUrl, getEventById, getPhotographerById } from '../../../data/mockPhotos'
+import { r2Url } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { Button } from '../../../ui/flat/Button'
 import { cn } from '../../../lib/cn'
+import type { GridPhoto } from './PhotoGrid'
 
 interface PhotoLightboxProps {
-  photos: Photo[]
+  photos: GridPhoto[]
   index: number
   onClose: () => void
   onNavigate: (index: number) => void
@@ -17,8 +17,6 @@ interface PhotoLightboxProps {
 
 export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLightboxProps) {
   const photo = photos[index]
-  const event = photo ? getEventById(photo.eventId) : undefined
-  const photographer = photo ? getPhotographerById(photo.photographerId) : undefined
   const filmstripRef = useRef<HTMLDivElement>(null)
 
   const inCart = useCartStore((s) => (photo ? s.has(photo.id) : false))
@@ -48,12 +46,10 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
     <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 font-flat">
       <div className="flex items-center justify-between px-4 py-3 text-white sm:px-6">
         <div className="min-w-0">
-          <p className="truncate font-semibold">{event?.title}</p>
-          {photographer && (
-            <Link to={`/app/fotografos/${photographer.id}`} className="text-sm text-white/70 hover:text-white">
-              {photographer.name}
-            </Link>
-          )}
+          <p className="truncate font-semibold">{photo.eventTitle}</p>
+          <Link to={`/app/fotografos/${photo.photographer_id}`} className="text-sm text-white/70 hover:text-white">
+            {photo.photographerName}
+          </Link>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-sm text-white/60">{index + 1} / {photos.length}</span>
@@ -74,8 +70,8 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
         )}
         <img
           key={photo.id}
-          src={thumbUrl(photo.seed, 1100, 1375)}
-          alt={event?.title}
+          src={r2Url(photo.storage_path)}
+          alt={photo.eventTitle}
           className="max-h-full max-w-full animate-[lightbox-in_.25s_ease-out] rounded-lg object-contain shadow-2xl"
         />
         {index < photos.length - 1 && (
@@ -88,7 +84,6 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
         )}
       </div>
 
-      {/* Filmstrip */}
       <div ref={filmstripRef} className="flex gap-2 overflow-x-auto px-4 pb-3 pt-1 sm:px-6">
         {photos.map((p, i) => (
           <button
@@ -99,7 +94,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
               i === index ? 'opacity-100 ring-2 ring-white' : 'opacity-40 hover:opacity-75',
             )}
           >
-            <img src={thumbUrl(p.seed, 80, 100)} alt="" className="h-full w-full object-cover" />
+            <img src={r2Url(p.storage_path)} alt="" className="h-full w-full object-cover" />
           </button>
         ))}
       </div>
@@ -107,7 +102,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <span className="text-lg font-bold text-white">Q{photo.price}</span>
-          <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70">{photo.motoBrand}</span>
+          {photo.moto_brand && <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70">{photo.moto_brand}</span>}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -121,7 +116,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
             onClick={() =>
               inCart
                 ? remove(photo.id)
-                : add({ photoId: photo.id, eventId: photo.eventId, eventTitle: event?.title ?? '', photographerName: photographer?.name ?? '', price: photo.price, seed: photo.seed })
+                : add({ photoId: photo.id, eventId: photo.event_id, eventTitle: photo.eventTitle, photographerId: photo.photographer_id, photographerName: photo.photographerName, price: photo.price, storagePath: photo.storage_path })
             }
             variant={inCart ? 'secondary' : 'primary'}
           >

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { events, photographers, photos, thumbUrl } from '../../data/mockPhotos'
+import { usePublicEvents, useApprovedPhotographers, useSearchPhotos } from './usePublicData'
+import { r2Url } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotographerCard } from './components/PhotographerCard'
 import { Button } from '../../ui/flat/Button'
@@ -24,22 +25,27 @@ export function Home() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
 
+  const { data: events = [] } = usePublicEvents()
+  const { data: photographers = [] } = useApprovedPhotographers()
+  const { data: photos = [] } = useSearchPhotos({})
+
   const firstName = profile?.display_name?.split(' ')[0] || 'biker'
-  const sortedEvents = [...events].sort((a, b) => +new Date(b.date) - +new Date(a.date))
+  const sortedEvents = [...events].sort((a, b) => +new Date(b.event_date) - +new Date(a.event_date))
   const featuredEvent = sortedEvents[0]
   const recentEvents = sortedEvents.slice(1, 5)
-  const featuredPhotographers = photographers.slice(0, 6)
 
   const collagePhotos = useMemo(() => {
-    const step = Math.max(1, Math.floor(photos.length / 20))
-    return Array.from({ length: 10 }, (_, i) => photos[(i * step) % photos.length])
-  }, [])
+    if (photos.length === 0) return []
+    const step = Math.max(1, Math.floor(photos.length / 10))
+    return Array.from({ length: Math.min(10, photos.length) }, (_, i) => photos[(i * step) % photos.length])
+  }, [photos])
 
+  const cities = new Set(events.map((e) => e.city))
   const stats = [
-    { value: `${(photos.length * 40).toLocaleString()}+`, label: 'Fotos disponibles' },
-    { value: `${photographers.length * 12}+`, label: 'Fotógrafos activos' },
-    { value: `${events.length * 6}+`, label: 'Eventos cubiertos' },
-    { value: '5', label: 'Ciudades' },
+    { value: photos.length, label: 'Fotos disponibles' },
+    { value: photographers.length, label: 'Fotógrafos activos' },
+    { value: events.length, label: 'Eventos cubiertos' },
+    { value: cities.size, label: 'Ciudades' },
   ]
 
   const onSearch = (e: React.FormEvent) => {
@@ -50,23 +56,25 @@ export function Home() {
   return (
     <div className="font-flat">
       {/* Hero — collage de fotos reales de fondo */}
-      <section className="relative isolate flex min-h-[560px] items-center overflow-hidden md:min-h-[640px]">
-        <div className="absolute inset-0 grid grid-cols-4 grid-rows-3 gap-1 md:grid-cols-6">
-          {collagePhotos.map((photo, i) => (
-            <img
-              key={photo.id}
-              src={thumbUrl(photo.seed, 400, 400)}
-              alt=""
-              className={`h-full w-full object-cover ${COLLAGE_SPANS[i % COLLAGE_SPANS.length]}`}
-              loading="eager"
-            />
-          ))}
-        </div>
+      <section className="relative isolate flex min-h-[560px] items-center overflow-hidden bg-primary md:min-h-[640px]">
+        {collagePhotos.length > 0 && (
+          <div className="absolute inset-0 grid grid-cols-4 grid-rows-3 gap-1 md:grid-cols-6">
+            {collagePhotos.map((photo, i) => (
+              <img
+                key={photo.id}
+                src={r2Url(photo.storage_path)}
+                alt=""
+                className={`h-full w-full object-cover ${COLLAGE_SPANS[i % COLLAGE_SPANS.length]}`}
+                loading="eager"
+              />
+            ))}
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-black/60 to-background" />
 
         <div className="relative mx-auto max-w-3xl px-6 text-center text-white md:px-16">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide backdrop-blur">
-            🏍️ Miles de fotos nuevas cada semana
+            🏍️ Fotos nuevas todas las semanas
           </span>
           <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight md:text-6xl">
             Hola {firstName}, tu próxima<br className="hidden md:block" /> mejor foto está aquí
@@ -108,7 +116,7 @@ export function Home() {
         </div>
       </section>
 
-      {/* Momentos recientes — layout asimétrico */}
+      {/* Momentos recientes */}
       <section className="mx-auto max-w-6xl px-6 py-16 md:px-16">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Momentos recientes</h2>
@@ -116,32 +124,33 @@ export function Home() {
             Ver todos →
           </Link>
         </div>
-        <div className="grid gap-5 lg:grid-cols-3">
-          {featuredEvent && (
-            <div className="lg:col-span-2 lg:row-span-2">
-              <Link to={`/app/eventos/${featuredEvent.id}`} className="group block h-full overflow-hidden rounded-lg bg-muted">
-                <div className="relative h-72 overflow-hidden lg:h-full">
-                  <img
-                    src={thumbUrl(featuredEvent.coverSeed, 900, 700)}
-                    alt={featuredEvent.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                    <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                      Recién subido
-                    </span>
-                    <h3 className="mt-3 text-2xl font-extrabold tracking-tight md:text-3xl">{featuredEvent.title}</h3>
-                    <p className="mt-1 text-white/85">{featuredEvent.city} · desde Q{featuredEvent.pricePerPhoto} por foto</p>
+
+        {events.length === 0 ? (
+          <p className="text-muted-foreground">Todavía no hay eventos publicados.</p>
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-3">
+            {featuredEvent && (
+              <div className="lg:col-span-2 lg:row-span-2">
+                <Link to={`/app/eventos/${featuredEvent.id}`} className="group block h-full overflow-hidden rounded-lg bg-muted">
+                  <div className="relative flex h-72 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100 lg:h-full">
+                    <span className="text-6xl opacity-30">🏍️</span>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                      <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                        {featuredEvent.status === 'activo' ? 'Activo' : 'Cerrado'}
+                      </span>
+                      <h3 className="mt-3 text-2xl font-extrabold tracking-tight md:text-3xl">{featuredEvent.title}</h3>
+                      <p className="mt-1 text-white/85">{featuredEvent.city} · desde Q{featuredEvent.price_per_photo} por foto</p>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            </div>
-          )}
-          {recentEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
+                </Link>
+              </div>
+            )}
+            {recentEvents.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Fotógrafos destacados */}
@@ -153,11 +162,15 @@ export function Home() {
               Ver todos →
             </Link>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {featuredPhotographers.map((p) => (
-              <PhotographerCard key={p.id} photographer={p} />
-            ))}
-          </div>
+          {photographers.length === 0 ? (
+            <p className="text-muted-foreground">Todavía no hay fotógrafos aprobados.</p>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {photographers.map((p) => (
+                <PhotographerCard key={p.id} photographer={p} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

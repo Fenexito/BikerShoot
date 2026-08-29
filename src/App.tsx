@@ -24,6 +24,7 @@ import { PhotographerProfile } from './features/biker/PhotographerProfile'
 import { Checkout as BikerCheckout } from './features/biker/Checkout'
 import { OrderSuccess } from './features/biker/OrderSuccess'
 import { Favorites as BikerFavorites } from './features/biker/Favorites'
+import { History as BikerHistory } from './features/biker/History'
 import { RouteMap } from './features/biker/RouteMap'
 import { StudioOnboarding } from './features/photographer/StudioOnboarding'
 import { StudioProfilePage } from './features/photographer/StudioProfilePage'
@@ -70,7 +71,7 @@ export default function App() {
         <Route path="/app/fotografos" element={<RequireBiker><PhotographersList /></RequireBiker>} />
         <Route path="/app/fotografos/:id" element={<RequireBiker><PhotographerProfile /></RequireBiker>} />
         <Route path="/app/favoritos" element={<RequireBiker><BikerFavorites /></RequireBiker>} />
-        <Route path="/app/historial" element={<RequireBiker><PlaceholderPage title="Historial" /></RequireBiker>} />
+        <Route path="/app/historial" element={<RequireBiker><BikerHistory /></RequireBiker>} />
         <Route path="/app/perfil" element={<RequireBiker><BikerProfilePage /></RequireBiker>} />
         <Route path="/app/checkout" element={<RequireBiker><BikerCheckout /></RequireBiker>} />
         <Route path="/app/pedido-confirmado" element={<RequireBiker><OrderSuccess /></RequireBiker>} />

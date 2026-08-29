@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { events } from '../../data/mockPhotos'
+import { usePublicEvents } from './usePublicData'
 import { EventCard } from './components/EventCard'
 import { Select } from '../../ui/flat/Select'
 
-const CITIES = Array.from(new Set(events.map((e) => e.city)))
-const CATEGORIES = Array.from(new Set(events.map((e) => e.category)))
+const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración']
 
 export function Events() {
+  const { data: events = [], isLoading } = usePublicEvents()
   const [searchParams, setSearchParams] = useSearchParams()
   const city = searchParams.get('ciudad') ?? ''
   const category = searchParams.get('categoria') ?? ''
@@ -19,12 +19,14 @@ export function Events() {
     setSearchParams(next, { replace: true })
   }
 
+  const CITIES = useMemo(() => Array.from(new Set(events.map((e) => e.city))), [events])
+
   const filtered = useMemo(() => {
     return [...events]
       .filter((e) => (city ? e.city === city : true))
       .filter((e) => (category ? e.category === category : true))
-      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
-  }, [city, category])
+      .sort((a, b) => +new Date(b.event_date) - +new Date(a.event_date))
+  }, [events, city, category])
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
@@ -45,6 +47,9 @@ export function Events() {
           ))}
         </Select>
       </div>
+
+      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {!isLoading && filtered.length === 0 && <p className="text-muted-foreground">No hay eventos con esos filtros.</p>}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((event) => (

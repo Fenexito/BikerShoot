@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Photo } from '../../../data/mockPhotos'
-import { getEventById, getPhotographerById } from '../../../data/mockPhotos'
+import type { DbPhoto } from '../../../types/db'
 import { PhotoCard } from './PhotoCard'
 import { Skeleton } from '../../../ui/flat/Skeleton'
 
 const BATCH_SIZE = 36
 
+export interface GridPhoto extends DbPhoto {
+  eventTitle: string
+  photographerName: string
+}
+
 interface PhotoGridProps {
-  photos: Photo[]
-  onOpenPhoto: (photos: Photo[], index: number) => void
+  photos: GridPhoto[]
+  onOpenPhoto: (photos: GridPhoto[], index: number) => void
 }
 
 export function PhotoGrid({ photos, onOpenPhoto }: PhotoGridProps) {
@@ -28,7 +32,6 @@ export function PhotoGrid({ photos, onOpenPhoto }: PhotoGridProps) {
       (entries) => {
         if (entries[0].isIntersecting && visibleCount < photos.length) {
           setLoadingMore(true)
-          // Simula latencia de red — en la Fase 2 esto es un fetch paginado real.
           setTimeout(() => {
             setVisibleCount((c) => Math.min(c + BATCH_SIZE, photos.length))
             setLoadingMore(false)
@@ -56,19 +59,15 @@ export function PhotoGrid({ photos, onOpenPhoto }: PhotoGridProps) {
   return (
     <div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:gap-3">
-        {visible.map((photo) => {
-          const event = getEventById(photo.eventId)
-          const photographer = getPhotographerById(photo.photographerId)
-          return (
-            <PhotoCard
-              key={photo.id}
-              photo={photo}
-              eventTitle={event?.title ?? ''}
-              photographerName={photographer?.name ?? ''}
-              onOpen={() => onOpenPhoto(visible, visible.indexOf(photo))}
-            />
-          )
-        })}
+        {visible.map((photo) => (
+          <PhotoCard
+            key={photo.id}
+            photo={photo}
+            eventTitle={photo.eventTitle}
+            photographerName={photo.photographerName}
+            onOpen={() => onOpenPhoto(visible, visible.indexOf(photo))}
+          />
+        ))}
         {loadingMore &&
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={`sk-${i}`} className="aspect-[4/5] w-full" />)}
       </div>

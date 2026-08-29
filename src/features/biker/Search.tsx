@@ -2,25 +2,25 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useBikerDetails } from './useBikerDetails'
-import { events, photographers, searchPhotos, type Photo, type SearchFilters } from '../../data/mockPhotos'
-import { PhotoGrid } from './components/PhotoGrid'
+import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type SearchFilters } from './usePublicData'
+import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { Select } from '../../ui/flat/Select'
 import { Badge } from '../../ui/flat/Badge'
 
-const CITIES = Array.from(new Set(events.map((e) => e.city)))
-const MOTO_BRANDS = Array.from(new Set([...events.map(() => ''), 'Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'KTM', 'BMW', 'Ducati'])).filter(Boolean)
-const CATEGORIES = Array.from(new Set(events.map((e) => e.category)))
+const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración']
 
 export function Search() {
   const { user } = useAuth()
   const { data: bikerDetails } = useBikerDetails(user?.id)
+  const { data: events = [] } = usePublicEvents()
+  const { data: photographers = [] } = useApprovedPhotographers()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [lightbox, setLightbox] = useState<{ photos: Photo[]; index: number } | null>(null)
+  const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
   const query = searchParams.get('q') ?? ''
   const city = searchParams.get('ciudad') ?? ''
-  const category = (searchParams.get('categoria') as SearchFilters['category']) ?? undefined
+  const category = searchParams.get('categoria') ?? ''
   const motoBrand = searchParams.get('marca') ?? ''
   const photographerId = searchParams.get('fotografo') ?? ''
   const sort = (searchParams.get('orden') as SearchFilters['sort']) ?? 'relevancia'
@@ -35,17 +35,29 @@ export function Search() {
 
   const effectiveBrand = onlyMyBrand ? bikerDetails?.moto_brand ?? '' : motoBrand
 
-  const results = useMemo(
+  const { data: rawResults = [] } = useSearchPhotos({
+    query: query || undefined,
+    city: city || undefined,
+    category: category || undefined,
+    motoBrand: effectiveBrand || undefined,
+    photographerId: photographerId || undefined,
+    sort,
+  })
+
+  const results: GridPhoto[] = useMemo(
     () =>
-      searchPhotos({
-        query: query || undefined,
-        city: city || undefined,
-        category,
-        motoBrand: effectiveBrand || undefined,
-        photographerId: photographerId || undefined,
-        sort,
-      }),
-    [query, city, category, effectiveBrand, photographerId, sort],
+      rawResults.map((p) => ({
+        ...p,
+        eventTitle: p.event?.title ?? '',
+        photographerName: p.photographer?.display_name ?? '',
+      })),
+    [rawResults],
+  )
+
+  const CITIES = useMemo(() => Array.from(new Set(events.map((e) => e.city))), [events])
+  const MOTO_BRANDS = useMemo(
+    () => Array.from(new Set(rawResults.map((p) => p.moto_brand).filter(Boolean))) as string[],
+    [rawResults],
   )
 
   const activeChips = [
@@ -54,7 +66,7 @@ export function Search() {
     category && { key: 'categoria', label: category },
     motoBrand && !onlyMyBrand && { key: 'marca', label: motoBrand },
     onlyMyBrand && bikerDetails?.moto_brand && { key: 'mi_moto', label: `Mi moto: ${bikerDetails.moto_brand}` },
-    photographerId && { key: 'fotografo', label: photographers.find((p) => p.id === photographerId)?.name ?? '' },
+    photographerId && { key: 'fotografo', label: photographers.find((p) => p.id === photographerId)?.display_name ?? '' },
   ].filter(Boolean) as { key: string; label: string }[]
 
   return (
@@ -63,7 +75,6 @@ export function Search() {
       <p className="mb-6 text-muted-foreground">{results.length} fotos encontradas</p>
 
       <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
-        {/* Filtros avanzados */}
         <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
           <input
             value={query}
@@ -79,7 +90,7 @@ export function Search() {
             ))}
           </Select>
 
-          <Select label="Categoría" value={category ?? ''} onChange={(e) => setParam('categoria', e.target.value || undefined)}>
+          <Select label="Categoría" value={category} onChange={(e) => setParam('categoria', e.target.value || undefined)}>
             <option value="">Todas</option>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -117,7 +128,6 @@ export function Search() {
           </Select>
         </aside>
 
-        {/* Resultados */}
         <div>
           {activeChips.length > 0 && (
             <div className="mb-5 flex flex-wrap gap-2">

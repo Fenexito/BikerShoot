@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../cart/cartStore'
-import { thumbUrl } from '../../data/mockPhotos'
+import { useAuth } from '../auth/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { r2Url } from '../../lib/r2'
 import { Button } from '../../ui/flat/Button'
 import { Card } from '../../ui/flat/Card'
+import { useToastStore } from '../../ui/overlays/toastStore'
 import { cn } from '../../lib/cn'
 
 const BUNDLE_THRESHOLD = 5
@@ -13,6 +16,8 @@ export function Checkout() {
   const items = useCartStore((s) => s.items)
   const remove = useCartStore((s) => s.remove)
   const clear = useCartStore((s) => s.clear)
+  const { user } = useAuth()
+  const push = useToastStore((s) => s.push)
   const navigate = useNavigate()
   const [method, setMethod] = useState<'tarjeta' | 'transferencia'>('tarjeta')
   const [placing, setPlacing] = useState(false)
@@ -34,12 +39,40 @@ export function Checkout() {
 
   const total = subtotal - discount
 
-  function placeOrder() {
+  async function placeOrder() {
+    if (!user) return
     setPlacing(true)
-    setTimeout(() => {
-      clear()
-      navigate('/app/pedido-confirmado', { state: { total, count: items.length } })
-    }, 900)
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({ biker_id: user.id, payment_method: method, total })
+      .select('id')
+      .single()
+
+    if (orderError || !order) {
+      push({ type: 'error', title: 'No se pudo crear el pedido', description: orderError?.message })
+      setPlacing(false)
+      return
+    }
+
+    const { error: itemsError } = await supabase.from('order_items').insert(
+      items.map((item) => ({
+        order_id: order.id,
+        photo_id: item.photoId,
+        photographer_id: item.photographerId,
+        event_id: item.eventId,
+        price: item.price,
+      })),
+    )
+
+    if (itemsError) {
+      push({ type: 'error', title: 'El pedido se creó, pero fallaron los detalles', description: itemsError.message })
+      setPlacing(false)
+      return
+    }
+
+    clear()
+    navigate('/app/pedido-confirmado', { state: { total, count: items.length } })
   }
 
   if (items.length === 0) {
@@ -63,7 +96,7 @@ export function Checkout() {
         <div className="flex flex-col gap-3">
           {items.map((item) => (
             <div key={item.photoId} className="flex items-center gap-4 rounded-lg bg-muted p-3">
-              <img src={thumbUrl(item.seed, 100, 125)} alt="" className="h-16 w-14 rounded object-cover" />
+              <img src={r2Url(item.storagePath)} alt="" className="h-16 w-14 rounded object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{item.eventTitle}</p>
                 <p className="text-sm text-muted-foreground">{item.photographerName}</p>

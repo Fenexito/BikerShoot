@@ -1,30 +1,19 @@
 import { Link } from 'react-router-dom'
-import type { MotoEvent } from '../../../data/mockPhotos'
-import { thumbUrl, getPhotographerById, getPhotosByEvent } from '../../../data/mockPhotos'
+import type { PublicEvent } from '../usePublicData'
 import { Badge } from '../../../ui/flat/Badge'
 
-export function EventCard({ event }: { event: MotoEvent }) {
-  const photographer = getPhotographerById(event.photographerId)
-  const photoCount = getPhotosByEvent(event.id).length
-  const date = new Date(event.date)
+export function EventCard({ event }: { event: PublicEvent }) {
+  const date = new Date(event.event_date)
 
   return (
     <Link
       to={`/app/eventos/${event.id}`}
       className="group block overflow-hidden rounded-lg bg-muted transition-transform duration-200 hover:scale-[1.02]"
     >
-      <div className="relative aspect-[4/3] overflow-hidden">
-        <img
-          src={thumbUrl(event.coverSeed, 500, 380)}
-          alt={event.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+      <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100">
+        <span className="text-4xl opacity-40">🏍️</span>
         <div className="absolute left-2 top-2">
           <Badge tone="accent">{event.category}</Badge>
-        </div>
-        <div className="absolute bottom-2 right-2 rounded-full bg-white px-2.5 py-1 text-xs font-bold">
-          {photoCount} fotos
         </div>
       </div>
       <div className="p-4">
@@ -32,7 +21,9 @@ export function EventCard({ event }: { event: MotoEvent }) {
           {date.toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })} · {event.city}
         </p>
         <h3 className="mt-1 truncate text-lg font-bold">{event.title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Por {photographer?.name} · desde Q{event.pricePerPhoto}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Por {event.photographer?.display_name ?? 'Fotógrafo'} · desde Q{event.price_per_photo}
+        </p>
       </div>
     </Link>
   )

@@ -1,16 +1,23 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { photos as allPhotos, type Photo } from '../../data/mockPhotos'
+import { useSearchPhotos } from './usePublicData'
 import { useFavoritesStore } from './favoritesStore'
-import { PhotoGrid } from './components/PhotoGrid'
+import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { Button } from '../../ui/flat/Button'
 
 export function Favorites() {
   const favoriteIds = useFavoritesStore((s) => s.ids)
-  const [lightbox, setLightbox] = useState<{ photos: Photo[]; index: number } | null>(null)
+  const { data: photos = [] } = useSearchPhotos({})
+  const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
-  const favoritePhotos = allPhotos.filter((p) => favoriteIds.includes(p.id))
+  const favoritePhotos: GridPhoto[] = useMemo(
+    () =>
+      photos
+        .filter((p) => favoriteIds.includes(p.id))
+        .map((p) => ({ ...p, eventTitle: p.event?.title ?? '', photographerName: p.photographer?.display_name ?? '' })),
+    [photos, favoriteIds],
+  )
 
   if (favoritePhotos.length === 0) {
     return (

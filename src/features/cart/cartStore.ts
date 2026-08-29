@@ -5,9 +5,10 @@ export interface CartItem {
   photoId: string
   eventId: string
   eventTitle: string
+  photographerId: string
   photographerName: string
   price: number
-  seed: string
+  storagePath: string
 }
 
 interface CartState {
@@ -30,6 +31,16 @@ export const useCartStore = create<CartState>()(
       clear: () => set({ items: [] }),
       total: () => get().items.reduce((sum, i) => sum + i.price, 0),
     }),
-    { name: 'motoshots-cart' },
+    {
+      name: 'motoshots-cart',
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as { items?: CartItem[] }
+        // v0 no tenía photographerId — un carrito viejo con esa forma se descarta
+        // en vez de romper el checkout con un valor faltante.
+        if (state?.items?.some((i) => !('photographerId' in i))) return { items: [] }
+        return state as CartState
+      },
+    },
   ),
 )
