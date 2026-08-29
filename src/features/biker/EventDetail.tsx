@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { usePublicEvent, useEventPhotos } from './usePublicData'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
@@ -13,14 +13,35 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 export function EventDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { data: event, isLoading } = usePublicEvent(id)
   const { data: photos = [] } = useEventPhotos(id)
   const [motoBrand, setMotoBrand] = useState('')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
   const cartItems = useCartStore((s) => s.items)
 
+  const pointId = searchParams.get('punto') ?? ''
+  const selectedPoint = event?.event_points.find((pt) => pt.id === pointId)
+
+  useEffect(() => {
+    if (pointId && event && !selectedPoint) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('punto')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointId, event, selectedPoint])
+
+  function setPointId(value: string) {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('punto', value)
+    else next.delete('punto')
+    setSearchParams(next, { replace: true })
+  }
+
   const brands = useMemo(() => Array.from(new Set(photos.map((p) => p.moto_brand).filter(Boolean))) as string[], [photos])
-  const filteredPhotos = motoBrand ? photos.filter((p) => p.moto_brand === motoBrand) : photos
+  const pointFilteredPhotos = pointId ? photos.filter((p) => p.point_id === pointId) : photos
+  const filteredPhotos = motoBrand ? pointFilteredPhotos.filter((p) => p.moto_brand === motoBrand) : pointFilteredPhotos
 
   const gridPhotos: GridPhoto[] = filteredPhotos.map((p) => ({
     ...p,
@@ -71,16 +92,39 @@ export function EventDetail() {
           💡 Compra 5 fotos o más de este evento y ahorra 15% automáticamente en el carrito.
         </div>
 
-        <div className="mt-10 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight">{photos.length} fotos del evento</h2>
-          {brands.length > 0 && (
-            <Select value={motoBrand} onChange={(e) => setMotoBrand(e.target.value)} className="w-48">
-              <option value="">Toda marca de moto</option>
-              {brands.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </Select>
-          )}
+        {selectedPoint && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-primary/10 px-4 py-3 text-sm">
+            <span>
+              📍 Viendo solo el punto <strong>{selectedPoint.label}</strong> ({selectedPoint.time_start.slice(0, 5)}–{selectedPoint.time_end.slice(0, 5)})
+            </span>
+            <button onClick={() => setPointId('')} className="font-semibold text-primary underline">
+              Ver todas las fotos del evento
+            </button>
+          </div>
+        )}
+
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-bold tracking-tight">{filteredPhotos.length} fotos {selectedPoint ? 'de este punto' : 'del evento'}</h2>
+          <div className="flex flex-wrap gap-3">
+            {event.event_points.length > 1 && (
+              <Select value={pointId} onChange={(e) => setPointId(e.target.value)} className="w-56">
+                <option value="">Todos los puntos</option>
+                {event.event_points.map((pt) => (
+                  <option key={pt.id} value={pt.id}>
+                    {pt.label} ({pt.time_start.slice(0, 5)}–{pt.time_end.slice(0, 5)})
+                  </option>
+                ))}
+              </Select>
+            )}
+            {brands.length > 0 && (
+              <Select value={motoBrand} onChange={(e) => setMotoBrand(e.target.value)} className="w-48">
+                <option value="">Toda marca de moto</option>
+                {brands.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </Select>
+            )}
+          </div>
         </div>
 
         <div className="mt-6">

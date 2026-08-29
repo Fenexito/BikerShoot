@@ -97,7 +97,7 @@ export function RouteMap() {
                   <p className="font-bold">{point.label}</p>
                   <p className="text-sm text-muted-foreground">{point.event?.photographer?.display_name}</p>
                   {point.event && (
-                    <Link to={`/app/eventos/${point.event.id}`}>
+                    <Link to={`/app/eventos/${point.event.id}?punto=${point.id}`}>
                       <Button size="sm" className="mt-3 w-full">Ver fotos de este punto</Button>
                     </Link>
                   )}

@@ -28,6 +28,7 @@ export interface SearchFilters {
   motoBrand?: string
   photographerId?: string
   eventId?: string
+  pointId?: string
   sort?: 'relevancia' | 'precio-asc' | 'precio-desc'
 }
 
@@ -164,10 +165,15 @@ export function useSearchPhotos(filters: SearchFilters) {
       let results = photos.filter((p) => {
         if (filters.photographerId && p.photographer_id !== filters.photographerId) return false
         if (filters.eventId && p.event_id !== filters.eventId) return false
+        if (filters.pointId && p.point_id !== filters.pointId) return false
         if (filters.motoBrand && p.moto_brand !== filters.motoBrand) return false
         if (filters.city && p.event?.city !== filters.city) return false
         if (filters.category && p.event?.category !== filters.category) return false
-        if (filters.query && !p.event?.title.toLowerCase().includes(filters.query.toLowerCase())) return false
+        if (filters.query) {
+          const q = filters.query.toLowerCase()
+          const haystack = [p.event?.title, p.event?.city, p.photographer?.display_name].join(' ').toLowerCase()
+          if (!haystack.includes(q)) return false
+        }
         return true
       })
       if (filters.sort === 'precio-asc') results = [...results].sort((a, b) => a.price - b.price)
