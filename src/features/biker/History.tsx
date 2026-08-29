@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useMyOrders } from './useMyOrders'
-import { r2Url } from '../../lib/r2'
+import { previewUrl, r2Url } from '../../lib/r2'
+import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/flat/Button'
 import { Badge } from '../../ui/flat/Badge'
+import { useToastStore } from '../../ui/overlays/toastStore'
 
 const STATUS_LABEL: Record<string, string> = {
   pendiente_pago: 'Pendiente de pago',
@@ -13,9 +16,31 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: 'Cancelado',
 }
 
+const PAID_STATUSES = new Set(['activo', 'finalizado', 'entregado'])
+
 export function History() {
   const { user } = useAuth()
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
+  const push = useToastStore((s) => s.push)
+  const [downloading, setDownloading] = useState<string | null>(null)
+
+  async function download(photoId: string, photo: { storage_path: string; preview_path: string | null }) {
+    if (!photo.preview_path) {
+      // Foto de antes de proteger el original — el único archivo que existe ya es público.
+      window.open(r2Url(photo.storage_path), '_blank')
+      return
+    }
+    setDownloading(photoId)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-download-url', { body: { photoId } })
+      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace de descarga')
+      window.open(data.downloadUrl, '_blank')
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
+    } finally {
+      setDownloading(null)
+    }
+  }
 
   if (isLoading) {
     return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando tus compras…</div>
@@ -51,23 +76,23 @@ export function History() {
               </div>
               <Badge tone="secondary">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}</Badge>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {order.order_items.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.photo ? r2Url(item.photo.storage_path) : undefined}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group relative aspect-[4/5] overflow-hidden rounded-md bg-background"
-                  title={item.event?.title ?? ''}
-                >
-                  {item.photo && (
-                    <img src={r2Url(item.photo.storage_path)} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
-                  )}
+                <div key={item.id} className="group relative aspect-[4/5] overflow-hidden rounded-md bg-background">
+                  {item.photo && <img src={previewUrl(item.photo)} alt="" className="h-full w-full object-cover" />}
                   <span className="absolute bottom-1 left-1 right-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
                     {STATUS_LABEL[item.status] ?? item.status}
                   </span>
-                </a>
+                  {PAID_STATUSES.has(item.status) && item.photo && (
+                    <button
+                      onClick={() => download(item.photo_id, item.photo!)}
+                      disabled={downloading === item.photo_id}
+                      className="absolute inset-x-0 top-0 flex items-center justify-center bg-black/0 py-1.5 text-xs font-semibold text-white opacity-0 transition-all duration-150 hover:bg-black/60 group-hover:opacity-100"
+                    >
+                      {downloading === item.photo_id ? 'Generando…' : '⬇ Descargar original'}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>

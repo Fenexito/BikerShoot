@@ -1,42 +1,89 @@
 import { useRef, useState, type DragEvent } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
+import { usePhotographerDetails } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
+import { previewUrl } from '../../lib/r2'
 import { Select } from '../../ui/studio/Select'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { cn } from '../../lib/cn'
 
-const R2_PUBLIC_URL = import.meta.env.VITE_R2_PUBLIC_URL as string | undefined
+const PREVIEW_MAX_SIDE = 1600
+const PREVIEW_QUALITY = 0.82
 
 type UploadStatus = 'subiendo' | 'lista' | 'error'
 
 interface UploadItem {
   id: string
   name: string
-  previewUrl: string
+  localPreview: string
   progress: number
   status: UploadStatus
   storagePath?: string
+  previewPath?: string
   errorMessage?: string
 }
 
-function uploadWithProgress(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+function uploadWithProgress(url: string, body: Blob, contentType: string, onProgress: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
-    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.setRequestHeader('Content-Type', contentType)
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress((e.loaded / e.total) * 100)
     }
     xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`R2 respondió ${xhr.status}`)))
     xhr.onerror = () => reject(new Error('Error de red subiendo a R2'))
-    xhr.send(file)
+    xhr.send(body)
+  })
+}
+
+/** Reescala a máx. PREVIEW_MAX_SIDE y le pone una marca de agua diagonal
+ * repetida — así se protege el original de ser "robado" en alta calidad
+ * antes de la compra (ver plan de watermark). */
+async function createWatermarkedPreview(file: File, watermarkText: string): Promise<Blob> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, PREVIEW_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+  const width = Math.round(bitmap.width * scale)
+  const height = Math.round(bitmap.height * scale)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No se pudo preparar el lienzo del preview')
+  ctx.drawImage(bitmap, 0, 0, width, height)
+
+  ctx.save()
+  ctx.translate(width / 2, height / 2)
+  ctx.rotate(-Math.PI / 8)
+  ctx.translate(-width / 2, -height / 2)
+  ctx.font = `700 ${Math.max(14, Math.round(width / 26))}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(255,255,255,0.32)'
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)'
+  ctx.lineWidth = 1
+
+  const stepX = width / 2
+  const stepY = height / 6
+  for (let y = -height * 0.5; y < height * 1.5; y += stepY) {
+    for (let x = -width * 0.5; x < width * 1.5; x += stepX) {
+      ctx.strokeText(watermarkText, x, y)
+      ctx.fillText(watermarkText, x, y)
+    }
+  }
+  ctx.restore()
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar el preview'))), 'image/jpeg', PREVIEW_QUALITY)
   })
 }
 
 export function StudioUpload() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { data: events } = useMyEvents(user?.id)
+  const { data: details } = usePhotographerDetails(user?.id)
   const push = useToastStore((s) => s.push)
   const [eventId, setEventId] = useState('')
   const [pointId, setPointId] = useState('')
@@ -45,6 +92,7 @@ export function StudioUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const event = events?.find((e) => e.id === eventId)
+  const watermarkText = [profile?.display_name, details?.whatsapp].filter(Boolean).join(' · ') || 'MotoShots'
 
   async function handleFiles(files: FileList | null) {
     if (!files || !user) return
@@ -61,7 +109,7 @@ export function StudioUpload() {
     const newItems: UploadItem[] = imageFiles.map((file) => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       name: file.name,
-      previewUrl: URL.createObjectURL(file),
+      localPreview: URL.createObjectURL(file),
       progress: 0,
       status: 'subiendo',
     }))
@@ -73,23 +121,37 @@ export function StudioUpload() {
         const { data, error } = await supabase.functions.invoke('r2-upload-url', {
           body: { fileName: file.name, contentType: file.type, eventId },
         })
-        if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
+        if (error || !data?.originalUploadUrl || !data?.previewUploadUrl) {
+          throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
+        }
 
-        await uploadWithProgress(data.uploadUrl, file, (pct) => {
-          setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, progress: pct } : it)))
-        })
+        const previewBlob = await createWatermarkedPreview(file, watermarkText)
+
+        let originalPct = 0
+        let previewPct = 0
+        const updateProgress = () => {
+          setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, progress: (originalPct + previewPct) / 2 } : it)))
+        }
+
+        await Promise.all([
+          uploadWithProgress(data.originalUploadUrl, file, file.type, (pct) => { originalPct = pct; updateProgress() }),
+          uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', (pct) => { previewPct = pct; updateProgress() }),
+        ])
 
         const { error: insertError } = await supabase.from('photos').insert({
           event_id: eventId,
           photographer_id: user.id,
           point_id: pointId,
           storage_path: data.storagePath,
+          preview_path: data.previewPath,
           price: event?.price_per_photo ?? 0,
           size_bytes: file.size,
         })
         if (insertError) throw insertError
 
-        setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, progress: 100, status: 'lista', storagePath: data.storagePath } : it)))
+        setItems((prev) =>
+          prev.map((it) => (it.id === itemId ? { ...it, progress: 100, status: 'lista', storagePath: data.storagePath, previewPath: data.previewPath } : it)),
+        )
       } catch (err) {
         setItems((prev) =>
           prev.map((it) => (it.id === itemId ? { ...it, status: 'error', errorMessage: (err as Error).message } : it)),
@@ -109,7 +171,9 @@ export function StudioUpload() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12 text-foreground md:px-16">
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Carga rápida</h1>
-      <p className="mt-2 text-muted-foreground">Arrastra las fotos de un punto específico y súbelas en lote a tu storage.</p>
+      <p className="mt-2 text-muted-foreground">
+        Arrastra las fotos de un punto específico y súbelas en lote — cada una se protege automáticamente con marca de agua para la vista previa; el original en alta calidad queda privado hasta que se compre.
+      </p>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2">
         <Select label="Evento" value={eventId} onChange={(e) => { setEventId(e.target.value); setPointId('') }}>
@@ -167,12 +231,12 @@ export function StudioUpload() {
             {items.map((item) => (
               <a
                 key={item.id}
-                href={item.status === 'lista' && item.storagePath && R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${item.storagePath}` : undefined}
+                href={item.status === 'lista' && item.previewPath ? previewUrl({ storage_path: item.storagePath!, preview_path: item.previewPath }) : undefined}
                 target="_blank"
                 rel="noreferrer"
                 className="relative aspect-[4/5] overflow-hidden border border-border"
               >
-                <img src={item.previewUrl} alt={item.name} className="h-full w-full object-cover" />
+                <img src={item.localPreview} alt={item.name} className="h-full w-full object-cover" />
                 {item.status === 'subiendo' && (
                   <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1">
                     <div className="h-1 w-full bg-white/20">

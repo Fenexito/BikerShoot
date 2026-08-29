@@ -11,7 +11,7 @@ interface RawOrderItem {
   price: number
   status: OrderItemStatus
   created_at: string
-  photo: { storage_path: string } | null
+  photo: { storage_path: string; preview_path: string | null } | null
   event: { title: string } | null
   order: { payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { display_name: string } | null } | null
 }
@@ -33,7 +33,7 @@ function useRawOrderItems(photographerId: string | undefined) {
     queryFn: async (): Promise<RawOrderItem[]> => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, photo:photos(storage_path), event:events(title), order:orders(payment_method, created_at, biker:profiles(display_name))')
+        .select('*, photo:photos(storage_path, preview_path), event:events(title), order:orders(payment_method, created_at, biker:profiles(display_name))')
         .eq('photographer_id', photographerId)
         .order('created_at', { ascending: false })
       if (error) throw error

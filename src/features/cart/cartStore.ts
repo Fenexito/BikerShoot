@@ -9,6 +9,7 @@ export interface CartItem {
   photographerName: string
   price: number
   storagePath: string
+  previewPath: string | null
 }
 
 interface CartState {
@@ -33,12 +34,12 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'motoshots-cart',
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const state = persisted as { items?: CartItem[] }
-        // v0 no tenía photographerId — un carrito viejo con esa forma se descarta
-        // en vez de romper el checkout con un valor faltante.
-        if (state?.items?.some((i) => !('photographerId' in i))) return { items: [] }
+        // Carritos de versiones viejas no tenían photographerId/previewPath —
+        // se descartan en vez de romper el checkout con un valor faltante.
+        if (state?.items?.some((i) => !('photographerId' in i) || !('previewPath' in i))) return { items: [] }
         return state as CartState
       },
     },

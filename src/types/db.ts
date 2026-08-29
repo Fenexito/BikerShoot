@@ -50,6 +50,7 @@ export interface DbPhoto {
   photographer_id: string
   point_id: string | null
   storage_path: string
+  preview_path: string | null
   price: number
   moto_brand: string | null
   created_at: string

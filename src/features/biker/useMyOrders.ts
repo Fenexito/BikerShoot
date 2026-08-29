@@ -6,7 +6,7 @@ export interface MyOrderItem {
   photo_id: string
   price: number
   status: string
-  photo: { storage_path: string } | null
+  photo: { storage_path: string; preview_path: string | null } | null
   event: { title: string } | null
   photographer: { display_name: string } | null
 }
@@ -25,7 +25,7 @@ export function useMyOrders(bikerId: string | undefined) {
     queryFn: async (): Promise<MyOrder[]> => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, order_items(*, photo:photos(storage_path), event:events(title), photographer:profiles(display_name))')
+        .select('*, order_items(*, photo:photos(storage_path, preview_path), event:events(title), photographer:profiles(display_name))')
         .eq('biker_id', bikerId)
         .order('created_at', { ascending: false })
       if (error) throw error

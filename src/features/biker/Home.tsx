@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos } from './usePublicData'
-import { r2Url } from '../../lib/r2'
+import { previewUrl } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotographerCard } from './components/PhotographerCard'
 import { Button } from '../../ui/flat/Button'
@@ -62,7 +62,7 @@ export function Home() {
             {collagePhotos.map((photo, i) => (
               <img
                 key={photo.id}
-                src={r2Url(photo.storage_path)}
+                src={previewUrl(photo)}
                 alt=""
                 className={`h-full w-full object-cover ${COLLAGE_SPANS[i % COLLAGE_SPANS.length]}`}
                 loading="eager"

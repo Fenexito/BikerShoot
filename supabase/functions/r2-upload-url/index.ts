@@ -1,17 +1,20 @@
-// Edge Function: genera una URL firmada temporal para subir UNA foto
-// directo a Cloudflare R2 desde el navegador del fotógrafo.
+// Edge Function: genera DOS URLs firmadas temporales para subir UNA foto
+// directo a Cloudflare R2 desde el navegador del fotógrafo — una para el
+// original (bucket privado) y otra para el preview con marca de agua que
+// el navegador genera antes de subir (bucket público).
 //
 // Por qué existe esta función en vez de subir directo desde el front-end:
 // la Secret Access Key de R2 nunca puede vivir en el navegador (cualquiera
 // podría leerla y borrar/reemplazar todo el bucket). Esta función corre en
-// el servidor de Supabase, firma la URL usando la Secret Key (que solo ella
-// conoce, guardada como "secret" de Supabase), y le devuelve al navegador
-// una URL que solo sirve para subir ESE archivo específico, por tiempo
-// limitado.
+// el servidor de Supabase, firma las URLs usando la Secret Key (que solo
+// ella conoce, guardada como "secret" de Supabase), y le devuelve al
+// navegador URLs que solo sirven para subir ESE archivo específico, por
+// tiempo limitado.
 //
 // Secrets necesarios (Supabase Dashboard > Edge Functions > Secrets, o
 // `supabase secrets set`): R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
-// R2_SECRET_ACCESS_KEY, R2_BUCKET.
+// R2_SECRET_ACCESS_KEY, R2_BUCKET (bucket público de previews, el de
+// siempre), R2_ORIGINALS_BUCKET (bucket privado nuevo, nunca público).
 // SUPABASE_URL y SUPABASE_ANON_KEY los inyecta Supabase automáticamente,
 // no hay que configurarlos.
 
@@ -29,6 +32,7 @@ const R2_ACCOUNT_ID = env('R2_ACCOUNT_ID')
 const R2_ACCESS_KEY_ID = env('R2_ACCESS_KEY_ID')
 const R2_SECRET_ACCESS_KEY = env('R2_SECRET_ACCESS_KEY')
 const R2_BUCKET = env('R2_BUCKET')
+const R2_ORIGINALS_BUCKET = env('R2_ORIGINALS_BUCKET')
 const SUPABASE_URL = env('SUPABASE_URL')
 const SUPABASE_ANON_KEY = env('SUPABASE_ANON_KEY')
 
@@ -94,7 +98,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const storagePath = `${user.id}/${eventId}/${crypto.randomUUID()}-${safeName}`
+  const uniqueName = `${crypto.randomUUID()}-${safeName}`
+  const storagePath = `${user.id}/${eventId}/${uniqueName}`
+  // El preview siempre se genera y sube como JPEG en el navegador (ver
+  // StudioUpload.tsx), sin importar el formato del original.
+  const previewPath = `previews/${user.id}/${eventId}/${uniqueName}.jpg`
 
   const r2 = new AwsClient({
     accessKeyId: R2_ACCESS_KEY_ID,
@@ -103,15 +111,22 @@ Deno.serve(async (req: Request) => {
     region: 'auto',
   })
 
-  const objectUrl = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${storagePath}`
+  async function signPut(bucket: string, key: string, type: string) {
+    const objectUrl = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${bucket}/${key}`
+    const signed = await r2.sign(objectUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': type },
+      aws: { signQuery: true },
+    })
+    return signed.url
+  }
 
-  const signed = await r2.sign(objectUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': contentType },
-    aws: { signQuery: true },
-  })
+  const [originalUploadUrl, previewUploadUrl] = await Promise.all([
+    signPut(R2_ORIGINALS_BUCKET, storagePath, contentType),
+    signPut(R2_BUCKET, previewPath, 'image/jpeg'),
+  ])
 
-  return new Response(JSON.stringify({ uploadUrl: signed.url, storagePath }), {
+  return new Response(JSON.stringify({ originalUploadUrl, previewUploadUrl, storagePath, previewPath }), {
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   })
 })

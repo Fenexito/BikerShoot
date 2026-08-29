@@ -1,5 +1,5 @@
 import type { DbPhoto } from '../../../types/db'
-import { r2Url } from '../../../lib/r2'
+import { previewUrl } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { cn } from '../../../lib/cn'
@@ -22,7 +22,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen }: Photo
     <div className="group relative overflow-hidden rounded-lg bg-muted">
       <button onClick={onOpen} className="block w-full">
         <img
-          src={r2Url(photo.storage_path)}
+          src={previewUrl(photo)}
           alt={`Foto de ${eventTitle}`}
           loading="lazy"
           className="aspect-[4/5] w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -54,7 +54,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen }: Photo
         onClick={() =>
           inCart
             ? remove(photo.id)
-            : add({ photoId: photo.id, eventId: photo.event_id, eventTitle, photographerId: photo.photographer_id, photographerName, price: photo.price, storagePath: photo.storage_path })
+            : add({ photoId: photo.id, eventId: photo.event_id, eventTitle, photographerId: photo.photographer_id, photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
         }
         className={cn(
           'absolute bottom-2 right-2 flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-all duration-200',

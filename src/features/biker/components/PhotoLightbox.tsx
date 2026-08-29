@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { r2Url } from '../../../lib/r2'
+import { previewUrl } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { Button } from '../../../ui/flat/Button'
@@ -70,7 +70,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
         )}
         <img
           key={photo.id}
-          src={r2Url(photo.storage_path)}
+          src={previewUrl(photo)}
           alt={photo.eventTitle}
           className="max-h-full max-w-full animate-[lightbox-in_.25s_ease-out] rounded-lg object-contain shadow-2xl"
         />
@@ -94,7 +94,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
               i === index ? 'opacity-100 ring-2 ring-white' : 'opacity-40 hover:opacity-75',
             )}
           >
-            <img src={r2Url(p.storage_path)} alt="" className="h-full w-full object-cover" />
+            <img src={previewUrl(p)} alt="" className="h-full w-full object-cover" />
           </button>
         ))}
       </div>
@@ -116,7 +116,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
             onClick={() =>
               inCart
                 ? remove(photo.id)
-                : add({ photoId: photo.id, eventId: photo.event_id, eventTitle: photo.eventTitle, photographerId: photo.photographer_id, photographerName: photo.photographerName, price: photo.price, storagePath: photo.storage_path })
+                : add({ photoId: photo.id, eventId: photo.event_id, eventTitle: photo.eventTitle, photographerId: photo.photographer_id, photographerName: photo.photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
             }
             variant={inCart ? 'secondary' : 'primary'}
           >

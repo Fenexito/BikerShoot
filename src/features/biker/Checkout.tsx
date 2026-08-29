@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { r2Url } from '../../lib/r2'
+import { previewUrl } from '../../lib/r2'
 import { Button } from '../../ui/flat/Button'
 import { Card } from '../../ui/flat/Card'
 import { useToastStore } from '../../ui/overlays/toastStore'
@@ -96,7 +96,7 @@ export function Checkout() {
         <div className="flex flex-col gap-3">
           {items.map((item) => (
             <div key={item.photoId} className="flex items-center gap-4 rounded-lg bg-muted p-3">
-              <img src={r2Url(item.storagePath)} alt="" className="h-16 w-14 rounded object-cover" />
+              <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 rounded object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{item.eventTitle}</p>
                 <p className="text-sm text-muted-foreground">{item.photographerName}</p>

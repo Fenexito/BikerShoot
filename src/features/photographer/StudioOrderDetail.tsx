@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useOrderGroup, type OrderItemStatus } from './useMyOrders'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
-import { r2Url } from '../../lib/r2'
+import { previewUrl } from '../../lib/r2'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
@@ -96,7 +96,7 @@ export function StudioOrderDetail() {
           {order.items.map((item) => (
             <img
               key={item.id}
-              src={item.photo ? r2Url(item.photo.storage_path) : undefined}
+              src={item.photo ? previewUrl(item.photo) : undefined}
               alt=""
               className="aspect-[4/5] w-full border border-border object-cover"
             />
