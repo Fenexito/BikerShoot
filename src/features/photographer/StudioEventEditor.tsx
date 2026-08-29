@@ -10,7 +10,8 @@ import { Select } from '../../ui/studio/Select'
 import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
 
-const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración'] as const
+const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos'] as const
+const AUTODROMOS = ['Autodromo Pedro Cofiño', 'Autodromo GT', 'Guatemala Raceway (1/4 de Milla)']
 
 interface LocalPoint {
   id: string
@@ -161,7 +162,16 @@ export function StudioEventEditor() {
         </Select>
         <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
         <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />
-        <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
+        {category === 'Pista' ? (
+          <Select label="Autódromo" value={venue} onChange={(e) => setVenue(e.target.value)}>
+            <option value="">Selecciona un autódromo</option>
+            {AUTODROMOS.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </Select>
+        ) : (
+          <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
+        )}
         <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
         <div className="sm:col-span-2">
           <label className="mb-2 block text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Descripción</label>
@@ -198,7 +208,7 @@ export function StudioEventEditor() {
         )}
 
         <div className="mt-6">
-          <RoutePointPicker onAdd={addPoint} />
+          <RoutePointPicker onAdd={addPoint} showRouteSelector={category === 'Rodada'} />
         </div>
       </section>
 

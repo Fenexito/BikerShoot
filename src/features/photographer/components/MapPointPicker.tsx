@@ -21,18 +21,27 @@ function ClickCatcher({ onPick }: { onPick: (lat: number, lng: number) => void }
 interface MapPointPickerProps {
   lat: number
   lng: number
-  onPick: (lat: number, lng: number) => void
+  onPick?: (lat: number, lng: number) => void
+  readOnly?: boolean
 }
 
-export function MapPointPicker({ lat, lng, onPick }: MapPointPickerProps) {
+export function MapPointPicker({ lat, lng, onPick, readOnly }: MapPointPickerProps) {
   return (
     <div className="h-64 w-full overflow-hidden border border-border">
-      <MapContainer center={[lat, lng]} zoom={12} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
+      <MapContainer
+        center={[lat, lng]}
+        zoom={12}
+        scrollWheelZoom={!readOnly}
+        dragging={!readOnly}
+        zoomControl={!readOnly}
+        doubleClickZoom={!readOnly}
+        style={{ height: '100%', width: '100%' }}
+      >
         <TileLayer
-          attribution='&copy; OpenStreetMap &copy; CARTO'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <ClickCatcher onPick={onPick} />
+        {!readOnly && onPick && <ClickCatcher onPick={onPick} />}
         <Marker position={[lat, lng]} icon={ACCENT_ICON} />
       </MapContainer>
     </div>

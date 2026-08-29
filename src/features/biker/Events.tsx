@@ -4,7 +4,7 @@ import { usePublicEvents } from './usePublicData'
 import { EventCard } from './components/EventCard'
 import { Select } from '../../ui/flat/Select'
 
-const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración']
+const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
 
 export function Events() {
   const { data: events = [], isLoading } = usePublicEvents()

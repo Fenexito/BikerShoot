@@ -9,7 +9,7 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { Select } from '../../ui/flat/Select'
 import { Badge } from '../../ui/flat/Badge'
 
-const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración']
+const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
 
 export function Search() {
   const { user } = useAuth()

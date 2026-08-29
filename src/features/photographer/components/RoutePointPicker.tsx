@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useRoutes, useRoutePoints, createRoute, createRoutePoint } from '../../shared/useRoutes'
+import { useRoutes, useRoutePoints, createRoutePoint } from '../../shared/useRoutes'
 import { MapPointPicker } from './MapPointPicker'
 import { Input } from '../../../ui/studio/Input'
 import { Select } from '../../../ui/studio/Select'
@@ -7,7 +7,6 @@ import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 
 const GUATEMALA_CENTER = { lat: 14.6349, lng: -90.5069 }
-const NEW_ROUTE = '__new__'
 const NEW_POINT = '__new__'
 
 export interface AddedPoint {
@@ -26,15 +25,17 @@ interface SelectedPoint {
   lng: number
 }
 
-export function RoutePointPicker({ onAdd }: { onAdd: (point: AddedPoint) => void }) {
+interface RoutePointPickerProps {
+  onAdd: (point: AddedPoint) => void
+  /** Rodadas pueden anclar el punto a una de las rutas fijas; pista/sesión de fotos siempre son puntos sueltos. */
+  showRouteSelector?: boolean
+}
+
+export function RoutePointPicker({ onAdd, showRouteSelector = false }: RoutePointPickerProps) {
   const push = useToastStore((s) => s.push)
   const { data: routes = [] } = useRoutes()
 
   const [routeId, setRouteId] = useState('')
-  const [creatingRoute, setCreatingRoute] = useState(false)
-  const [newRouteName, setNewRouteName] = useState('')
-  const [savingRoute, setSavingRoute] = useState(false)
-
   const { data: routePoints = [] } = useRoutePoints(routeId || undefined)
 
   const [pointFormOpen, setPointFormOpen] = useState(true)
@@ -55,34 +56,9 @@ export function RoutePointPicker({ onAdd }: { onAdd: (point: AddedPoint) => void
   }
 
   function handleRouteChange(value: string) {
-    if (value === NEW_ROUTE) {
-      setCreatingRoute(true)
-      setRouteId('')
-    } else {
-      setCreatingRoute(false)
-      setRouteId(value)
-    }
+    setRouteId(value)
     resetPointForm()
     setPointFormOpen(!value)
-  }
-
-  async function handleCreateRoute() {
-    if (!newRouteName.trim()) {
-      push({ type: 'error', title: 'Ponle un nombre a la ruta' })
-      return
-    }
-    setSavingRoute(true)
-    try {
-      const route = await createRoute(newRouteName.trim())
-      setRouteId(route.id)
-      setCreatingRoute(false)
-      setNewRouteName('')
-      setPointFormOpen(false)
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo crear la ruta', description: (err as Error).message })
-    } finally {
-      setSavingRoute(false)
-    }
   }
 
   function handlePointChange(value: string) {
@@ -117,7 +93,7 @@ export function RoutePointPicker({ onAdd }: { onAdd: (point: AddedPoint) => void
   }
 
   function handleAdd() {
-    const point: SelectedPoint | null = routeId
+    const point: SelectedPoint | null = showRouteSelector && routeId
       ? selectedPoint
       : newLabel.trim()
         ? { routePointId: null, label: newLabel.trim(), lat: newLat, lng: newLng }
@@ -130,35 +106,24 @@ export function RoutePointPicker({ onAdd }: { onAdd: (point: AddedPoint) => void
 
     onAdd({ ...point, timeStart, timeEnd })
     resetPointForm()
-    setPointFormOpen(!routeId)
+    setPointFormOpen(!(showRouteSelector && routeId))
   }
 
-  const readyToTime = routeId ? !!selectedPoint : !!newLabel.trim()
+  const usingRoute = showRouteSelector && !!routeId
+  const readyToTime = usingRoute ? !!selectedPoint : !!newLabel.trim()
 
   return (
     <div className="border border-border p-5">
-      <Select
-        label="Ruta"
-        value={creatingRoute ? NEW_ROUTE : routeId}
-        onChange={(e) => handleRouteChange(e.target.value)}
-      >
-        <option value="">Sin ruta (evento único)</option>
-        {routes.map((r) => (
-          <option key={r.id} value={r.id}>{r.name}</option>
-        ))}
-        <option value={NEW_ROUTE}>+ Nueva ruta</option>
-      </Select>
-
-      {creatingRoute && (
-        <div className="mt-4 flex items-end gap-3">
-          <div className="flex-1">
-            <Input label="Nombre de la ruta" value={newRouteName} onChange={(e) => setNewRouteName(e.target.value)} placeholder="Ej. Ruta a Tecpan" />
-          </div>
-          <Button variant="ghost" loading={savingRoute} onClick={handleCreateRoute}>Crear ruta</Button>
-        </div>
+      {showRouteSelector && (
+        <Select label="Ruta" value={routeId} onChange={(e) => handleRouteChange(e.target.value)}>
+          <option value="">Sin ruta</option>
+          {routes.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </Select>
       )}
 
-      {routeId && !creatingRoute && (
+      {usingRoute && (
         <div className="mt-4">
           <Select label="Punto en esta ruta" value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')} onChange={(e) => handlePointChange(e.target.value)}>
             <option value="">Selecciona un punto</option>
@@ -180,7 +145,7 @@ export function RoutePointPicker({ onAdd }: { onAdd: (point: AddedPoint) => void
             <div className="flex-1">
               <Input label="Nombre del punto" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. VP Racing" />
             </div>
-            {routeId && (
+            {usingRoute && (
               <Button variant="ghost" loading={savingPoint} onClick={handleCreatePoint}>Crear punto</Button>
             )}
           </div>
@@ -188,10 +153,13 @@ export function RoutePointPicker({ onAdd }: { onAdd: (point: AddedPoint) => void
       )}
 
       {selectedPoint && !pointFormOpen && (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Punto: <span className="font-semibold text-foreground">{selectedPoint.label}</span>{' '}
-          <button onClick={() => { setPointFormOpen(true); setSelectedPoint(null) }} className="text-accent underline">Cambiar</button>
-        </p>
+        <div className="mt-4">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Punto: <span className="font-semibold text-foreground">{selectedPoint.label}</span>{' '}
+            <button onClick={() => { setPointFormOpen(true); setSelectedPoint(null) }} className="text-accent underline">Cambiar</button>
+          </p>
+          <MapPointPicker lat={selectedPoint.lat} lng={selectedPoint.lng} readOnly />
+        </div>
       )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
