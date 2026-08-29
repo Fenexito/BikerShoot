@@ -1,34 +1,44 @@
 import { Link } from 'react-router-dom'
-import { studioEvents, thumbUrlStudio } from '../../data/mockStudio'
+import { useAuth } from '../auth/AuthContext'
+import { useMyEvents } from './useMyEvents'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
 
 export function StudioEvents() {
+  const { user } = useAuth()
+  const { data: events, isLoading, error } = useMyEvents(user?.id)
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-12 text-foreground md:px-16">
       <div className="mb-10 flex items-center justify-between">
         <div>
           <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Tus eventos</h1>
-          <p className="mt-2 text-muted-foreground">{studioEvents.length} eventos publicados</p>
+          <p className="mt-2 text-muted-foreground">{events?.length ?? 0} eventos publicados</p>
         </div>
         <Link to="/studio/eventos/new">
           <Button variant="secondary">+ Crear evento</Button>
         </Link>
       </div>
 
+      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {error && <p className="text-accent">No se pudieron cargar tus eventos.</p>}
+
+      {events && events.length === 0 && (
+        <div className="border border-border px-6 py-16 text-center text-muted-foreground">
+          Todavía no tienes eventos.{' '}
+          <Link to="/studio/eventos/new" className="text-accent">Crea el primero.</Link>
+        </div>
+      )}
+
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {studioEvents.map((event) => (
+        {events?.map((event) => (
           <Link
             key={event.id}
             to={`/studio/eventos/${event.id}`}
             className="group overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover"
           >
-            <div className="relative h-40 overflow-hidden">
-              <img
-                src={thumbUrlStudio(event.coverSeed, 400, 220)}
-                alt={event.title}
-                className="h-full w-full object-cover grayscale transition-transform duration-500 group-hover:scale-105"
-              />
+            <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
+              <span className="text-3xl opacity-30">📷</span>
               <div className="absolute left-3 top-3">
                 <Badge>{event.category}</Badge>
               </div>
@@ -40,18 +50,16 @@ export function StudioEvents() {
                   {event.status === 'activo' ? '● Activo' : 'Cerrado'}
                 </span>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{event.city} · {new Date(event.date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}</p>
-              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
+              <p className="mt-1 text-sm text-muted-foreground">
+                {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4 text-center">
                 <div>
-                  <p className="font-studio text-lg font-bold">{event.photosCount}</p>
-                  <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
+                  <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
+                  <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
                 </div>
                 <div>
-                  <p className="font-studio text-lg font-bold">{event.salesCount}</p>
-                  <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Ventas</p>
-                </div>
-                <div>
-                  <p className="font-studio text-lg font-bold">{event.points.length}</p>
+                  <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
                   <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
                 </div>
               </div>

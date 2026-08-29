@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getStudioEventById, type StudioPoint } from '../../data/mockStudio'
+import { useAuth } from '../auth/AuthContext'
+import { useEvent } from './useMyEvents'
+import { supabase } from '../../lib/supabase'
+import { queryClient } from '../../lib/queryClient'
 import { MapPointPicker } from './components/MapPointPicker'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
@@ -8,21 +11,56 @@ import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
 
 const GUATEMALA_CENTER = { lat: 14.6349, lng: -90.5069 }
+const CATEGORIES = ['Rodada', 'Pista', 'Exhibición', 'Concentración'] as const
+
+interface LocalPoint {
+  id: string
+  label: string
+  lat: number
+  lng: number
+  timeStart: string
+  timeEnd: string
+}
 
 export function StudioEventEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const push = useToastStore((s) => s.push)
   const isNew = id === 'new'
-  const existing = !isNew ? getStudioEventById(id ?? '') : undefined
+  const { data: existing, isLoading } = useEvent(id)
 
-  const [title, setTitle] = useState(existing?.title ?? '')
-  const [category, setCategory] = useState(existing?.category ?? 'Rodada')
-  const [city, setCity] = useState(existing?.city ?? '')
-  const [venue, setVenue] = useState(existing?.venue ?? '')
-  const [price, setPrice] = useState(existing?.pricePerPhoto ?? 25)
-  const [description, setDescription] = useState(existing?.description ?? '')
-  const [points, setPoints] = useState<StudioPoint[]>(existing?.points ?? [])
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('Rodada')
+  const [city, setCity] = useState('')
+  const [venue, setVenue] = useState('')
+  const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [price, setPrice] = useState(25)
+  const [description, setDescription] = useState('')
+  const [points, setPoints] = useState<LocalPoint[]>([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (existing) {
+      setTitle(existing.title)
+      setCategory(existing.category)
+      setCity(existing.city)
+      setVenue(existing.venue ?? '')
+      setEventDate(existing.event_date)
+      setPrice(existing.price_per_photo)
+      setDescription(existing.description ?? '')
+      setPoints(
+        existing.event_points.map((pt) => ({
+          id: pt.id,
+          label: pt.label,
+          lat: pt.lat,
+          lng: pt.lng,
+          timeStart: pt.time_start.slice(0, 5),
+          timeEnd: pt.time_end.slice(0, 5),
+        })),
+      )
+    }
+  }, [existing])
 
   const [newLat, setNewLat] = useState(GUATEMALA_CENTER.lat)
   const [newLng, setNewLng] = useState(GUATEMALA_CENTER.lng)
@@ -37,7 +75,7 @@ export function StudioEventEditor() {
     }
     setPoints((p) => [
       ...p,
-      { id: `pt-${Date.now()}`, label: newLabel, lat: newLat, lng: newLng, timeStart: newStart, timeEnd: newEnd },
+      { id: `local-${Date.now()}`, label: newLabel, lat: newLat, lng: newLng, timeStart: newStart, timeEnd: newEnd },
     ])
     setNewLabel('')
   }
@@ -46,9 +84,72 @@ export function StudioEventEditor() {
     setPoints((p) => p.filter((pt) => pt.id !== pointId))
   }
 
-  function save() {
+  async function save() {
+    if (!user) return
+    if (!title.trim() || !city.trim()) {
+      push({ type: 'error', title: 'Título y ciudad son obligatorios' })
+      return
+    }
+
+    setSaving(true)
+
+    const payload = {
+      photographer_id: user.id,
+      title,
+      category,
+      city,
+      venue: venue || null,
+      event_date: eventDate,
+      price_per_photo: price,
+      description: description || null,
+    }
+
+    let eventId = existing?.id
+
+    if (isNew) {
+      const { data, error } = await supabase.from('events').insert(payload).select('id').single()
+      if (error || !data) {
+        push({ type: 'error', title: 'No se pudo crear el evento', description: error?.message })
+        setSaving(false)
+        return
+      }
+      eventId = data.id
+    } else {
+      const { error } = await supabase.from('events').update(payload).eq('id', eventId)
+      if (error) {
+        push({ type: 'error', title: 'No se pudo actualizar el evento', description: error.message })
+        setSaving(false)
+        return
+      }
+      // Reconciliación simple: borra los puntos existentes y vuelve a insertar los actuales.
+      await supabase.from('event_points').delete().eq('event_id', eventId)
+    }
+
+    if (points.length > 0) {
+      const { error: pointsError } = await supabase.from('event_points').insert(
+        points.map((pt) => ({
+          event_id: eventId,
+          label: pt.label,
+          lat: pt.lat,
+          lng: pt.lng,
+          time_start: pt.timeStart,
+          time_end: pt.timeEnd,
+        })),
+      )
+      if (pointsError) {
+        push({ type: 'error', title: 'El evento se guardó, pero fallaron los puntos', description: pointsError.message })
+        setSaving(false)
+        return
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
     push({ type: 'success', title: isNew ? 'Evento creado' : 'Evento actualizado' })
     navigate('/studio/eventos')
+  }
+
+  if (!isNew && isLoading) {
+    return <p className="px-6 py-16 text-center text-muted-foreground">Cargando evento…</p>
   }
 
   return (
@@ -63,14 +164,14 @@ export function StudioEventEditor() {
           <Input label="Título del evento" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Rodada Nocturna Antigua" />
         </div>
         <Select label="Categoría" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
-          <option>Rodada</option>
-          <option>Pista</option>
-          <option>Exhibición</option>
-          <option>Concentración</option>
+          {CATEGORIES.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
         </Select>
         <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
         <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />
         <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
+        <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
         <div className="sm:col-span-2">
           <label className="mb-2 block text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Descripción</label>
           <textarea
@@ -125,7 +226,7 @@ export function StudioEventEditor() {
 
       <div className="mt-10 flex justify-end gap-3">
         <Button variant="secondary" onClick={() => navigate('/studio/eventos')}>Cancelar</Button>
-        <Button onClick={save}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
+        <Button onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
       </div>
     </div>
   )
