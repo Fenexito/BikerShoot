@@ -1,10 +1,23 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useCartStore } from '../../features/cart/cartStore'
 
 export function HeaderUser() {
   const { signOut } = useAuth()
+  const navigate = useNavigate()
   const itemCount = useCartStore((s) => s.items.length)
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   return (
     <header className="border-b border-border bg-background">
@@ -34,8 +47,12 @@ export function HeaderUser() {
           <Link to="/app/perfil" aria-label="Perfil" className="text-foreground">
             👤
           </Link>
-          <button onClick={() => signOut()} className="text-muted-foreground hover:text-foreground">
-            Salir
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {signingOut ? 'Saliendo…' : 'Salir'}
           </button>
         </div>
       </div>

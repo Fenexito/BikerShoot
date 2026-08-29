@@ -1,9 +1,22 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../studio/ThemeToggle'
 import { useAuth } from '../../features/auth/AuthContext'
 
 export function HeaderStudio() {
   const { signOut } = useAuth()
+  const navigate = useNavigate()
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   return (
     <header className="border-b border-border bg-background text-foreground">
@@ -23,10 +36,11 @@ export function HeaderStudio() {
             👤
           </Link>
           <button
-            onClick={() => signOut()}
-            className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
-            Salir
+            {signingOut ? 'Saliendo…' : 'Salir'}
           </button>
         </div>
       </div>
