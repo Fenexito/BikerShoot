@@ -18,12 +18,19 @@
 import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.20'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID')!
-const R2_ACCESS_KEY_ID = Deno.env.get('R2_ACCESS_KEY_ID')!
-const R2_SECRET_ACCESS_KEY = Deno.env.get('R2_SECRET_ACCESS_KEY')!
-const R2_BUCKET = Deno.env.get('R2_BUCKET')!
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
+// .trim() defensivo: es muy fácil que un copy/paste de una credencial
+// incluya un salto de línea o espacio invisible al final, lo que corrompe
+// la firma AWS4 por completo (así se vería un 400 de R2 sin pista clara).
+function env(name: string): string {
+  return (Deno.env.get(name) ?? '').trim()
+}
+
+const R2_ACCOUNT_ID = env('R2_ACCOUNT_ID')
+const R2_ACCESS_KEY_ID = env('R2_ACCESS_KEY_ID')
+const R2_SECRET_ACCESS_KEY = env('R2_SECRET_ACCESS_KEY')
+const R2_BUCKET = env('R2_BUCKET')
+const SUPABASE_URL = env('SUPABASE_URL')
+const SUPABASE_ANON_KEY = env('SUPABASE_ANON_KEY')
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
