@@ -36,6 +36,10 @@ import { StudioOrders } from './features/photographer/StudioOrders'
 import { StudioOrderDetail } from './features/photographer/StudioOrderDetail'
 import { RequireAdmin } from './features/admin/RequireAdmin'
 import { ApprovePhotographers } from './features/admin/ApprovePhotographers'
+import { AdminHome } from './features/admin/AdminHome'
+import { BugReportsAdmin } from './features/admin/BugReportsAdmin'
+import { ReleasesAdmin } from './features/admin/ReleasesAdmin'
+import { StoragePlansAdmin } from './features/admin/StoragePlansAdmin'
 import { AuthCallback } from './features/auth/AuthCallback'
 
 export default function App() {
@@ -88,9 +92,11 @@ export default function App() {
         <Route path="/studio/perfil" element={<RequireStudio><StudioProfilePage /></RequireStudio>} />
 
         {/* Admin */}
-        <Route path="/admin" element={<RequireAdmin><PlaceholderPage title="Admin" /></RequireAdmin>} />
-        <Route path="/admin/bug-reports" element={<RequireAdmin><PlaceholderPage title="Reportes de bugs" /></RequireAdmin>} />
+        <Route path="/admin" element={<RequireAdmin><AdminHome /></RequireAdmin>} />
+        <Route path="/admin/bug-reports" element={<RequireAdmin><BugReportsAdmin /></RequireAdmin>} />
         <Route path="/admin/aprobar-fotografos" element={<RequireAdmin><ApprovePhotographers /></RequireAdmin>} />
+        <Route path="/admin/releases" element={<RequireAdmin><ReleasesAdmin /></RequireAdmin>} />
+        <Route path="/admin/planes" element={<RequireAdmin><StoragePlansAdmin /></RequireAdmin>} />
       </Route>
     </Routes>
   )

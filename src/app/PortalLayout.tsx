@@ -3,6 +3,7 @@ import { cn } from '../lib/cn'
 import { HeaderPublic } from '../ui/layout/HeaderPublic'
 import { HeaderUser } from '../ui/layout/HeaderUser'
 import { HeaderStudio } from '../ui/layout/HeaderStudio'
+import { HeaderAdmin } from '../ui/layout/HeaderAdmin'
 import { Footer } from '../ui/layout/Footer'
 import { Toaster } from '../ui/overlays/Toaster'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
@@ -32,8 +33,8 @@ export function PortalLayout() {
 
   return (
     <div className={cn('flex min-h-screen flex-col bg-background text-foreground', themeClass)}>
-      {!isAuthPage && !isAdminPortal && (
-        isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
+      {!isAuthPage && (
+        isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
       )}
       <div className="flex-1">
         <Outlet />

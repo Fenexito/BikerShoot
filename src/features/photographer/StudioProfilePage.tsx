@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../auth/AuthContext'
-import { usePhotographerDetails } from './usePhotographerDetails'
+import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Button } from '../../ui/studio/Button'
@@ -23,6 +23,7 @@ type FormValues = z.infer<typeof schema>
 export function StudioProfilePage() {
   const { user, profile, refreshProfile } = useAuth()
   const { data: details, isLoading } = usePhotographerDetails(user?.id)
+  const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const push = useToastStore((s) => s.push)
 
   const {
@@ -90,6 +91,33 @@ export function StudioProfilePage() {
           Tu cuenta está en revisión. Podrás publicar eventos y vender fotos en cuanto un
           administrador la apruebe.
         </p>
+      )}
+
+      {details?.storage_plan && (
+        <div className="mb-8 border border-border p-5">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="font-studio text-lg font-bold">Almacenamiento</p>
+            <span className="font-studio-mono text-xs uppercase tracking-wider2 text-accent">
+              Plan {details.storage_plan.name}
+            </span>
+          </div>
+          {(() => {
+            const limitBytes = details.storage_plan.gb_limit * 1024 * 1024 * 1024
+            const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
+            const usedGB = (usageBytes / 1024 / 1024 / 1024).toFixed(2)
+            return (
+              <>
+                <div className="h-2 w-full overflow-hidden bg-muted">
+                  <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {usedGB} GB de {details.storage_plan.gb_limit} GB usados
+                  {details.storage_plan.price_monthly_gtq > 0 && ` · Q${details.storage_plan.price_monthly_gtq}/mes`}
+                </p>
+              </>
+            )
+          })()}
+        </div>
       )}
 
       <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>

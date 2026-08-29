@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
+export interface StoragePlanInfo {
+  id: string
+  name: string
+  gb_limit: number
+  price_monthly_gtq: number
+}
+
 export interface PhotographerDetails {
   profile_id: string
   bio: string | null
@@ -9,6 +16,8 @@ export interface PhotographerDetails {
   onboarding_completed: boolean
   approved: boolean
   approved_at: string | null
+  storage_plan_id: string
+  storage_plan: StoragePlanInfo | null
 }
 
 export function usePhotographerDetails(userId: string | undefined) {
@@ -17,11 +26,23 @@ export function usePhotographerDetails(userId: string | undefined) {
     queryFn: async (): Promise<PhotographerDetails | null> => {
       const { data, error } = await supabase
         .from('photographer_details')
-        .select('*')
+        .select('*, storage_plan:storage_plans(id, name, gb_limit, price_monthly_gtq)')
         .eq('profile_id', userId)
         .single()
       if (error) throw error
-      return data
+      return data as unknown as PhotographerDetails
+    },
+    enabled: !!userId,
+  })
+}
+
+export function usePhotographerUsageBytes(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['photographer-usage-bytes', userId],
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await supabase.from('photos').select('size_bytes').eq('photographer_id', userId)
+      if (error) throw error
+      return (data ?? []).reduce((sum, p) => sum + (p.size_bytes ?? 0), 0)
     },
     enabled: !!userId,
   })

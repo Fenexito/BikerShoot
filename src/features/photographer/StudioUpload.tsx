@@ -85,6 +85,7 @@ export function StudioUpload() {
           point_id: pointId,
           storage_path: data.storagePath,
           price: event?.price_per_photo ?? 0,
+          size_bytes: file.size,
         })
         if (insertError) throw insertError
 
