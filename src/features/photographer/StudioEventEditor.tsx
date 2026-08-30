@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useEvent } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
+import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint } from './components/RoutePointPicker'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
@@ -39,7 +40,11 @@ export function StudioEventEditor() {
   const [price, setPrice] = useState(25)
   const [description, setDescription] = useState('')
   const [points, setPoints] = useState<LocalPoint[]>([])
+  const [watermarkPath, setWatermarkPath] = useState<string | null>(null)
+  const [watermarkFile, setWatermarkFile] = useState<File | null>(null)
+  const [watermarkLocalPreview, setWatermarkLocalPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const watermarkInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (existing) {
@@ -50,6 +55,7 @@ export function StudioEventEditor() {
       setEventDate(existing.event_date)
       setPrice(existing.price_per_photo)
       setDescription(existing.description ?? '')
+      setWatermarkPath(existing.watermark_path)
       setPoints(
         existing.event_points.map((pt) => ({
           id: pt.id,
@@ -73,6 +79,22 @@ export function StudioEventEditor() {
 
   function removePoint(pointId: string) {
     setPoints((p) => p.filter((pt) => pt.id !== pointId))
+  }
+
+  function handleWatermarkFile(file: File | undefined) {
+    if (!file) return
+    if (file.type !== 'image/png') {
+      push({ type: 'error', title: 'La marca de agua debe ser un PNG' })
+      return
+    }
+    setWatermarkFile(file)
+    setWatermarkLocalPreview(URL.createObjectURL(file))
+  }
+
+  function clearWatermark() {
+    setWatermarkFile(null)
+    setWatermarkLocalPreview(null)
+    setWatermarkPath(null)
   }
 
   async function save() {
@@ -135,6 +157,27 @@ export function StudioEventEditor() {
       }
     }
 
+    if (watermarkFile) {
+      const { data: signed, error: signError } = await supabase.functions.invoke('r2-watermark-upload-url', {
+        body: { eventId, fileName: watermarkFile.name, contentType: watermarkFile.type },
+      })
+      if (signError || !signed?.uploadUrl) {
+        push({ type: 'error', title: 'El evento se guardó, pero falló la marca de agua', description: signError?.message })
+        setSaving(false)
+        return
+      }
+      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: watermarkFile })
+      if (!putRes.ok) {
+        push({ type: 'error', title: 'El evento se guardó, pero falló la marca de agua', description: `R2 respondió ${putRes.status}` })
+        setSaving(false)
+        return
+      }
+      await supabase.from('events').update({ watermark_path: signed.watermarkPath }).eq('id', eventId)
+    } else if (!isNew && existing && watermarkPath !== existing.watermark_path) {
+      // Se quitó la marca de agua sin subir una nueva.
+      await supabase.from('events').update({ watermark_path: null }).eq('id', eventId)
+    }
+
     queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
     push({ type: 'success', title: isNew ? 'Evento creado' : 'Evento actualizado' })
     navigate('/studio/eventos')
@@ -183,6 +226,43 @@ export function StudioEventEditor() {
           />
         </div>
       </div>
+
+      {/* Marca de agua */}
+      <section className="mt-14 border-t border-border pt-10">
+        <h2 className="font-studio text-xl font-bold tracking-tight2">Marca de agua</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Un PNG que se estampa sobre todas las fotos de este evento hasta que lo cambies. Es opcional — si no subes uno, las fotos igual se suben reducidas, pero sin ninguna marca encima.
+        </p>
+
+        <div className="mt-4 flex items-center gap-4">
+          {(watermarkLocalPreview || watermarkPath) ? (
+            <img
+              src={watermarkLocalPreview ?? r2Url(watermarkPath!)}
+              alt="Marca de agua"
+              className="h-20 w-20 border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
+            />
+          ) : (
+            <div className="flex h-20 w-20 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
+              Sin PNG
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => watermarkInputRef.current?.click()}>
+              {watermarkPath || watermarkLocalPreview ? 'Cambiar PNG' : 'Subir PNG'}
+            </Button>
+            {(watermarkPath || watermarkLocalPreview) && (
+              <Button variant="ghost" onClick={clearWatermark}>Quitar</Button>
+            )}
+          </div>
+          <input
+            ref={watermarkInputRef}
+            type="file"
+            accept="image/png"
+            className="hidden"
+            onChange={(e) => handleWatermarkFile(e.target.files?.[0])}
+          />
+        </div>
+      </section>
 
       {/* Puntos de cobertura */}
       <section className="mt-14 border-t border-border pt-10">

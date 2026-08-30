@@ -1,15 +1,14 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
-import { usePhotographerDetails } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
-import { previewUrl } from '../../lib/r2'
+import { previewUrl, r2Url } from '../../lib/r2'
 import { Select } from '../../ui/studio/Select'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { cn } from '../../lib/cn'
 
 const PREVIEW_MAX_SIDE = 1600
-const PREVIEW_QUALITY = 0.82
+const PREVIEW_QUALITY = 0.5
 
 type UploadStatus = 'subiendo' | 'lista' | 'error'
 
@@ -37,10 +36,19 @@ function uploadWithProgress(url: string, body: Blob, contentType: string, onProg
   })
 }
 
-/** Reescala a máx. PREVIEW_MAX_SIDE y le pone una marca de agua diagonal
- * repetida — así se protege el original de ser "robado" en alta calidad
- * antes de la compra (ver plan de watermark). */
-async function createWatermarkedPreview(file: File, watermarkText: string): Promise<Blob> {
+async function loadWatermarkImage(url: string): Promise<ImageBitmap> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('No se pudo cargar la marca de agua')
+  const blob = await res.blob()
+  return createImageBitmap(blob)
+}
+
+/** Reescala a máx. PREVIEW_MAX_SIDE (calidad reducida siempre) y, si el
+ * evento tiene un PNG de marca de agua configurado, lo estampa en mosaico
+ * diagonal sobre toda la foto — así se protege el original de ser
+ * "robado" en alta calidad antes de la compra. Sin PNG, el preview sale
+ * reducido igual pero sin nada encima. */
+async function createWatermarkedPreview(file: File, watermarkImage: ImageBitmap | null): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, PREVIEW_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const width = Math.round(bitmap.width * scale)
@@ -53,26 +61,25 @@ async function createWatermarkedPreview(file: File, watermarkText: string): Prom
   if (!ctx) throw new Error('No se pudo preparar el lienzo del preview')
   ctx.drawImage(bitmap, 0, 0, width, height)
 
-  ctx.save()
-  ctx.translate(width / 2, height / 2)
-  ctx.rotate(-Math.PI / 8)
-  ctx.translate(-width / 2, -height / 2)
-  ctx.font = `700 ${Math.max(14, Math.round(width / 26))}px sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillStyle = 'rgba(255,255,255,0.32)'
-  ctx.strokeStyle = 'rgba(0,0,0,0.22)'
-  ctx.lineWidth = 1
+  if (watermarkImage) {
+    ctx.save()
+    ctx.globalAlpha = 0.45
+    ctx.translate(width / 2, height / 2)
+    ctx.rotate(-Math.PI / 8)
+    ctx.translate(-width / 2, -height / 2)
 
-  const stepX = width / 2
-  const stepY = height / 6
-  for (let y = -height * 0.5; y < height * 1.5; y += stepY) {
-    for (let x = -width * 0.5; x < width * 1.5; x += stepX) {
-      ctx.strokeText(watermarkText, x, y)
-      ctx.fillText(watermarkText, x, y)
+    const wmWidth = width * 0.32
+    const wmHeight = wmWidth * (watermarkImage.height / watermarkImage.width)
+    const stepX = wmWidth * 1.6
+    const stepY = wmHeight * 2.2
+
+    for (let y = -height * 0.5; y < height * 1.5; y += stepY) {
+      for (let x = -width * 0.5; x < width * 1.5; x += stepX) {
+        ctx.drawImage(watermarkImage, x, y, wmWidth, wmHeight)
+      }
     }
+    ctx.restore()
   }
-  ctx.restore()
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar el preview'))), 'image/jpeg', PREVIEW_QUALITY)
@@ -80,9 +87,8 @@ async function createWatermarkedPreview(file: File, watermarkText: string): Prom
 }
 
 export function StudioUpload() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const { data: events } = useMyEvents(user?.id)
-  const { data: details } = usePhotographerDetails(user?.id)
   const push = useToastStore((s) => s.push)
   const [eventId, setEventId] = useState('')
   const [pointId, setPointId] = useState('')
@@ -90,9 +96,26 @@ export function StudioUpload() {
   const [dragging, setDragging] = useState(false)
   const [items, setItems] = useState<UploadItem[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const watermarkImageRef = useRef<ImageBitmap | null>(null)
 
   const event = events?.find((e) => e.id === eventId)
-  const watermarkText = [profile?.display_name, details?.whatsapp].filter(Boolean).join(' · ') || 'MotoShots'
+
+  useEffect(() => {
+    watermarkImageRef.current = null
+    if (!event?.watermark_path) return
+    let cancelled = false
+    loadWatermarkImage(r2Url(event.watermark_path))
+      .then((bitmap) => {
+        if (!cancelled) watermarkImageRef.current = bitmap
+      })
+      .catch(() => {
+        if (!cancelled) push({ type: 'error', title: 'No se pudo cargar la marca de agua del evento' })
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.watermark_path])
 
   async function handleFiles(files: FileList | null) {
     if (!files || !user) return
@@ -125,7 +148,7 @@ export function StudioUpload() {
           throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
         }
 
-        const previewBlob = await createWatermarkedPreview(file, watermarkText)
+        const previewBlob = await createWatermarkedPreview(file, watermarkImageRef.current)
 
         let previewPct = 0
         let rawPct = backupRaw ? 0 : 100
@@ -173,7 +196,7 @@ export function StudioUpload() {
     <div className="mx-auto max-w-4xl px-6 py-12 text-foreground md:px-16">
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Carga rápida</h1>
       <p className="mt-2 text-muted-foreground">
-        Arrastra las fotos de un punto específico y súbelas en lote — cada una se sube reducida y con marca de agua para la vista previa. La entrega en alta calidad se sube aparte, foto por foto, después de cada venta (en el detalle del pedido).
+        Arrastra las fotos de un punto específico y súbelas en lote — cada una se sube reducida, con la marca de agua PNG del evento si configuraste una (edítala en el evento). La entrega en alta calidad se sube aparte, foto por foto, después de cada venta (en el detalle del pedido).
       </p>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2">
@@ -193,6 +216,10 @@ export function StudioUpload() {
 
       {events && events.length === 0 && (
         <p className="mt-3 text-sm text-accent">No tienes eventos todavía — crea uno primero en "Eventos".</p>
+      )}
+
+      {event && !event.watermark_path && (
+        <p className="mt-3 text-sm text-accent">Este evento no tiene marca de agua configurada — las fotos se subirán reducidas pero sin nada encima.</p>
       )}
 
       <label className="mt-4 flex items-center gap-2 text-sm">
