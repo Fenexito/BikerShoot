@@ -102,7 +102,8 @@ Deno.serve(async (req: Request) => {
   const storagePath = `${user.id}/${eventId}/${uniqueName}`
   // El preview siempre se genera y sube como JPEG en el navegador (ver
   // StudioUpload.tsx), sin importar el formato del original.
-  const previewPath = `previews/${user.id}/${eventId}/${uniqueName}.jpg`
+  const previewName = uniqueName.replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg'
+  const previewPath = `previews/${user.id}/${eventId}/${previewName}`
 
   const r2 = new AwsClient({
     accessKeyId: R2_ACCESS_KEY_ID,
