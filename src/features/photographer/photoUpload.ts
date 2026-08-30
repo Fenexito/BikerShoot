@@ -1,5 +1,5 @@
-// Lógica compartida de subida de fotos — usada por Carga rápida y por la
-// carga por punto dentro del visor de un evento. Un solo lugar para el
+// Lógica compartida de subida de fotos — usada por la carga por punto
+// dentro del visor y del editor de un evento. Un solo lugar para el
 // pipeline de reescalado + marca de agua y la subida con progreso a R2.
 
 export const PREVIEW_MAX_SIDE = 1600

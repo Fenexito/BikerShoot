@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import type { OrderItemStatus } from '../../lib/orderStatus'
 
 export interface MyOrderItem {
   id: string
   photo_id: string
   price: number
-  status: string
+  status: OrderItemStatus
   photo: { storage_path: string | null; preview_path: string | null; delivered_path: string | null } | null
   event: { title: string } | null
   photographer: { display_name: string } | null

@@ -6,17 +6,11 @@ import { previewUrl, r2Url } from '../../lib/r2'
 import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/flat/Button'
 import { Badge } from '../../ui/flat/Badge'
+import { StatusPill } from '../../ui/shared/StatusPill'
+import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
 import { useToastStore } from '../../ui/overlays/toastStore'
 
-const STATUS_LABEL: Record<string, string> = {
-  pendiente_pago: 'Pendiente de pago',
-  activo: 'En proceso',
-  finalizado: 'Finalizado',
-  entregado: 'Entregado',
-  cancelado: 'Cancelado',
-}
-
-const PAID_STATUSES = new Set(['activo', 'finalizado', 'entregado'])
+const PAID_STATUSES = new Set<OrderItemStatus>(['en_preparacion', 'entregado'])
 
 export function History() {
   const { user } = useAuth()
@@ -80,8 +74,13 @@ export function History() {
               {order.order_items.map((item) => (
                 <div key={item.id} className="group relative aspect-[4/5] overflow-hidden rounded-md bg-background">
                   {item.photo && <img src={previewUrl(item.photo)} alt="" className="h-full w-full object-cover" />}
-                  <span className="absolute bottom-1 left-1 right-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                    {STATUS_LABEL[item.status] ?? item.status}
+                  <span className="absolute bottom-1 left-1 right-1 truncate rounded bg-black/60 px-1.5 py-0.5">
+                    <StatusPill
+                      dot={getOrderStatusStyle(item.status).dot}
+                      text="text-white"
+                      label={getOrderStatusStyle(item.status).label}
+                      className="text-[10px]"
+                    />
                   </span>
                   {PAID_STATUSES.has(item.status) && item.photo && (item.photo.delivered_path || !item.photo.preview_path) && (
                     <button

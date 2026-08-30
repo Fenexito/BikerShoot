@@ -10,10 +10,17 @@ import { PhotoUploadQueue } from './components/PhotoUploadQueue'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
 import { Button } from '../../ui/studio/Button'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import type { EventStatus } from '../../types/db'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos'] as const
 const AUTODROMOS = ['Autodromo Pedro Cofiño', 'Autodromo GT', 'Guatemala Raceway (1/4 de Milla)']
+const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
+  { value: 'activo', label: 'Activo — visible para todos' },
+  { value: 'pausado', label: 'Pausado — solo tú lo ves' },
+  { value: 'cerrado', label: 'Cerrado' },
+]
 
 interface LocalPoint {
   id: string
@@ -41,6 +48,7 @@ export function StudioEventEditor() {
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [price, setPrice] = useState(25)
   const [description, setDescription] = useState('')
+  const [status, setStatus] = useState<EventStatus>('activo')
   const [points, setPoints] = useState<LocalPoint[]>([])
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null)
   const [watermarkFile, setWatermarkFile] = useState<File | null>(null)
@@ -63,6 +71,7 @@ export function StudioEventEditor() {
       setEventDate(existing.event_date)
       setPrice(existing.price_per_photo)
       setDescription(existing.description ?? '')
+      setStatus(existing.status)
       setWatermarkPath(existing.watermark_path)
       setCoverPath(existing.cover_path)
       setPoints(
@@ -153,6 +162,7 @@ export function StudioEventEditor() {
       event_date: eventDate,
       price_per_photo: price,
       description: description || null,
+      status,
     }
 
     let eventId = existing?.id
@@ -256,7 +266,7 @@ export function StudioEventEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">
         {isNew ? 'Crear evento' : 'Editar evento'}
       </h1>
@@ -284,6 +294,11 @@ export function StudioEventEditor() {
           <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
         )}
         <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+        <Select label="Estado" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </Select>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Descripción</label>
           <textarea

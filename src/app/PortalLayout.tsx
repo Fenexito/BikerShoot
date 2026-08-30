@@ -6,6 +6,7 @@ import { HeaderStudio } from '../ui/layout/HeaderStudio'
 import { HeaderAdmin } from '../ui/layout/HeaderAdmin'
 import { Footer } from '../ui/layout/Footer'
 import { Toaster } from '../ui/overlays/Toaster'
+import { ConfirmDialog } from '../ui/overlays/ConfirmDialog'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
 
@@ -41,6 +42,7 @@ export function PortalLayout() {
       </div>
       {!isUserPortal && !isStudioPortal && !isAdminPortal && !isAuthPage && <Footer />}
       <Toaster />
+      <ConfirmDialog />
       {!isAdminPortal && <BugReportWidget />}
     </div>
   )

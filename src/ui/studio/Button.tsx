@@ -31,8 +31,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           ref={ref}
           disabled={disabled || loading}
           className={cn(
-            'group relative inline-flex items-center justify-center px-0 font-semibold uppercase tracking-wider2',
+            'inline-flex items-center justify-center gap-2 border-2 border-accent px-6 font-semibold uppercase tracking-wider2',
             'text-accent whitespace-nowrap transition-all duration-150 active:translate-y-px',
+            'hover:bg-accent hover:text-accent-foreground',
             'disabled:pointer-events-none disabled:opacity-50',
             focusRing,
             sizeText[size],
@@ -42,7 +43,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         >
           {loading && <Spinner />}
           {children}
-          <span className="absolute -bottom-0.5 left-0 h-0.5 w-full origin-left scale-x-100 bg-accent transition-transform duration-150 group-hover:scale-x-110" />
         </button>
       )
     }

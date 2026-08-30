@@ -17,6 +17,7 @@ interface AuthState {
   user: User | null
   profile: Profile | null
   loading: boolean
+  profileLoading: boolean
   signUp: (
     email: string,
     password: string,
@@ -37,25 +38,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(true)
 
+  // Nunca deja profile/profileLoading en un estado ambiguo: los guards de
+  // ruta (RequireStudio/RequireBiker) niegan acceso por defecto mientras
+  // profileLoading sea true, y tratan un fetch fallido como "sin perfil"
+  // en vez de dejar pasar silenciosamente (bug real: un biker podía entrar
+  // a /studio durante la ventana en la que loadProfile aún no resolvía).
   async function loadProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    setProfile(data ?? null)
+    setProfileLoading(true)
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      if (error) {
+        console.error('No se pudo cargar el perfil', error)
+        setProfile(null)
+        return
+      }
+      setProfile(data ?? null)
+    } finally {
+      setProfileLoading(false)
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session)
-      if (data.session?.user) loadProfile(data.session.user.id)
+      if (data.session?.user) {
+        await loadProfile(data.session.user.id)
+      } else {
+        setProfileLoading(false)
+      }
       setLoading(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
       if (newSession?.user) {
-        loadProfile(newSession.user.id)
+        await loadProfile(newSession.user.id)
       } else {
         setProfile(null)
+        setProfileLoading(false)
       }
     })
 
@@ -132,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: session?.user ?? null,
         profile,
         loading,
+        profileLoading,
         signUp,
         signIn,
         signInWithGoogle,

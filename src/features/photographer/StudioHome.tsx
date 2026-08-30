@@ -4,24 +4,13 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
 import { usePhotographerOrders } from './useMyOrders'
 import { supabase } from '../../lib/supabase'
+import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
+import { getOrderStatusStyle } from '../../lib/orderStatus'
 import { Card } from '../../ui/studio/Card'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
-
-const STATUS_LABEL: Record<string, string> = {
-  pendiente_pago: 'Pendiente de pago',
-  activo: 'En proceso',
-  finalizado: 'Finalizado',
-  entregado: 'Entregado',
-  cancelado: 'Cancelado',
-}
-const STATUS_TONE: Record<string, string> = {
-  pendiente_pago: 'text-accent',
-  activo: 'text-muted-foreground',
-  finalizado: 'text-foreground',
-  entregado: 'text-foreground',
-  cancelado: 'text-muted-foreground',
-}
+import { StatusPill } from '../../ui/shared/StatusPill'
+import { STUDIO_PAGE_DASHBOARD } from '../../ui/studio/layout'
 
 function usePhotoCount(photographerId: string | undefined) {
   return useQuery({
@@ -46,11 +35,11 @@ export function StudioHome() {
 
   const totalSalesQ = orders.filter((o) => o.status !== 'pendiente_pago' && o.status !== 'cancelado').reduce((s, o) => s + o.total, 0)
   const pendingPayment = orders.filter((o) => o.status === 'pendiente_pago')
-  const active = orders.filter((o) => o.status === 'activo')
-  const needsAttention = [...pendingPayment, ...active].slice(0, 6)
+  const inPreparation = orders.filter((o) => o.status === 'en_preparacion')
+  const needsAttention = [...pendingPayment, ...inPreparation].slice(0, 6)
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_DASHBOARD}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">
         Hola, {profile?.display_name || 'estudio'}
       </h1>
@@ -66,8 +55,8 @@ export function StudioHome() {
           <p className="mt-2 font-studio text-3xl font-bold text-accent">{pendingPayment.length}</p>
         </Card>
         <Card bordered className="text-center">
-          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">En proceso</p>
-          <p className="mt-2 font-studio text-3xl font-bold">{active.length}</p>
+          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">En preparación</p>
+          <p className="mt-2 font-studio text-3xl font-bold">{inPreparation.length}</p>
         </Card>
         <Card bordered className="text-center">
           <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">Fotos subidas</p>
@@ -98,9 +87,12 @@ export function StudioHome() {
                   <p className="truncate text-sm text-muted-foreground">{order.eventTitle} · {order.items.length} fotos</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className={`font-studio-mono text-xs uppercase tracking-wider2 ${STATUS_TONE[order.status]}`}>
-                    {STATUS_LABEL[order.status]}
-                  </span>
+                  <StatusPill
+                    dot={getOrderStatusStyle(order.status).dot}
+                    text={getOrderStatusStyle(order.status).text}
+                    label={getOrderStatusStyle(order.status).label}
+                    className="font-studio-mono text-xs uppercase tracking-wider2"
+                  />
                   <span className="font-bold">Q{order.total}</span>
                 </div>
               </Link>
@@ -130,18 +122,18 @@ export function StudioHome() {
                 <div className="p-5">
                   <div className="flex items-center justify-between">
                     <Badge>{event.category}</Badge>
-                    <span className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
-                      {event.status === 'activo' ? 'Activo' : 'Cerrado'}
-                    </span>
+                    <StatusPill
+                      dot={EVENT_STATUS_STYLE[event.status].dot}
+                      text={EVENT_STATUS_STYLE[event.status].text}
+                      label={EVENT_STATUS_STYLE[event.status].label}
+                      className="font-studio-mono text-xs uppercase tracking-wider2"
+                    />
                   </div>
                   <h3 className="mt-3 font-studio text-lg font-bold">{event.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">Q{event.price_per_photo} por foto · {event.event_points.length} puntos</p>
-                  <div className="mt-4 flex gap-2">
-                    <Link to={`/studio/eventos/${event.id}`} className="flex-1">
-                      <Button variant="secondary" size="sm" className="w-full justify-center">Editar</Button>
-                    </Link>
-                    <Link to="/studio/carga-rapida" className="flex-1">
-                      <Button size="sm" className="w-full justify-center">Subir fotos</Button>
+                  <div className="mt-4">
+                    <Link to={`/studio/eventos/${event.id}`}>
+                      <Button variant="secondary" size="sm" className="w-full justify-center">Ver evento</Button>
                     </Link>
                   </div>
                 </div>

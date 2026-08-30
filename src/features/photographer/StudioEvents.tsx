@@ -4,10 +4,13 @@ import { useMyEvents } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
+import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
+import { StatusPill } from '../../ui/shared/StatusPill'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { cn } from '../../lib/cn'
+import { confirmDialog } from '../../ui/overlays/confirmStore'
 
 export function StudioEvents() {
   const { user } = useAuth()
@@ -17,7 +20,13 @@ export function StudioEvents() {
   async function deleteEvent(e: React.MouseEvent, eventId: string, title: string) {
     e.preventDefault()
     e.stopPropagation()
-    if (!window.confirm(`¿Eliminar "${title}"? Los bikers que ya compraron fotos de este evento conservan su acceso — solo desaparece de la búsqueda.`)) return
+    const ok = await confirmDialog.ask({
+      title: `¿Eliminar "${title}"?`,
+      description: 'Los bikers que ya compraron fotos de este evento conservan su acceso — solo desaparece de la búsqueda.',
+      confirmLabel: 'Eliminar',
+      tone: 'danger',
+    })
+    if (!ok) return
 
     const { error } = await supabase.from('events').update({ deleted_at: new Date().toISOString() }).eq('id', eventId)
     if (error) {
@@ -29,7 +38,7 @@ export function StudioEvents() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_WIDE}>
       <div className="mb-10 flex items-center justify-between">
         <div>
           <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Tus eventos</h1>
@@ -50,10 +59,10 @@ export function StudioEvents() {
         </div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {events?.map((event) => {
           const photoCount = event.photos?.[0]?.count ?? 0
-          const isActive = event.status === 'activo'
+          const statusStyle = EVENT_STATUS_STYLE[event.status]
           return (
             <Link
               key={event.id}
@@ -73,15 +82,12 @@ export function StudioEvents() {
               <div className="p-5">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-studio text-lg font-bold">{event.title}</h3>
-                  <span
-                    className={cn(
-                      'flex shrink-0 items-center gap-1.5 font-studio-mono text-[10px] uppercase tracking-wider2',
-                      isActive ? 'text-emerald-500' : 'text-muted-foreground',
-                    )}
-                  >
-                    <span className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-emerald-500' : 'bg-muted-foreground')} />
-                    {isActive ? 'Activo' : 'Cerrado'}
-                  </span>
+                  <StatusPill
+                    dot={statusStyle.dot}
+                    text={statusStyle.text}
+                    label={statusStyle.label}
+                    className="shrink-0 font-studio-mono text-[10px] uppercase tracking-wider2"
+                  />
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}

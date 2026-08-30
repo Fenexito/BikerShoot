@@ -1,24 +1,19 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { usePhotographerOrders, type OrderItemStatus } from './useMyOrders'
+import { usePhotographerOrders } from './useMyOrders'
+import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
+import { StatusPill } from '../../ui/shared/StatusPill'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { cn } from '../../lib/cn'
-
-const ORDER_STATUS_LABEL: Record<OrderItemStatus, string> = {
-  pendiente_pago: 'Pendiente de pago',
-  activo: 'En proceso',
-  finalizado: 'Finalizado',
-  entregado: 'Entregado',
-  cancelado: 'Cancelado',
-}
 
 const TABS: { value: OrderItemStatus | 'todos'; label: string }[] = [
   { value: 'todos', label: 'Todos' },
   { value: 'pendiente_pago', label: 'Pendientes de pago' },
-  { value: 'activo', label: 'En proceso' },
-  { value: 'finalizado', label: 'Finalizados' },
+  { value: 'en_preparacion', label: 'En preparación' },
   { value: 'entregado', label: 'Entregados' },
+  { value: 'cancelado', label: 'Cancelados' },
 ]
 
 export function StudioOrders() {
@@ -28,7 +23,7 @@ export function StudioOrders() {
   const filtered = tab === 'todos' ? orders : orders.filter((o) => o.status === tab)
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Pedidos</h1>
       <p className="mt-2 text-muted-foreground">{orders.length} pedidos en total</p>
 
@@ -71,8 +66,13 @@ export function StudioOrders() {
             <span className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
               {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
             </span>
-            <span className="w-36 shrink-0 text-right font-studio-mono text-xs uppercase tracking-wider2">
-              {ORDER_STATUS_LABEL[order.status]}
+            <span className="w-40 shrink-0 justify-end">
+              <StatusPill
+                dot={getOrderStatusStyle(order.status).dot}
+                text={getOrderStatusStyle(order.status).text}
+                label={getOrderStatusStyle(order.status).label}
+                className="justify-end font-studio-mono text-xs uppercase tracking-wider2"
+              />
             </span>
             <span className="w-16 shrink-0 text-right font-bold">Q{order.total}</span>
           </Link>

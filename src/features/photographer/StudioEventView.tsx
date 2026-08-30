@@ -6,11 +6,16 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
 import { PhotoUploadQueue } from './components/PhotoUploadQueue'
+import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
+import { StatusPill } from '../../ui/shared/StatusPill'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { cn } from '../../lib/cn'
+import type { EventStatus } from '../../types/db'
 
 function PhotoTile({ photo, onDelete, onToggleFeatured }: { photo: EventPhoto; onDelete: (id: string) => void; onToggleFeatured: (id: string, next: boolean) => void }) {
   const sold = !!photo.delivered_path
@@ -63,7 +68,8 @@ export function StudioEventView() {
   }, [photos])
 
   async function deletePhoto(photoId: string) {
-    if (!window.confirm('¿Eliminar esta foto?')) return
+    const ok = await confirmDialog.ask({ title: '¿Eliminar esta foto?', confirmLabel: 'Eliminar', tone: 'danger' })
+    if (!ok) return
     const { error } = await supabase.from('photos').delete().eq('id', photoId)
     if (error) {
       if (error.code === '23503') {
@@ -75,6 +81,20 @@ export function StudioEventView() {
     }
     push({ type: 'success', title: 'Foto eliminada' })
     queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
+    queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
+  }
+
+  async function toggleStatus(next: EventStatus) {
+    const { error } = await supabase.from('events').update({ status: next }).eq('id', id)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
+      return
+    }
+    push({
+      type: 'success',
+      title: next === 'pausado' ? 'Evento pausado — oculto del público' : 'Evento publicado',
+    })
+    queryClient.invalidateQueries({ queryKey: ['event', id] })
     queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
   }
 
@@ -90,11 +110,11 @@ export function StudioEventView() {
   if (isLoading) return <p className="px-6 py-16 text-center text-muted-foreground">Cargando evento…</p>
   if (!event) return <PlaceholderPage title="Evento no encontrado" />
 
-  const isActive = event.status === 'activo'
+  const statusStyle = EVENT_STATUS_STYLE[event.status]
   const unassigned = photosByPoint.get('__none__') ?? []
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_WIDE}>
       <Link to="/studio/eventos" className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground">
         ← Todos tus eventos
       </Link>
@@ -111,19 +131,23 @@ export function StudioEventView() {
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <Badge>{event.category}</Badge>
-            <span className={cn('flex items-center gap-1.5 font-studio-mono text-[10px] uppercase tracking-wider2', isActive ? 'text-emerald-500' : 'text-muted-foreground')}>
-              <span className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-emerald-500' : 'bg-muted-foreground')} />
-              {isActive ? 'Activo' : 'Cerrado'}
-            </span>
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-[10px] uppercase tracking-wider2" />
           </div>
           <h1 className="mt-2 font-studio text-3xl font-bold tracking-tight2 md:text-4xl">{event.title}</h1>
           <p className="mt-1 text-muted-foreground">
             {event.city}{event.venue ? ` · ${event.venue}` : ''} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <Link to={`/studio/eventos/${id}/editar`}>
-          <Button variant="secondary">Editar evento</Button>
-        </Link>
+        <div className="flex gap-2">
+          {event.status === 'pausado' ? (
+            <Button variant="ghost" onClick={() => toggleStatus('activo')}>Publicar</Button>
+          ) : (
+            <Button variant="ghost" onClick={() => toggleStatus('pausado')}>Pausar</Button>
+          )}
+          <Link to={`/studio/eventos/${id}/editar`}>
+            <Button variant="secondary">Editar evento</Button>
+          </Link>
+        </div>
       </div>
 
       {event.description && <p className="mt-4 max-w-2xl text-muted-foreground">{event.description}</p>}

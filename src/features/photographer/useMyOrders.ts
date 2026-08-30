@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import type { OrderItemStatus } from '../../lib/orderStatus'
 
-export type OrderItemStatus = 'pendiente_pago' | 'activo' | 'finalizado' | 'entregado' | 'cancelado'
+export type { OrderItemStatus }
 
 interface RawOrderItem {
   id: string

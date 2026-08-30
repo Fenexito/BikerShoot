@@ -2,7 +2,7 @@
 // el portal fotógrafo — evita duplicar tipos entre features.
 
 export type EventCategory = 'Rodada' | 'Pista' | 'Sesión de Fotos'
-export type EventStatus = 'activo' | 'cerrado'
+export type EventStatus = 'activo' | 'pausado' | 'cerrado'
 
 export interface DbEventPoint {
   id: string

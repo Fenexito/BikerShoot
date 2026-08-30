@@ -2,13 +2,17 @@ import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useOrderGroup, type OrderItemStatus } from './useMyOrders'
+import { useOrderGroup } from './useMyOrders'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
+import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { StatusPill } from '../../ui/shared/StatusPill'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { cn } from '../../lib/cn'
 
@@ -21,7 +25,7 @@ interface DeliverablePhoto {
   original_filename: string | null
 }
 
-function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
+function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; orderItemId: string }) {
   const push = useToastStore((s) => s.push)
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -54,6 +58,11 @@ function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
 
       const { error: updateError } = await supabase.from('photos').update({ delivered_path: data.deliveredPath, delivered_size_bytes: file.size }).eq('id', photo.id)
       if (updateError) throw updateError
+
+      // La entrega de un archivo real es lo único que de verdad marca el
+      // pedido como completado — se refleja el status automáticamente en
+      // vez de depender de que el fotógrafo se acuerde de un segundo clic.
+      await supabase.from('order_items').update({ status: 'entregado' satisfies OrderItemStatus }).eq('id', orderItemId)
 
       push({ type: 'success', title: 'Foto entregada' })
       queryClient.invalidateQueries({ queryKey: ['photographer-order-items'] })
@@ -108,18 +117,9 @@ function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
   )
 }
 
-const FLOW: OrderItemStatus[] = ['pendiente_pago', 'activo', 'finalizado', 'entregado']
-const STATUS_LABEL: Record<OrderItemStatus, string> = {
-  pendiente_pago: 'Pendiente de pago',
-  activo: 'En proceso',
-  finalizado: 'Finalizado',
-  entregado: 'Entregado',
-  cancelado: 'Cancelado',
-}
+const FLOW: OrderItemStatus[] = ['pendiente_pago', 'en_preparacion', 'entregado']
 const NEXT_ACTION: Partial<Record<OrderItemStatus, { next: OrderItemStatus; label: string }>> = {
-  pendiente_pago: { next: 'activo', label: 'Marcar como pagado' },
-  activo: { next: 'finalizado', label: 'Marcar como finalizado' },
-  finalizado: { next: 'entregado', label: 'Marcar como entregado' },
+  pendiente_pago: { next: 'en_preparacion', label: 'Confirmar pago recibido' },
 }
 
 export function StudioOrderDetail() {
@@ -133,12 +133,14 @@ export function StudioOrderDetail() {
 
   const stepIndex = FLOW.indexOf(order.status)
   const action = NEXT_ACTION[order.status]
+  const canCancel = order.status === 'pendiente_pago' || order.status === 'en_preparacion'
+  const statusStyle = getOrderStatusStyle(order.status)
 
-  async function advance() {
-    if (!action || !user) return
+  async function setStatus(next: OrderItemStatus) {
+    if (!user) return
     const { error } = await supabase
       .from('order_items')
-      .update({ status: action.next })
+      .update({ status: next })
       .eq('order_id', order!.orderId)
       .eq('photographer_id', user.id)
 
@@ -146,22 +148,36 @@ export function StudioOrderDetail() {
       push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
       return
     }
-    push({ type: 'success', title: STATUS_LABEL[action.next] })
+    push({ type: 'success', title: getOrderStatusStyle(next).label })
     queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
   }
 
+  async function cancelOrder() {
+    const ok = await confirmDialog.ask({
+      title: '¿Cancelar este pedido?',
+      description: 'El biker verá el pedido como cancelado. Esta acción no se puede deshacer desde aquí.',
+      confirmLabel: 'Cancelar pedido',
+      tone: 'danger',
+    })
+    if (!ok) return
+    await setStatus('cancelado')
+  }
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_WIDE}>
       <Link to="/studio/pedidos" className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground">
         ← Todos los pedidos
       </Link>
 
-      <div className="mt-6 flex items-center gap-4">
-        <InitialsAvatar name={order.bikerName} className="h-14 w-14 bg-foreground text-lg text-background" />
-        <div>
-          <h1 className="font-studio text-2xl font-bold tracking-tight2">{order.bikerName}</h1>
-          <p className="text-muted-foreground">{order.eventTitle}</p>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <InitialsAvatar name={order.bikerName} className="h-14 w-14 bg-foreground text-lg text-background" />
+          <div>
+            <h1 className="font-studio text-2xl font-bold tracking-tight2">{order.bikerName}</h1>
+            <p className="text-muted-foreground">{order.eventTitle}</p>
+          </div>
         </div>
+        <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-xs uppercase tracking-wider2" />
       </div>
 
       {order.status !== 'cancelado' && (
@@ -178,7 +194,7 @@ export function StudioOrderDetail() {
                   {i < stepIndex ? '✓' : i + 1}
                 </div>
                 <span className="whitespace-nowrap text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                  {STATUS_LABEL[s]}
+                  {getOrderStatusStyle(s).label}
                 </span>
               </div>
               {i < FLOW.length - 1 && <div className={cn('mx-2 h-0.5 flex-1', i < stepIndex ? 'bg-accent' : 'bg-border')} />}
@@ -190,10 +206,10 @@ export function StudioOrderDetail() {
       <section className="mt-12">
         <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">{order.items.length} fotos compradas</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          Edita cada foto por tu cuenta y sube aquí el archivo final — eso es lo que el biker va a descargar.
+          Edita cada foto por tu cuenta y sube aquí el archivo final — eso es lo que el biker va a descargar. En cuanto subas todas, el pedido pasa a "Entregado" automáticamente.
         </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} />)}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
         </div>
       </section>
 
@@ -211,11 +227,14 @@ export function StudioOrderDetail() {
         )}
       </section>
 
-      {action && (
-        <div className="mt-8 flex justify-end">
-          <Button onClick={advance}>{action.label}</Button>
-        </div>
-      )}
+      <div className="mt-8 flex items-center justify-between">
+        {canCancel ? (
+          <Button variant="ghost" onClick={cancelOrder}>Cancelar pedido</Button>
+        ) : (
+          <span />
+        )}
+        {action && <Button onClick={() => setStatus(action.next)}>{action.label}</Button>}
+      </div>
     </div>
   )
 }

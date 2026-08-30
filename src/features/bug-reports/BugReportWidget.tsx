@@ -83,7 +83,7 @@ export function BugReportWidget() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-card hover:bg-slate-800"
+        className="fixed bottom-5 left-5 z-40 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-card hover:bg-slate-800"
       >
         🐞 Reportar bug
       </button>

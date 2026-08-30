@@ -5,7 +5,9 @@ import { useStorageOverview, type EventStorage } from './useStorageOverview'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/studio/Button'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { cn } from '../../lib/cn'
 
 function formatBytes(n: number) {
@@ -23,7 +25,13 @@ function CleanupSoldButton({ eventId, pointId }: { eventId: string; pointId?: st
 
   async function run(clear: 'preview' | 'raw' | 'both') {
     const label = clear === 'preview' ? 'la vista previa' : clear === 'raw' ? 'el respaldo crudo' : 'la vista previa y el respaldo crudo'
-    if (!window.confirm(`¿Liberar espacio de fotos ya vendidas y entregadas? Se borrará ${label} de esas fotos. La entrega final del comprador NUNCA se toca.`)) return
+    const ok = await confirmDialog.ask({
+      title: '¿Liberar espacio de fotos ya vendidas y entregadas?',
+      description: `Se borrará ${label} de esas fotos. La entrega final del comprador NUNCA se toca.`,
+      confirmLabel: 'Liberar espacio',
+      tone: 'danger',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { eventId, pointId, clear } })
@@ -52,7 +60,13 @@ function DeleteUnsoldButton({ pointId, eventId, label }: { pointId?: string; eve
   const [busy, setBusy] = useState(false)
 
   async function run() {
-    if (!window.confirm(`¿Eliminar todas las fotos NO vendidas de "${label}"? Esta acción borra los archivos de forma permanente. Las fotos ya vendidas se conservan intactas.`)) return
+    const ok = await confirmDialog.ask({
+      title: `¿Eliminar todas las fotos NO vendidas de "${label}"?`,
+      description: 'Esta acción borra los archivos de forma permanente. Las fotos ya vendidas se conservan intactas.',
+      confirmLabel: 'Eliminar',
+      tone: 'danger',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: pointId ? { pointId } : { eventId } })
@@ -149,7 +163,7 @@ export function StudioStorage() {
   const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12 text-foreground md:px-16">
+    <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-2xl font-bold tracking-tight2">Administrar almacenamiento</h1>
       <p className="mt-1 text-muted-foreground">Revisa qué eventos ocupan más espacio y libera lo que ya no necesitas.</p>
 

@@ -33,7 +33,6 @@ import { StudioHome } from './features/photographer/StudioHome'
 import { StudioEvents } from './features/photographer/StudioEvents'
 import { StudioEventView } from './features/photographer/StudioEventView'
 import { StudioEventEditor } from './features/photographer/StudioEventEditor'
-import { StudioUpload } from './features/photographer/StudioUpload'
 import { StudioOrders } from './features/photographer/StudioOrders'
 import { StudioOrderDetail } from './features/photographer/StudioOrderDetail'
 import { RequireAdmin } from './features/admin/RequireAdmin'
@@ -92,7 +91,6 @@ export default function App() {
         <Route path="/studio/pedidos" element={<RequireStudio><StudioOrders /></RequireStudio>} />
         <Route path="/studio/pedidos/:id" element={<RequireStudio><StudioOrderDetail /></RequireStudio>} />
         <Route path="/studio/estadisticas" element={<RequireStudio><PlaceholderPage title="Estadísticas" /></RequireStudio>} />
-        <Route path="/studio/carga-rapida" element={<RequireStudio><StudioUpload /></RequireStudio>} />
         <Route path="/studio/perfil" element={<RequireStudio><StudioProfilePage /></RequireStudio>} />
         <Route path="/studio/almacenamiento" element={<RequireStudio><StudioStorage /></RequireStudio>} />
 

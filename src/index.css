@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scrollbar-gutter: stable;
+}
+
 @layer base {
   body {
     @apply bg-background text-foreground antialiased;
@@ -17,6 +21,36 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-confirm-in {
+  animation: confirm-in 180ms cubic-bezier(0.25, 0, 0, 1);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 220ms cubic-bezier(0.25, 0, 0, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

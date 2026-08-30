@@ -29,7 +29,6 @@ export function HeaderStudio() {
           <Link to="/studio/eventos">Eventos</Link>
           <Link to="/studio/pedidos">Pedidos</Link>
           <Link to="/studio/estadisticas">Estadísticas</Link>
-          <Link to="/studio/carga-rapida">Carga rápida</Link>
           <Link to="/studio/almacenamiento">Almacenamiento</Link>
         </nav>
         <div className="flex items-center gap-5">
