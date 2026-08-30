@@ -30,7 +30,8 @@ export function StudioEventEditor() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const push = useToastStore((s) => s.push)
-  const isNew = id === 'new'
+  // /studio/eventos/new no tiene :id — id llega undefined en esa ruta.
+  const isNew = !id || id === 'new'
   const { data: existing, isLoading } = useEvent(id)
 
   const [title, setTitle] = useState('')
