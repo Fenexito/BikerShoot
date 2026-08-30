@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../studio/ThemeToggle'
 import { useAuth } from '../../features/auth/AuthContext'
+import { IconUser, IconLogOut } from '../shared/icons'
 
 export function HeaderStudio() {
   const { signOut } = useAuth()
@@ -32,15 +33,17 @@ export function HeaderStudio() {
         </nav>
         <div className="flex items-center gap-5">
           <ThemeToggle />
-          <Link to="/studio/perfil" aria-label="Perfil" className="text-muted-foreground hover:text-foreground">
-            👤
+          <Link to="/studio/perfil" aria-label="Perfil" title="Perfil" className="text-muted-foreground hover:text-foreground">
+            <IconUser className="h-5 w-5" />
           </Link>
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+            aria-label="Salir"
+            title="Salir"
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
-            {signingOut ? 'Saliendo…' : 'Salir'}
+            <IconLogOut className="h-5 w-5" />
           </button>
         </div>
       </div>

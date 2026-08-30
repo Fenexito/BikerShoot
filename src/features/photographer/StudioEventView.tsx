@@ -105,7 +105,7 @@ function PointUploader({
   )
 }
 
-function PhotoTile({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
+function PhotoTile({ photo, onDelete, onToggleFeatured }: { photo: EventPhoto; onDelete: (id: string) => void; onToggleFeatured: (id: string, next: boolean) => void }) {
   const sold = !!photo.delivered_path
   return (
     <div className="group relative aspect-[4/5] overflow-hidden border border-border">
@@ -115,6 +115,17 @@ function PhotoTile({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: stri
           Vendida
         </span>
       )}
+      <button
+        onClick={() => onToggleFeatured(photo.id, !photo.featured)}
+        aria-label="Destacar en tu perfil"
+        title="Destacar en tu perfil"
+        className={cn(
+          'absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-sm transition-opacity',
+          photo.featured ? 'bg-accent text-white opacity-100' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100',
+        )}
+      >
+        ★
+      </button>
       <button
         onClick={() => onDelete(photo.id)}
         className="absolute inset-x-0 bottom-0 bg-black/70 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100"
@@ -157,6 +168,15 @@ export function StudioEventView() {
     push({ type: 'success', title: 'Foto eliminada' })
     queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
     queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
+  }
+
+  async function toggleFeatured(photoId: string, next: boolean) {
+    const { error } = await supabase.from('photos').update({ featured: next }).eq('id', photoId)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
+      return
+    }
+    queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
   }
 
   if (isLoading) return <p className="px-6 py-16 text-center text-muted-foreground">Cargando evento…</p>
@@ -232,7 +252,7 @@ export function StudioEventView() {
               {ptPhotos.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                   {ptPhotos.map((photo) => (
-                    <PhotoTile key={photo.id} photo={photo} onDelete={deletePhoto} />
+                    <PhotoTile key={photo.id} photo={photo} onDelete={deletePhoto} onToggleFeatured={toggleFeatured} />
                   ))}
                 </div>
               ) : (
@@ -247,7 +267,7 @@ export function StudioEventView() {
             <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
               {unassigned.map((photo) => (
-                <PhotoTile key={photo.id} photo={photo} onDelete={deletePhoto} />
+                <PhotoTile key={photo.id} photo={photo} onDelete={deletePhoto} onToggleFeatured={toggleFeatured} />
               ))}
             </div>
           </section>

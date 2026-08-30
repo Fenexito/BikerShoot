@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePublicPhotographer, usePhotographerEvents, usePhotographerPhotos } from './usePublicData'
+import { r2Url } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
@@ -16,13 +17,26 @@ export function PhotographerProfile() {
   const [tab, setTab] = useState<'fotos' | 'eventos'>('fotos')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
+  const gridPhotos: GridPhoto[] = useMemo(() => {
+    if (!photographer) return []
+    return photos.map((p) => {
+      const event = events.find((e) => e.id === p.event_id)
+      return { ...p, eventTitle: event?.title ?? '', photographerName: photographer.display_name }
+    })
+  }, [photos, events, photographer])
+
+  // Si el fotógrafo no ha curado ninguna, mostramos todas para no dejar la pestaña vacía.
+  const featuredPhotos = useMemo(() => {
+    const featured = gridPhotos.filter((p) => p.featured)
+    return featured.length > 0 ? featured : gridPhotos
+  }, [gridPhotos])
+
   if (isLoading) return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando…</div>
   if (!photographer) return <PlaceholderPage title="Fotógrafo no encontrado" />
 
-  const gridPhotos: GridPhoto[] = photos.map((p) => {
-    const event = events.find((e) => e.id === p.event_id)
-    return { ...p, eventTitle: event?.title ?? '', photographerName: photographer.display_name }
-  })
+  const avatarUrl = photographer.avatar_url
+    ? (photographer.avatar_url.startsWith('http') ? photographer.avatar_url : r2Url(photographer.avatar_url))
+    : null
 
   return (
     <div className="font-flat">
@@ -32,15 +46,25 @@ export function PhotographerProfile() {
 
       <div className="mx-auto max-w-5xl px-4 md:px-8">
         <div className="-mt-14 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
-          <InitialsAvatar
-            name={photographer.display_name}
-            className="h-28 w-28 rounded-full border-4 border-background bg-primary text-3xl text-white"
-          />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={photographer.display_name} className="h-28 w-28 rounded-full border-4 border-background object-cover" />
+          ) : (
+            <InitialsAvatar
+              name={photographer.display_name}
+              className="h-28 w-28 rounded-full border-4 border-background bg-primary text-3xl text-white"
+            />
+          )}
           <div className="flex-1 text-center sm:text-left">
             <h1 className="text-2xl font-bold tracking-tight">{photographer.display_name}</h1>
             {photographer.city && <p className="text-muted-foreground">{photographer.city}</p>}
           </div>
-          <Button size="lg">Contactar</Button>
+          {photographer.whatsapp ? (
+            <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
+              <Button size="lg">Contactar por WhatsApp</Button>
+            </a>
+          ) : (
+            <Button size="lg" disabled>Sin contacto</Button>
+          )}
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-4 rounded-lg bg-muted p-6 text-center">
@@ -73,7 +97,7 @@ export function PhotographerProfile() {
 
         <div className="py-8">
           {tab === 'fotos' ? (
-            <PhotoGrid photos={gridPhotos} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+            <PhotoGrid photos={featuredPhotos} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
+import { r2Url } from '../../lib/r2'
 import { Button } from '../../ui/studio/Button'
 import { Input } from '../../ui/studio/Input'
 import { Badge } from '../../ui/studio/Badge'
@@ -25,6 +26,36 @@ export function StudioProfilePage() {
   const { data: details, isLoading } = usePhotographerDetails(user?.id)
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const push = useToastStore((s) => s.push)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+
+  async function handleAvatarFile(file: File | undefined) {
+    if (!file || !user) return
+    if (!file.type.startsWith('image/')) {
+      push({ type: 'error', title: 'La foto de perfil debe ser una imagen' })
+      return
+    }
+    setUploadingAvatar(true)
+    try {
+      const { data: signed, error: signError } = await supabase.functions.invoke('r2-avatar-upload-url', {
+        body: { fileName: file.name, contentType: file.type },
+      })
+      if (signError || !signed?.uploadUrl) throw new Error(signError?.message ?? 'No se pudo obtener la URL de subida')
+
+      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: signed.avatarPath }).eq('id', user.id)
+      if (updateError) throw updateError
+
+      await refreshProfile()
+      push({ type: 'success', title: 'Foto de perfil actualizada' })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo actualizar la foto', description: (err as Error).message })
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   const {
     register,
@@ -74,7 +105,21 @@ export function StudioProfilePage() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-16 text-foreground">
       <div className="mb-10 flex items-center gap-5">
-        <InitialsAvatar name={profile.display_name || 'S'} className="h-20 w-20 bg-foreground text-2xl text-background" />
+        <button onClick={() => avatarInputRef.current?.click()} className="group relative h-20 w-20 shrink-0" disabled={uploadingAvatar}>
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)}
+              alt={profile.display_name}
+              className="h-20 w-20 rounded-full object-cover"
+            />
+          ) : (
+            <InitialsAvatar name={profile.display_name || 'S'} className="h-20 w-20 bg-foreground text-2xl text-background" />
+          )}
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white opacity-0 transition-opacity group-hover:opacity-100">
+            {uploadingAvatar ? '…' : 'Cambiar'}
+          </span>
+        </button>
+        <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
         <div>
           <h1 className="font-studio text-2xl font-bold tracking-tight2">{profile.display_name}</h1>
           <p className="text-muted-foreground">{user?.email}</p>
