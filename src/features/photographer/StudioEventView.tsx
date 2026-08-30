@@ -1,109 +1,16 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useEvent, useEventPhotosDetailed, type EventPhoto } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
-import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview } from './photoUpload'
+import { PhotoUploadQueue } from './components/PhotoUploadQueue'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { cn } from '../../lib/cn'
-
-function PointUploader({
-  eventId,
-  photographerId,
-  pointId,
-  price,
-  watermarkPath,
-}: {
-  eventId: string
-  photographerId: string
-  pointId: string | null
-  price: number
-  watermarkPath: string | null
-}) {
-  const push = useToastStore((s) => s.push)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [backupRaw, setBackupRaw] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState({ done: 0, total: 0 })
-
-  async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'))
-    if (imageFiles.length === 0) return
-
-    setUploading(true)
-    setProgress({ done: 0, total: imageFiles.length })
-
-    let watermarkImage: ImageBitmap | null = null
-    if (watermarkPath) {
-      try {
-        watermarkImage = await loadWatermarkImage(r2Url(watermarkPath))
-      } catch {
-        push({ type: 'error', title: 'No se pudo cargar la marca de agua del evento' })
-      }
-    }
-
-    let failures = 0
-    await Promise.all(
-      imageFiles.map(async (file) => {
-        try {
-          const { data, error } = await supabase.functions.invoke('r2-upload-url', {
-            body: { fileName: file.name, contentType: file.type, eventId, includeRaw: backupRaw },
-          })
-          if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
-
-          const previewBlob = await createWatermarkedPreview(file, watermarkImage)
-
-          const uploads = [uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', () => {})]
-          if (backupRaw && data.rawUploadUrl) uploads.push(uploadWithProgress(data.rawUploadUrl, file, file.type, () => {}))
-          await Promise.all(uploads)
-
-          const { error: insertError } = await supabase.from('photos').insert({
-            event_id: eventId,
-            photographer_id: photographerId,
-            point_id: pointId,
-            preview_path: data.previewPath,
-            raw_path: backupRaw ? data.rawPath : null,
-            price,
-            size_bytes: previewBlob.size + (backupRaw ? file.size : 0),
-          })
-          if (insertError) throw insertError
-        } catch {
-          failures++
-        } finally {
-          setProgress((p) => ({ ...p, done: p.done + 1 }))
-        }
-      }),
-    )
-
-    setUploading(false)
-    if (failures > 0) {
-      push({ type: 'error', title: `${failures} foto(s) fallaron`, description: 'Vuelve a intentarlo con esos archivos.' })
-    } else {
-      push({ type: 'success', title: `${imageFiles.length} foto(s) subidas` })
-    }
-    queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', eventId] })
-    queryClient.invalidateQueries({ queryKey: ['my-events', photographerId] })
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button variant="ghost" loading={uploading} onClick={() => inputRef.current?.click()}>
-        {uploading ? `Subiendo ${progress.done}/${progress.total}…` : '+ Subir fotos a este punto'}
-      </Button>
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" checked={backupRaw} onChange={(e) => setBackupRaw(e.target.checked)} className="h-3.5 w-3.5 accent-accent" />
-        Respaldar original
-      </label>
-      <input ref={inputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-    </div>
-  )
-}
 
 function PhotoTile({ photo, onDelete, onToggleFeatured }: { photo: EventPhoto; onDelete: (id: string) => void; onToggleFeatured: (id: string, next: boolean) => void }) {
   const sold = !!photo.delivered_path
@@ -142,6 +49,7 @@ export function StudioEventView() {
   const push = useToastStore((s) => s.push)
   const { data: event, isLoading } = useEvent(id)
   const { data: photos = [] } = useEventPhotosDetailed(id)
+  const [uploadOpenFor, setUploadOpenFor] = useState<string | null>(null)
 
   const photosByPoint = useMemo(() => {
     const map = new Map<string, EventPhoto[]>()
@@ -247,8 +155,25 @@ export function StudioEventView() {
                     {pt.time_start.slice(0, 5)} – {pt.time_end.slice(0, 5)} · {ptPhotos.length} fotos
                   </p>
                 </div>
-                <PointUploader eventId={event.id} photographerId={event.photographer_id} pointId={pt.id} price={event.price_per_photo} watermarkPath={event.watermark_path} />
+                <Button variant="ghost" onClick={() => setUploadOpenFor(uploadOpenFor === pt.id ? null : pt.id)}>
+                  {uploadOpenFor === pt.id ? 'Cerrar' : '+ Subir fotos a este punto'}
+                </Button>
               </div>
+              {uploadOpenFor === pt.id && (
+                <div className="mb-6">
+                  <PhotoUploadQueue
+                    eventId={event.id}
+                    pointId={pt.id}
+                    photographerId={event.photographer_id}
+                    price={event.price_per_photo}
+                    watermarkPath={event.watermark_path}
+                    onItemUploaded={() => {
+                      queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
+                      queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
+                    }}
+                  />
+                </div>
+              )}
               {ptPhotos.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                   {ptPhotos.map((photo) => (

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
+import { PhotoUploadQueue } from './components/PhotoUploadQueue'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
 import { Button } from '../../ui/studio/Button'
@@ -50,6 +51,7 @@ export function StudioEventEditor() {
   const watermarkInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const routePointPickerRef = useRef<RoutePointPickerHandle>(null)
+  const [uploadOpenFor, setUploadOpenFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (existing) {
@@ -235,8 +237,17 @@ export function StudioEventEditor() {
     }
 
     queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
-    push({ type: 'success', title: isNew ? 'Evento creado' : 'Evento actualizado' })
-    navigate(`/studio/eventos/${eventId}`)
+    queryClient.invalidateQueries({ queryKey: ['event', eventId] })
+    push({ type: 'success', title: isNew ? 'Evento creado — ya puedes subir fotos por punto aquí mismo' : 'Evento actualizado' })
+    setSaving(false)
+
+    if (isNew) {
+      // Nos quedamos en el editor (ahora como "evento existente") para poder
+      // subir fotos por punto de una vez, sin salir de la página.
+      navigate(`/studio/eventos/${eventId}/editar`, { replace: true })
+    } else {
+      navigate(`/studio/eventos/${eventId}`)
+    }
   }
 
   if (!isNew && isLoading) {
@@ -395,6 +406,45 @@ export function StudioEventEditor() {
         <div className="mt-6">
           <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} showRouteSelector={category === 'Rodada'} />
         </div>
+      </section>
+
+      {/* Subir fotos por punto — solo una vez que el evento y sus puntos ya están guardados */}
+      <section className="mt-14 border-t border-border pt-10">
+        <h2 className="font-studio text-xl font-bold tracking-tight2">Subir fotos</h2>
+        {!isNew && existing && existing.event_points.length > 0 ? (
+          <>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ya puedes subir fotos a cualquiera de tus puntos guardados, sin salir de esta página.
+            </p>
+            <div className="mt-6 flex flex-col gap-4">
+              {existing.event_points.map((pt) => (
+                <div key={pt.id} className="border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="font-semibold">{pt.label} <span className="font-studio-mono text-xs font-normal text-muted-foreground">({pt.time_start.slice(0, 5)}–{pt.time_end.slice(0, 5)})</span></p>
+                    <Button variant="ghost" onClick={() => setUploadOpenFor(uploadOpenFor === pt.id ? null : pt.id)}>
+                      {uploadOpenFor === pt.id ? 'Cerrar' : '+ Subir fotos'}
+                    </Button>
+                  </div>
+                  {uploadOpenFor === pt.id && (
+                    <div className="mt-4">
+                      <PhotoUploadQueue
+                        eventId={existing.id}
+                        pointId={pt.id}
+                        photographerId={existing.photographer_id}
+                        price={price}
+                        watermarkPath={watermarkPath}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Guarda el evento con al menos un punto primero para poder subir fotos.
+          </p>
+        )}
       </section>
 
       <div className="mt-10 flex justify-end gap-3">
