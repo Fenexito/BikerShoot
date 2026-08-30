@@ -47,7 +47,7 @@ function CleanupSoldButton({ eventId, pointId }: { eventId: string; pointId?: st
   )
 }
 
-function DeleteUnsoldButton({ pointId, label }: { pointId: string; label: string }) {
+function DeleteUnsoldButton({ pointId, eventId, label }: { pointId?: string; eventId?: string; label: string }) {
   const push = useToastStore((s) => s.push)
   const [busy, setBusy] = useState(false)
 
@@ -55,7 +55,7 @@ function DeleteUnsoldButton({ pointId, label }: { pointId: string; label: string
     if (!window.confirm(`¿Eliminar todas las fotos NO vendidas de "${label}"? Esta acción borra los archivos de forma permanente. Las fotos ya vendidas se conservan intactas.`)) return
     setBusy(true)
     try {
-      const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: { pointId } })
+      const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: pointId ? { pointId } : { eventId } })
       if (error) throw new Error(error.message)
       push({
         type: 'success',
@@ -73,7 +73,7 @@ function DeleteUnsoldButton({ pointId, label }: { pointId: string; label: string
 
   return (
     <Button variant="ghost" disabled={busy} onClick={run}>
-      Eliminar fotos no vendidas de este punto
+      {pointId ? 'Eliminar fotos no vendidas de este punto' : 'Eliminar fotos no vendidas de este evento'}
     </Button>
   )
 }
@@ -100,7 +100,10 @@ function EventRow({ event }: { event: EventStorage }) {
         <div className="border-t border-border p-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
             <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Acciones sobre todo el evento</p>
-            <CleanupSoldButton eventId={event.id} />
+            <div className="flex flex-wrap gap-2">
+              <DeleteUnsoldButton eventId={event.id} label={event.title} />
+              <CleanupSoldButton eventId={event.id} />
+            </div>
           </div>
 
           {event.points.length === 0 ? (
@@ -116,7 +119,7 @@ function EventRow({ event }: { event: EventStorage }) {
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <DeleteUnsoldButton pointId={pt.id} label={pt.label} />
+                    <DeleteUnsoldButton pointId={pt.id} label={pt.label} eventId={event.id} />
                     <CleanupSoldButton eventId={event.id} pointId={pt.id} />
                   </div>
                 </div>

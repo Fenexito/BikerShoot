@@ -1,6 +1,10 @@
-// Edge Function: borra TODAS las fotos no vendidas de un punto — filas de
-// `photos` + sus archivos reales en R2 (preview público, raw privado si
-// existe). Nunca borra el punto (`event_points`) en sí, solo sus fotos.
+// Edge Function: borra TODAS las fotos no vendidas de un punto, o de un
+// evento completo — filas de `photos` + sus archivos reales en R2 (preview
+// público, raw privado si existe). Nunca borra el punto (`event_points`)
+// ni el evento en sí, solo sus fotos. Recibe `{ pointId }` para limpiar un
+// punto, o `{ eventId }` para limpiar TODO el evento (incluidas las fotos
+// sin punto asignado, como las que deja Carga rápida sin seleccionar
+// punto) — mutuamente excluyentes.
 //
 // La protección clave ya vive en la base de datos: order_items.photo_id
 // no tiene "on delete cascade", así que Postgres rechaza por sí solo
@@ -53,26 +57,38 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser()
   if (userError || !user) return json({ error: 'No autenticado' }, 401)
 
-  const { pointId } = await req.json()
-  if (!pointId) return json({ error: 'Falta pointId' }, 400)
+  const { pointId, eventId } = (await req.json()) as { pointId?: string; eventId?: string }
+  if (!pointId && !eventId) return json({ error: 'Falta pointId o eventId' }, 400)
 
-  // Verifica que el punto pertenezca a un evento del fotógrafo que llama.
-  const { data: point, error: pointError } = await supabase
-    .from('event_points')
-    .select('id, event:events(photographer_id)')
-    .eq('id', pointId)
-    .single()
+  let query = supabase.from('photos').select('id, preview_path, raw_path').eq('photographer_id', user.id)
 
-  const eventPhotographerId = (point?.event as unknown as { photographer_id: string } | null)?.photographer_id
-  if (pointError || !point || eventPhotographerId !== user.id) {
-    return json({ error: 'No autorizado para este punto' }, 403)
+  if (pointId) {
+    // Verifica que el punto pertenezca a un evento del fotógrafo que llama.
+    const { data: point, error: pointError } = await supabase
+      .from('event_points')
+      .select('id, event:events(photographer_id)')
+      .eq('id', pointId)
+      .single()
+
+    const eventPhotographerId = (point?.event as unknown as { photographer_id: string } | null)?.photographer_id
+    if (pointError || !point || eventPhotographerId !== user.id) {
+      return json({ error: 'No autorizado para este punto' }, 403)
+    }
+    query = query.eq('point_id', pointId)
+  } else {
+    // Verifica que el evento sea del fotógrafo que llama.
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id, photographer_id')
+      .eq('id', eventId)
+      .single()
+    if (eventError || !event || event.photographer_id !== user.id) {
+      return json({ error: 'No autorizado para este evento' }, 403)
+    }
+    query = query.eq('event_id', eventId as string)
   }
 
-  const { data: photos, error: photosError } = await supabase
-    .from('photos')
-    .select('id, preview_path, raw_path')
-    .eq('point_id', pointId)
-    .eq('photographer_id', user.id)
+  const { data: photos, error: photosError } = await query
 
   if (photosError) return json({ error: photosError.message }, 500)
   if (!photos || photos.length === 0) return json({ deleted: 0, skippedSold: 0 })
@@ -93,20 +109,55 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // Corre una lista de tareas async con un límite de concurrencia — evita
+  // saturar R2 con cientos de DELETE simultáneos, pero también evita el
+  // costo de esperar cada uno secuencialmente (lo que agotaba el tiempo de
+  // ejecución de la función en lotes grandes, ej. 699 fotos).
+  async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>) {
+    let cursor = 0
+    async function worker() {
+      while (cursor < items.length) {
+        const item = items[cursor++]
+        await task(item)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  }
+
   let deleted = 0
   let skippedSold = 0
+  const deletedPhotos: typeof photos = []
 
-  for (const photo of photos) {
-    const { error: deleteError } = await supabase.from('photos').delete().eq('id', photo.id)
-    if (deleteError) {
-      // 23503 = foreign_key_violation — ya fue vendida, se deja intacta.
-      skippedSold++
+  // Borra las filas en lotes con un solo DELETE ... IN (...) por lote — mucho
+  // más rápido que una fila a la vez. Si el lote falla (porque contiene al
+  // menos una foto ya vendida, protegida por la falta de "on delete cascade"
+  // en order_items.photo_id), se reintenta ese lote fila por fila para
+  // separar cuáles sí se pudieron borrar de cuáles había que conservar.
+  const BATCH_SIZE = 100
+  for (let i = 0; i < photos.length; i += BATCH_SIZE) {
+    const batch = photos.slice(i, i + BATCH_SIZE)
+    const ids = batch.map((p) => p.id)
+    const { error: batchError } = await supabase.from('photos').delete().in('id', ids)
+    if (!batchError) {
+      deleted += batch.length
+      deletedPhotos.push(...batch)
       continue
     }
-    deleted++
+    for (const photo of batch) {
+      const { error: rowError } = await supabase.from('photos').delete().eq('id', photo.id)
+      if (rowError) {
+        skippedSold++
+        continue
+      }
+      deleted++
+      deletedPhotos.push(photo)
+    }
+  }
+
+  await runWithConcurrency(deletedPhotos, 20, async (photo) => {
     if (photo.preview_path) await deleteObject(R2_BUCKET, photo.preview_path)
     if (photo.raw_path) await deleteObject(R2_ORIGINALS_BUCKET, photo.raw_path)
-  }
+  })
 
   return json({ deleted, skippedSold })
 })
