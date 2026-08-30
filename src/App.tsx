@@ -28,6 +28,7 @@ import { History as BikerHistory } from './features/biker/History'
 import { RouteMap } from './features/biker/RouteMap'
 import { StudioOnboarding } from './features/photographer/StudioOnboarding'
 import { StudioProfilePage } from './features/photographer/StudioProfilePage'
+import { StudioStorage } from './features/photographer/StudioStorage'
 import { StudioHome } from './features/photographer/StudioHome'
 import { StudioEvents } from './features/photographer/StudioEvents'
 import { StudioEventView } from './features/photographer/StudioEventView'
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="/studio/estadisticas" element={<RequireStudio><PlaceholderPage title="Estadísticas" /></RequireStudio>} />
         <Route path="/studio/carga-rapida" element={<RequireStudio><StudioUpload /></RequireStudio>} />
         <Route path="/studio/perfil" element={<RequireStudio><StudioProfilePage /></RequireStudio>} />
+        <Route path="/studio/almacenamiento" element={<RequireStudio><StudioStorage /></RequireStudio>} />
 
         {/* Admin */}
         <Route path="/admin" element={<RequireAdmin><AdminHome /></RequireAdmin>} />

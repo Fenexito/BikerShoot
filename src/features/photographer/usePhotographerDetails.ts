@@ -40,9 +40,15 @@ export function usePhotographerUsageBytes(userId: string | undefined) {
   return useQuery({
     queryKey: ['photographer-usage-bytes', userId],
     queryFn: async (): Promise<number> => {
-      const { data, error } = await supabase.from('photos').select('size_bytes').eq('photographer_id', userId)
+      const { data, error } = await supabase
+        .from('photos')
+        .select('preview_size_bytes, raw_size_bytes, delivered_size_bytes')
+        .eq('photographer_id', userId)
       if (error) throw error
-      return (data ?? []).reduce((sum, p) => sum + (p.size_bytes ?? 0), 0)
+      return (data ?? []).reduce(
+        (sum, p) => sum + (p.preview_size_bytes ?? 0) + (p.raw_size_bytes ?? 0) + (p.delivered_size_bytes ?? 0),
+        0,
+      )
     },
     enabled: !!userId,
   })

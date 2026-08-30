@@ -52,7 +52,7 @@ function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
       const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
       if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
 
-      const { error: updateError } = await supabase.from('photos').update({ delivered_path: data.deliveredPath }).eq('id', photo.id)
+      const { error: updateError } = await supabase.from('photos').update({ delivered_path: data.deliveredPath, delivered_size_bytes: file.size }).eq('id', photo.id)
       if (updateError) throw updateError
 
       push({ type: 'success', title: 'Foto entregada' })

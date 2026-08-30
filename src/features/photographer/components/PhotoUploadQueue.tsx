@@ -127,6 +127,8 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         raw_path: backupRaw ? data.rawPath : null,
         price,
         size_bytes: previewBlob.size + (backupRaw ? item.file.size : 0),
+        preview_size_bytes: previewBlob.size,
+        raw_size_bytes: backupRaw ? item.file.size : 0,
         original_filename: item.file.name,
       })
       if (insertError) throw insertError
