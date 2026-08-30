@@ -12,6 +12,7 @@ export function useMyEvents(photographerId: string | undefined) {
         .from('events')
         .select('*, event_points(*)')
         .eq('photographer_id', photographerId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data as unknown as DbEvent[]) ?? []

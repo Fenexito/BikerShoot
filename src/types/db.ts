@@ -41,6 +41,7 @@ export interface DbEvent {
   status: EventStatus
   cover_path: string | null
   watermark_path: string | null
+  deleted_at: string | null
   created_at: string
   event_points: DbEventPoint[]
 }

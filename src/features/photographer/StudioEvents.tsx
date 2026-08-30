@@ -1,12 +1,30 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
+import { supabase } from '../../lib/supabase'
+import { queryClient } from '../../lib/queryClient'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
+import { useToastStore } from '../../ui/overlays/toastStore'
 
 export function StudioEvents() {
   const { user } = useAuth()
   const { data: events, isLoading, error } = useMyEvents(user?.id)
+  const push = useToastStore((s) => s.push)
+
+  async function deleteEvent(e: React.MouseEvent, eventId: string, title: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm(`¿Eliminar "${title}"? Los bikers que ya compraron fotos de este evento conservan su acceso — solo desaparece de la búsqueda.`)) return
+
+    const { error } = await supabase.from('events').update({ deleted_at: new Date().toISOString() }).eq('id', eventId)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo eliminar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: 'Evento eliminado' })
+    queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12 text-foreground md:px-16">
@@ -63,6 +81,12 @@ export function StudioEvents() {
                   <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
                 </div>
               </div>
+              <button
+                onClick={(e) => deleteEvent(e, event.id, event.title)}
+                className="mt-4 w-full border-t border-border pt-3 text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground hover:text-accent"
+              >
+                Eliminar evento
+              </button>
             </div>
           </Link>
         ))}

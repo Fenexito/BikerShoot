@@ -7,7 +7,7 @@ export interface PublicEvent extends DbEvent {
 }
 
 export interface PublicPhoto extends DbPhoto {
-  event: { title: string; city: string; category: string } | null
+  event: { title: string; city: string; category: string; deleted_at: string | null } | null
   photographer: { display_name: string } | null
   point: { route_point: { route_id: string } | null } | null
 }
@@ -19,6 +19,7 @@ export interface MapPoint extends DbEventPoint {
     city: string
     photographer_id: string
     photographer: { display_name: string } | null
+    deleted_at: string | null
   } | null
   route_point: { route_id: string } | null
 }
@@ -43,6 +44,7 @@ export function usePublicEvents() {
       const { data, error } = await supabase
         .from('events')
         .select('*, event_points(*), photographer:profiles(display_name)')
+        .is('deleted_at', null)
         .order('event_date', { ascending: false })
       if (error) throw error
       return (data as unknown as PublicEvent[]) ?? []
@@ -58,6 +60,7 @@ export function usePublicEvent(eventId: string | undefined) {
         .from('events')
         .select('*, event_points(*), photographer:profiles(display_name)')
         .eq('id', eventId)
+        .is('deleted_at', null)
         .single()
       if (error) throw error
       return data as unknown as PublicEvent
@@ -133,6 +136,7 @@ export function usePhotographerEvents(photographerId: string | undefined) {
         .from('events')
         .select('*, event_points(*), photographer:profiles(display_name)')
         .eq('photographer_id', photographerId)
+        .is('deleted_at', null)
         .order('event_date', { ascending: false })
       if (error) throw error
       return (data as unknown as PublicEvent[]) ?? []
@@ -145,9 +149,12 @@ export function usePhotographerPhotos(photographerId: string | undefined) {
   return useQuery({
     queryKey: ['photographer-photos', photographerId],
     queryFn: async (): Promise<DbPhoto[]> => {
-      const { data, error } = await supabase.from('photos').select('*').eq('photographer_id', photographerId)
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*, event:events(deleted_at)')
+        .eq('photographer_id', photographerId)
       if (error) throw error
-      return (data as DbPhoto[]) ?? []
+      return ((data as unknown as (DbPhoto & { event: { deleted_at: string | null } | null })[]) ?? []).filter((p) => !p.event?.deleted_at)
     },
     enabled: !!photographerId,
   })
@@ -160,12 +167,13 @@ export function useSearchPhotos(filters: SearchFilters) {
     queryFn: async (): Promise<PublicPhoto[]> => {
       const { data, error } = await supabase
         .from('photos')
-        .select('*, event:events(title, city, category), photographer:profiles(display_name), point:event_points(route_point:route_points(route_id))')
+        .select('*, event:events(title, city, category, deleted_at), photographer:profiles(display_name), point:event_points(route_point:route_points(route_id))')
       if (error) throw error
       return (data as unknown as PublicPhoto[]) ?? []
     },
     select: (photos) => {
       let results = photos.filter((p) => {
+        if (p.event?.deleted_at) return false
         if (filters.photographerId && p.photographer_id !== filters.photographerId) return false
         if (filters.eventId && p.event_id !== filters.eventId) return false
         if (filters.pointId && p.point_id !== filters.pointId) return false
@@ -207,9 +215,9 @@ export function useMapPoints() {
     queryFn: async (): Promise<MapPoint[]> => {
       const { data, error } = await supabase
         .from('event_points')
-        .select('*, event:events(id, title, city, photographer_id, photographer:profiles(display_name)), route_point:route_points(route_id)')
+        .select('*, event:events(id, title, city, photographer_id, photographer:profiles(display_name), deleted_at), route_point:route_points(route_id)')
       if (error) throw error
-      return (data as unknown as MapPoint[]) ?? []
+      return ((data as unknown as MapPoint[]) ?? []).filter((p) => !p.event?.deleted_at)
     },
   })
 }
