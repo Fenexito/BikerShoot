@@ -30,6 +30,7 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [downloadingRaw, setDownloadingRaw] = useState(false)
+  const [openingDelivered, setOpeningDelivered] = useState(false)
 
   async function downloadRaw() {
     setDownloadingRaw(true)
@@ -41,6 +42,19 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
     } finally {
       setDownloadingRaw(false)
+    }
+  }
+
+  async function viewDelivered() {
+    setOpeningDelivered(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: photo.id } })
+      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
+      window.open(data.downloadUrl, '_blank')
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo abrir la entrega', description: (err as Error).message })
+    } finally {
+      setOpeningDelivered(false)
     }
   }
 
@@ -73,10 +87,16 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
     }
   }
 
+  const hasPreview = !!(photo.preview_path || photo.storage_path)
+
   return (
     <div className="border border-border">
-      <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-        {photo.preview_path || photo.storage_path ? (
+      <div
+        onClick={() => hasPreview && window.open(previewUrl(photo), '_blank')}
+        className={cn('relative aspect-[4/5] overflow-hidden bg-muted', hasPreview && 'cursor-pointer')}
+        title={hasPreview ? 'Ver con marca de agua' : undefined}
+      >
+        {hasPreview ? (
           <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-muted-foreground">
@@ -87,7 +107,7 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
         )}
         <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
           <button
-            onClick={() => inputRef.current?.click()}
+            onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
             disabled={uploading}
             className={cn(
               'w-full text-[10px] font-semibold uppercase tracking-wider2',
@@ -97,7 +117,7 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
             {uploading ? 'Subiendo…' : photo.delivered_path ? '✓ Entregada — cambiar' : 'Subir entrega final'}
           </button>
         </div>
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
       </div>
       <div className="p-2">
         <p className="truncate font-studio-mono text-[10px] text-muted-foreground" title={photo.original_filename ?? undefined}>
@@ -107,9 +127,18 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
           <button
             onClick={downloadRaw}
             disabled={downloadingRaw}
-            className="mt-1 text-[10px] font-semibold uppercase tracking-wider2 text-accent hover:underline disabled:opacity-50"
+            className="mt-1 block text-[10px] font-semibold uppercase tracking-wider2 text-accent hover:underline disabled:opacity-50"
           >
             {downloadingRaw ? 'Generando…' : '⬇ Descargar original (respaldo)'}
+          </button>
+        )}
+        {photo.delivered_path && (
+          <button
+            onClick={viewDelivered}
+            disabled={openingDelivered}
+            className="mt-1 block text-[10px] font-semibold uppercase tracking-wider2 text-accent hover:underline disabled:opacity-50"
+          >
+            {openingDelivered ? 'Generando…' : '★ Ver entrega final'}
           </button>
         )}
       </div>
@@ -169,15 +198,29 @@ export function StudioOrderDetail() {
         ← Todos los pedidos
       </Link>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-6 border-b border-border pb-6">
         <div className="flex items-center gap-4">
           <InitialsAvatar name={order.bikerName} className="h-14 w-14 bg-foreground text-lg text-background" />
           <div>
+            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Comprador</p>
             <h1 className="font-studio text-2xl font-bold tracking-tight2">{order.bikerName}</h1>
             <p className="text-muted-foreground">{order.eventTitle}</p>
           </div>
         </div>
-        <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-xs uppercase tracking-wider2" />
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="text-right">
+            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+              {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
+            </p>
+            <p className="font-studio text-2xl font-bold">Q{order.total}</p>
+          </div>
+          {order.paymentMethod === 'transferencia' && (
+            <Button variant="secondary" size="sm" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
+              Ver comprobante
+            </Button>
+          )}
+          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-xs uppercase tracking-wider2" />
+        </div>
       </div>
 
       {order.status !== 'cancelado' && (
@@ -211,20 +254,6 @@ export function StudioOrderDetail() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
         </div>
-      </section>
-
-      <section className="mt-10 flex items-center justify-between border border-border p-5">
-        <div>
-          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
-            {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
-          </p>
-          <p className="mt-1 text-2xl font-bold">Q{order.total}</p>
-        </div>
-        {order.paymentMethod === 'transferencia' && (
-          <Button variant="secondary" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
-            Ver comprobante
-          </Button>
-        )}
       </section>
 
       <div className="mt-8 flex items-center justify-between">

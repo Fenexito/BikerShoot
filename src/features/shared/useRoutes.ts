@@ -9,7 +9,7 @@ export function useRoutes() {
   return useQuery({
     queryKey: ['routes'],
     queryFn: async (): Promise<DbRoute[]> => {
-      const { data, error } = await supabase.from('routes').select('id, name').order('name')
+      const { data, error } = await supabase.from('routes').select('id, name').order('sort_order').order('name')
       if (error) throw error
       return data ?? []
     },

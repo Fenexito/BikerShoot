@@ -1,5 +1,5 @@
-import { forwardRef, useImperativeHandle, useState } from 'react'
-import { useRoutes, useRoutePoints, createRoutePoint } from '../../shared/useRoutes'
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import { useRoutePoints, createRoutePoint } from '../../shared/useRoutes'
 import { MapPointPicker } from './MapPointPicker'
 import { Input } from '../../../ui/studio/Input'
 import { Select } from '../../../ui/studio/Select'
@@ -34,18 +34,17 @@ interface SelectedPoint {
 
 interface RoutePointPickerProps {
   onAdd: (point: AddedPoint) => void
-  /** Rodadas pueden anclar el punto a una de las rutas fijas; pista/sesión de fotos siempre son puntos sueltos. */
-  showRouteSelector?: boolean
+  /** Rodadas anclan el punto a la ruta elegida arriba en el formulario (una sola
+   * vez por evento, no por punto); pista/sesión de fotos siempre son puntos sueltos. */
+  useRoute?: boolean
+  routeId?: string
 }
 
 export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPickerProps>(function RoutePointPicker(
-  { onAdd, showRouteSelector = false },
+  { onAdd, useRoute = false, routeId = '' },
   ref,
 ) {
   const push = useToastStore((s) => s.push)
-  const { data: routes = [] } = useRoutes()
-
-  const [routeId, setRouteId] = useState('')
   const { data: routePoints = [] } = useRoutePoints(routeId || undefined)
 
   const [pointFormOpen, setPointFormOpen] = useState(true)
@@ -65,11 +64,13 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     setNewLng(GUATEMALA_CENTER.lng)
   }
 
-  function handleRouteChange(value: string) {
-    setRouteId(value)
+  // Si el fotógrafo cambia la ruta arriba, el punto que tenía a medio elegir
+  // ya no tiene sentido (pertenecía a la ruta anterior).
+  useEffect(() => {
     resetPointForm()
-    setPointFormOpen(!value)
-  }
+    setPointFormOpen(!routeId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeId])
 
   function handlePointChange(value: string) {
     if (value === NEW_POINT) {
@@ -102,7 +103,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     }
   }
 
-  const usingRoute = showRouteSelector && !!routeId
+  const usingRoute = useRoute && !!routeId
   const readyToTime = usingRoute ? !!selectedPoint : !!newLabel.trim()
 
   function resolvePendingPoint(): AddedPoint | null {
@@ -136,27 +137,24 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     },
   }))
 
+  if (useRoute && !routeId) {
+    return (
+      <div className="border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
+        Elige una ruta arriba para poder agregar puntos.
+      </div>
+    )
+  }
+
   return (
     <div className="border border-border p-5">
-      {showRouteSelector && (
-        <Select label="Ruta" value={routeId} onChange={(e) => handleRouteChange(e.target.value)}>
-          <option value="">Sin ruta</option>
-          {routes.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </Select>
-      )}
-
       {usingRoute && (
-        <div className="mt-4">
-          <Select label="Punto en esta ruta" value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')} onChange={(e) => handlePointChange(e.target.value)}>
-            <option value="">Selecciona un punto</option>
-            {routePoints.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-            <option value={NEW_POINT}>+ Nuevo punto en esta ruta</option>
-          </Select>
-        </div>
+        <Select label="Punto en esta ruta" value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')} onChange={(e) => handlePointChange(e.target.value)}>
+          <option value="">Selecciona un punto</option>
+          {routePoints.map((p) => (
+            <option key={p.id} value={p.id}>{p.label}</option>
+          ))}
+          <option value={NEW_POINT}>+ Nuevo punto en esta ruta</option>
+        </Select>
       )}
 
       {pointFormOpen && (

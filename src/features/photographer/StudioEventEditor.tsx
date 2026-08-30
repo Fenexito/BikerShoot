@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useEvent } from './useMyEvents'
+import { useRoutes } from '../shared/useRoutes'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
@@ -21,6 +22,7 @@ const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: 'pausado', label: 'Pausado — solo tú lo ves' },
   { value: 'cerrado', label: 'Cerrado' },
 ]
+const RODADA_CITY = 'Guatemala'
 
 interface LocalPoint {
   id: string
@@ -40,15 +42,17 @@ export function StudioEventEditor() {
   // /studio/eventos/new no tiene :id — id llega undefined en esa ruta.
   const isNew = !id || id === 'new'
   const { data: existing, isLoading } = useEvent(id)
+  const { data: routes = [] } = useRoutes()
 
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('Rodada')
+  const [routeId, setRouteId] = useState('')
   const [city, setCity] = useState('')
   const [venue, setVenue] = useState('')
   const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [price, setPrice] = useState(25)
   const [description, setDescription] = useState('')
-  const [status, setStatus] = useState<EventStatus>('activo')
+  const [status, setStatus] = useState<EventStatus>('pausado')
   const [points, setPoints] = useState<LocalPoint[]>([])
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null)
   const [watermarkFile, setWatermarkFile] = useState<File | null>(null)
@@ -85,6 +89,20 @@ export function StudioEventEditor() {
           timeEnd: pt.time_end.slice(0, 5),
         })),
       )
+      // Los puntos guardan a qué route_point pertenecen, pero no a qué ruta —
+      // se busca la ruta a partir del primer punto anclado a una para
+      // poder hidratar el selector único de arriba.
+      const firstRoutePointId = existing.event_points.find((pt) => pt.route_point_id)?.route_point_id
+      if (firstRoutePointId) {
+        supabase
+          .from('route_points')
+          .select('route_id')
+          .eq('id', firstRoutePointId)
+          .single()
+          .then(({ data }) => {
+            if (data) setRouteId(data.route_id)
+          })
+      }
     }
   }, [existing])
 
@@ -137,7 +155,8 @@ export function StudioEventEditor() {
 
   async function save() {
     if (!user) return
-    if (!title.trim() || !city.trim()) {
+    const isRodada = category === 'Rodada'
+    if (!title.trim() || (!isRodada && !city.trim())) {
       push({ type: 'error', title: 'Título y ciudad son obligatorios' })
       return
     }
@@ -157,8 +176,8 @@ export function StudioEventEditor() {
       photographer_id: user.id,
       title,
       category,
-      city,
-      venue: venue || null,
+      city: isRodada ? RODADA_CITY : city,
+      venue: isRodada ? null : venue || null,
       event_date: eventDate,
       price_per_photo: price,
       description: description || null,
@@ -249,16 +268,12 @@ export function StudioEventEditor() {
 
     queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
     queryClient.invalidateQueries({ queryKey: ['event', eventId] })
-    push({ type: 'success', title: isNew ? 'Evento creado — ya puedes subir fotos por punto aquí mismo' : 'Evento actualizado' })
+    push({ type: 'success', title: isNew ? 'Evento creado — pausado hasta que lo publiques' : 'Evento actualizado' })
     setSaving(false)
 
-    if (isNew) {
-      // Nos quedamos en el editor (ahora como "evento existente") para poder
-      // subir fotos por punto de una vez, sin salir de la página.
-      navigate(`/studio/eventos/${eventId}/editar`, { replace: true })
-    } else {
-      navigate(`/studio/eventos/${eventId}`)
-    }
+    // Tanto al crear como al editar, el destino es la vista del evento — ahí
+    // vive el uploader por punto.
+    navigate(`/studio/eventos/${eventId}`, { replace: isNew })
   }
 
   if (!isNew && isLoading) {
@@ -281,16 +296,25 @@ export function StudioEventEditor() {
             <option key={c}>{c}</option>
           ))}
         </Select>
+        {category === 'Rodada' && (
+          <Select label="Ruta" value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+            <option value="">Selecciona una ruta</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
+        )}
         <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
-        <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />
-        {category === 'Pista' ? (
+        {category !== 'Rodada' && <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />}
+        {category === 'Pista' && (
           <Select label="Autódromo" value={venue} onChange={(e) => setVenue(e.target.value)}>
             <option value="">Selecciona un autódromo</option>
             {AUTODROMOS.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </Select>
-        ) : (
+        )}
+        {category === 'Sesión de Fotos' && (
           <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
         )}
         <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
@@ -310,22 +334,21 @@ export function StudioEventEditor() {
         </div>
       </div>
 
-      {/* Portada */}
-      <section className="mt-14 border-t border-border pt-10">
-        <h2 className="font-studio text-xl font-bold tracking-tight2">Foto de portada</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Se muestra en tu lista de eventos y en la página pública del evento. Opcional.
-        </p>
-
-        <div className="mt-4 flex items-center gap-4">
+      {/* Portada + Marca de agua */}
+      <section className="mt-14 grid grid-cols-1 gap-10 border-t border-border pt-10 sm:grid-cols-2">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h2 className="font-studio text-xl font-bold tracking-tight2">Foto de portada</h2>
+          <p className="text-sm text-muted-foreground">
+            Se muestra como banner ancho en la vista del evento y en tu lista de eventos. Opcional.
+          </p>
           {(coverLocalPreview || coverPath) ? (
             <img
               src={coverLocalPreview ?? r2Url(coverPath!)}
               alt="Portada"
-              className="h-20 w-32 border border-border object-cover"
+              className="h-24 w-40 border border-border object-cover"
             />
           ) : (
-            <div className="flex h-20 w-32 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
+            <div className="flex h-24 w-40 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
               Sin portada
             </div>
           )}
@@ -345,24 +368,20 @@ export function StudioEventEditor() {
             onChange={(e) => handleCoverFile(e.target.files?.[0])}
           />
         </div>
-      </section>
 
-      {/* Marca de agua */}
-      <section className="mt-14 border-t border-border pt-10">
-        <h2 className="font-studio text-xl font-bold tracking-tight2">Marca de agua</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Un PNG que se estampa sobre todas las fotos de este evento hasta que lo cambies. Es opcional — si no subes uno, las fotos igual se suben reducidas, pero sin ninguna marca encima.
-        </p>
-
-        <div className="mt-4 flex items-center gap-4">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h2 className="font-studio text-xl font-bold tracking-tight2">Marca de agua</h2>
+          <p className="text-sm text-muted-foreground">
+            Un PNG que se estampa sobre todas las fotos de este evento. Opcional — sin uno, las fotos se suben reducidas pero sin marca.
+          </p>
           {(watermarkLocalPreview || watermarkPath) ? (
             <img
               src={watermarkLocalPreview ?? r2Url(watermarkPath!)}
               alt="Marca de agua"
-              className="h-20 w-20 border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
+              className="h-24 w-24 border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
             />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
+            <div className="flex h-24 w-24 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
               Sin PNG
             </div>
           )}
@@ -420,7 +439,7 @@ export function StudioEventEditor() {
         )}
 
         <div className="mt-6">
-          <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} showRouteSelector={category === 'Rodada'} />
+          <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} useRoute={category === 'Rodada'} routeId={routeId} />
         </div>
       </section>
 
@@ -463,7 +482,7 @@ export function StudioEventEditor() {
         )}
       </section>
 
-      <div className="mt-10 flex justify-end gap-3">
+      <div className="sticky bottom-0 z-20 mt-10 flex justify-end gap-3 border-t border-border bg-background px-6 py-4 -mx-6 md:-mx-16 md:px-16">
         <Button variant="secondary" onClick={() => navigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
         <Button onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
       </div>

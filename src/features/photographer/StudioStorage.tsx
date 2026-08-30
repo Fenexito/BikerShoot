@@ -19,11 +19,18 @@ function formatBytes(n: number) {
 
 type SortMode = 'oldest' | 'newest' | 'biggest'
 
+const CLEAR_OPTIONS: { value: 'preview' | 'raw' | 'both'; label: string }[] = [
+  { value: 'preview', label: 'Vista previa' },
+  { value: 'raw', label: 'Respaldo crudo' },
+  { value: 'both', label: 'Ambos' },
+]
+
 function CleanupSoldButton({ eventId, pointId }: { eventId: string; pointId?: string }) {
   const push = useToastStore((s) => s.push)
+  const [clear, setClear] = useState<'preview' | 'raw' | 'both'>('both')
   const [busy, setBusy] = useState(false)
 
-  async function run(clear: 'preview' | 'raw' | 'both') {
+  async function run() {
     const label = clear === 'preview' ? 'la vista previa' : clear === 'raw' ? 'el respaldo crudo' : 'la vista previa y el respaldo crudo'
     const ok = await confirmDialog.ask({
       title: '¿Liberar espacio de fotos ya vendidas y entregadas?',
@@ -47,10 +54,17 @@ function CleanupSoldButton({ eventId, pointId }: { eventId: string; pointId?: st
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="ghost" disabled={busy} onClick={() => run('preview')}>Liberar previews vendidas</Button>
-      <Button variant="ghost" disabled={busy} onClick={() => run('raw')}>Liberar respaldos vendidos</Button>
-      <Button variant="ghost" disabled={busy} onClick={() => run('both')}>Liberar ambos (vendidas)</Button>
+    <div className="flex items-center gap-2">
+      <select
+        value={clear}
+        onChange={(e) => setClear(e.target.value as typeof clear)}
+        className="border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none focus:border-accent"
+      >
+        {CLEAR_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <Button variant="ghost" disabled={busy} onClick={run}>Liberar espacio de vendidas</Button>
     </div>
   )
 }
@@ -112,8 +126,8 @@ function EventRow({ event }: { event: EventStorage }) {
 
       {open && (
         <div className="border-t border-border p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Acciones sobre todo el evento</p>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-accent/40 bg-accent/5 px-4 py-3">
+            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-accent">Acciones sobre todo el evento</p>
             <div className="flex flex-wrap gap-2">
               <DeleteUnsoldButton eventId={event.id} label={event.title} />
               <CleanupSoldButton eventId={event.id} />
@@ -123,9 +137,10 @@ function EventRow({ event }: { event: EventStorage }) {
           {event.points.length === 0 ? (
             <p className="text-sm text-muted-foreground">Este evento no tiene puntos.</p>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+              <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Acciones por punto</p>
               {event.points.map((pt) => (
-                <div key={pt.id} className="flex flex-col gap-2 border border-border p-3">
+                <div key={pt.id} className="flex flex-col gap-2 border border-border bg-muted/30 p-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold">{pt.label}</p>
                     <span className="font-studio-mono text-xs text-muted-foreground">
