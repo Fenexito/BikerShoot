@@ -17,12 +17,28 @@ interface DeliverablePhoto {
   storage_path: string | null
   preview_path: string | null
   delivered_path: string | null
+  raw_path: string | null
+  original_filename: string | null
 }
 
 function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
   const push = useToastStore((s) => s.push)
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [downloadingRaw, setDownloadingRaw] = useState(false)
+
+  async function downloadRaw() {
+    setDownloadingRaw(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-raw-download-url', { body: { photoId: photo.id } })
+      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
+      window.open(data.downloadUrl, '_blank')
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
+    } finally {
+      setDownloadingRaw(false)
+    }
+  }
 
   async function handleFile(file: File | undefined) {
     if (!file) return
@@ -49,21 +65,37 @@ function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
   }
 
   return (
-    <div className="relative aspect-[4/5] overflow-hidden border border-border">
-      <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
-      <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className={cn(
-            'w-full text-[10px] font-semibold uppercase tracking-wider2',
-            photo.delivered_path ? 'text-accent' : 'text-white',
-          )}
-        >
-          {uploading ? 'Subiendo…' : photo.delivered_path ? '✓ Entregada — cambiar' : 'Subir entrega final'}
-        </button>
+    <div className="border border-border">
+      <div className="relative aspect-[4/5] overflow-hidden">
+        <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+        <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className={cn(
+              'w-full text-[10px] font-semibold uppercase tracking-wider2',
+              photo.delivered_path ? 'text-accent' : 'text-white',
+            )}
+          >
+            {uploading ? 'Subiendo…' : photo.delivered_path ? '✓ Entregada — cambiar' : 'Subir entrega final'}
+          </button>
+        </div>
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
       </div>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+      <div className="p-2">
+        <p className="truncate font-studio-mono text-[10px] text-muted-foreground" title={photo.original_filename ?? undefined}>
+          {photo.original_filename ?? 'Sin nombre registrado'}
+        </p>
+        {photo.raw_path && (
+          <button
+            onClick={downloadRaw}
+            disabled={downloadingRaw}
+            className="mt-1 text-[10px] font-semibold uppercase tracking-wider2 text-accent hover:underline disabled:opacity-50"
+          >
+            {downloadingRaw ? 'Generando…' : '⬇ Descargar original (respaldo)'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
