@@ -56,25 +56,25 @@ export function StudioOrders() {
           <Link
             key={order.orderId}
             to={`/studio/pedidos/${order.orderId}`}
-            className="flex flex-wrap items-center gap-4 px-5 py-4 transition-colors hover:bg-muted"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted"
           >
             <InitialsAvatar name={order.bikerName} className="h-10 w-10 shrink-0 bg-foreground text-sm text-background" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{order.bikerName}</p>
               <p className="truncate text-sm text-muted-foreground">{order.eventTitle} · {order.items.length} fotos</p>
             </div>
-            <span className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
-              {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
-            </span>
-            <span className="w-40 shrink-0 justify-end">
+            <div className="ml-[52px] flex w-full flex-wrap items-center gap-3 sm:ml-0 sm:w-auto sm:justify-end">
+              <span className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+                {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+              </span>
               <StatusPill
                 dot={getOrderStatusStyle(order.status).dot}
                 text={getOrderStatusStyle(order.status).text}
                 label={getOrderStatusStyle(order.status).label}
-                className="justify-end font-studio-mono text-xs uppercase tracking-wider2"
+                className="font-studio-mono text-xs uppercase tracking-wider2"
               />
-            </span>
-            <span className="w-16 shrink-0 text-right font-bold">Q{order.total}</span>
+              <span className="font-bold">Q{order.total}</span>
+            </div>
           </Link>
         ))}
       </div>

@@ -39,7 +39,7 @@ export function StudioEvents() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <div className="mb-10 flex items-center justify-between">
+      <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Tus eventos</h1>
           <p className="mt-2 text-muted-foreground">{events?.length ?? 0} eventos publicados</p>

@@ -53,7 +53,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-sm text-white/60">{index + 1} / {photos.length}</span>
-          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg hover:bg-white/20">
+          <button onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-lg hover:bg-white/20">
             ✕
           </button>
         </div>

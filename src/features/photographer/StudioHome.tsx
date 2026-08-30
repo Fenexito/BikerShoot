@@ -80,13 +80,13 @@ export function StudioHome() {
               <Link
                 key={order.orderId}
                 to={`/studio/pedidos/${order.orderId}`}
-                className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted"
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold">{order.bikerName}</p>
                   <p className="truncate text-sm text-muted-foreground">{order.eventTitle} · {order.items.length} fotos</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-4">
                   <StatusPill
                     dot={getOrderStatusStyle(order.status).dot}
                     text={getOrderStatusStyle(order.status).text}

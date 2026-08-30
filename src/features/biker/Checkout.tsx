@@ -95,20 +95,22 @@ export function Checkout() {
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
           {items.map((item) => (
-            <div key={item.photoId} className="flex items-center gap-4 rounded-lg bg-muted p-3">
-              <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 rounded object-cover" />
+            <div key={item.photoId} className="flex items-center gap-3 rounded-lg bg-muted p-3 sm:gap-4">
+              <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 shrink-0 rounded object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{item.eventTitle}</p>
-                <p className="text-sm text-muted-foreground">{item.photographerName}</p>
+                <p className="truncate text-sm text-muted-foreground">{item.photographerName}</p>
               </div>
-              <p className="font-bold">Q{item.price}</p>
-              <button
-                onClick={() => remove(item.photoId)}
-                className="text-sm text-muted-foreground hover:text-red-600"
-                aria-label="Quitar"
-              >
-                Quitar
-              </button>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <p className="font-bold">Q{item.price}</p>
+                <button
+                  onClick={() => remove(item.photoId)}
+                  className="text-xs text-muted-foreground hover:text-red-600"
+                  aria-label="Quitar"
+                >
+                  Quitar
+                </button>
+              </div>
             </div>
           ))}
         </div>

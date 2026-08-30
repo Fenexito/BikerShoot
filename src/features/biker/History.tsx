@@ -86,7 +86,7 @@ export function History() {
                     <button
                       onClick={() => download(item.photo_id, item.photo!)}
                       disabled={downloading === item.photo_id}
-                      className="absolute inset-x-0 top-0 flex items-center justify-center bg-black/0 py-1.5 text-xs font-semibold text-white opacity-0 transition-all duration-150 hover:bg-black/60 group-hover:opacity-100"
+                      className="absolute inset-x-0 top-0 flex items-center justify-center bg-black/60 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/75"
                     >
                       {downloading === item.photo_id ? 'Generando…' : '⬇ Descargar original'}
                     </button>

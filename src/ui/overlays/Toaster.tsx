@@ -41,7 +41,7 @@ function ToastItem({ toast }: { toast: Toast }) {
   return (
     <div
       className={cn(
-        'min-w-[280px] max-w-sm border border-border border-l-4 bg-card px-4 py-3.5 text-foreground shadow-lg',
+        'w-full sm:min-w-[280px] sm:w-auto max-w-sm border border-border border-l-4 bg-card px-4 py-3.5 text-foreground shadow-lg',
         'transition-all duration-150',
         toneClasses[toast.type],
         leaving ? 'translate-x-6 opacity-0' : 'animate-toast-in',
@@ -70,7 +70,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 export function Toaster() {
   const toasts = useToastStore((s) => s.toasts)
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+    <div className="fixed inset-x-4 top-4 z-[100] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4">
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} />
       ))}

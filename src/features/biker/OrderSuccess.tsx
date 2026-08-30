@@ -13,7 +13,7 @@ export function OrderSuccess() {
         {state?.total ? `Pagaste Q${state.total.toFixed(2)}. ` : ''}
         Ya puedes descargarlas en alta calidad desde tu historial de compras, sin marca de agua.
       </p>
-      <div className="mt-4 flex gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <Link to="/app/historial">
           <Button size="lg">Ver mis compras</Button>
         </Link>

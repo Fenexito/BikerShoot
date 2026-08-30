@@ -224,7 +224,7 @@ export function StudioOrderDetail() {
       </div>
 
       {order.status !== 'cancelado' && (
-        <div className="mt-10 flex items-center">
+        <div className="mt-10 flex items-center overflow-x-auto">
           {FLOW.map((s, i) => (
             <div key={s} className="flex flex-1 items-center last:flex-none">
               <div className="flex flex-col items-center gap-2">
