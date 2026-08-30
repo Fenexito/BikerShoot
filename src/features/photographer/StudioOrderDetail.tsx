@@ -66,8 +66,16 @@ function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
 
   return (
     <div className="border border-border">
-      <div className="relative aspect-[4/5] overflow-hidden">
-        <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+      <div className="relative aspect-[4/5] overflow-hidden bg-muted">
+        {photo.preview_path || photo.storage_path ? (
+          <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-muted-foreground">
+            Vista previa liberada
+            <br />
+            (espacio de almacenamiento)
+          </div>
+        )}
         <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
           <button
             onClick={() => inputRef.current?.click()}
