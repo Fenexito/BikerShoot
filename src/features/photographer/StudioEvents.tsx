@@ -3,9 +3,11 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
+import { r2Url } from '../../lib/r2'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { cn } from '../../lib/cn'
 
 export function StudioEvents() {
   const { user } = useAuth()
@@ -49,47 +51,65 @@ export function StudioEvents() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {events?.map((event) => (
-          <Link
-            key={event.id}
-            to={`/studio/eventos/${event.id}`}
-            className="group overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover"
-          >
-            <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
-              <span className="text-3xl opacity-30">📷</span>
-              <div className="absolute left-3 top-3">
-                <Badge>{event.category}</Badge>
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="flex items-center justify-between">
-                <h3 className="font-studio text-lg font-bold">{event.title}</h3>
-                <span className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                  {event.status === 'activo' ? '● Activo' : 'Cerrado'}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4 text-center">
-                <div>
-                  <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
-                  <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
-                </div>
-                <div>
-                  <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
-                  <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
+        {events?.map((event) => {
+          const photoCount = event.photos?.[0]?.count ?? 0
+          const isActive = event.status === 'activo'
+          return (
+            <Link
+              key={event.id}
+              to={`/studio/eventos/${event.id}`}
+              className="group overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover"
+            >
+              <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
+                {event.cover_path ? (
+                  <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-3xl opacity-30">📷</span>
+                )}
+                <div className="absolute left-3 top-3">
+                  <Badge>{event.category}</Badge>
                 </div>
               </div>
-              <button
-                onClick={(e) => deleteEvent(e, event.id, event.title)}
-                className="mt-4 w-full border-t border-border pt-3 text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground hover:text-accent"
-              >
-                Eliminar evento
-              </button>
-            </div>
-          </Link>
-        ))}
+              <div className="p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-studio text-lg font-bold">{event.title}</h3>
+                  <span
+                    className={cn(
+                      'flex shrink-0 items-center gap-1.5 font-studio-mono text-[10px] uppercase tracking-wider2',
+                      isActive ? 'text-emerald-500' : 'text-muted-foreground',
+                    )}
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-emerald-500' : 'bg-muted-foreground')} />
+                    {isActive ? 'Activo' : 'Cerrado'}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+                </p>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
+                  <div>
+                    <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
+                    <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
+                  </div>
+                  <div>
+                    <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
+                    <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
+                  </div>
+                  <div>
+                    <p className="font-studio text-lg font-bold">{photoCount}</p>
+                    <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => deleteEvent(e, event.id, event.title)}
+                  className="mt-4 w-full border-t border-border pt-3 text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground hover:text-accent"
+                >
+                  Eliminar evento
+                </button>
+              </div>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

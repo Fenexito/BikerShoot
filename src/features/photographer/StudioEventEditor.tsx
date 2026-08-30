@@ -5,7 +5,7 @@ import { useEvent } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
-import { RoutePointPicker, type AddedPoint } from './components/RoutePointPicker'
+import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
 import { Button } from '../../ui/studio/Button'
@@ -43,8 +43,13 @@ export function StudioEventEditor() {
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null)
   const [watermarkFile, setWatermarkFile] = useState<File | null>(null)
   const [watermarkLocalPreview, setWatermarkLocalPreview] = useState<string | null>(null)
+  const [coverPath, setCoverPath] = useState<string | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverLocalPreview, setCoverLocalPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const watermarkInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const routePointPickerRef = useRef<RoutePointPickerHandle>(null)
 
   useEffect(() => {
     if (existing) {
@@ -56,6 +61,7 @@ export function StudioEventEditor() {
       setPrice(existing.price_per_photo)
       setDescription(existing.description ?? '')
       setWatermarkPath(existing.watermark_path)
+      setCoverPath(existing.cover_path)
       setPoints(
         existing.event_points.map((pt) => ({
           id: pt.id,
@@ -81,6 +87,10 @@ export function StudioEventEditor() {
     setPoints((p) => p.filter((pt) => pt.id !== pointId))
   }
 
+  function updatePointTime(pointId: string, field: 'timeStart' | 'timeEnd', value: string) {
+    setPoints((p) => p.map((pt) => (pt.id === pointId ? { ...pt, [field]: value } : pt)))
+  }
+
   function handleWatermarkFile(file: File | undefined) {
     if (!file) return
     if (file.type !== 'image/png') {
@@ -97,6 +107,22 @@ export function StudioEventEditor() {
     setWatermarkPath(null)
   }
 
+  function handleCoverFile(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      push({ type: 'error', title: 'La portada debe ser una imagen' })
+      return
+    }
+    setCoverFile(file)
+    setCoverLocalPreview(URL.createObjectURL(file))
+  }
+
+  function clearCover() {
+    setCoverFile(null)
+    setCoverLocalPreview(null)
+    setCoverPath(null)
+  }
+
   async function save() {
     if (!user) return
     if (!title.trim() || !city.trim()) {
@@ -105,6 +131,15 @@ export function StudioEventEditor() {
     }
 
     setSaving(true)
+
+    const pending = routePointPickerRef.current?.commitPending()
+    const finalPoints = pending
+      ? [
+          ...points,
+          { id: `local-${Date.now()}`, routePointId: pending.routePointId, label: pending.label, lat: pending.lat, lng: pending.lng, timeStart: pending.timeStart, timeEnd: pending.timeEnd },
+        ]
+      : points
+    if (pending) setPoints(finalPoints)
 
     const payload = {
       photographer_id: user.id,
@@ -138,9 +173,9 @@ export function StudioEventEditor() {
       await supabase.from('event_points').delete().eq('event_id', eventId)
     }
 
-    if (points.length > 0) {
+    if (finalPoints.length > 0) {
       const { error: pointsError } = await supabase.from('event_points').insert(
-        points.map((pt) => ({
+        finalPoints.map((pt) => ({
           event_id: eventId,
           route_point_id: pt.routePointId,
           label: pt.label,
@@ -178,9 +213,30 @@ export function StudioEventEditor() {
       await supabase.from('events').update({ watermark_path: null }).eq('id', eventId)
     }
 
+    if (coverFile) {
+      const { data: signed, error: signError } = await supabase.functions.invoke('r2-cover-upload-url', {
+        body: { eventId, fileName: coverFile.name, contentType: coverFile.type },
+      })
+      if (signError || !signed?.uploadUrl) {
+        push({ type: 'error', title: 'El evento se guardó, pero falló la portada', description: signError?.message })
+        setSaving(false)
+        return
+      }
+      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': coverFile.type }, body: coverFile })
+      if (!putRes.ok) {
+        push({ type: 'error', title: 'El evento se guardó, pero falló la portada', description: `R2 respondió ${putRes.status}` })
+        setSaving(false)
+        return
+      }
+      await supabase.from('events').update({ cover_path: signed.coverPath }).eq('id', eventId)
+    } else if (!isNew && existing && coverPath !== existing.cover_path) {
+      // Se quitó la portada sin subir una nueva.
+      await supabase.from('events').update({ cover_path: null }).eq('id', eventId)
+    }
+
     queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
     push({ type: 'success', title: isNew ? 'Evento creado' : 'Evento actualizado' })
-    navigate('/studio/eventos')
+    navigate(`/studio/eventos/${eventId}`)
   }
 
   if (!isNew && isLoading) {
@@ -226,6 +282,43 @@ export function StudioEventEditor() {
           />
         </div>
       </div>
+
+      {/* Portada */}
+      <section className="mt-14 border-t border-border pt-10">
+        <h2 className="font-studio text-xl font-bold tracking-tight2">Foto de portada</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Se muestra en tu lista de eventos y en la página pública del evento. Opcional.
+        </p>
+
+        <div className="mt-4 flex items-center gap-4">
+          {(coverLocalPreview || coverPath) ? (
+            <img
+              src={coverLocalPreview ?? r2Url(coverPath!)}
+              alt="Portada"
+              className="h-20 w-32 border border-border object-cover"
+            />
+          ) : (
+            <div className="flex h-20 w-32 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
+              Sin portada
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => coverInputRef.current?.click()}>
+              {coverPath || coverLocalPreview ? 'Cambiar' : 'Subir portada'}
+            </Button>
+            {(coverPath || coverLocalPreview) && (
+              <Button variant="ghost" onClick={clearCover}>Quitar</Button>
+            )}
+          </div>
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleCoverFile(e.target.files?.[0])}
+          />
+        </div>
+      </section>
 
       {/* Marca de agua */}
       <section className="mt-14 border-t border-border pt-10">
@@ -274,26 +367,38 @@ export function StudioEventEditor() {
         {points.length > 0 && (
           <div className="mt-6 flex flex-col divide-y divide-border border border-border">
             {points.map((pt) => (
-              <div key={pt.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div>
-                  <p className="font-semibold">{pt.label}</p>
-                  <p className="font-studio-mono text-xs text-muted-foreground">{pt.timeStart} – {pt.timeEnd}</p>
+              <div key={pt.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <p className="font-semibold">{pt.label}</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={pt.timeStart}
+                    onChange={(e) => updatePointTime(pt.id, 'timeStart', e.target.value)}
+                    className="border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
+                  />
+                  <span className="text-xs text-muted-foreground">–</span>
+                  <input
+                    type="time"
+                    value={pt.timeEnd}
+                    onChange={(e) => updatePointTime(pt.id, 'timeEnd', e.target.value)}
+                    className="border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
+                  />
+                  <button onClick={() => removePoint(pt.id)} className="ml-2 text-sm text-muted-foreground hover:text-accent">
+                    Quitar
+                  </button>
                 </div>
-                <button onClick={() => removePoint(pt.id)} className="text-sm text-muted-foreground hover:text-accent">
-                  Quitar
-                </button>
               </div>
             ))}
           </div>
         )}
 
         <div className="mt-6">
-          <RoutePointPicker onAdd={addPoint} showRouteSelector={category === 'Rodada'} />
+          <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} showRouteSelector={category === 'Rodada'} />
         </div>
       </section>
 
       <div className="mt-10 flex justify-end gap-3">
-        <Button variant="secondary" onClick={() => navigate('/studio/eventos')}>Cancelar</Button>
+        <Button variant="secondary" onClick={() => navigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
         <Button onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
       </div>
     </div>

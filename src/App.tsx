@@ -30,6 +30,7 @@ import { StudioOnboarding } from './features/photographer/StudioOnboarding'
 import { StudioProfilePage } from './features/photographer/StudioProfilePage'
 import { StudioHome } from './features/photographer/StudioHome'
 import { StudioEvents } from './features/photographer/StudioEvents'
+import { StudioEventView } from './features/photographer/StudioEventView'
 import { StudioEventEditor } from './features/photographer/StudioEventEditor'
 import { StudioUpload } from './features/photographer/StudioUpload'
 import { StudioOrders } from './features/photographer/StudioOrders'
@@ -84,7 +85,9 @@ export default function App() {
         <Route path="/studio/onboarding" element={<RequireStudio skipOnboardingCheck><StudioOnboarding /></RequireStudio>} />
         <Route path="/studio" element={<RequireStudio><StudioHome /></RequireStudio>} />
         <Route path="/studio/eventos" element={<RequireStudio><StudioEvents /></RequireStudio>} />
-        <Route path="/studio/eventos/:id" element={<RequireStudio><StudioEventEditor /></RequireStudio>} />
+        <Route path="/studio/eventos/new" element={<RequireStudio><StudioEventEditor /></RequireStudio>} />
+        <Route path="/studio/eventos/:id" element={<RequireStudio><StudioEventView /></RequireStudio>} />
+        <Route path="/studio/eventos/:id/editar" element={<RequireStudio><StudioEventEditor /></RequireStudio>} />
         <Route path="/studio/pedidos" element={<RequireStudio><StudioOrders /></RequireStudio>} />
         <Route path="/studio/pedidos/:id" element={<RequireStudio><StudioOrderDetail /></RequireStudio>} />
         <Route path="/studio/estadisticas" element={<RequireStudio><PlaceholderPage title="Estadísticas" /></RequireStudio>} />

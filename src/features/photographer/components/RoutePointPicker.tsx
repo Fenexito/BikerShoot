@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 import { useRoutes, useRoutePoints, createRoutePoint } from '../../shared/useRoutes'
 import { MapPointPicker } from './MapPointPicker'
 import { Input } from '../../../ui/studio/Input'
@@ -18,6 +18,13 @@ export interface AddedPoint {
   timeEnd: string
 }
 
+export interface RoutePointPickerHandle {
+  /** Si hay un punto configurado pero sin agregar a la lista, lo devuelve (y limpia
+   * el formulario) — para que "Guardar cambios" nunca pierda un punto que el
+   * fotógrafo olvidó confirmar. No llama a onAdd: quien llama decide qué hacer. */
+  commitPending: () => AddedPoint | null
+}
+
 interface SelectedPoint {
   routePointId: string | null
   label: string
@@ -31,7 +38,10 @@ interface RoutePointPickerProps {
   showRouteSelector?: boolean
 }
 
-export function RoutePointPicker({ onAdd, showRouteSelector = false }: RoutePointPickerProps) {
+export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPickerProps>(function RoutePointPicker(
+  { onAdd, showRouteSelector = false },
+  ref,
+) {
   const push = useToastStore((s) => s.push)
   const { data: routes = [] } = useRoutes()
 
@@ -92,25 +102,39 @@ export function RoutePointPicker({ onAdd, showRouteSelector = false }: RoutePoin
     }
   }
 
-  function handleAdd() {
-    const point: SelectedPoint | null = showRouteSelector && routeId
+  const usingRoute = showRouteSelector && !!routeId
+  const readyToTime = usingRoute ? !!selectedPoint : !!newLabel.trim()
+
+  function resolvePendingPoint(): AddedPoint | null {
+    const point: SelectedPoint | null = usingRoute
       ? selectedPoint
       : newLabel.trim()
         ? { routePointId: null, label: newLabel.trim(), lat: newLat, lng: newLng }
         : null
+    if (!point) return null
+    return { ...point, timeStart, timeEnd }
+  }
 
+  function handleAdd() {
+    const point = resolvePendingPoint()
     if (!point) {
       push({ type: 'error', title: 'Elige o crea un punto primero' })
       return
     }
-
-    onAdd({ ...point, timeStart, timeEnd })
+    onAdd(point)
     resetPointForm()
-    setPointFormOpen(!(showRouteSelector && routeId))
+    setPointFormOpen(!usingRoute)
   }
 
-  const usingRoute = showRouteSelector && !!routeId
-  const readyToTime = usingRoute ? !!selectedPoint : !!newLabel.trim()
+  useImperativeHandle(ref, () => ({
+    commitPending: () => {
+      const point = resolvePendingPoint()
+      if (!point) return null
+      resetPointForm()
+      setPointFormOpen(!usingRoute)
+      return point
+    },
+  }))
 
   return (
     <div className="border border-border p-5">
@@ -166,9 +190,18 @@ export function RoutePointPicker({ onAdd, showRouteSelector = false }: RoutePoin
         <Input label="Hora inicio" type="time" value={timeStart} onChange={(e) => setTimeStart(e.target.value)} />
         <Input label="Hora fin" type="time" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} />
       </div>
-      <Button variant="ghost" className="mt-3" onClick={handleAdd} disabled={!readyToTime}>
-        + Agregar este punto
+      <Button
+        className="mt-4 w-full justify-center py-4 text-sm"
+        onClick={handleAdd}
+        disabled={!readyToTime}
+      >
+        ✓ Agregar este punto a la lista
       </Button>
+      {readyToTime && (
+        <p className="mt-2 text-center text-xs text-accent">
+          No olvides hacer clic arriba — si guardas el evento sin agregarlo, lo agregamos automáticamente por ti.
+        </p>
+      )}
     </div>
   )
-}
+})
