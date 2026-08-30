@@ -49,8 +49,10 @@ export interface DbPhoto {
   event_id: string
   photographer_id: string
   point_id: string | null
-  storage_path: string
+  storage_path: string | null
   preview_path: string | null
+  raw_path: string | null
+  delivered_path: string | null
   price: number
   moto_brand: string | null
   created_at: string

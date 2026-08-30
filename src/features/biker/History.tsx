@@ -24,10 +24,10 @@ export function History() {
   const push = useToastStore((s) => s.push)
   const [downloading, setDownloading] = useState<string | null>(null)
 
-  async function download(photoId: string, photo: { storage_path: string; preview_path: string | null }) {
+  async function download(photoId: string, photo: { storage_path: string | null; preview_path: string | null; delivered_path: string | null }) {
     if (!photo.preview_path) {
       // Foto de antes de proteger el original — el único archivo que existe ya es público.
-      window.open(r2Url(photo.storage_path), '_blank')
+      window.open(r2Url(photo.storage_path ?? ''), '_blank')
       return
     }
     setDownloading(photoId)
@@ -83,7 +83,7 @@ export function History() {
                   <span className="absolute bottom-1 left-1 right-1 truncate rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
                     {STATUS_LABEL[item.status] ?? item.status}
                   </span>
-                  {PAID_STATUSES.has(item.status) && item.photo && (
+                  {PAID_STATUSES.has(item.status) && item.photo && (item.photo.delivered_path || !item.photo.preview_path) && (
                     <button
                       onClick={() => download(item.photo_id, item.photo!)}
                       disabled={downloading === item.photo_id}
@@ -91,6 +91,11 @@ export function History() {
                     >
                       {downloading === item.photo_id ? 'Generando…' : '⬇ Descargar original'}
                     </button>
+                  )}
+                  {PAID_STATUSES.has(item.status) && item.photo?.preview_path && !item.photo.delivered_path && (
+                    <span className="absolute inset-x-0 top-0 bg-black/60 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">
+                      El fotógrafo está editando tu foto
+                    </span>
                   )}
                 </div>
               ))}

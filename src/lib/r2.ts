@@ -17,6 +17,6 @@ export function hasR2PublicUrl(): boolean {
  * Nunca usar esto para dar acceso de descarga al original comprado — para
  * eso está la Edge Function r2-download-url.
  */
-export function previewUrl(photo: { storage_path: string; preview_path: string | null }): string {
-  return r2Url(photo.preview_path ?? photo.storage_path)
+export function previewUrl(photo: { storage_path: string | null; preview_path: string | null }): string {
+  return r2Url(photo.preview_path ?? photo.storage_path ?? '')
 }

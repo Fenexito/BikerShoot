@@ -8,7 +8,7 @@ export interface CartItem {
   photographerId: string
   photographerName: string
   price: number
-  storagePath: string
+  storagePath: string | null
   previewPath: string | null
 }
 

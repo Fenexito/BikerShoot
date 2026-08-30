@@ -19,7 +19,6 @@ interface UploadItem {
   localPreview: string
   progress: number
   status: UploadStatus
-  storagePath?: string
   previewPath?: string
   errorMessage?: string
 }
@@ -87,6 +86,7 @@ export function StudioUpload() {
   const push = useToastStore((s) => s.push)
   const [eventId, setEventId] = useState('')
   const [pointId, setPointId] = useState('')
+  const [backupRaw, setBackupRaw] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [items, setItems] = useState<UploadItem[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -119,38 +119,39 @@ export function StudioUpload() {
       const itemId = newItems[i].id
       try {
         const { data, error } = await supabase.functions.invoke('r2-upload-url', {
-          body: { fileName: file.name, contentType: file.type, eventId },
+          body: { fileName: file.name, contentType: file.type, eventId, includeRaw: backupRaw },
         })
-        if (error || !data?.originalUploadUrl || !data?.previewUploadUrl) {
+        if (error || !data?.previewUploadUrl) {
           throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
         }
 
         const previewBlob = await createWatermarkedPreview(file, watermarkText)
 
-        let originalPct = 0
         let previewPct = 0
+        let rawPct = backupRaw ? 0 : 100
         const updateProgress = () => {
-          setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, progress: (originalPct + previewPct) / 2 } : it)))
+          setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, progress: (previewPct + rawPct) / 2 } : it)))
         }
 
-        await Promise.all([
-          uploadWithProgress(data.originalUploadUrl, file, file.type, (pct) => { originalPct = pct; updateProgress() }),
-          uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', (pct) => { previewPct = pct; updateProgress() }),
-        ])
+        const uploads = [uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', (pct) => { previewPct = pct; updateProgress() })]
+        if (backupRaw && data.rawUploadUrl) {
+          uploads.push(uploadWithProgress(data.rawUploadUrl, file, file.type, (pct) => { rawPct = pct; updateProgress() }))
+        }
+        await Promise.all(uploads)
 
         const { error: insertError } = await supabase.from('photos').insert({
           event_id: eventId,
           photographer_id: user.id,
           point_id: pointId,
-          storage_path: data.storagePath,
           preview_path: data.previewPath,
+          raw_path: backupRaw ? data.rawPath : null,
           price: event?.price_per_photo ?? 0,
-          size_bytes: file.size,
+          size_bytes: previewBlob.size + (backupRaw ? file.size : 0),
         })
         if (insertError) throw insertError
 
         setItems((prev) =>
-          prev.map((it) => (it.id === itemId ? { ...it, progress: 100, status: 'lista', storagePath: data.storagePath, previewPath: data.previewPath } : it)),
+          prev.map((it) => (it.id === itemId ? { ...it, progress: 100, status: 'lista', previewPath: data.previewPath } : it)),
         )
       } catch (err) {
         setItems((prev) =>
@@ -172,7 +173,7 @@ export function StudioUpload() {
     <div className="mx-auto max-w-4xl px-6 py-12 text-foreground md:px-16">
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Carga rápida</h1>
       <p className="mt-2 text-muted-foreground">
-        Arrastra las fotos de un punto específico y súbelas en lote — cada una se protege automáticamente con marca de agua para la vista previa; el original en alta calidad queda privado hasta que se compre.
+        Arrastra las fotos de un punto específico y súbelas en lote — cada una se sube reducida y con marca de agua para la vista previa. La entrega en alta calidad se sube aparte, foto por foto, después de cada venta (en el detalle del pedido).
       </p>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2">
@@ -193,6 +194,11 @@ export function StudioUpload() {
       {events && events.length === 0 && (
         <p className="mt-3 text-sm text-accent">No tienes eventos todavía — crea uno primero en "Eventos".</p>
       )}
+
+      <label className="mt-4 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={backupRaw} onChange={(e) => setBackupRaw(e.target.checked)} className="h-4 w-4 accent-accent" />
+        Respaldar también el original sin editar (opcional, cuenta contra tu plan de almacenamiento)
+      </label>
 
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
@@ -231,7 +237,7 @@ export function StudioUpload() {
             {items.map((item) => (
               <a
                 key={item.id}
-                href={item.status === 'lista' && item.previewPath ? previewUrl({ storage_path: item.storagePath!, preview_path: item.previewPath }) : undefined}
+                href={item.status === 'lista' && item.previewPath ? previewUrl({ storage_path: null, preview_path: item.previewPath }) : undefined}
                 target="_blank"
                 rel="noreferrer"
                 className="relative aspect-[4/5] overflow-hidden border border-border"

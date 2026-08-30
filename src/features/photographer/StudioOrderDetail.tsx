@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
@@ -10,6 +11,62 @@ import { Button } from '../../ui/studio/Button'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { cn } from '../../lib/cn'
+
+interface DeliverablePhoto {
+  id: string
+  storage_path: string | null
+  preview_path: string | null
+  delivered_path: string | null
+}
+
+function DeliverPhotoTile({ photo }: { photo: DeliverablePhoto }) {
+  const push = useToastStore((s) => s.push)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return
+    setUploading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-deliver-upload-url', {
+        body: { photoId: photo.id, fileName: file.name, contentType: file.type },
+      })
+      if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
+
+      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+
+      const { error: updateError } = await supabase.from('photos').update({ delivered_path: data.deliveredPath }).eq('id', photo.id)
+      if (updateError) throw updateError
+
+      push({ type: 'success', title: 'Foto entregada' })
+      queryClient.invalidateQueries({ queryKey: ['photographer-order-items'] })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo entregar la foto', description: (err as Error).message })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="relative aspect-[4/5] overflow-hidden border border-border">
+      <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+      <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className={cn(
+            'w-full text-[10px] font-semibold uppercase tracking-wider2',
+            photo.delivered_path ? 'text-accent' : 'text-white',
+          )}
+        >
+          {uploading ? 'Subiendo…' : photo.delivered_path ? '✓ Entregada — cambiar' : 'Subir entrega final'}
+        </button>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+    </div>
+  )
+}
 
 const FLOW: OrderItemStatus[] = ['pendiente_pago', 'activo', 'finalizado', 'entregado']
 const STATUS_LABEL: Record<OrderItemStatus, string> = {
@@ -92,15 +149,11 @@ export function StudioOrderDetail() {
 
       <section className="mt-12">
         <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">{order.items.length} fotos compradas</h2>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-          {order.items.map((item) => (
-            <img
-              key={item.id}
-              src={item.photo ? previewUrl(item.photo) : undefined}
-              alt=""
-              className="aspect-[4/5] w-full border border-border object-cover"
-            />
-          ))}
+        <p className="mb-4 text-sm text-muted-foreground">
+          Edita cada foto por tu cuenta y sube aquí el archivo final — eso es lo que el biker va a descargar.
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} />)}
         </div>
       </section>
 

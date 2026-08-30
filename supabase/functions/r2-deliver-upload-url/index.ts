@@ -1,14 +1,8 @@
-// Edge Function: genera una URL firmada temporal (10 min) para descargar la
-// ENTREGA FINAL de una foto comprada (el archivo editado que el fotógrafo
-// sube después de la venta, ver r2-deliver-upload-url) desde el bucket
-// privado de R2. Solo la usan: el fotógrafo dueño de la foto, o un biker
-// que la compró y ya la pagó.
-//
-// La autorización se apoya en las policies de RLS que YA existen —
-// consultamos photos/order_items usando el JWT de quien llama, así que si
-// Supabase nos devuelve la fila es porque esa persona tiene derecho a
-// verla ("fotografo administra sus fotos", "biker ve items de sus
-// pedidos"). No hay lógica de permisos nueva que mantener.
+// Edge Function: genera una URL firmada temporal para que el fotógrafo
+// suba la ENTREGA FINAL de una foto ya vendida y editada por su cuenta
+// (fuera de la plataforma) — el archivo que el biker realmente va a
+// descargar. Se sube al bucket privado; solo se hace accesible al biker
+// que la compró a través de r2-download-url.
 //
 // Secrets: los mismos que r2-upload-url (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
 // R2_SECRET_ACCESS_KEY, R2_ORIGINALS_BUCKET).
@@ -54,34 +48,24 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser()
   if (userError || !user) return json({ error: 'No autenticado' }, 401)
 
-  const { photoId } = await req.json()
-  if (!photoId) return json({ error: 'Falta photoId' }, 400)
+  const { photoId, fileName, contentType } = await req.json()
+  if (!photoId || !fileName || !contentType) {
+    return json({ error: 'Faltan photoId, fileName o contentType' }, 400)
+  }
 
+  // Solo el fotógrafo dueño de la foto puede subir su entrega final.
   const { data: photo, error: photoError } = await supabase
     .from('photos')
-    .select('id, delivered_path, photographer_id')
+    .select('id, event_id, photographer_id')
     .eq('id', photoId)
     .single()
 
-  if (photoError || !photo) return json({ error: 'Foto no encontrada' }, 404)
-
-  const isOwner = photo.photographer_id === user.id
-
-  if (!isOwner) {
-    const { data: orderItems, error: orderItemsError } = await supabase
-      .from('order_items')
-      .select('id, status')
-      .eq('photo_id', photoId)
-      .not('status', 'in', '(pendiente_pago,cancelado)')
-
-    if (orderItemsError || !orderItems || orderItems.length === 0) {
-      return json({ error: 'No has comprado esta foto' }, 403)
-    }
+  if (photoError || !photo || photo.photographer_id !== user.id) {
+    return json({ error: 'No autorizado para entregar esta foto' }, 403)
   }
 
-  if (!photo.delivered_path) {
-    return json({ error: 'not_delivered', message: 'El fotógrafo todavía no ha entregado esta foto' }, 409)
-  }
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const deliveredPath = `delivered/${user.id}/${photo.event_id}/${crypto.randomUUID()}-${safeName}`
 
   const r2 = new AwsClient({
     accessKeyId: R2_ACCESS_KEY_ID,
@@ -90,11 +74,12 @@ Deno.serve(async (req: Request) => {
     region: 'auto',
   })
 
-  const objectUrl = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_ORIGINALS_BUCKET}/${photo.delivered_path}?X-Amz-Expires=600`
+  const objectUrl = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_ORIGINALS_BUCKET}/${deliveredPath}`
   const signed = await r2.sign(objectUrl, {
-    method: 'GET',
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
     aws: { signQuery: true },
   })
 
-  return json({ downloadUrl: signed.url })
+  return json({ uploadUrl: signed.url, deliveredPath })
 })
