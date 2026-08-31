@@ -11,6 +11,7 @@ import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { Button } from '../../ui/studio/Button'
+import { OrderStepper } from '../../ui/studio/OrderStepper'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
@@ -88,13 +89,20 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   }
 
   const hasPreview = !!(photo.preview_path || photo.storage_path)
+  const delivered = !!photo.delivered_path
+  const clickable = delivered || hasPreview
+
+  function handleTileClick() {
+    if (delivered) viewDelivered()
+    else if (hasPreview) window.open(previewUrl(photo), '_blank')
+  }
 
   return (
     <div className="border border-border">
       <div
-        onClick={() => hasPreview && window.open(previewUrl(photo), '_blank')}
-        className={cn('relative aspect-[4/5] overflow-hidden bg-muted', hasPreview && 'cursor-pointer')}
-        title={hasPreview ? 'Ver con marca de agua' : undefined}
+        onClick={handleTileClick}
+        className={cn('relative aspect-[4/5] overflow-hidden bg-muted', clickable && 'cursor-pointer')}
+        title={delivered ? 'Ver entrega final' : hasPreview ? 'Ver con marca de agua' : undefined}
       >
         {hasPreview ? (
           <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
@@ -105,19 +113,27 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
             (espacio de almacenamiento)
           </div>
         )}
+        {openingDelivered && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white">
+            Abriendo…
+          </div>
+        )}
         <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
-          <button
-            onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
-            disabled={uploading}
-            className={cn(
-              'w-full text-[10px] font-semibold uppercase tracking-wider2',
-              photo.delivered_path ? 'text-accent' : 'text-white',
-            )}
-          >
-            {uploading ? 'Subiendo…' : photo.delivered_path ? '✓ Entregada — cambiar' : 'Subir entrega final'}
-          </button>
+          {delivered ? (
+            <span className="block text-[10px] font-semibold uppercase tracking-wider2 text-emerald-400">✓ Entregada — clic para ver</span>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+              disabled={uploading}
+              className="w-full text-[10px] font-semibold uppercase tracking-wider2 text-white"
+            >
+              {uploading ? 'Subiendo…' : 'Subir entrega final'}
+            </button>
+          )}
         </div>
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
+        {!delivered && (
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
+        )}
       </div>
       <div className="p-2">
         <p className="truncate font-studio-mono text-[10px] text-muted-foreground" title={photo.original_filename ?? undefined}>
@@ -132,23 +148,21 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
             {downloadingRaw ? 'Generando…' : '⬇ Descargar original (respaldo)'}
           </button>
         )}
-        {photo.delivered_path && (
-          <button
-            onClick={viewDelivered}
-            disabled={openingDelivered}
-            className="mt-1 block text-[10px] font-semibold uppercase tracking-wider2 text-accent hover:underline disabled:opacity-50"
-          >
-            {openingDelivered ? 'Generando…' : '★ Ver entrega final'}
-          </button>
-        )}
       </div>
     </div>
   )
 }
 
 const FLOW: OrderItemStatus[] = ['pendiente_pago', 'en_preparacion', 'entregado']
+const FLOW_LABELS = FLOW.map((s) => getOrderStatusStyle(s).label)
 const NEXT_ACTION: Partial<Record<OrderItemStatus, { next: OrderItemStatus; label: string }>> = {
   pendiente_pago: { next: 'en_preparacion', label: 'Confirmar pago recibido' },
+}
+const SECTION_COPY: Record<OrderItemStatus, string> = {
+  pendiente_pago: 'Todavía no confirmas el pago de este pedido — puedes preparar las entregas, pero espera a confirmar el pago antes de avisarle al biker.',
+  en_preparacion: 'Edita cada foto por tu cuenta y sube aquí el archivo final — eso es lo que el biker va a descargar. En cuanto subas las que faltan, el pedido pasa a "Entregado" automáticamente.',
+  entregado: 'Pedido completo — el biker ya tiene sus archivos finales. Puedes hacer clic en cualquier foto para ver exactamente lo que se le entregó.',
+  cancelado: 'Este pedido fue cancelado — el biker ya no tiene acceso a estas fotos.',
 }
 
 export function StudioOrderDetail() {
@@ -223,34 +237,11 @@ export function StudioOrderDetail() {
         </div>
       </div>
 
-      {order.status !== 'cancelado' && (
-        <div className="mt-10 flex items-center overflow-x-auto">
-          {FLOW.map((s, i) => (
-            <div key={s} className="flex flex-1 items-center last:flex-none">
-              <div className="flex flex-col items-center gap-2">
-                <div
-                  className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full border-2 font-studio-mono text-xs',
-                    i <= stepIndex ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground',
-                  )}
-                >
-                  {i < stepIndex ? '✓' : i + 1}
-                </div>
-                <span className="whitespace-nowrap text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
-                  {getOrderStatusStyle(s).label}
-                </span>
-              </div>
-              {i < FLOW.length - 1 && <div className={cn('mx-2 h-0.5 flex-1', i < stepIndex ? 'bg-accent' : 'bg-border')} />}
-            </div>
-          ))}
-        </div>
-      )}
+      {order.status !== 'cancelado' && <OrderStepper steps={FLOW_LABELS} currentIndex={stepIndex} className="mt-10" />}
 
       <section className="mt-12">
         <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">{order.items.length} fotos compradas</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Edita cada foto por tu cuenta y sube aquí el archivo final — eso es lo que el biker va a descargar. En cuanto subas todas, el pedido pasa a "Entregado" automáticamente.
-        </p>
+        <p className="mb-4 text-sm text-muted-foreground">{SECTION_COPY[order.status]}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
         </div>

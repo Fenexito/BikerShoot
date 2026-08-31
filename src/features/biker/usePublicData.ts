@@ -90,18 +90,24 @@ export function useApprovedPhotographers() {
     queryFn: async (): Promise<DbPhotographer[]> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp)')
+        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url)')
         .eq('role', 'photographer')
       if (error) throw error
-      return (data ?? []).map((row: any) => ({
-        id: row.id,
-        display_name: row.display_name,
-        avatar_url: row.avatar_url,
-        phone: row.phone,
-        bio: row.photographer_details?.[0]?.bio ?? row.photographer_details?.bio ?? null,
-        city: row.photographer_details?.[0]?.city ?? row.photographer_details?.city ?? null,
-        whatsapp: row.photographer_details?.[0]?.whatsapp ?? row.photographer_details?.whatsapp ?? null,
-      }))
+      return (data ?? []).map((row: any) => {
+        const pd = row.photographer_details?.[0] ?? row.photographer_details
+        return {
+          id: row.id,
+          display_name: row.display_name,
+          avatar_url: row.avatar_url,
+          phone: row.phone,
+          bio: pd?.bio ?? null,
+          city: pd?.city ?? null,
+          whatsapp: pd?.whatsapp ?? null,
+          instagram_url: pd?.instagram_url ?? null,
+          facebook_url: pd?.facebook_url ?? null,
+          tiktok_url: pd?.tiktok_url ?? null,
+        }
+      })
     },
   })
 }
@@ -112,7 +118,7 @@ export function usePublicPhotographer(photographerId: string | undefined) {
     queryFn: async (): Promise<DbPhotographer | null> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp)')
+        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url)')
         .eq('id', photographerId)
         .single()
       if (error) throw error
@@ -125,6 +131,9 @@ export function usePublicPhotographer(photographerId: string | undefined) {
         bio: pd?.bio ?? null,
         city: pd?.city ?? null,
         whatsapp: pd?.whatsapp ?? null,
+        instagram_url: pd?.instagram_url ?? null,
+        facebook_url: pd?.facebook_url ?? null,
+        tiktok_url: pd?.tiktok_url ?? null,
       }
     },
     enabled: !!photographerId,

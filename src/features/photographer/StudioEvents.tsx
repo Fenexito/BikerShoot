@@ -10,30 +10,23 @@ import { Button } from '../../ui/studio/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { confirmDialog } from '../../ui/overlays/confirmStore'
+import type { EventStatus } from '../../types/db'
+import { cn } from '../../lib/cn'
 
 export function StudioEvents() {
   const { user } = useAuth()
   const { data: events, isLoading, error } = useMyEvents(user?.id)
   const push = useToastStore((s) => s.push)
 
-  async function deleteEvent(e: React.MouseEvent, eventId: string, title: string) {
+  async function toggleStatus(e: React.MouseEvent, eventId: string, next: EventStatus) {
     e.preventDefault()
     e.stopPropagation()
-    const ok = await confirmDialog.ask({
-      title: `¿Eliminar "${title}"?`,
-      description: 'Los bikers que ya compraron fotos de este evento conservan su acceso — solo desaparece de la búsqueda.',
-      confirmLabel: 'Eliminar',
-      tone: 'danger',
-    })
-    if (!ok) return
-
-    const { error } = await supabase.from('events').update({ deleted_at: new Date().toISOString() }).eq('id', eventId)
+    const { error } = await supabase.from('events').update({ status: next }).eq('id', eventId)
     if (error) {
-      push({ type: 'error', title: 'No se pudo eliminar', description: error.message })
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
       return
     }
-    push({ type: 'success', title: 'Evento eliminado' })
+    push({ type: 'success', title: next === 'pausado' ? 'Evento pausado — oculto del público' : 'Evento publicado' })
     queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
   }
 
@@ -64,56 +57,76 @@ export function StudioEvents() {
           const photoCount = event.photos?.[0]?.count ?? 0
           const statusStyle = EVENT_STATUS_STYLE[event.status]
           return (
-            <Link
+            <div
               key={event.id}
-              to={`/studio/eventos/${event.id}`}
               className="group overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover"
             >
-              <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
-                {event.cover_path ? (
-                  <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />
+              <Link to={`/studio/eventos/${event.id}`} className="block">
+                <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
+                  {event.cover_path ? (
+                    <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-3xl opacity-30">📷</span>
+                  )}
+                  <div className="absolute left-3 top-3">
+                    <Badge className="border-white/20 bg-black/70 text-white">{event.category}</Badge>
+                  </div>
+                </div>
+                <div className="px-5 pt-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-studio text-lg font-bold">{event.title}</h3>
+                    <StatusPill
+                      dot={statusStyle.dot}
+                      text={statusStyle.text}
+                      label={statusStyle.label}
+                      className="shrink-0 font-studio-mono text-[10px] uppercase tracking-wider2"
+                    />
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+                  </p>
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
+                    <div>
+                      <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
+                      <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
+                    </div>
+                    <div>
+                      <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
+                      <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
+                    </div>
+                    <div>
+                      <p className="font-studio text-lg font-bold">{photoCount}</p>
+                      <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+              <div className="grid grid-cols-2 gap-2 border-t border-border p-5 pt-4">
+                {event.status === 'pausado' ? (
+                  <button
+                    onClick={(e) => toggleStatus(e, event.id, 'activo')}
+                    className="bg-emerald-600 py-2 text-center font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-white transition-colors hover:bg-emerald-500"
+                  >
+                    Publicar
+                  </button>
                 ) : (
-                  <span className="text-3xl opacity-30">📷</span>
+                  <button
+                    onClick={(e) => toggleStatus(e, event.id, 'pausado')}
+                    className="bg-blue-600 py-2 text-center font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-white transition-colors hover:bg-blue-500"
+                  >
+                    Pausar
+                  </button>
                 )}
-                <div className="absolute left-3 top-3">
-                  <Badge>{event.category}</Badge>
-                </div>
-              </div>
-              <div className="p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-studio text-lg font-bold">{event.title}</h3>
-                  <StatusPill
-                    dot={statusStyle.dot}
-                    text={statusStyle.text}
-                    label={statusStyle.label}
-                    className="shrink-0 font-studio-mono text-[10px] uppercase tracking-wider2"
-                  />
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
-                </p>
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
-                  <div>
-                    <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
-                    <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
-                  </div>
-                  <div>
-                    <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
-                    <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
-                  </div>
-                  <div>
-                    <p className="font-studio text-lg font-bold">{photoCount}</p>
-                    <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => deleteEvent(e, event.id, event.title)}
-                  className="mt-4 w-full border-t border-border pt-3 text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground hover:text-accent"
+                <Link
+                  to={`/studio/eventos/${event.id}/editar`}
+                  className={cn(
+                    'bg-foreground py-2 text-center font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-background transition-opacity hover:opacity-80',
+                  )}
                 >
-                  Eliminar evento
-                </button>
+                  Editar
+                </Link>
               </div>
-            </Link>
+            </div>
           )
         })}
       </div>

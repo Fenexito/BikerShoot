@@ -335,71 +335,81 @@ export function StudioEventEditor() {
       </div>
 
       {/* Portada + Marca de agua */}
-      <section className="mt-14 grid grid-cols-1 gap-10 border-t border-border pt-10 sm:grid-cols-2">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <h2 className="font-studio text-xl font-bold tracking-tight2">Foto de portada</h2>
-          <p className="text-sm text-muted-foreground">
-            Se muestra como banner ancho en la vista del evento y en tu lista de eventos. Opcional.
-          </p>
-          {(coverLocalPreview || coverPath) ? (
-            <img
-              src={coverLocalPreview ?? r2Url(coverPath!)}
-              alt="Portada"
-              className="h-24 w-40 border border-border object-cover"
-            />
-          ) : (
-            <div className="flex h-24 w-40 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
-              Sin portada
+      <section className="mt-14 border-t border-border pt-10">
+        <div className="grid grid-cols-1 gap-10 divide-y divide-border sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-y-0">
+          <div className="flex flex-col gap-4 sm:pr-10">
+            <div>
+              <h2 className="font-studio text-xl font-bold tracking-tight2">Foto de portada</h2>
+              <p className="mt-1 min-h-[2.75rem] text-justify text-sm text-muted-foreground [text-align-last:left]">
+                Se muestra como banner ancho en la vista del evento y en tu lista de eventos. Opcional.
+              </p>
             </div>
-          )}
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => coverInputRef.current?.click()}>
-              {coverPath || coverLocalPreview ? 'Cambiar' : 'Subir portada'}
-            </Button>
-            {(coverPath || coverLocalPreview) && (
-              <Button variant="ghost" onClick={clearCover}>Quitar</Button>
-            )}
+            <div className="flex items-center gap-4">
+              {(coverLocalPreview || coverPath) ? (
+                <img
+                  src={coverLocalPreview ?? r2Url(coverPath!)}
+                  alt="Portada"
+                  className="h-20 w-32 shrink-0 border border-border object-cover"
+                />
+              ) : (
+                <div className="flex h-20 w-32 shrink-0 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
+                  Sin portada
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <Button variant="ghost" size="sm" onClick={() => coverInputRef.current?.click()}>
+                  {coverPath || coverLocalPreview ? 'Cambiar' : 'Subir portada'}
+                </Button>
+                {(coverPath || coverLocalPreview) && (
+                  <Button variant="ghost" size="sm" onClick={clearCover}>Quitar</Button>
+                )}
+              </div>
+            </div>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleCoverFile(e.target.files?.[0])}
+            />
           </div>
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => handleCoverFile(e.target.files?.[0])}
-          />
-        </div>
 
-        <div className="flex flex-col items-center gap-4 text-center">
-          <h2 className="font-studio text-xl font-bold tracking-tight2">Marca de agua</h2>
-          <p className="text-sm text-muted-foreground">
-            Un PNG que se estampa sobre todas las fotos de este evento. Opcional — sin uno, las fotos se suben reducidas pero sin marca.
-          </p>
-          {(watermarkLocalPreview || watermarkPath) ? (
-            <img
-              src={watermarkLocalPreview ?? r2Url(watermarkPath!)}
-              alt="Marca de agua"
-              className="h-24 w-24 border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
-            />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
-              Sin PNG
+          <div className="flex flex-col gap-4 pt-10 sm:pl-10 sm:pt-0">
+            <div>
+              <h2 className="font-studio text-xl font-bold tracking-tight2">Marca de agua</h2>
+              <p className="mt-1 min-h-[2.75rem] text-justify text-sm text-muted-foreground [text-align-last:left]">
+                Un PNG que se estampa sobre las fotos de este evento. Opcional — sin uno, las fotos se suben reducidas pero sin marca.
+              </p>
             </div>
-          )}
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => watermarkInputRef.current?.click()}>
-              {watermarkPath || watermarkLocalPreview ? 'Cambiar PNG' : 'Subir PNG'}
-            </Button>
-            {(watermarkPath || watermarkLocalPreview) && (
-              <Button variant="ghost" onClick={clearWatermark}>Quitar</Button>
-            )}
+            <div className="flex items-center gap-4">
+              {(watermarkLocalPreview || watermarkPath) ? (
+                <img
+                  src={watermarkLocalPreview ?? r2Url(watermarkPath!)}
+                  alt="Marca de agua"
+                  className="h-20 w-20 shrink-0 border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
+                />
+              ) : (
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
+                  Sin PNG
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <Button variant="ghost" size="sm" onClick={() => watermarkInputRef.current?.click()}>
+                  {watermarkPath || watermarkLocalPreview ? 'Cambiar PNG' : 'Subir PNG'}
+                </Button>
+                {(watermarkPath || watermarkLocalPreview) && (
+                  <Button variant="ghost" size="sm" onClick={clearWatermark}>Quitar</Button>
+                )}
+              </div>
+            </div>
+            <input
+              ref={watermarkInputRef}
+              type="file"
+              accept="image/png"
+              className="hidden"
+              onChange={(e) => handleWatermarkFile(e.target.files?.[0])}
+            />
           </div>
-          <input
-            ref={watermarkInputRef}
-            type="file"
-            accept="image/png"
-            className="hidden"
-            onChange={(e) => handleWatermarkFile(e.target.files?.[0])}
-          />
         </div>
       </section>
 

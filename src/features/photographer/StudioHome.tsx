@@ -130,7 +130,9 @@ export function StudioHome() {
                     />
                   </div>
                   <h3 className="mt-3 font-studio text-lg font-bold">{event.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">Q{event.price_per_photo} por foto · {event.event_points.length} puntos</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Q{event.price_per_photo} por foto · {event.event_points.length} puntos · {event.photos?.[0]?.count ?? 0} fotos
+                  </p>
                   <div className="mt-4">
                     <Link to={`/studio/eventos/${event.id}`}>
                       <Button variant="secondary" size="sm" className="w-full justify-center">Ver evento</Button>

@@ -95,3 +95,51 @@ export function IconClose(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+export function IconVerified(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="#3b82f6" {...props}>
+      <path d="M12 1.5l2.4 1.6 2.85-.5 1.35 2.5 2.5 1.35-.5 2.85 1.6 2.4-1.6 2.4.5 2.85-2.5 1.35-1.35 2.5-2.85-.5L12 22.5l-2.4-1.6-2.85.5-1.35-2.5-2.5-1.35.5-2.85L1.9 12l1.6-2.4-.5-2.85 2.5-1.35 1.35-2.5 2.85.5L12 1.5z" />
+      <path d="M8.5 12.3l2.3 2.3 4.7-4.9" fill="none" stroke="white" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function IconInstagram(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function IconFacebook(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M15 4h-2a4 4 0 0 0-4 4v3H7v4h2v7h4v-7h2.5l.5-4H13V8a1 1 0 0 1 1-1h2z" />
+    </svg>
+  )
+}
+
+export function IconTiktok(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 3v10.5a3 3 0 1 1-3-3" />
+      <path d="M14 3c.6 2.6 2.3 4.2 5 4.5" />
+    </svg>
+  )
+}
+
+export function IconTrash(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+      <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  )
+}

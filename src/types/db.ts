@@ -69,4 +69,7 @@ export interface DbPhotographer {
   bio: string | null
   city: string | null
   whatsapp: string | null
+  instagram_url: string | null
+  facebook_url: string | null
+  tiktok_url: string | null
 }

@@ -4,9 +4,14 @@ import { r2Url, previewUrl } from '../../../lib/r2'
 import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview } from '../photoUpload'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
+import { confirmDialog } from '../../../ui/overlays/confirmStore'
 import { cn } from '../../../lib/cn'
 
 const CONCURRENCY = 4
+// Se deja el check verde visible un momento antes de quitarla de la cola —
+// para entonces ya es parte de las fotos del punto/evento más abajo, así
+// que dejarla aquí también sería confuso (¿es la misma foto dos veces?).
+const REMOVE_DONE_DELAY = 1400
 
 type ItemStatus = 'pendiente' | 'subiendo' | 'lista' | 'error'
 
@@ -20,6 +25,7 @@ interface QueueItem {
   progress: number
   errorMessage?: string
   previewPath?: string
+  backupRaw: boolean
 }
 
 function formatBytes(n: number) {
@@ -43,7 +49,6 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   const activeCountRef = useRef(0)
   const watermarkImageRef = useRef<ImageBitmap | null>(null)
   const [, setTick] = useState(0)
-  const [backupRaw, setBackupRaw] = useState(false)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -79,11 +84,19 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
+  function removeItem(id: string) {
+    itemsRef.current = itemsRef.current.filter((i) => i.id !== id)
+    rerender()
+  }
+
   function updateItem(id: string, patch: Partial<QueueItem>) {
     const item = itemsRef.current.find((i) => i.id === id)
     if (!item) return
     Object.assign(item, patch)
     rerender()
+    if (patch.status === 'lista') {
+      setTimeout(() => removeItem(id), REMOVE_DONE_DELAY)
+    }
   }
 
   function pump() {
@@ -103,18 +116,18 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   async function runItem(item: QueueItem) {
     try {
       const { data, error } = await supabase.functions.invoke('r2-upload-url', {
-        body: { fileName: item.file.name, contentType: item.file.type, eventId, includeRaw: backupRaw },
+        body: { fileName: item.file.name, contentType: item.file.type, eventId, includeRaw: item.backupRaw },
       })
       if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
       const previewBlob = await createWatermarkedPreview(item.file, watermarkImageRef.current)
 
       let previewPct = 0
-      let rawPct = backupRaw ? 0 : 100
+      let rawPct = item.backupRaw ? 0 : 100
       const reportProgress = () => updateItem(item.id, { progress: (previewPct + rawPct) / 2 })
 
       const uploads = [uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', (pct) => { previewPct = pct; reportProgress() })]
-      if (backupRaw && data.rawUploadUrl) {
+      if (item.backupRaw && data.rawUploadUrl) {
         uploads.push(uploadWithProgress(data.rawUploadUrl, item.file, item.file.type, (pct) => { rawPct = pct; reportProgress() }))
       }
       await Promise.all(uploads)
@@ -124,11 +137,11 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         photographer_id: photographerId,
         point_id: pointId,
         preview_path: data.previewPath,
-        raw_path: backupRaw ? data.rawPath : null,
+        raw_path: item.backupRaw ? data.rawPath : null,
         price,
-        size_bytes: previewBlob.size + (backupRaw ? item.file.size : 0),
+        size_bytes: previewBlob.size + (item.backupRaw ? item.file.size : 0),
         preview_size_bytes: previewBlob.size,
-        raw_size_bytes: backupRaw ? item.file.size : 0,
+        raw_size_bytes: item.backupRaw ? item.file.size : 0,
         original_filename: item.file.name,
       })
       if (insertError) throw insertError
@@ -140,12 +153,19 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     }
   }
 
-  function enqueue(files: FileList | File[] | null) {
+  async function enqueue(files: FileList | File[] | null) {
     if (!files) return
     const imageFiles = Array.from(files)
       .filter((f) => f.type.startsWith('image/'))
       .sort((a, b) => a.name.localeCompare(b.name))
     if (imageFiles.length === 0) return
+
+    const backupRaw = await confirmDialog.ask({
+      title: `¿Respaldar el original de ${imageFiles.length === 1 ? 'esta foto' : `estas ${imageFiles.length} fotos`}?`,
+      description: 'Guarda una copia sin editar (sin marca de agua) además de la vista previa. Ocupa más espacio de tu plan.',
+      confirmLabel: 'Sí, respaldar también',
+      cancelLabel: 'No, solo vista previa',
+    })
 
     const newItems: QueueItem[] = imageFiles.map((file) => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
@@ -155,6 +175,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       localPreview: URL.createObjectURL(file),
       status: 'pendiente',
       progress: 0,
+      backupRaw,
     }))
     itemsRef.current = [...itemsRef.current, ...newItems]
     rerender()
@@ -213,11 +234,6 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         </button>
         <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => enqueue(e.target.files)} />
       </div>
-
-      <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" checked={backupRaw} onChange={(e) => setBackupRaw(e.target.checked)} className="h-3.5 w-3.5 accent-accent" />
-        Respaldar también el original sin editar (opcional)
-      </label>
 
       {items.length > 0 && (
         <div className="mt-6">

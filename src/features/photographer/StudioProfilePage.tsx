@@ -16,7 +16,10 @@ import { Badge } from '../../ui/studio/Badge'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { SocialLinks } from '../../ui/shared/SocialLinks'
+import { IconVerified } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import DriftWall from '../../ui/reactbits/DriftWall'
 import { cn } from '../../lib/cn'
 
 const schema = z.object({
@@ -24,8 +27,16 @@ const schema = z.object({
   city: z.string().optional(),
   whatsapp: z.string().optional(),
   bio: z.string().optional(),
+  instagramUrl: z.string().optional(),
+  facebookUrl: z.string().optional(),
+  tiktokUrl: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
+
+function formatBytes(n: number) {
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(0)} MB`
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
 
 export function StudioProfilePage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -97,6 +108,9 @@ export function StudioProfilePage() {
         city: details?.city ?? '',
         whatsapp: details?.whatsapp ?? '',
         bio: details?.bio ?? '',
+        instagramUrl: details?.instagram_url ?? '',
+        facebookUrl: details?.facebook_url ?? '',
+        tiktokUrl: details?.tiktok_url ?? '',
       })
     }
   }, [profile, details, reset])
@@ -111,7 +125,14 @@ export function StudioProfilePage() {
 
     const { error: detailsError } = await supabase
       .from('photographer_details')
-      .update({ city: values.city || null, whatsapp: values.whatsapp || null, bio: values.bio || null })
+      .update({
+        city: values.city || null,
+        whatsapp: values.whatsapp || null,
+        bio: values.bio || null,
+        instagram_url: values.instagramUrl || null,
+        facebook_url: values.facebookUrl || null,
+        tiktok_url: values.tiktokUrl || null,
+      })
       .eq('profile_id', user.id)
 
     if (profileError || detailsError) {
@@ -131,173 +152,212 @@ export function StudioProfilePage() {
   }
 
   const avatarUrl = profile.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
+  const limitBytes = details?.storage_plan ? details.storage_plan.gb_limit * 1024 * 1024 * 1024 : 0
+  const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
 
   return (
-    <div className={STUDIO_PAGE_WIDE}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-5">
-          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-24 w-24 shrink-0" disabled={uploadingAvatar}>
+    <div>
+      {/* Banner — misma estructura que el perfil público que ve el biker (PhotographerProfile.tsx) */}
+      <div className="relative flex h-48 items-center justify-center bg-muted md:h-64">
+        <span className="text-6xl opacity-20">🏍️</span>
+      </div>
+
+      <div className={STUDIO_PAGE_WIDE}>
+        <div className="-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-28 w-28 shrink-0" disabled={uploadingAvatar}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt={profile.display_name} className="h-24 w-24 rounded-full object-cover" />
+              <img src={avatarUrl} alt={profile.display_name} className="h-28 w-28 border-4 border-background object-cover" />
             ) : (
-              <InitialsAvatar name={profile.display_name || 'S'} className="h-24 w-24 bg-foreground text-2xl text-background" />
+              <InitialsAvatar name={profile.display_name || 'S'} className="h-28 w-28 border-4 border-background bg-foreground text-2xl text-background" />
             )}
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white opacity-0 transition-opacity group-hover:opacity-100">
               {uploadingAvatar ? '…' : 'Cambiar'}
             </span>
           </button>
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
-          <div>
-            <h1 className="font-studio text-3xl font-bold tracking-tight2">{profile.display_name}</h1>
+
+          <div className="flex-1 text-center sm:text-left">
+            <div className="flex items-center justify-center gap-2 sm:justify-start">
+              <h1 className="font-studio text-3xl font-bold tracking-tight2">{profile.display_name}</h1>
+              {details?.approved && <IconVerified className="h-6 w-6 shrink-0" aria-label="Fotógrafo verificado" />}
+            </div>
             <p className="text-muted-foreground">{photographer.city || 'Sin ciudad configurada'}</p>
+            <SocialLinks
+              instagramUrl={photographer.instagram_url}
+              facebookUrl={photographer.facebook_url}
+              tiktokUrl={photographer.tiktok_url}
+              className="mt-2 justify-center sm:justify-start"
+            />
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {details?.approved ? (
-            <Badge className="border-accent text-accent">Aprobado para vender</Badge>
-          ) : (
-            <Badge>Pendiente de aprobación</Badge>
-          )}
+
           <Button variant={editing ? 'secondary' : 'primary'} onClick={() => setEditing((e) => !e)}>
             {editing ? 'Cancelar' : 'Editar perfil'}
           </Button>
         </div>
-      </div>
 
-      {!details?.approved && (
-        <p className="mt-6 border border-border px-4 py-3 text-sm text-muted-foreground">
-          Tu cuenta está en revisión. Podrás publicar eventos y vender fotos en cuanto un administrador la apruebe.
-        </p>
-      )}
-
-      {details?.storage_plan && (
-        <div className="mt-6 border border-border p-5">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="font-studio text-lg font-bold">Almacenamiento</p>
-            <span className="font-studio-mono text-xs uppercase tracking-wider2 text-accent">Plan {details.storage_plan.name}</span>
-          </div>
-          {(() => {
-            const limitBytes = details.storage_plan.gb_limit * 1024 * 1024 * 1024
-            const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
-            const usedGB = (usageBytes / 1024 / 1024 / 1024).toFixed(2)
-            return (
-              <>
-                <div className="h-2 w-full overflow-hidden bg-muted">
-                  <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {usedGB} GB de {details.storage_plan.gb_limit} GB usados
-                  {details.storage_plan.price_monthly_gtq > 0 && ` · Q${details.storage_plan.price_monthly_gtq}/mes`}
-                </p>
-              </>
-            )
-          })()}
-        </div>
-      )}
-
-      {editing ? (
-        <form className="mt-8 flex flex-col gap-5 border-t border-border pt-8" onSubmit={handleSubmit(onSubmit)}>
-          <p className="text-sm text-muted-foreground">Esto es lo que ve un biker en tu perfil público.</p>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Input label="Nombre del estudio" error={errors.displayName?.message} {...register('displayName')} />
-            <Input label="Ciudad" {...register('city')} />
-            <Input label="WhatsApp de contacto" {...register('whatsapp')} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Sobre ti</label>
-            <textarea
-              rows={4}
-              className="border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
-              {...register('bio')}
-            />
-          </div>
-          <Button type="submit" size="lg" loading={isSubmitting} className="mt-2 w-fit">
-            Guardar cambios
-          </Button>
-        </form>
-      ) : (
-        photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>
-      )}
-
-      <div className="mt-10 grid grid-cols-2 gap-4 border-y border-border py-6 text-center sm:w-80">
-        <div>
-          <p className="font-studio text-2xl font-bold">{events.length}</p>
-          <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Eventos</p>
-        </div>
-        <div>
-          <p className="font-studio text-2xl font-bold">{photos.length}</p>
-          <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
-        </div>
-      </div>
-
-      <div className="mt-8 flex gap-1 border-b border-border">
-        <button
-          onClick={() => setTab('destacadas')}
-          className={cn(
-            'border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
-            tab === 'destacadas' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {editing ? 'Curar destacadas' : 'Fotos destacadas'}
-        </button>
-        <button
-          onClick={() => setTab('eventos')}
-          className={cn(
-            'border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
-            tab === 'eventos' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          Eventos ({events.length})
-        </button>
-      </div>
-
-      <div className="py-8">
-        {tab === 'destacadas' ? (
-          <>
-            {editing && (
-              <p className="mb-4 text-sm text-muted-foreground">
-                Marca ★ las fotos que quieres mostrar en tu perfil público. Sin ninguna marcada, se muestran todas.
-              </p>
-            )}
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-              {(editing ? photos : featuredPhotos).map((photo) => (
-                <div key={photo.id} className="group relative aspect-[4/5] overflow-hidden border border-border">
-                  <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
-                  {editing && (
-                    <button
-                      onClick={() => toggleFeatured(photo.id, !photo.featured)}
-                      aria-label="Destacar en tu perfil"
-                      className={cn(
-                        'absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-sm transition-opacity',
-                        photo.featured ? 'bg-accent text-white opacity-100' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100',
-                      )}
-                    >
-                      ★
-                    </button>
-                  )}
-                </div>
-              ))}
-              {photos.length === 0 && <p className="col-span-full text-sm text-muted-foreground">Todavía no tienes fotos publicadas.</p>}
-            </div>
-          </>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {events.map((event) => {
-              const statusStyle = EVENT_STATUS_STYLE[event.status]
-              return (
-                <Link key={event.id} to={`/studio/eventos/${event.id}`} className="border border-border p-4 transition-colors hover:border-border-hover">
-                  <div className="flex items-center justify-between">
-                    <Badge>{event.category}</Badge>
-                    <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-[10px] uppercase tracking-wider2" />
-                  </div>
-                  <p className="mt-3 font-semibold">{event.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}</p>
-                </Link>
-              )
-            })}
-            {events.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tienes eventos.</p>}
-          </div>
+        {!details?.approved && (
+          <p className="mt-6 border border-border px-4 py-3 text-sm text-muted-foreground">
+            Tu cuenta está en revisión. Podrás publicar eventos y vender fotos en cuanto un administrador la apruebe.
+          </p>
         )}
+
+        <div className="mt-8 flex flex-wrap gap-4">
+          <div className="grid grid-cols-2 gap-4 border border-border px-6 py-5 text-center sm:w-72">
+            <div>
+              <p className="font-studio text-2xl font-bold">{events.length}</p>
+              <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Rodadas cubiertas</p>
+            </div>
+            <div>
+              <p className="font-studio text-2xl font-bold">{photos.length}</p>
+              <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos publicadas</p>
+            </div>
+          </div>
+
+          {details?.storage_plan && (
+            <div className="flex-1 border border-border px-6 py-5" style={{ minWidth: 240 }}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                  Almacenamiento · Plan {details.storage_plan.name}
+                </p>
+                <Link to="/studio/planes" className="font-studio-mono text-[10px] uppercase tracking-wider2 text-accent hover:underline">
+                  Ver planes →
+                </Link>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden bg-muted">
+                <div className={cn('h-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB usados
+              </p>
+            </div>
+          )}
+        </div>
+
+        {editing ? (
+          <form className="mt-8 flex flex-col gap-5 border-t border-border pt-8" onSubmit={handleSubmit(onSubmit)}>
+            <p className="text-sm text-muted-foreground">Esto es lo que ve un biker en tu perfil público.</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Input label="Nombre del estudio" error={errors.displayName?.message} {...register('displayName')} />
+              <Input label="Ciudad" {...register('city')} />
+              <Input label="WhatsApp de contacto" {...register('whatsapp')} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Sobre ti</label>
+              <textarea
+                rows={4}
+                className="border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
+                {...register('bio')}
+              />
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Redes sociales (opcional)</p>
+              <div className="grid gap-5 sm:grid-cols-3">
+                <Input label="Instagram" placeholder="https://instagram.com/tu_estudio" {...register('instagramUrl')} />
+                <Input label="Facebook" placeholder="https://facebook.com/tu_estudio" {...register('facebookUrl')} />
+                <Input label="TikTok" placeholder="https://tiktok.com/@tu_estudio" {...register('tiktokUrl')} />
+              </div>
+            </div>
+            <Button type="submit" size="lg" loading={isSubmitting} className="mt-2 w-fit">
+              Guardar cambios
+            </Button>
+          </form>
+        ) : (
+          photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>
+        )}
+
+        <div className="mt-8 flex gap-1 border-b border-border">
+          <button
+            onClick={() => setTab('destacadas')}
+            className={cn(
+              'border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
+              tab === 'destacadas' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {editing ? 'Curar destacadas' : 'Fotos destacadas'}
+          </button>
+          <button
+            onClick={() => setTab('eventos')}
+            className={cn(
+              'border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
+              tab === 'eventos' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Eventos ({events.length})
+          </button>
+        </div>
+
+        <div className="py-8">
+          {tab === 'destacadas' ? (
+            <>
+              {editing && (
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Marca ★ las fotos que quieres mostrar en tu perfil público. Sin ninguna marcada, se muestran todas.
+                </p>
+              )}
+              {editing ? (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="group relative aspect-[4/5] overflow-hidden border border-border">
+                      <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => toggleFeatured(photo.id, !photo.featured)}
+                        aria-label="Destacar en tu perfil"
+                        className={cn(
+                          'absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-sm transition-opacity',
+                          photo.featured ? 'bg-accent text-white opacity-100' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100',
+                        )}
+                      >
+                        ★
+                      </button>
+                    </div>
+                  ))}
+                  {photos.length === 0 && <p className="col-span-full text-sm text-muted-foreground">Todavía no tienes fotos publicadas.</p>}
+                </div>
+              ) : featuredPhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Todavía no tienes fotos publicadas.</p>
+              ) : (
+                <div style={{ height: 420 }}>
+                  <DriftWall
+                    items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
+                    columns={Math.min(7, Math.max(3, featuredPhotos.length))}
+                    tileWidth={180}
+                    tileHeight={180}
+                    gap={6}
+                    radius={0}
+                    tilt={16}
+                    turn={-14}
+                    perspective={950}
+                    depth={100}
+                    speed={22}
+                    variance={0.5}
+                    parallax={0.5}
+                    lift={48}
+                    fade={0.25}
+                    dim={0.75}
+                    overlayColor="rgb(var(--color-background))"
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {events.map((event) => {
+                const statusStyle = EVENT_STATUS_STYLE[event.status]
+                return (
+                  <Link key={event.id} to={`/studio/eventos/${event.id}`} className="border border-border p-4 transition-colors hover:border-border-hover">
+                    <div className="flex items-center justify-between">
+                      <Badge>{event.category}</Badge>
+                      <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-[10px] uppercase tracking-wider2" />
+                    </div>
+                    <p className="mt-3 font-semibold">{event.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}</p>
+                  </Link>
+                )
+              })}
+              {events.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tienes eventos.</p>}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

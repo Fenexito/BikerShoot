@@ -7,6 +7,8 @@ import { HeaderAdmin } from '../ui/layout/HeaderAdmin'
 import { Footer } from '../ui/layout/Footer'
 import { Toaster } from '../ui/overlays/Toaster'
 import { ConfirmDialog } from '../ui/overlays/ConfirmDialog'
+import { TypedConfirmDialog } from '../ui/overlays/TypedConfirmDialog'
+import { ScrollRestoration } from './ScrollRestoration'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
 
@@ -34,6 +36,7 @@ export function PortalLayout() {
 
   return (
     <div id="portal-theme-root" className={cn('flex min-h-screen flex-col bg-background text-foreground', themeClass)}>
+      <ScrollRestoration />
       {!isAuthPage && (
         isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
       )}
@@ -43,6 +46,7 @@ export function PortalLayout() {
       {!isUserPortal && !isStudioPortal && !isAdminPortal && !isAuthPage && <Footer />}
       <Toaster />
       <ConfirmDialog />
+      <TypedConfirmDialog />
       {!isAdminPortal && <BugReportWidget />}
     </div>
   )

@@ -63,17 +63,17 @@ function PlanCard({
   return (
     <div
       className={cn(
-        'flex flex-col border p-6',
+        'relative flex flex-col border p-6',
         isCurrent ? 'border-2 border-accent bg-accent/5' : 'border-border',
       )}
     >
       {isCurrent && (
-        <span className="mb-3 inline-flex w-fit items-center gap-1.5 border border-accent px-2 py-1 font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-accent">
+        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 bg-background border border-accent px-2 py-1 font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-accent">
           Tu plan actual
         </span>
       )}
       {isPending && (
-        <span className="mb-3 inline-flex w-fit items-center gap-1.5 border border-foreground px-2 py-1 font-studio-mono text-[10px] font-bold uppercase tracking-wider2">
+        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 bg-background border border-foreground px-2 py-1 font-studio-mono text-[10px] font-bold uppercase tracking-wider2">
           Entra en tu próxima renovación
         </span>
       )}

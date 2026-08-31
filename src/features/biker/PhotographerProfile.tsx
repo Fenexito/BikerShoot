@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePublicPhotographer, usePhotographerEvents, usePhotographerPhotos } from './usePublicData'
-import { r2Url } from '../../lib/r2'
+import { r2Url, previewUrl } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
+import DriftWall from '../../ui/reactbits/DriftWall'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { SocialLinks } from '../../ui/shared/SocialLinks'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 
 export function PhotographerProfile() {
@@ -15,7 +17,7 @@ export function PhotographerProfile() {
   const { data: events = [] } = usePhotographerEvents(id)
   const { data: photos = [] } = usePhotographerPhotos(id)
   const [tab, setTab] = useState<'fotos' | 'eventos'>('fotos')
-  const [galleryLayout, setGalleryLayout] = useState<'grid' | 'mosaic'>('grid')
+  const [galleryLayout, setGalleryLayout] = useState<'grid' | 'mosaic' | 'muro'>('muro')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
   const gridPhotos: GridPhoto[] = useMemo(() => {
@@ -58,6 +60,12 @@ export function PhotographerProfile() {
           <div className="flex-1 text-center sm:text-left">
             <h1 className="text-2xl font-bold tracking-tight">{photographer.display_name}</h1>
             {photographer.city && <p className="text-muted-foreground">{photographer.city}</p>}
+            <SocialLinks
+              instagramUrl={photographer.instagram_url}
+              facebookUrl={photographer.facebook_url}
+              tiktokUrl={photographer.tiktok_url}
+              className="mt-2 justify-center sm:justify-start"
+            />
           </div>
           {photographer.whatsapp ? (
             <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
@@ -99,6 +107,13 @@ export function PhotographerProfile() {
           {tab === 'fotos' && (
             <div className="mb-2 flex gap-1 rounded-md bg-muted p-1">
               <button
+                onClick={() => setGalleryLayout('muro')}
+                aria-label="Vista muro"
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'muro' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+              >
+                ✦ Muro
+              </button>
+              <button
                 onClick={() => setGalleryLayout('grid')}
                 aria-label="Vista cuadrícula"
                 className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'grid' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
@@ -118,7 +133,35 @@ export function PhotographerProfile() {
 
         <div className="py-8">
           {tab === 'fotos' ? (
-            <PhotoGrid photos={featuredPhotos} layout={galleryLayout} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+            galleryLayout === 'muro' ? (
+              featuredPhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Este fotógrafo todavía no tiene fotos publicadas.</p>
+              ) : (
+                <div style={{ height: 420 }}>
+                  <DriftWall
+                    items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
+                    columns={Math.min(7, Math.max(3, featuredPhotos.length))}
+                    tileWidth={180}
+                    tileHeight={180}
+                    gap={6}
+                    radius={12}
+                    tilt={16}
+                    turn={-14}
+                    perspective={950}
+                    depth={100}
+                    speed={22}
+                    variance={0.5}
+                    parallax={0.5}
+                    lift={48}
+                    fade={0.25}
+                    dim={0.75}
+                    onItemClick={(_, index) => setLightbox({ photos: featuredPhotos, index })}
+                  />
+                </div>
+              )
+            ) : (
+              <PhotoGrid photos={featuredPhotos} layout={galleryLayout} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+            )
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (

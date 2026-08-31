@@ -44,6 +44,19 @@ function useRawOrderItems(photographerId: string | undefined) {
   })
 }
 
+/** El estado del PEDIDO no es el de una fila cualquiera — un pedido de 3
+ * fotos no está "Entregado" hasta que las 3 lo estén. Prioridad: si falta
+ * algún pago, el pedido entero sigue pendiente de pago; si no, solo es
+ * "Entregado" cuando TODAS las fotos (no canceladas) lo están; cualquier
+ * otro caso es "En preparación". */
+function deriveOrderStatus(items: { status: OrderItemStatus }[]): OrderItemStatus {
+  const active = items.filter((i) => i.status !== 'cancelado')
+  if (active.length === 0) return 'cancelado'
+  if (active.some((i) => i.status === 'pendiente_pago')) return 'pendiente_pago'
+  if (active.every((i) => i.status === 'entregado')) return 'entregado'
+  return 'en_preparacion'
+}
+
 export function usePhotographerOrders(photographerId: string | undefined) {
   const query = useRawOrderItems(photographerId)
 
@@ -60,7 +73,7 @@ export function usePhotographerOrders(photographerId: string | undefined) {
       eventTitle: items[0].event?.title ?? '',
       paymentMethod: items[0].order?.payment_method ?? 'tarjeta',
       createdAt: items[0].order?.created_at ?? items[0].created_at,
-      status: items[0].status,
+      status: deriveOrderStatus(items),
       total: items.reduce((sum, i) => sum + i.price, 0),
       items,
     }))
