@@ -7,7 +7,6 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
-import { PhotoUploadQueue } from './components/PhotoUploadQueue'
 import { Input } from '../../ui/studio/Input'
 import { Select } from '../../ui/studio/Select'
 import { Button } from '../../ui/studio/Button'
@@ -64,7 +63,6 @@ export function StudioEventEditor() {
   const watermarkInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const routePointPickerRef = useRef<RoutePointPickerHandle>(null)
-  const [uploadOpenFor, setUploadOpenFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (existing) {
@@ -201,13 +199,27 @@ export function StudioEventEditor() {
         setSaving(false)
         return
       }
-      // Reconciliación simple: borra los puntos existentes y vuelve a insertar los actuales.
-      await supabase.from('event_points').delete().eq('event_id', eventId)
     }
 
-    if (finalPoints.length > 0) {
-      const { error: pointsError } = await supabase.from('event_points').insert(
-        finalPoints.map((pt) => ({
+    // Reconciliación por id: nunca borrar-y-reinsertar TODOS los puntos —
+    // event_points.id es la FK que las fotos usan (photos.point_id, on
+    // delete set null). Borrar y recrear un punto que sigue existiendo le
+    // da un id nuevo y desvincula silenciosamente todas sus fotos (bug
+    // real detectado: guardar el evento las mandaba a "sin punto asignado"
+    // aunque el fotógrafo no hubiera tocado los puntos para nada). Solo se
+    // borran los puntos que el fotógrafo quitó de verdad.
+    const isLocalPointId = (pid: string) => pid.startsWith('local-')
+    const existingPointIds = new Set((existing?.event_points ?? []).map((pt) => pt.id))
+    const keptPointIds = new Set(finalPoints.filter((pt) => !isLocalPointId(pt.id)).map((pt) => pt.id))
+    const removedPointIds = [...existingPointIds].filter((pid) => !keptPointIds.has(pid))
+
+    if (removedPointIds.length > 0) {
+      await supabase.from('event_points').delete().in('id', removedPointIds)
+    }
+
+    for (const pt of finalPoints) {
+      if (isLocalPointId(pt.id)) {
+        const { error: pointsError } = await supabase.from('event_points').insert({
           event_id: eventId,
           route_point_id: pt.routePointId,
           label: pt.label,
@@ -215,12 +227,29 @@ export function StudioEventEditor() {
           lng: pt.lng,
           time_start: pt.timeStart,
           time_end: pt.timeEnd,
-        })),
-      )
-      if (pointsError) {
-        push({ type: 'error', title: 'El evento se guardó, pero fallaron los puntos', description: pointsError.message })
-        setSaving(false)
-        return
+        })
+        if (pointsError) {
+          push({ type: 'error', title: 'El evento se guardó, pero fallaron los puntos', description: pointsError.message })
+          setSaving(false)
+          return
+        }
+      } else {
+        const { error: pointsError } = await supabase
+          .from('event_points')
+          .update({
+            route_point_id: pt.routePointId,
+            label: pt.label,
+            lat: pt.lat,
+            lng: pt.lng,
+            time_start: pt.timeStart,
+            time_end: pt.timeEnd,
+          })
+          .eq('id', pt.id)
+        if (pointsError) {
+          push({ type: 'error', title: 'El evento se guardó, pero fallaron los puntos', description: pointsError.message })
+          setSaving(false)
+          return
+        }
       }
     }
 
@@ -453,44 +482,11 @@ export function StudioEventEditor() {
         </div>
       </section>
 
-      {/* Subir fotos por punto — solo una vez que el evento y sus puntos ya están guardados */}
-      <section className="mt-14 border-t border-border pt-10">
-        <h2 className="font-studio text-xl font-bold tracking-tight2">Subir fotos</h2>
-        {!isNew && existing && existing.event_points.length > 0 ? (
-          <>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ya puedes subir fotos a cualquiera de tus puntos guardados, sin salir de esta página.
-            </p>
-            <div className="mt-6 flex flex-col gap-4">
-              {existing.event_points.map((pt) => (
-                <div key={pt.id} className="border border-border p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="font-semibold">{pt.label} <span className="font-studio-mono text-xs font-normal text-muted-foreground">({pt.time_start.slice(0, 5)}–{pt.time_end.slice(0, 5)})</span></p>
-                    <Button variant="ghost" onClick={() => setUploadOpenFor(uploadOpenFor === pt.id ? null : pt.id)}>
-                      {uploadOpenFor === pt.id ? 'Cerrar' : '+ Subir fotos'}
-                    </Button>
-                  </div>
-                  {uploadOpenFor === pt.id && (
-                    <div className="mt-4">
-                      <PhotoUploadQueue
-                        eventId={existing.id}
-                        pointId={pt.id}
-                        photographerId={existing.photographer_id}
-                        price={price}
-                        watermarkPath={watermarkPath}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Guarda el evento con al menos un punto primero para poder subir fotos.
-          </p>
-        )}
-      </section>
+      {!isNew && (
+        <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
+          Para subir fotos, guarda tus cambios y hazlo desde la vista del evento.
+        </p>
+      )}
 
       <div className="sticky bottom-0 z-20 mt-10 flex justify-end gap-3 border-t border-border bg-background px-6 py-4 -mx-6 md:-mx-16 md:px-16">
         <Button variant="secondary" onClick={() => navigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
