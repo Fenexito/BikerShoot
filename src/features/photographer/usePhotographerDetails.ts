@@ -29,7 +29,7 @@ export function usePhotographerDetails(userId: string | undefined) {
     queryFn: async (): Promise<PhotographerDetails | null> => {
       const { data, error } = await supabase
         .from('photographer_details')
-        .select('*, storage_plan:storage_plans(id, name, gb_limit, price_monthly_gtq)')
+        .select('*, storage_plan:storage_plans!photographer_details_storage_plan_id_fkey(id, name, gb_limit, price_monthly_gtq)')
         .eq('profile_id', userId)
         .single()
       if (error) throw error
