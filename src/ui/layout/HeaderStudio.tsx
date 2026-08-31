@@ -14,8 +14,8 @@ const NAV_UNDERLINE =
 const NAV_ITEMS = [
   { to: '/studio/eventos', label: 'Eventos' },
   { to: '/studio/pedidos', label: 'Pedidos' },
-  { to: '/studio/estadisticas', label: 'Estadísticas' },
   { to: '/studio/almacenamiento', label: 'Almacenamiento' },
+  { to: '/studio/planes', label: 'Planes' },
 ]
 
 export function HeaderStudio() {

@@ -104,7 +104,7 @@ export function StudioHome() {
       <section className="mt-14">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-studio text-xl font-bold tracking-tight2">Tus eventos</h2>
-          <Link to="/studio/eventos">
+          <Link to="/studio/eventos/new">
             <Button variant="ghost">+ Crear evento</Button>
           </Link>
         </div>

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import type { DbEvent, DbEventPoint, DbPhoto, DbPhotographer } from '../../types/db'
 
 export interface PublicEvent extends DbEvent {
-  photographer: { display_name: string } | null
+  photographer: { display_name: string; photographer_details: { whatsapp: string | null }[] | { whatsapp: string | null } | null } | null
 }
 
 export interface PublicPhoto extends DbPhoto {
@@ -60,7 +60,7 @@ export function usePublicEvent(eventId: string | undefined) {
     queryFn: async (): Promise<PublicEvent | null> => {
       const { data, error } = await supabase
         .from('events')
-        .select('*, event_points(*), photographer:profiles(display_name)')
+        .select('*, event_points(*), photographer:profiles(display_name, photographer_details(whatsapp))')
         .eq('id', eventId)
         .is('deleted_at', null)
         .neq('status', 'pausado')

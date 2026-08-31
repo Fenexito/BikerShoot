@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
 import { useStorageOverview, type EventStorage } from './useStorageOverview'
@@ -19,22 +20,28 @@ function formatBytes(n: number) {
 
 type SortMode = 'oldest' | 'newest' | 'biggest'
 
-const CLEAR_OPTIONS: { value: 'preview' | 'raw' | 'both'; label: string }[] = [
-  { value: 'preview', label: 'Vista previa' },
-  { value: 'raw', label: 'Respaldo crudo' },
-  { value: 'both', label: 'Ambos' },
-]
+function ActionButton({ label, description, busy, onClick }: { label: string; description: string; busy: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      className="flex flex-col gap-0.5 border border-border px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5 disabled:opacity-50"
+    >
+      <span className="font-studio-mono text-[10px] font-bold uppercase tracking-wider2">{busy ? 'Procesando…' : label}</span>
+      <span className="text-[11px] text-muted-foreground">{description}</span>
+    </button>
+  )
+}
 
-function CleanupSoldButton({ eventId, pointId }: { eventId: string; pointId?: string }) {
+function CleanupSoldButton({ eventId, pointId, clear, label, description }: { eventId: string; pointId?: string; clear: 'preview' | 'raw' | 'both'; label: string; description: string }) {
   const push = useToastStore((s) => s.push)
-  const [clear, setClear] = useState<'preview' | 'raw' | 'both'>('both')
   const [busy, setBusy] = useState(false)
 
   async function run() {
-    const label = clear === 'preview' ? 'la vista previa' : clear === 'raw' ? 'el respaldo crudo' : 'la vista previa y el respaldo crudo'
+    const what = clear === 'preview' ? 'la vista previa' : clear === 'raw' ? 'el respaldo crudo' : 'la vista previa y el respaldo crudo'
     const ok = await confirmDialog.ask({
       title: '¿Liberar espacio de fotos ya vendidas y entregadas?',
-      description: `Se borrará ${label} de esas fotos. La entrega final del comprador NUNCA se toca.`,
+      description: `Se borrará ${what} de esas fotos. La entrega final del comprador NUNCA se toca.`,
       confirmLabel: 'Liberar espacio',
       tone: 'danger',
     })
@@ -53,29 +60,16 @@ function CleanupSoldButton({ eventId, pointId }: { eventId: string; pointId?: st
     }
   }
 
-  return (
-    <div className="flex items-center gap-2">
-      <select
-        value={clear}
-        onChange={(e) => setClear(e.target.value as typeof clear)}
-        className="border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none focus:border-accent"
-      >
-        {CLEAR_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <Button variant="ghost" disabled={busy} onClick={run}>Liberar espacio de vendidas</Button>
-    </div>
-  )
+  return <ActionButton label={label} description={description} busy={busy} onClick={run} />
 }
 
-function DeleteUnsoldButton({ pointId, eventId, label }: { pointId?: string; eventId?: string; label: string }) {
+function DeleteUnsoldButton({ pointId, eventId, label: scopeLabel }: { pointId?: string; eventId?: string; label: string }) {
   const push = useToastStore((s) => s.push)
   const [busy, setBusy] = useState(false)
 
   async function run() {
     const ok = await confirmDialog.ask({
-      title: `¿Eliminar todas las fotos NO vendidas de "${label}"?`,
+      title: `¿Eliminar todas las fotos NO vendidas de "${scopeLabel}"?`,
       description: 'Esta acción borra los archivos de forma permanente. Las fotos ya vendidas se conservan intactas.',
       confirmLabel: 'Eliminar',
       tone: 'danger',
@@ -100,9 +94,37 @@ function DeleteUnsoldButton({ pointId, eventId, label }: { pointId?: string; eve
   }
 
   return (
-    <Button variant="ghost" disabled={busy} onClick={run}>
-      {pointId ? 'Eliminar fotos no vendidas de este punto' : 'Eliminar fotos no vendidas de este evento'}
-    </Button>
+    <ActionButton
+      label="Eliminar no vendidas"
+      description="Borra permanentemente las fotos que nadie ha comprado."
+      busy={busy}
+      onClick={run}
+    />
+  )
+}
+
+function ActionGroup({ title, eventId, pointId, scopeLabel }: { title: string; eventId: string; pointId?: string; scopeLabel: string }) {
+  return (
+    <div>
+      <p className="mb-2 font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">{title}</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <DeleteUnsoldButton eventId={eventId} pointId={pointId} label={scopeLabel} />
+        <CleanupSoldButton
+          eventId={eventId}
+          pointId={pointId}
+          clear="preview"
+          label="Liberar vista previa"
+          description="De fotos ya vendidas. La entrega final no se toca."
+        />
+        <CleanupSoldButton
+          eventId={eventId}
+          pointId={pointId}
+          clear="raw"
+          label="Liberar respaldo crudo"
+          description="De fotos ya vendidas. La entrega final no se toca."
+        />
+      </div>
+    </div>
   )
 }
 
@@ -126,30 +148,36 @@ function EventRow({ event }: { event: EventStorage }) {
 
       {open && (
         <div className="border-t border-border p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-accent/40 bg-accent/5 px-4 py-3">
-            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-accent">Acciones sobre todo el evento</p>
-            <div className="flex flex-wrap gap-2">
-              <DeleteUnsoldButton eventId={event.id} label={event.title} />
-              <CleanupSoldButton eventId={event.id} />
-            </div>
+          <div className="mb-5 border-2 border-accent bg-accent/5 p-4">
+            <p className="mb-3 font-studio-mono text-[10px] uppercase tracking-wider2 text-accent">
+              Acciones de este evento — afecta los {event.points.length || 0} puntos y todo lo que no tenga punto asignado
+            </p>
+            <ActionGroup title="Acciones de este evento" eventId={event.id} scopeLabel={event.title} />
           </div>
 
           {event.points.length === 0 ? (
             <p className="text-sm text-muted-foreground">Este evento no tiene puntos.</p>
           ) : (
-            <div className="flex flex-col gap-3">
-              <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Acciones por punto</p>
-              {event.points.map((pt) => (
-                <div key={pt.id} className="flex flex-col gap-2 border border-border bg-muted/30 p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{pt.label}</p>
-                    <span className="font-studio-mono text-xs text-muted-foreground">
-                      {formatBytes(pt.bytes)} · {pt.totalPhotos} fotos · {pt.soldPhotos} vendidas
+            <div className="flex flex-col gap-0">
+              <p className="mb-2 font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                {event.points.length} puntos de este evento — cada uno se administra por separado
+              </p>
+              {event.points.map((pt, i) => (
+                <div key={pt.id} className="flex gap-3 border-l-2 border-border pl-4">
+                  <div className="flex flex-col items-center pt-1">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border font-studio-mono text-[10px] font-bold text-muted-foreground">
+                      {i + 1}
                     </span>
+                    {i < event.points.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <DeleteUnsoldButton pointId={pt.id} label={pt.label} eventId={event.id} />
-                    <CleanupSoldButton eventId={event.id} pointId={pt.id} />
+                  <div className="mb-4 flex-1 border border-border bg-muted/30 p-3">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{pt.label}</p>
+                      <span className="font-studio-mono text-xs text-muted-foreground">
+                        {formatBytes(pt.bytes)} · {pt.totalPhotos} fotos · {pt.soldPhotos} vendidas
+                      </span>
+                    </div>
+                    <ActionGroup title="Acciones de este punto" eventId={event.id} pointId={pt.id} scopeLabel={pt.label} />
                   </div>
                 </div>
               ))}
@@ -184,13 +212,21 @@ export function StudioStorage() {
 
       {details?.storage_plan && (
         <div className="mt-6 border border-border p-5">
-          <div className="flex items-center justify-between font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
-            <span>Uso total</span>
-            <span>
-              {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+              <span>Uso total</span>
+              <span className="text-foreground">
+                {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB
+              </span>
+              <span>· Plan {details.storage_plan.name}</span>
+            </div>
+            <Link to="/studio/planes">
+              <Button variant="secondary" size="sm">
+                {pct > 80 ? 'Mejorar plan →' : 'Ver planes'}
+              </Button>
+            </Link>
           </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
             <div className={cn('h-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
           </div>
         </div>

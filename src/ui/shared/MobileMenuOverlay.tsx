@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../lib/cn'
+import { getPortalRoot } from './portalRoot'
 
 interface MobileMenuOverlayProps {
   open: boolean
@@ -36,6 +37,6 @@ export function MobileMenuOverlay({ open, onClose, children, className }: Mobile
         {children}
       </div>
     </div>,
-    document.body,
+    getPortalRoot(),
   )
 }

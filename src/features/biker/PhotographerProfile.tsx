@@ -15,6 +15,7 @@ export function PhotographerProfile() {
   const { data: events = [] } = usePhotographerEvents(id)
   const { data: photos = [] } = usePhotographerPhotos(id)
   const [tab, setTab] = useState<'fotos' | 'eventos'>('fotos')
+  const [galleryLayout, setGalleryLayout] = useState<'grid' | 'mosaic'>('grid')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
   const gridPhotos: GridPhoto[] = useMemo(() => {
@@ -70,34 +71,54 @@ export function PhotographerProfile() {
         <div className="mt-8 grid grid-cols-2 gap-4 rounded-lg bg-muted p-6 text-center">
           <div>
             <p className="text-2xl font-bold">{events.length}</p>
-            <p className="text-sm text-muted-foreground">Eventos</p>
+            <p className="text-sm text-muted-foreground">Rodadas cubiertas</p>
           </div>
           <div>
             <p className="text-2xl font-bold">{photos.length}</p>
-            <p className="text-sm text-muted-foreground">Fotos</p>
+            <p className="text-sm text-muted-foreground">Fotos publicadas</p>
           </div>
         </div>
 
         {photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>}
 
-        <div className="mt-8 flex gap-2 border-b border-border">
-          <button
-            onClick={() => setTab('fotos')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${tab === 'fotos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-          >
-            Fotos destacadas
-          </button>
-          <button
-            onClick={() => setTab('eventos')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${tab === 'eventos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-          >
-            Eventos ({events.length})
-          </button>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-border">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTab('fotos')}
+              className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${tab === 'fotos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
+            >
+              Fotos destacadas
+            </button>
+            <button
+              onClick={() => setTab('eventos')}
+              className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${tab === 'eventos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
+            >
+              Eventos ({events.length})
+            </button>
+          </div>
+          {tab === 'fotos' && (
+            <div className="mb-2 flex gap-1 rounded-md bg-muted p-1">
+              <button
+                onClick={() => setGalleryLayout('grid')}
+                aria-label="Vista cuadrícula"
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'grid' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+              >
+                ▦ Grid
+              </button>
+              <button
+                onClick={() => setGalleryLayout('mosaic')}
+                aria-label="Vista mosaico"
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'mosaic' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+              >
+                ▤ Mosaico
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="py-8">
           {tab === 'fotos' ? (
-            <PhotoGrid photos={featuredPhotos} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+            <PhotoGrid photos={featuredPhotos} layout={galleryLayout} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (

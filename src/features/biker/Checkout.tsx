@@ -89,10 +89,10 @@ export function Checkout() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 font-flat md:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-10 pb-24 font-flat md:px-8 lg:pb-10">
       <h1 className="mb-8 text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
           {items.map((item) => (
             <div key={item.photoId} className="flex items-center gap-3 rounded-lg bg-muted p-3 sm:gap-4">
@@ -100,6 +100,7 @@ export function Checkout() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{item.eventTitle}</p>
                 <p className="truncate text-sm text-muted-foreground">{item.photographerName}</p>
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">Resolución completa · JPEG alta calidad · Descarga válida por siempre</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <p className="font-bold">Q{item.price}</p>
@@ -115,7 +116,7 @@ export function Checkout() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
           <Card>
             <h2 className="mb-4 font-bold">Resumen</h2>
             <div className="flex justify-between text-sm">
@@ -162,6 +163,18 @@ export function Checkout() {
 
           <Button size="lg" loading={placing} onClick={placeOrder}>
             Confirmar y pagar Q{total.toFixed(2)}
+          </Button>
+        </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">{items.length} fotos</p>
+            <p className="text-lg font-bold">Q{total.toFixed(2)}</p>
+          </div>
+          <Button loading={placing} onClick={placeOrder}>
+            Confirmar y pagar
           </Button>
         </div>
       </div>

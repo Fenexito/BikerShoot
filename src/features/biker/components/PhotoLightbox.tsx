@@ -100,9 +100,12 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="text-lg font-bold text-white">Q{photo.price}</span>
-          {photo.moto_brand && <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70">{photo.moto_brand}</span>}
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-bold text-white">Q{photo.price}</span>
+            {photo.moto_brand && <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70">{photo.moto_brand}</span>}
+          </div>
+          <p className="mt-1 text-xs text-white/50">Vista previa con marca de agua — al comprar recibes el archivo original sin marca de agua.</p>
         </div>
         <div className="flex items-center gap-2">
           <button

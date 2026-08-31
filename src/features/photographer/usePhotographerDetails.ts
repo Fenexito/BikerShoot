@@ -18,6 +18,9 @@ export interface PhotographerDetails {
   approved_at: string | null
   storage_plan_id: string
   storage_plan: StoragePlanInfo | null
+  plan_started_at: string
+  plan_renews_at: string
+  pending_plan_id: string | null
 }
 
 export function usePhotographerDetails(userId: string | undefined) {
@@ -33,6 +36,17 @@ export function usePhotographerDetails(userId: string | undefined) {
       return data as unknown as PhotographerDetails
     },
     enabled: !!userId,
+  })
+}
+
+export function useStoragePlans() {
+  return useQuery({
+    queryKey: ['storage-plans'],
+    queryFn: async (): Promise<StoragePlanInfo[]> => {
+      const { data, error } = await supabase.from('storage_plans').select('id, name, gb_limit, price_monthly_gtq').order('sort_order')
+      if (error) throw error
+      return data
+    },
   })
 }
 

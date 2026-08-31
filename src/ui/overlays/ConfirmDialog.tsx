@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useConfirmStore } from './confirmStore'
 import { cn } from '../../lib/cn'
+import { getPortalRoot } from '../shared/portalRoot'
 
 const CLOSE_DURATION = 150
 
@@ -79,6 +80,6 @@ export function ConfirmDialog() {
         </div>
       </div>
     </div>,
-    document.body,
+    getPortalRoot(),
   )
 }

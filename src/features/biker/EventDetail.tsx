@@ -55,6 +55,8 @@ export function EventDetail() {
   if (!event) return <PlaceholderPage title="Evento no encontrado" />
 
   const date = new Date(event.event_date)
+  const pd = event.photographer?.photographer_details
+  const whatsapp = pd ? (Array.isArray(pd) ? pd[0]?.whatsapp : pd.whatsapp) : null
 
   return (
     <div className="pb-24 font-flat">
@@ -77,12 +79,19 @@ export function EventDetail() {
             <InitialsAvatar name={event.photographer?.display_name ?? '?'} className="h-12 w-12 rounded-full bg-primary text-sm text-white" />
             <div>
               <p className="font-bold">{event.photographer?.display_name}</p>
-              <p className="text-sm text-muted-foreground">Fotógrafo del evento</p>
+              <p className="text-sm text-muted-foreground">Ver perfil del fotógrafo</p>
             </div>
           </Link>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Desde</p>
-            <p className="text-xl font-bold text-primary">Q{event.price_per_photo} / foto</p>
+          <div className="flex items-center gap-4">
+            {whatsapp && (
+              <a href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
+                <Button style={{ backgroundColor: '#25D366' }}>💬 Escribir por WhatsApp</Button>
+              </a>
+            )}
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Desde</p>
+              <p className="text-xl font-bold text-primary">Q{event.price_per_photo} / foto</p>
+            </div>
           </div>
         </div>
 
