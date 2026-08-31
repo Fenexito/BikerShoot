@@ -24,6 +24,7 @@ interface DeliverablePhoto {
   delivered_path: string | null
   raw_path: string | null
   original_filename: string | null
+  featured: boolean
 }
 
 function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; orderItemId: string }) {
@@ -32,6 +33,20 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   const [uploading, setUploading] = useState(false)
   const [downloadingRaw, setDownloadingRaw] = useState(false)
   const [openingDelivered, setOpeningDelivered] = useState(false)
+  const [togglingFeatured, setTogglingFeatured] = useState(false)
+
+  async function toggleFeatured() {
+    setTogglingFeatured(true)
+    const { error } = await supabase.from('photos').update({ featured: !photo.featured }).eq('id', photo.id)
+    setTogglingFeatured(false)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: photo.featured ? 'Quitada de destacadas' : '★ Agregada a tu muro de destacadas' })
+    queryClient.invalidateQueries({ queryKey: ['photographer-order-items'] })
+    queryClient.invalidateQueries({ queryKey: ['featured-photographer-photos'] })
+  }
 
   async function downloadRaw() {
     setDownloadingRaw(true)
@@ -117,6 +132,20 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
           <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white">
             Abriendo…
           </div>
+        )}
+        {delivered && (
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleFeatured() }}
+            disabled={togglingFeatured}
+            aria-label="Destacar en tu perfil público"
+            title="Destacar en tu perfil público"
+            className={cn(
+              'absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center text-base transition-colors',
+              photo.featured ? 'bg-accent text-white' : 'bg-black/60 text-white hover:bg-black/80',
+            )}
+          >
+            ★
+          </button>
         )}
         <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
           {delivered ? (

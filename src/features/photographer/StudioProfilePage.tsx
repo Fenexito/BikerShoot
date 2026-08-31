@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
-import { usePublicPhotographer, usePhotographerEvents, usePhotographerPhotos } from '../biker/usePublicData'
+import { usePublicPhotographer, usePhotographerEvents, useFeaturedPhotographerPhotos, usePhotographerPhotoCount } from '../biker/usePublicData'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
@@ -44,17 +44,47 @@ export function StudioProfilePage() {
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: photographer, isLoading } = usePublicPhotographer(user?.id)
   const { data: events = [] } = usePhotographerEvents(user?.id)
-  const { data: photos = [] } = usePhotographerPhotos(user?.id)
+  const { data: featuredPhotos = [] } = useFeaturedPhotographerPhotos(user?.id)
+  const { data: photoCount = 0 } = usePhotographerPhotoCount(user?.id)
   const push = useToastStore((s) => s.push)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
   const [editing, setEditing] = useState(false)
   const [tab, setTab] = useState<'destacadas' | 'eventos'>('destacadas')
 
-  const featuredPhotos = useMemo(() => {
-    const featured = photos.filter((p) => p.featured)
-    return featured.length > 0 ? featured : photos
-  }, [photos])
+  async function handleCoverFile(file: File | undefined) {
+    if (!file || !user) return
+    if (!file.type.startsWith('image/')) {
+      push({ type: 'error', title: 'La portada debe ser una imagen' })
+      return
+    }
+    setUploadingCover(true)
+    try {
+      const { data: signed, error: signError } = await supabase.functions.invoke('r2-profile-cover-upload-url', {
+        body: { fileName: file.name, contentType: file.type },
+      })
+      if (signError || !signed?.uploadUrl) throw new Error(signError?.message ?? 'No se pudo obtener la URL de subida')
+
+      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+
+      const { error: updateError } = await supabase
+        .from('photographer_details')
+        .update({ profile_cover_path: signed.coverPath })
+        .eq('profile_id', user.id)
+      if (updateError) throw updateError
+
+      queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+      push({ type: 'success', title: 'Portada actualizada' })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo actualizar la portada', description: (err as Error).message })
+    } finally {
+      setUploadingCover(false)
+    }
+  }
 
   async function handleAvatarFile(file: File | undefined) {
     if (!file || !user) return
@@ -83,15 +113,6 @@ export function StudioProfilePage() {
     } finally {
       setUploadingAvatar(false)
     }
-  }
-
-  async function toggleFeatured(photoId: string, next: boolean) {
-    const { error } = await supabase.from('photos').update({ featured: next }).eq('id', photoId)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
-      return
-    }
-    queryClient.invalidateQueries({ queryKey: ['photographer-photos', user?.id] })
   }
 
   const {
@@ -158,9 +179,21 @@ export function StudioProfilePage() {
   return (
     <div>
       {/* Banner — misma estructura que el perfil público que ve el biker (PhotographerProfile.tsx) */}
-      <div className="relative flex h-48 items-center justify-center bg-muted md:h-64">
-        <span className="text-6xl opacity-20">🏍️</span>
-      </div>
+      <button
+        onClick={() => coverInputRef.current?.click()}
+        disabled={uploadingCover}
+        className="group relative flex h-48 w-full items-center justify-center overflow-hidden bg-muted md:h-64"
+      >
+        {details?.profile_cover_path ? (
+          <img src={r2Url(details.profile_cover_path)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <span className="text-6xl opacity-20">🏍️</span>
+        )}
+        <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold uppercase tracking-wider2 text-white opacity-0 transition-opacity group-hover:opacity-100">
+          {uploadingCover ? 'Subiendo…' : 'Cambiar portada'}
+        </span>
+      </button>
+      <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
 
       <div className={STUDIO_PAGE_WIDE}>
         <div className="-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
@@ -208,7 +241,7 @@ export function StudioProfilePage() {
               <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Rodadas cubiertas</p>
             </div>
             <div>
-              <p className="font-studio text-2xl font-bold">{photos.length}</p>
+              <p className="font-studio text-2xl font-bold">{photoCount}</p>
               <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos publicadas</p>
             </div>
           </div>
@@ -273,7 +306,7 @@ export function StudioProfilePage() {
               tab === 'destacadas' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
-            {editing ? 'Curar destacadas' : 'Fotos destacadas'}
+            Fotos destacadas
           </button>
           <button
             onClick={() => setTab('eventos')}
@@ -289,39 +322,19 @@ export function StudioProfilePage() {
         <div className="py-8">
           {tab === 'destacadas' ? (
             <>
-              {editing && (
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Marca ★ las fotos que quieres mostrar en tu perfil público. Sin ninguna marcada, se muestran todas.
-                </p>
-              )}
-              {editing ? (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                  {photos.map((photo) => (
-                    <div key={photo.id} className="group relative aspect-[4/5] overflow-hidden border border-border">
-                      <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
-                      <button
-                        onClick={() => toggleFeatured(photo.id, !photo.featured)}
-                        aria-label="Destacar en tu perfil"
-                        className={cn(
-                          'absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-sm transition-opacity',
-                          photo.featured ? 'bg-accent text-white opacity-100' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100',
-                        )}
-                      >
-                        ★
-                      </button>
-                    </div>
-                  ))}
-                  {photos.length === 0 && <p className="col-span-full text-sm text-muted-foreground">Todavía no tienes fotos publicadas.</p>}
-                </div>
-              ) : featuredPhotos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Todavía no tienes fotos publicadas.</p>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Para destacar una foto aquí, márcala al entregar el archivo final en un pedido — así solo se muestran
+                fotos que ya editaste y entregaste, no las miles que puedas tener subidas.
+              </p>
+              {featuredPhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>
               ) : (
-                <div style={{ height: 420 }}>
+                <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen" style={{ height: '75vh', minHeight: 480 }}>
                   <DriftWall
                     items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
-                    columns={Math.min(7, Math.max(3, featuredPhotos.length))}
-                    tileWidth={180}
-                    tileHeight={180}
+                    columns={Math.min(8, Math.max(3, featuredPhotos.length))}
+                    tileWidth={220}
+                    tileHeight={220}
                     gap={6}
                     radius={0}
                     tilt={16}
@@ -332,9 +345,9 @@ export function StudioProfilePage() {
                     variance={0.5}
                     parallax={0.5}
                     lift={48}
-                    fade={0.25}
-                    dim={0.75}
-                    overlayColor="rgb(var(--color-background))"
+                    fade={0.15}
+                    dim={0.92}
+                    overlayColor="transparent"
                   />
                 </div>
               )}

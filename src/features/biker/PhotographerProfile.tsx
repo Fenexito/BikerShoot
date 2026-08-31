@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { usePublicPhotographer, usePhotographerEvents, usePhotographerPhotos } from './usePublicData'
+import { usePublicPhotographer, usePhotographerEvents, useFeaturedPhotographerPhotos, usePhotographerPhotoCount } from './usePublicData'
 import { r2Url, previewUrl } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
@@ -9,18 +9,20 @@ import DriftWall from '../../ui/reactbits/DriftWall'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
+import { IconVerified } from '../../ui/shared/icons'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 
 export function PhotographerProfile() {
   const { id } = useParams()
   const { data: photographer, isLoading } = usePublicPhotographer(id)
   const { data: events = [] } = usePhotographerEvents(id)
-  const { data: photos = [] } = usePhotographerPhotos(id)
+  const { data: photos = [] } = useFeaturedPhotographerPhotos(id)
+  const { data: photoCount = 0 } = usePhotographerPhotoCount(id)
   const [tab, setTab] = useState<'fotos' | 'eventos'>('fotos')
   const [galleryLayout, setGalleryLayout] = useState<'grid' | 'mosaic' | 'muro'>('muro')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
 
-  const gridPhotos: GridPhoto[] = useMemo(() => {
+  const featuredPhotos: GridPhoto[] = useMemo(() => {
     if (!photographer) return []
     return photos.map((p) => {
       const event = events.find((e) => e.id === p.event_id)
@@ -28,27 +30,29 @@ export function PhotographerProfile() {
     })
   }, [photos, events, photographer])
 
-  // Si el fotógrafo no ha curado ninguna, mostramos todas para no dejar la pestaña vacía.
-  const featuredPhotos = useMemo(() => {
-    const featured = gridPhotos.filter((p) => p.featured)
-    return featured.length > 0 ? featured : gridPhotos
-  }, [gridPhotos])
-
   if (isLoading) return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando…</div>
   if (!photographer) return <PlaceholderPage title="Fotógrafo no encontrado" />
 
   const avatarUrl = photographer.avatar_url
     ? (photographer.avatar_url.startsWith('http') ? photographer.avatar_url : r2Url(photographer.avatar_url))
     : null
+  const coverUrl = photographer.profile_cover_path ? r2Url(photographer.profile_cover_path) : null
 
   return (
     <div className="font-flat">
-      <div className="relative flex h-48 items-center justify-center bg-gradient-to-br from-blue-200 to-emerald-200 md:h-64">
-        <span className="text-6xl opacity-30">🏍️</span>
+      <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-200 to-emerald-200 md:h-64">
+        {coverUrl ? (
+          <>
+            <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
+          </>
+        ) : (
+          <span className="text-6xl opacity-30">🏍️</span>
+        )}
       </div>
 
       <div className="mx-auto max-w-5xl px-4 md:px-8">
-        <div className="-mt-14 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+        <div className="relative -mt-14 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           {avatarUrl ? (
             <img src={avatarUrl} alt={photographer.display_name} className="h-28 w-28 rounded-full border-4 border-background object-cover" />
           ) : (
@@ -58,7 +62,10 @@ export function PhotographerProfile() {
             />
           )}
           <div className="flex-1 text-center sm:text-left">
-            <h1 className="text-2xl font-bold tracking-tight">{photographer.display_name}</h1>
+            <div className="flex items-center justify-center gap-1.5 sm:justify-start">
+              <h1 className="text-2xl font-bold tracking-tight">{photographer.display_name}</h1>
+              <IconVerified className="h-5 w-5 shrink-0" aria-label="Fotógrafo verificado" />
+            </div>
             {photographer.city && <p className="text-muted-foreground">{photographer.city}</p>}
             <SocialLinks
               instagramUrl={photographer.instagram_url}
@@ -82,7 +89,7 @@ export function PhotographerProfile() {
             <p className="text-sm text-muted-foreground">Rodadas cubiertas</p>
           </div>
           <div>
-            <p className="text-2xl font-bold">{photos.length}</p>
+            <p className="text-2xl font-bold">{photoCount}</p>
             <p className="text-sm text-muted-foreground">Fotos publicadas</p>
           </div>
         </div>
@@ -135,14 +142,14 @@ export function PhotographerProfile() {
           {tab === 'fotos' ? (
             galleryLayout === 'muro' ? (
               featuredPhotos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Este fotógrafo todavía no tiene fotos publicadas.</p>
+                <p className="text-sm text-muted-foreground">Este fotógrafo todavía no ha destacado fotos en su perfil.</p>
               ) : (
-                <div style={{ height: 420 }}>
+                <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen" style={{ height: '75vh', minHeight: 480 }}>
                   <DriftWall
                     items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
-                    columns={Math.min(7, Math.max(3, featuredPhotos.length))}
-                    tileWidth={180}
-                    tileHeight={180}
+                    columns={Math.min(8, Math.max(3, featuredPhotos.length))}
+                    tileWidth={220}
+                    tileHeight={220}
                     gap={6}
                     radius={12}
                     tilt={16}
@@ -153,8 +160,9 @@ export function PhotographerProfile() {
                     variance={0.5}
                     parallax={0.5}
                     lift={48}
-                    fade={0.25}
-                    dim={0.75}
+                    fade={0.15}
+                    dim={0.92}
+                    overlayColor="transparent"
                     onItemClick={(_, index) => setLightbox({ photos: featuredPhotos, index })}
                   />
                 </div>

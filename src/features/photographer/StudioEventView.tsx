@@ -222,11 +222,10 @@ export function StudioEventView() {
           useWindowScroll
           startRadius={0}
           endRadius={0}
-          scrollDistance={0.6}
-          holdDistance={0.1}
-        >
-          <Badge className="border-white/20 bg-black/70 text-white">{event.category}</Badge>
-        </ScrollExpand>
+          mediaZoom={1.12}
+          scrollDistance={0.35}
+          holdDistance={0.05}
+        />
       ) : (
         <div className="relative flex h-[280px] w-full items-center justify-center overflow-hidden bg-muted md:h-[380px]">
           <span className="text-5xl opacity-20">📷</span>

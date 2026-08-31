@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { queryClient } from '../../../lib/queryClient'
 import { supabase } from '../../../lib/supabase'
 import { r2Url, previewUrl } from '../../../lib/r2'
-import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview } from '../photoUpload'
+import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, hashFile } from '../photoUpload'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
@@ -26,6 +28,7 @@ interface QueueItem {
   errorMessage?: string
   previewPath?: string
   backupRaw: boolean
+  hash: string
 }
 
 function formatBytes(n: number) {
@@ -51,9 +54,26 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   const [, setTick] = useState(0)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [dragging, setDragging] = useState(false)
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const knownHashesRef = useRef<Set<string>>(new Set())
 
   const rerender = () => setTick((t) => t + 1)
+
+  // Hashes de todo lo que ya existe en este evento (cualquier punto) — un
+  // duplicado no debería colarse solo porque se sube a un punto distinto.
+  const { data: existingHashes } = useQuery({
+    queryKey: ['event-photo-hashes', eventId],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase.from('photos').select('content_hash').eq('event_id', eventId).not('content_hash', 'is', null)
+      if (error) throw error
+      return (data ?? []).map((r) => r.content_hash as string)
+    },
+  })
+
+  useEffect(() => {
+    if (existingHashes) for (const h of existingHashes) knownHashesRef.current.add(h)
+  }, [existingHashes])
 
   useEffect(() => {
     watermarkImageRef.current = null
@@ -143,10 +163,12 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         preview_size_bytes: previewBlob.size,
         raw_size_bytes: item.backupRaw ? item.file.size : 0,
         original_filename: item.file.name,
+        content_hash: item.hash,
       })
       if (insertError) throw insertError
 
       updateItem(item.id, { status: 'lista', progress: 100, previewPath: data.previewPath })
+      queryClient.invalidateQueries({ queryKey: ['event-photo-hashes', eventId] })
       onItemUploaded?.()
     } catch (err) {
       updateItem(item.id, { status: 'error', errorMessage: (err as Error).message })
@@ -160,14 +182,38 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       .sort((a, b) => a.name.localeCompare(b.name))
     if (imageFiles.length === 0) return
 
+    setCheckingDuplicates(true)
+    const hashed = await Promise.all(imageFiles.map(async (file) => ({ file, hash: await hashFile(file) })))
+    setCheckingDuplicates(false)
+
+    const unique: { file: File; hash: string }[] = []
+    let duplicateCount = 0
+    for (const item of hashed) {
+      if (knownHashesRef.current.has(item.hash)) {
+        duplicateCount++
+        continue
+      }
+      knownHashesRef.current.add(item.hash)
+      unique.push(item)
+    }
+
+    if (duplicateCount > 0) {
+      push({
+        type: 'error',
+        title: duplicateCount === 1 ? 'Se omitió 1 foto duplicada' : `Se omitieron ${duplicateCount} fotos duplicadas`,
+        description: 'Ya existen fotos con este mismo contenido en este evento.',
+      })
+    }
+    if (unique.length === 0) return
+
     const backupRaw = await confirmDialog.ask({
-      title: `¿Respaldar el original de ${imageFiles.length === 1 ? 'esta foto' : `estas ${imageFiles.length} fotos`}?`,
+      title: `¿Respaldar el original de ${unique.length === 1 ? 'esta foto' : `estas ${unique.length} fotos`}?`,
       description: 'Guarda una copia sin editar (sin marca de agua) además de la vista previa. Ocupa más espacio de tu plan.',
       confirmLabel: 'Sí, respaldar también',
       cancelLabel: 'No, solo vista previa',
     })
 
-    const newItems: QueueItem[] = imageFiles.map((file) => ({
+    const newItems: QueueItem[] = unique.map(({ file, hash }) => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       file,
       name: file.name,
@@ -176,6 +222,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       status: 'pendiente',
       progress: 0,
       backupRaw,
+      hash,
     }))
     itemsRef.current = [...itemsRef.current, ...newItems]
     rerender()
@@ -228,9 +275,10 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         <p className="text-sm font-semibold">Arrastra tus fotos aquí</p>
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="border border-foreground px-4 py-2 text-xs font-semibold uppercase tracking-wider2 transition-colors hover:bg-foreground hover:text-background"
+          disabled={checkingDuplicates}
+          className="border border-foreground px-4 py-2 text-xs font-semibold uppercase tracking-wider2 transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
         >
-          Elegir archivos
+          {checkingDuplicates ? 'Revisando duplicados…' : 'Elegir archivos'}
         </button>
         <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => enqueue(e.target.files)} />
       </div>

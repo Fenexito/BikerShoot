@@ -19,6 +19,15 @@ export function uploadWithProgress(url: string, body: Blob, contentType: string,
   })
 }
 
+/** Hash SHA-256 del archivo original (bytes, no del preview reescalado) —
+ * base del validador de duplicados: dos archivos con contenido idéntico dan
+ * el mismo hash sin importar el nombre con el que se subieron. */
+export async function hashFile(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 export async function loadWatermarkImage(url: string): Promise<ImageBitmap> {
   const res = await fetch(url)
   if (!res.ok) throw new Error('No se pudo cargar la marca de agua')

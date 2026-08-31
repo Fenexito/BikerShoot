@@ -90,7 +90,7 @@ export function useApprovedPhotographers() {
     queryFn: async (): Promise<DbPhotographer[]> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url)')
+        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url, profile_cover_path)')
         .eq('role', 'photographer')
       if (error) throw error
       return (data ?? []).map((row: any) => {
@@ -106,6 +106,7 @@ export function useApprovedPhotographers() {
           instagram_url: pd?.instagram_url ?? null,
           facebook_url: pd?.facebook_url ?? null,
           tiktok_url: pd?.tiktok_url ?? null,
+          profile_cover_path: pd?.profile_cover_path ?? null,
         }
       })
     },
@@ -118,7 +119,7 @@ export function usePublicPhotographer(photographerId: string | undefined) {
     queryFn: async (): Promise<DbPhotographer | null> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url)')
+        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url, profile_cover_path)')
         .eq('id', photographerId)
         .single()
       if (error) throw error
@@ -134,6 +135,7 @@ export function usePublicPhotographer(photographerId: string | undefined) {
         instagram_url: pd?.instagram_url ?? null,
         facebook_url: pd?.facebook_url ?? null,
         tiktok_url: pd?.tiktok_url ?? null,
+        profile_cover_path: pd?.profile_cover_path ?? null,
       }
     },
     enabled: !!photographerId,
@@ -158,18 +160,40 @@ export function usePhotographerEvents(photographerId: string | undefined) {
   })
 }
 
-export function usePhotographerPhotos(photographerId: string | undefined) {
+/** Solo las fotos marcadas como destacadas — nunca "todas las fotos del
+ * fotógrafo" (eso puede ser decenas de miles de filas). El fotógrafo elige
+ * cuáles destacar al momento de entregarlas en un pedido, no aquí. */
+export function useFeaturedPhotographerPhotos(photographerId: string | undefined) {
   return useQuery({
-    queryKey: ['photographer-photos', photographerId],
+    queryKey: ['featured-photographer-photos', photographerId],
     queryFn: async (): Promise<DbPhoto[]> => {
       const { data, error } = await supabase
         .from('photos')
         .select('*, event:events(deleted_at, status)')
         .eq('photographer_id', photographerId)
+        .eq('featured', true)
       if (error) throw error
       return (
         (data as unknown as (DbPhoto & { event: { deleted_at: string | null; status: string } | null })[]) ?? []
       ).filter((p) => !p.event?.deleted_at && p.event?.status !== 'pausado')
+    },
+    enabled: !!photographerId,
+  })
+}
+
+/** Conteo liviano (sin traer las filas) para el stat "Fotos publicadas". */
+export function usePhotographerPhotoCount(photographerId: string | undefined) {
+  return useQuery({
+    queryKey: ['photographer-photo-count', photographerId],
+    queryFn: async (): Promise<number> => {
+      const { count, error } = await supabase
+        .from('photos')
+        .select('id, event:events!inner(deleted_at, status)', { count: 'exact', head: true })
+        .eq('photographer_id', photographerId)
+        .is('event.deleted_at', null)
+        .neq('event.status', 'pausado')
+      if (error) throw error
+      return count ?? 0
     },
     enabled: !!photographerId,
   })

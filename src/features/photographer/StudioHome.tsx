@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
 import { usePhotographerOrders } from './useMyOrders'
 import { supabase } from '../../lib/supabase'
+import { r2Url } from '../../lib/r2'
 import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
 import { getOrderStatusStyle } from '../../lib/orderStatus'
 import { Card } from '../../ui/studio/Card'
@@ -116,8 +117,12 @@ export function StudioHome() {
           <div className="grid gap-4 md:grid-cols-3">
             {events.slice(0, 6).map((event) => (
               <div key={event.id} className="overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover">
-                <div className="flex h-36 items-center justify-center bg-muted">
-                  <span className="text-3xl opacity-30">📷</span>
+                <div className="flex h-36 items-center justify-center overflow-hidden bg-muted">
+                  {event.cover_path ? (
+                    <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-3xl opacity-30">📷</span>
+                  )}
                 </div>
                 <div className="p-5">
                   <div className="flex items-center justify-between">

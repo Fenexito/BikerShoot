@@ -207,8 +207,8 @@ export function StudioStorage() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <h1 className="font-studio text-2xl font-bold tracking-tight2">Administrar almacenamiento</h1>
-      <p className="mt-1 text-muted-foreground">Revisa qué eventos ocupan más espacio y libera lo que ya no necesitas.</p>
+      <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Almacenamiento</h1>
+      <p className="mt-2 text-muted-foreground">Revisa qué eventos ocupan más espacio y libera lo que ya no necesitas.</p>
 
       {details?.storage_plan && (
         <div className="mt-6 border border-border p-5">
