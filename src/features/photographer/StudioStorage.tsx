@@ -25,7 +25,7 @@ function ActionButton({ label, description, busy, onClick }: { label: string; de
     <button
       onClick={onClick}
       disabled={busy}
-      className="flex flex-col gap-0.5 border border-border px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5 disabled:opacity-50"
+      className="flex flex-col gap-0.5 rounded-2xl border border-border px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5 disabled:opacity-50"
     >
       <span className="font-studio-mono text-[10px] font-bold uppercase tracking-wider2">{busy ? 'Procesando…' : label}</span>
       <span className="text-[11px] text-muted-foreground">{description}</span>
@@ -132,7 +132,7 @@ function EventRow({ event }: { event: EventStorage }) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="border border-border">
+    <div className="rounded-2xl border border-border">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left">
         <div className="min-w-0">
           <p className="truncate font-semibold">{event.title}</p>
@@ -165,12 +165,12 @@ function EventRow({ event }: { event: EventStorage }) {
               {event.points.map((pt, i) => (
                 <div key={pt.id} className="flex gap-3 border-l-2 border-border pl-4">
                   <div className="flex flex-col items-center pt-1">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border font-studio-mono text-[10px] font-bold text-muted-foreground">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full rounded-2xl border border-border font-studio-mono text-[10px] font-bold text-muted-foreground">
                       {i + 1}
                     </span>
                     {i < event.points.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
                   </div>
-                  <div className="mb-4 flex-1 border border-border bg-muted/30 p-3">
+                  <div className="mb-4 flex-1 rounded-2xl border border-border bg-muted/30 p-3">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold">{pt.label}</p>
                       <span className="font-studio-mono text-xs text-muted-foreground">
@@ -211,7 +211,7 @@ export function StudioStorage() {
       <p className="mt-2 text-muted-foreground">Revisa qué eventos ocupan más espacio y libera lo que ya no necesitas.</p>
 
       {details?.storage_plan && (
-        <div className="mt-6 border border-border p-5">
+        <div className="mt-6 rounded-2xl border border-border p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
               <span>Uso total</span>
@@ -234,7 +234,7 @@ export function StudioStorage() {
 
       <div className="mt-8 flex items-center justify-between">
         <h2 className="font-studio text-lg font-bold tracking-tight2">Tus eventos</h2>
-        <div className="flex border border-border">
+        <div className="flex rounded-2xl border border-border">
           {(['oldest', 'newest', 'biggest'] as SortMode[]).map((s) => (
             <button
               key={s}

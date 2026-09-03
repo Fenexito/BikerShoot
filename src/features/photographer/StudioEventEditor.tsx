@@ -358,7 +358,7 @@ export function StudioEventEditor() {
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
+            className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
           />
         </div>
       </div>
@@ -378,7 +378,7 @@ export function StudioEventEditor() {
                 <img
                   src={coverLocalPreview ?? r2Url(coverPath!)}
                   alt="Portada"
-                  className="h-20 w-32 shrink-0 border border-border object-cover"
+                  className="h-20 w-32 shrink-0 rounded-2xl border border-border object-cover"
                 />
               ) : (
                 <div className="flex h-20 w-32 shrink-0 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
@@ -415,7 +415,7 @@ export function StudioEventEditor() {
                 <img
                   src={watermarkLocalPreview ?? r2Url(watermarkPath!)}
                   alt="Marca de agua"
-                  className="h-20 w-20 shrink-0 border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
+                  className="h-20 w-20 shrink-0 rounded-2xl border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
                 />
               ) : (
                 <div className="flex h-20 w-20 shrink-0 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
@@ -450,7 +450,7 @@ export function StudioEventEditor() {
         </p>
 
         {points.length > 0 && (
-          <div className="mt-6 flex flex-col divide-y divide-border border border-border">
+          <div className="mt-6 flex flex-col divide-y divide-border rounded-2xl border border-border">
             {points.map((pt) => (
               <div key={pt.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <p className="font-semibold">{pt.label}</p>
@@ -459,14 +459,14 @@ export function StudioEventEditor() {
                     type="time"
                     value={pt.timeStart}
                     onChange={(e) => updatePointTime(pt.id, 'timeStart', e.target.value)}
-                    className="border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
+                    className="rounded-2xl border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
                   />
                   <span className="text-xs text-muted-foreground">–</span>
                   <input
                     type="time"
                     value={pt.timeEnd}
                     onChange={(e) => updatePointTime(pt.id, 'timeEnd', e.target.value)}
-                    className="border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
+                    className="rounded-2xl border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
                   />
                   <button onClick={() => removePoint(pt.id)} className="ml-2 text-sm text-muted-foreground hover:text-accent">
                     Quitar

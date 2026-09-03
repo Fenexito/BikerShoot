@@ -26,7 +26,7 @@ const PAGE_SIZE = 12
 function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2">
-      <img src={previewUrl(photo)} alt="" className="h-12 w-12 shrink-0 border border-border object-cover" />
+      <img src={previewUrl(photo)} alt="" className="h-12 w-12 shrink-0 rounded-2xl border border-border object-cover" />
       <p className="min-w-0 flex-1 truncate text-sm" title={photo.original_filename ?? undefined}>
         {photo.original_filename ?? 'Sin nombre registrado'}
       </p>
@@ -93,7 +93,7 @@ function PhotoGallery({ photos, onDelete }: { photos: EventPhoto[]; onDelete: (i
   return (
     <div>
       <div className="mb-3 flex items-center justify-end">
-        <div className="flex border border-border">
+        <div className="flex rounded-2xl border border-border">
           <button
             onClick={() => setView('grid')}
             className={cn('px-2 py-1 text-[10px] uppercase tracking-wider2', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground')}
@@ -116,7 +116,7 @@ function PhotoGallery({ photos, onDelete }: { photos: EventPhoto[]; onDelete: (i
           ))}
         </div>
       ) : (
-        <div className="flex flex-col divide-y divide-border border border-border">
+        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
           {visible.map((photo) => (
             <PhotoListRow key={photo.id} photo={photo} onDelete={onDelete} />
           ))}
@@ -126,7 +126,7 @@ function PhotoGallery({ photos, onDelete }: { photos: EventPhoto[]; onDelete: (i
       {visibleCount < photos.length && (
         <button
           onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-          className="mt-4 w-full border border-border py-3 text-center text-xs font-semibold uppercase tracking-wider2 text-muted-foreground hover:text-foreground"
+          className="mt-4 w-full rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wider2 text-muted-foreground hover:text-foreground"
         >
           Ver más fotos ({photos.length - visibleCount} más)
         </button>
@@ -254,14 +254,14 @@ export function StudioEventView() {
             {event.status === 'pausado' ? (
               <button
                 onClick={() => toggleStatus('activo')}
-                className="bg-emerald-600 px-5 py-2.5 text-xs font-bold uppercase tracking-wider2 text-white transition-colors hover:bg-emerald-500"
+                className="rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
               >
                 Publicar
               </button>
             ) : (
               <button
                 onClick={() => toggleStatus('pausado')}
-                className="bg-blue-600 px-5 py-2.5 text-xs font-bold uppercase tracking-wider2 text-white transition-colors hover:bg-blue-500"
+                className="rounded-full bg-blue-600 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-500"
               >
                 Pausar
               </button>
@@ -273,7 +273,7 @@ export function StudioEventView() {
               onClick={deleteEvent}
               aria-label="Eliminar evento"
               title="Eliminar evento"
-              className="flex items-center justify-center border border-border px-3 text-accent transition-colors hover:border-accent hover:bg-accent hover:text-accent-foreground"
+              className="flex items-center justify-center rounded-full border border-border px-3 text-accent transition-colors hover:border-accent hover:bg-accent hover:text-accent-foreground"
             >
               <IconTrash className="h-4 w-4" />
             </button>

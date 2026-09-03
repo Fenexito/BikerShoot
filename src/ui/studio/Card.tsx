@@ -10,7 +10,7 @@ export function Card({ bordered = true, highlighted = false, className, children
   return (
     <div
       className={cn(
-        'relative bg-transparent p-6 transition-colors duration-150 md:p-8',
+        'relative rounded-3xl bg-card p-6 transition-colors duration-150 md:p-8',
         bordered && 'border border-border hover:border-border-hover',
         highlighted && 'border-2 border-accent hover:border-accent',
         className,
@@ -18,7 +18,7 @@ export function Card({ bordered = true, highlighted = false, className, children
       {...props}
     >
       {highlighted && (
-        <span className="absolute -top-3 left-6 bg-accent px-3 py-1 font-studio-mono text-xs uppercase tracking-wider2 text-accent-foreground">
+        <span className="absolute -top-3 left-6 rounded-full bg-accent px-3 py-1 text-xs font-semibold uppercase tracking-wide text-accent-foreground">
           Destacado
         </span>
       )}

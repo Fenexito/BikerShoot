@@ -132,6 +132,15 @@ export function IconTiktok(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconSearch(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.5" y2="16.5" />
+    </svg>
+  )
+}
+
 export function IconTrash(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

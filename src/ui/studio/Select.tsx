@@ -18,7 +18,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({ label, class
         ref={ref}
         id={selectId}
         className={cn(
-          'h-12 border border-border bg-input px-4 text-sm text-foreground md:h-14',
+          'h-12 rounded-full border border-border bg-input px-5 text-sm text-foreground md:h-14',
           'outline-none transition-colors duration-150 focus:border-accent',
           className,
         )}

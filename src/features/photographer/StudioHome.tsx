@@ -74,9 +74,9 @@ export function StudioHome() {
         </div>
 
         {needsAttention.length === 0 ? (
-          <p className="border border-border px-4 py-6 text-center text-muted-foreground">Todo al día. No hay pedidos pendientes.</p>
+          <p className="rounded-2xl border border-border px-4 py-6 text-center text-muted-foreground">Todo al día. No hay pedidos pendientes.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-border border border-border">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
             {needsAttention.map((order) => (
               <Link
                 key={order.orderId}
@@ -110,13 +110,13 @@ export function StudioHome() {
           </Link>
         </div>
         {events.length === 0 ? (
-          <p className="border border-border px-4 py-6 text-center text-muted-foreground">
+          <p className="rounded-2xl border border-border px-4 py-6 text-center text-muted-foreground">
             Todavía no tienes eventos. <Link to="/studio/eventos/new" className="text-accent">Crea el primero.</Link>
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {events.slice(0, 6).map((event) => (
-              <div key={event.id} className="overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover">
+              <div key={event.id} className="overflow-hidden rounded-2xl border border-border transition-colors duration-150 hover:border-border-hover">
                 <div className="flex h-36 items-center justify-center overflow-hidden bg-muted">
                   {event.cover_path ? (
                     <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />

@@ -14,27 +14,29 @@ export function HeaderPublic() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <header className="border-b border-border bg-background">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+    <div className="sticky top-3 z-30 px-3 md:top-4 md:px-4">
+      <header className="mx-auto flex h-16 max-w-5xl items-center justify-between rounded-full border border-border bg-muted/80 px-3 shadow-sm backdrop-blur-md md:px-4">
         <div className="flex items-center gap-3">
           <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="text-foreground md:hidden">
             <IconMenu className="h-6 w-6" />
           </button>
-          <Link to="/" className="text-lg font-extrabold tracking-tight text-primary">
+          <Link to="/" className="pl-2 text-lg font-extrabold tracking-tight text-primary">
             MotoShots
           </Link>
         </div>
-        <nav className="hidden gap-6 text-sm font-medium text-foreground md:flex">
+        <nav className="hidden gap-7 text-sm font-medium text-foreground md:flex">
           {NAV_ITEMS.map((item) => (
-            <Link key={item.to} to={item.to}>{item.label}</Link>
+            <Link key={item.to} to={item.to} className="transition-colors hover:text-primary">
+              {item.label}
+            </Link>
           ))}
-          <Link to="/studio/login" className="text-muted-foreground">
+          <Link to="/studio/login" className="text-muted-foreground transition-colors hover:text-foreground">
             Soy fotógrafo
           </Link>
         </nav>
         <div className="flex gap-2">
           <Link to="/login">
-            <Button variant="secondary" size="sm">
+            <Button variant="outline" size="sm">
               Iniciar sesión
             </Button>
           </Link>
@@ -42,9 +44,9 @@ export function HeaderPublic() {
             <Button size="sm">Crear cuenta</Button>
           </Link>
         </div>
-      </div>
+      </header>
 
-      <MobileMenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} className="rounded-b-2xl border-b border-border bg-background">
+      <MobileMenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} className="rounded-b-3xl border-b border-border bg-background">
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <span className="text-lg font-extrabold tracking-tight text-primary">MotoShots</span>
           <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="text-foreground">
@@ -76,6 +78,6 @@ export function HeaderPublic() {
           </Link>
         </div>
       </MobileMenuOverlay>
-    </header>
+    </div>
   )
 }

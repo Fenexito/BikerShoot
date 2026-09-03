@@ -7,7 +7,27 @@ import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
+import { Accordion } from '../../ui/shared/Accordion'
 import { cn } from '../../lib/cn'
+
+const FAQ_ITEMS = [
+  {
+    question: '¿Puedo cambiar de plan cuando quiera?',
+    answer: 'Sí. Mejorar de plan aplica de inmediato y reinicia tu ciclo de cobro ese mismo día. Bajar de plan se programa para tu próxima renovación, así no pierdes espacio que ya estás usando a mitad de mes.',
+  },
+  {
+    question: '¿Qué pasa con mis fotos si me quedo sin espacio?',
+    answer: 'Puedes seguir vendiendo lo que ya subiste, pero no podrás subir fotos nuevas hasta liberar espacio (ver Almacenamiento) o mejorar de plan.',
+  },
+  {
+    question: '¿Cobran comisión por cada venta?',
+    answer: 'No. El único costo es tu plan mensual de almacenamiento — el 100% de cada venta es tuyo.',
+  },
+  {
+    question: '¿Puedo cancelar en cualquier momento?',
+    answer: 'Sí, puedes bajar al plan Gratis cuando quieras — el cambio entra en tu próxima renovación, igual que cualquier otra reducción de plan.',
+  },
+]
 
 function formatBytes(n: number) {
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(0)} MB`
@@ -63,17 +83,17 @@ function PlanCard({
   return (
     <div
       className={cn(
-        'relative flex flex-col border p-6',
-        isCurrent ? 'border-2 border-accent bg-accent/5' : 'border-border',
+        'relative flex flex-col rounded-3xl border p-6',
+        isCurrent ? 'border-2 border-accent bg-accent/5' : 'border-border bg-card',
       )}
     >
       {isCurrent && (
-        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 bg-background border border-accent px-2 py-1 font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-accent">
+        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-background border border-accent px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-accent">
           Tu plan actual
         </span>
       )}
       {isPending && (
-        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 bg-background border border-foreground px-2 py-1 font-studio-mono text-[10px] font-bold uppercase tracking-wider2">
+        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-background border border-foreground px-3 py-1 text-[10px] font-bold uppercase tracking-wide">
           Entra en tu próxima renovación
         </span>
       )}
@@ -207,16 +227,16 @@ export function StudioPlans() {
       <p className="mt-2 text-muted-foreground">Elige el espacio que necesitas según cuántos eventos y fotos manejas al mes.</p>
 
       {currentPlan && (
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border border-border p-5">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-muted p-6">
           <div>
-            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Plan activo</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Plan activo</p>
             <p className="mt-1 font-studio text-xl font-bold">{currentPlan.name} · {formatBytes(usageBytes)} usados de {currentPlan.gb_limit} GB</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Ciclo iniciado el {formatDate(details.plan_started_at)} · próxima renovación el {formatDate(details!.plan_renews_at)}
             </p>
           </div>
           {pendingPlan && (
-            <div className="flex items-center gap-3 border border-foreground px-4 py-3">
+            <div className="flex items-center gap-3 rounded-full bg-background px-5 py-3">
               <p className="text-sm">
                 Pasarás a <span className="font-bold">{pendingPlan.name}</span> el {formatDate(details!.plan_renews_at)}
               </p>
@@ -242,8 +262,8 @@ export function StudioPlans() {
         ))}
       </div>
 
-      <div className="mt-10 border-t border-border pt-8">
-        <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Todos los planes incluyen</p>
+      <div className="mt-14 rounded-3xl bg-muted p-8">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Todos los planes incluyen</p>
         <ul className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           {COMMON_FEATURES.map((f) => (
             <li key={f} className="flex items-start gap-2">
@@ -252,6 +272,13 @@ export function StudioPlans() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div className="mx-auto mt-20 max-w-2xl">
+        <h2 className="text-center font-studio text-3xl font-bold tracking-tight2">Preguntas frecuentes</h2>
+        <div className="mt-8">
+          <Accordion items={FAQ_ITEMS} />
+        </div>
       </div>
     </div>
   )

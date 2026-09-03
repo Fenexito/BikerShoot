@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
 import { GoogleIcon } from '../../ui/shared/GoogleIcon'
+import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
 import { useAuth } from './AuthContext'
 
 const schema = z
@@ -76,15 +77,11 @@ export function BikerSignup() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 font-flat">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 inline-block text-2xl font-extrabold tracking-tight text-primary">
-          MotoShots
-        </Link>
-        <h1 className="mb-2 text-3xl font-bold tracking-tight">Crear cuenta</h1>
-        <p className="mb-8 text-muted-foreground">Encuentra tus fotos de moto en segundos.</p>
+    <AuthSplitLayout>
+      <h1 className="mb-2 text-3xl font-bold tracking-tight">Crear cuenta</h1>
+      <p className="mb-8 text-muted-foreground">Encuentra tus fotos de moto en segundos.</p>
 
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Nombre" placeholder="Tu nombre" error={errors.displayName?.message} {...register('displayName')} />
           <Input label="Correo" type="email" placeholder="tu@correo.com" error={errors.email?.message} {...register('email')} />
           <Input label="Contraseña" type="password" placeholder="••••••••" error={errors.password?.message} {...register('password')} />
@@ -118,7 +115,6 @@ export function BikerSignup() {
         <p className="mt-2 text-sm text-muted-foreground">
           ¿Eres fotógrafo? <Link to="/studio/signup" className="font-semibold text-primary">Regístrate en Studio</Link>
         </p>
-      </div>
-    </div>
+    </AuthSplitLayout>
   )
 }

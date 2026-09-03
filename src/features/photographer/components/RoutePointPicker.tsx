@@ -146,7 +146,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   }
 
   return (
-    <div className="border border-border p-5">
+    <div className="rounded-2xl border border-border p-5">
       {usingRoute && (
         <Select label="Punto en esta ruta" value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')} onChange={(e) => handlePointChange(e.target.value)}>
           <option value="">Selecciona un punto</option>

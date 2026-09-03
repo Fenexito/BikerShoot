@@ -18,7 +18,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'group cursor-pointer rounded-lg p-6 transition-all duration-200 hover:scale-[1.02] md:p-8',
+        'group cursor-pointer rounded-3xl p-6 transition-all duration-200 hover:scale-[1.01] md:p-8',
         tintClasses[tint],
         className,
       )}

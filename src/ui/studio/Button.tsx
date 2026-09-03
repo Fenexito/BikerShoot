@@ -15,70 +15,32 @@ const Spinner = () => (
 )
 
 const sizeText: Record<Size, string> = {
-  sm: 'text-xs py-2 gap-2',
-  default: 'text-sm py-3 gap-2.5',
-  lg: 'text-base py-4 gap-3',
+  sm: 'text-sm h-10 px-4 gap-1.5',
+  default: 'text-sm h-12 px-6 gap-2',
+  lg: 'text-base h-14 px-8 gap-2.5',
 }
 
 const focusRing =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
+const variantClasses: Record<Variant, string> = {
+  primary: 'bg-accent text-accent-foreground hover:opacity-90',
+  secondary: 'border border-border text-foreground bg-transparent hover:bg-muted',
+  ghost: 'text-muted-foreground hover:text-foreground hover:bg-muted',
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'default', loading, disabled, className, children, ...props }, ref) => {
-    if (variant === 'primary') {
-      return (
-        <button
-          ref={ref}
-          disabled={disabled || loading}
-          className={cn(
-            'inline-flex items-center justify-center gap-2 border-2 border-accent px-6 font-semibold uppercase tracking-wider2',
-            'text-accent whitespace-nowrap transition-all duration-150 active:translate-y-px',
-            'hover:bg-accent hover:text-accent-foreground',
-            'disabled:pointer-events-none disabled:opacity-50',
-            focusRing,
-            sizeText[size],
-            className,
-          )}
-          {...props}
-        >
-          {loading && <Spinner />}
-          {children}
-        </button>
-      )
-    }
-
-    if (variant === 'secondary') {
-      return (
-        <button
-          ref={ref}
-          disabled={disabled || loading}
-          className={cn(
-            'inline-flex items-center justify-center gap-2 border border-foreground px-6 font-semibold uppercase tracking-wider2',
-            'text-foreground whitespace-nowrap transition-all duration-150 active:translate-y-px',
-            'hover:bg-foreground hover:text-background',
-            'disabled:pointer-events-none disabled:opacity-50',
-            focusRing,
-            sizeText[size],
-            className,
-          )}
-          {...props}
-        >
-          {loading && <Spinner />}
-          {children}
-        </button>
-      )
-    }
-
     return (
       <button
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          'group relative inline-flex items-center justify-center px-4 font-semibold uppercase tracking-wider2',
-          'text-muted-foreground whitespace-nowrap transition-all duration-150 active:translate-y-px',
-          'hover:text-foreground',
+          'inline-flex items-center justify-center whitespace-nowrap rounded-full font-semibold transition-all duration-150',
+          'active:scale-[0.98]',
           'disabled:pointer-events-none disabled:opacity-50',
           focusRing,
+          variantClasses[variant],
           sizeText[size],
           className,
         )}
@@ -86,7 +48,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading && <Spinner />}
         {children}
-        <span className="absolute -bottom-0.5 left-4 right-4 h-px origin-left scale-x-0 bg-foreground transition-transform duration-150 group-hover:scale-x-100" />
       </button>
     )
   },

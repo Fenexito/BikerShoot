@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Button } from '../../ui/studio/Button'
 import { Input } from '../../ui/studio/Input'
 import { GoogleIcon } from '../../ui/shared/GoogleIcon'
+import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
 import { useAuth } from './AuthContext'
 
 const schema = z.object({
@@ -47,15 +48,11 @@ export function StudioLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-10 inline-block font-studio-mono text-xs uppercase tracking-widest2 text-muted-foreground">
-          MotoShots Studio
-        </Link>
-        <h1 className="mb-3 font-studio text-4xl font-bold tracking-tight2">Acceso de estudio</h1>
-        <p className="mb-10 text-muted-foreground">Gestiona tus eventos, pedidos y cobros.</p>
+    <AuthSplitLayout logoTo="/" logoLabel="MotoShots Studio">
+      <h1 className="mb-3 font-studio text-4xl font-bold tracking-tight2">Acceso de estudio</h1>
+      <p className="mb-10 text-muted-foreground">Gestiona tus eventos, pedidos y cobros.</p>
 
-        <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Correo" type="email" placeholder="tu@estudio.com" error={errors.email?.message} {...register('email')} />
           <Input label="Contraseña" type="password" placeholder="••••••••" error={errors.password?.message} {...register('password')} />
           <Link to="/studio/forgot-password" className="-mt-3 self-end font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-accent">
@@ -84,7 +81,6 @@ export function StudioLogin() {
         <p className="mt-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
           ¿Eres biker? <Link to="/login" className="text-accent">Ir al sitio principal</Link>
         </p>
-      </div>
-    </div>
+    </AuthSplitLayout>
   )
 }

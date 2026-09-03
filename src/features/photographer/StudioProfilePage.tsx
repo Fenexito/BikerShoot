@@ -229,13 +229,13 @@ export function StudioProfilePage() {
         </div>
 
         {!details?.approved && (
-          <p className="mt-6 border border-border px-4 py-3 text-sm text-muted-foreground">
+          <p className="mt-6 rounded-2xl border border-border px-4 py-3 text-sm text-muted-foreground">
             Tu cuenta está en revisión. Podrás publicar eventos y vender fotos en cuanto un administrador la apruebe.
           </p>
         )}
 
         <div className="mt-8 flex flex-wrap gap-4">
-          <div className="grid grid-cols-2 gap-4 border border-border px-6 py-5 text-center sm:w-72">
+          <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border px-6 py-5 text-center sm:w-72">
             <div>
               <p className="font-studio text-2xl font-bold">{events.length}</p>
               <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Rodadas cubiertas</p>
@@ -247,7 +247,7 @@ export function StudioProfilePage() {
           </div>
 
           {details?.storage_plan && (
-            <div className="flex-1 border border-border px-6 py-5" style={{ minWidth: 240 }}>
+            <div className="flex-1 rounded-2xl border border-border px-6 py-5" style={{ minWidth: 240 }}>
               <div className="flex items-center justify-between gap-3">
                 <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
                   Almacenamiento · Plan {details.storage_plan.name}
@@ -278,7 +278,7 @@ export function StudioProfilePage() {
               <label className="text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Sobre ti</label>
               <textarea
                 rows={4}
-                className="border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
+                className="rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
                 {...register('bio')}
               />
             </div>
@@ -357,7 +357,7 @@ export function StudioProfilePage() {
               {events.map((event) => {
                 const statusStyle = EVENT_STATUS_STYLE[event.status]
                 return (
-                  <Link key={event.id} to={`/studio/eventos/${event.id}`} className="border border-border p-4 transition-colors hover:border-border-hover">
+                  <Link key={event.id} to={`/studio/eventos/${event.id}`} className="rounded-2xl border border-border p-4 transition-colors hover:border-border-hover">
                     <div className="flex items-center justify-between">
                       <Badge>{event.category}</Badge>
                       <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-[10px] uppercase tracking-wider2" />

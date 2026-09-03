@@ -113,7 +113,7 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   }
 
   return (
-    <div className="border border-border">
+    <div className="rounded-2xl border border-border">
       <div
         onClick={handleTileClick}
         className={cn('relative aspect-[4/5] overflow-hidden bg-muted', clickable && 'cursor-pointer')}

@@ -47,19 +47,19 @@ export function TypedConfirmDialog() {
         aria-modal="true"
         aria-labelledby="typed-confirm-title"
         className={cn(
-          'relative z-10 w-full max-w-sm border border-border bg-card p-6 text-foreground',
+          'relative z-10 w-full max-w-sm rounded-3xl border border-border bg-card p-6 text-foreground shadow-2xl',
           'transition-all duration-150',
           closing ? 'translate-y-1 opacity-0' : 'animate-confirm-in',
         )}
       >
-        <h2 id="typed-confirm-title" className="font-studio-mono text-xs font-bold uppercase tracking-wider2 text-accent">
+        <h2 id="typed-confirm-title" className="text-xs font-bold uppercase tracking-wide text-accent">
           Confirmar eliminación
         </h2>
         <p className="mt-3 text-base font-semibold leading-snug">{request.title}</p>
         {request.description && <p className="mt-2 text-sm text-muted-foreground">{request.description}</p>}
 
         <label className="mt-5 block">
-          <span className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             {request.matchLabel ?? `Escribe "${request.matchText}" para confirmar`}
           </span>
           <input
@@ -69,7 +69,7 @@ export function TypedConfirmDialog() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && matches) close(true)
             }}
-            className="mt-2 w-full border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-accent"
+            className="mt-2 w-full rounded-full border border-border bg-input px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
             placeholder={request.matchText}
           />
         </label>
@@ -77,14 +77,14 @@ export function TypedConfirmDialog() {
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={() => close(false)}
-            className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider2 text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-full px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             {request.cancelLabel ?? 'Cancelar'}
           </button>
           <button
             onClick={() => close(true)}
             disabled={!matches}
-            className="border-2 border-accent px-5 py-2.5 text-xs font-semibold uppercase tracking-wider2 text-accent transition-all hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40"
+            className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground transition-all hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
           >
             {request.confirmLabel ?? 'Eliminar'}
           </button>

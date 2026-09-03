@@ -51,7 +51,7 @@ export function StudioOrders() {
         <p className="mt-10 text-center text-muted-foreground">No hay pedidos en esta categoría.</p>
       )}
 
-      <div className="mt-6 flex flex-col divide-y divide-border border border-border">
+      <div className="mt-6 flex flex-col divide-y divide-border rounded-2xl border border-border">
         {filtered.map((order) => (
           <Link
             key={order.orderId}

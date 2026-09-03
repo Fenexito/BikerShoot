@@ -85,7 +85,7 @@ export function StudioOnboarding() {
             <label className="text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Sobre ti</label>
             <textarea
               rows={4}
-              className="border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
+              className="rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
               placeholder="Qué tipo de eventos cubres, tu estilo, experiencia..."
               {...register('bio')}
             />

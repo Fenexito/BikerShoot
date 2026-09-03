@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useCartStore } from '../../features/cart/cartStore'
-import { IconHeart, IconCart, IconUser, IconLogOut, IconMenu, IconClose } from '../shared/icons'
+import { r2Url } from '../../lib/r2'
+import { IconHeart, IconCart, IconUser, IconLogOut, IconMenu, IconClose, IconSearch } from '../shared/icons'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
+import { InitialsAvatar } from '../shared/InitialsAvatar'
+import { ProfileMenu } from '../shared/ProfileMenu'
 
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
@@ -14,11 +17,12 @@ const NAV_ITEMS = [
 ]
 
 export function HeaderUser() {
-  const { signOut } = useAuth()
+  const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const itemCount = useCartStore((s) => s.items.length)
   const [signingOut, setSigningOut] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [query, setQuery] = useState('')
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -30,50 +34,83 @@ export function HeaderUser() {
     }
   }
 
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault()
+    navigate(query.trim() ? `/app/buscar?q=${encodeURIComponent(query.trim())}` : '/app/buscar')
+  }
+
+  const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
+
   return (
-    <header className="border-b border-border bg-background">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="text-foreground md:hidden">
-            <IconMenu className="h-6 w-6" />
-          </button>
-          <Link to="/app" className="text-lg font-extrabold tracking-tight text-primary">
-            MotoShots
-          </Link>
-        </div>
-        <nav className="hidden gap-6 text-sm font-medium text-foreground md:flex">
-          {NAV_ITEMS.map((item) => (
-            <Link key={item.to} to={item.to}>{item.label}</Link>
+    <div className="sticky top-3 z-30 px-3 md:top-4 md:px-4">
+      <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background/90 px-3 shadow-sm backdrop-blur-md md:gap-5 md:px-4">
+        <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="text-foreground md:hidden">
+          <IconMenu className="h-6 w-6" />
+        </button>
+        <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
+          MotoShots
+        </Link>
+
+        <nav className="hidden shrink-0 items-center gap-5 text-sm font-medium text-foreground lg:flex">
+          {NAV_ITEMS.slice(0, 4).map((item) => (
+            <Link key={item.to} to={item.to} className="transition-colors hover:text-primary">
+              {item.label}
+            </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-4 text-sm">
-          <Link to="/app/favoritos" aria-label="Favoritos" title="Favoritos" className="text-foreground hover:text-primary">
+
+        <form onSubmit={submitSearch} className="ml-auto hidden max-w-md flex-1 items-center gap-2 rounded-full bg-muted px-4 md:flex">
+          <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar evento, fotógrafo, ciudad…"
+            className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </form>
+
+        <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:gap-2">
+          <Link
+            to="/app/favoritos"
+            aria-label="Favoritos"
+            title="Favoritos"
+            className="hidden h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted sm:flex"
+          >
             <IconHeart className="h-5 w-5" />
           </Link>
-          <Link to="/app/checkout" aria-label="Carrito" title="Carrito" className="relative text-foreground hover:text-primary">
+          <Link
+            to="/app/checkout"
+            aria-label="Carrito"
+            title="Carrito"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+          >
             <IconCart className="h-5 w-5" />
             {itemCount > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
                 {itemCount}
               </span>
             )}
           </Link>
-          <Link to="/app/perfil" aria-label="Perfil" title="Perfil" className="hidden text-foreground hover:text-primary sm:inline-block">
-            <IconUser className="h-5 w-5" />
-          </Link>
-          <button
-            onClick={handleSignOut}
-            disabled={signingOut}
-            aria-label="Salir"
-            title="Salir"
-            className="hidden text-muted-foreground hover:text-foreground disabled:opacity-50 sm:inline-block"
-          >
-            <IconLogOut className="h-5 w-5" />
-          </button>
+          <ProfileMenu
+            name={profile?.display_name ?? 'Biker'}
+            avatar={
+              avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <InitialsAvatar name={profile?.display_name ?? 'B'} className="h-full w-full bg-primary text-sm text-white" />
+              )
+            }
+            links={[
+              { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
+              { to: '/app/historial', label: 'Mis compras' },
+              { to: '/app/favoritos', label: 'Favoritos' },
+              { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+            ]}
+          />
         </div>
-      </div>
+      </header>
 
-      <MobileMenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} className="rounded-b-2xl border-b border-border bg-background">
+      <MobileMenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} className="rounded-b-3xl border-b border-border bg-background">
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <span className="text-lg font-extrabold tracking-tight text-primary">MotoShots</span>
           <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="text-foreground">
@@ -109,6 +146,6 @@ export function HeaderUser() {
           </button>
         </div>
       </MobileMenuOverlay>
-    </header>
+    </div>
   )
 }

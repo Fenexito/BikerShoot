@@ -27,7 +27,7 @@ interface MapPointPickerProps {
 
 export function MapPointPicker({ lat, lng, onPick, readOnly }: MapPointPickerProps) {
   return (
-    <div className="h-64 w-full overflow-hidden border border-border">
+    <div className="h-64 w-full overflow-hidden rounded-2xl border border-border">
       <MapContainer
         center={[lat, lng]}
         zoom={12}

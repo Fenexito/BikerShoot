@@ -295,7 +295,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
               {errorCount > 0 && (
                 <Button variant="ghost" onClick={retryAllFailed}>Reintentar todos los fallidos</Button>
               )}
-              <div className="flex border border-border">
+              <div className="flex rounded-2xl border border-border">
                 <button
                   onClick={() => setView('grid')}
                   className={cn('px-2 py-1 text-xs uppercase tracking-wider2', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground')}
@@ -320,7 +320,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                   href={item.status === 'lista' && item.previewPath ? previewUrl({ storage_path: null, preview_path: item.previewPath }) : undefined}
                   target="_blank"
                   rel="noreferrer"
-                  className="relative aspect-[4/5] overflow-hidden border border-border"
+                  className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-border"
                   title={`${item.name} · ${formatBytes(item.size)}`}
                 >
                   <img src={item.localPreview} alt={item.name} className="h-full w-full object-cover" />
@@ -347,7 +347,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
               ))}
             </div>
           ) : (
-            <div className="flex flex-col divide-y divide-border border border-border">
+            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 px-3 py-2">
                   <img src={item.localPreview} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />

@@ -37,6 +37,24 @@ export interface SearchFilters {
   sort?: 'relevancia' | 'precio-asc' | 'precio-desc'
 }
 
+/** Muestra liviana de fotos públicas para muros decorativos (login, landing) —
+ * no trae datos de ningún fotógrafo en particular, solo variedad visual. */
+export function usePublicPhotoSample(limit = 40) {
+  return useQuery({
+    queryKey: ['public-photo-sample', limit],
+    queryFn: async (): Promise<{ preview_path: string | null; storage_path: string | null }[]> => {
+      const { data, error } = await supabase
+        .from('photos')
+        .select('preview_path, storage_path')
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 /** Todos los eventos visibles públicamente (con sus puntos y el nombre del fotógrafo). */
 export function usePublicEvents() {
   return useQuery({

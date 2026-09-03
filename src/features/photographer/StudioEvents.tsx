@@ -46,7 +46,7 @@ export function StudioEvents() {
       {error && <p className="text-accent">No se pudieron cargar tus eventos.</p>}
 
       {events && events.length === 0 && (
-        <div className="border border-border px-6 py-16 text-center text-muted-foreground">
+        <div className="rounded-2xl border border-border px-6 py-16 text-center text-muted-foreground">
           Todavía no tienes eventos.{' '}
           <Link to="/studio/eventos/new" className="text-accent">Crea el primero.</Link>
         </div>
@@ -59,7 +59,7 @@ export function StudioEvents() {
           return (
             <div
               key={event.id}
-              className="group overflow-hidden border border-border transition-colors duration-150 hover:border-border-hover"
+              className="group overflow-hidden rounded-2xl border border-border transition-colors duration-150 hover:border-border-hover"
             >
               <Link to={`/studio/eventos/${event.id}`} className="block">
                 <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
@@ -105,14 +105,14 @@ export function StudioEvents() {
                 {event.status === 'pausado' ? (
                   <button
                     onClick={(e) => toggleStatus(e, event.id, 'activo')}
-                    className="bg-emerald-600 py-2 text-center font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-white transition-colors hover:bg-emerald-500"
+                    className="rounded-full bg-emerald-600 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-emerald-500"
                   >
                     Publicar
                   </button>
                 ) : (
                   <button
                     onClick={(e) => toggleStatus(e, event.id, 'pausado')}
-                    className="bg-blue-600 py-2 text-center font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-white transition-colors hover:bg-blue-500"
+                    className="rounded-full bg-blue-600 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-blue-500"
                   >
                     Pausar
                   </button>
@@ -120,7 +120,7 @@ export function StudioEvents() {
                 <Link
                   to={`/studio/eventos/${event.id}/editar`}
                   className={cn(
-                    'bg-foreground py-2 text-center font-studio-mono text-[10px] font-bold uppercase tracking-wider2 text-background transition-opacity hover:opacity-80',
+                    'rounded-full bg-foreground py-2 text-center text-xs font-bold text-background transition-opacity hover:opacity-80',
                   )}
                 >
                   Editar
