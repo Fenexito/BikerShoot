@@ -109,7 +109,7 @@ export function StoragePlansAdmin() {
           const overLimit = row.usageBytes > limitBytes
 
           return (
-            <div key={row.profile_id} className="rounded-lg bg-muted p-4">
+            <div key={row.profile_id} className="rounded-3xl border border-border bg-card p-4">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold">{row.profiles?.display_name ?? 'Fotógrafo'}</p>
                 <div className="flex items-center gap-3">

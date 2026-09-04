@@ -83,7 +83,7 @@ export function EventDetail() {
       </div>
 
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-muted p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border bg-card p-5">
           <Link to={`/app/fotografos/${event.photographer_id}`} className="flex items-center gap-3">
             <InitialsAvatar name={event.photographer?.display_name ?? '?'} className="h-12 w-12 rounded-full bg-primary text-sm text-white" />
             <div>
@@ -106,12 +106,12 @@ export function EventDetail() {
 
         {event.description && <p className="mt-6 max-w-2xl text-muted-foreground">{event.description}</p>}
 
-        <div className="mt-4 inline-flex items-center gap-2 rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-700">
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm text-amber-700">
           💡 Compra 5 fotos o más de este evento y ahorra 15% automáticamente en el carrito.
         </div>
 
         {selectedPoint && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-primary/10 px-4 py-3 text-sm">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-primary/10 px-4 py-3 text-sm">
             <span>
               📍 Viendo solo el punto <strong>{selectedPoint.label}</strong> ({selectedPoint.time_start.slice(0, 5)}–{selectedPoint.time_end.slice(0, 5)})
             </span>

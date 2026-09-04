@@ -53,6 +53,15 @@ html {
   animation: menu-in 150ms cubic-bezier(0.25, 0, 0, 1);
 }
 
+/* Leaflet trae sus propias esquinas cuadradas por defecto — se redondean
+   para que el popup del mapa combine con el resto de tarjetas de la app. */
+.leaflet-popup-content-wrapper {
+  border-radius: 1.25rem;
+}
+.leaflet-popup-tip {
+  border-radius: 2px;
+}
+
 /* Entrada escalonada para grids (fotos, eventos, tarjetas) — cada item
    pasa `animationDelay` inline para el efecto stagger. */
 @keyframes fade-in-up {

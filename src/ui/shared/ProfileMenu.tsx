@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { IconClose } from './icons'
 import { cn } from '../../lib/cn'
 
 export interface ProfileMenuLink {
@@ -8,6 +9,7 @@ export interface ProfileMenuLink {
   label: string
   icon?: ReactNode
   tone?: 'default' | 'danger'
+  external?: boolean
 }
 
 interface ProfileMenuProps {
@@ -73,7 +75,8 @@ export function ProfileMenu({ name, email, avatar, links, themeSwitcher }: Profi
               const content = (
                 <>
                   {link.icon && <span className="h-4 w-4 shrink-0">{link.icon}</span>}
-                  {link.label}
+                  <span className="flex-1">{link.label}</span>
+                  {link.external && <span className="text-white/40">↗</span>}
                 </>
               )
               const itemClass = cn(
@@ -81,7 +84,13 @@ export function ProfileMenu({ name, email, avatar, links, themeSwitcher }: Profi
                 link.tone === 'danger' ? 'text-red-400' : 'text-white/90',
               )
               return link.to ? (
-                <Link key={link.label} to={link.to} onClick={() => setOpen(false)} className={itemClass}>
+                <Link
+                  key={link.label}
+                  to={link.to}
+                  onClick={() => setOpen(false)}
+                  className={itemClass}
+                  {...(link.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                >
                   {content}
                 </Link>
               ) : (
@@ -99,12 +108,21 @@ export function ProfileMenu({ name, email, avatar, links, themeSwitcher }: Profi
             })}
           </div>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-white/10 px-4 py-3 text-[11px] text-white/40">
-            {FOOTER_LINKS.map((link) => (
-              <Link key={link.label} to={link.to!} onClick={() => setOpen(false)} className="transition-colors hover:text-white/70">
-                {link.label}
-              </Link>
-            ))}
+          <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/40">
+              {FOOTER_LINKS.map((link) => (
+                <Link key={link.label} to={link.to!} onClick={() => setOpen(false)} className="transition-colors hover:text-white/70">
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Cerrar menú"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white/80"
+            >
+              <IconClose className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       )}

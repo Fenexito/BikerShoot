@@ -86,7 +86,7 @@ export function Home() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Busca por evento, ciudad o fotógrafo..."
-              className="h-14 flex-1 rounded-md border-0 bg-white px-5 text-base text-foreground shadow-lg outline-none focus:ring-2 focus:ring-white"
+              className="h-14 flex-1 rounded-full border-0 bg-white px-5 text-base text-foreground shadow-lg outline-none focus:ring-2 focus:ring-white"
             />
             <Button type="submit" size="lg" className="bg-white text-primary shadow-lg hover:bg-white/90">
               Buscar

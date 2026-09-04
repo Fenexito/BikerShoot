@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../studio/ThemeToggle'
+import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
 import { useAuth } from '../../features/auth/AuthContext'
 import { r2Url } from '../../lib/r2'
 import { IconUser, IconLogOut, IconMenu, IconClose } from '../shared/icons'
@@ -58,9 +59,6 @@ export function HeaderStudio() {
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted md:flex">
-            <ThemeToggle />
-          </div>
           <div className="hidden md:block">
             <NotificationsMenu />
           </div>
@@ -73,6 +71,7 @@ export function HeaderStudio() {
                 <InitialsAvatar name={profile?.display_name ?? 'S'} className="h-full w-full bg-accent text-sm text-accent-foreground" />
               )
             }
+            themeSwitcher={<ThemeSwitcherInline />}
             links={[
               { to: '/studio/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
               { to: '/studio/almacenamiento', label: 'Almacenamiento' },

@@ -62,31 +62,39 @@ export function RouteMap() {
 
   return (
     <div className="relative font-flat" style={{ height: 'calc(100dvh - 64px)' }}>
-      <div className="absolute left-4 right-4 top-4 z-[500] flex flex-wrap items-center gap-3 rounded-3xl bg-background/95 p-4 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
-        <div className="w-full">
+      <div className="absolute left-4 right-4 top-4 z-[500] flex flex-col gap-3 rounded-3xl border border-border bg-background/95 p-5 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
+        <div>
           <h1 className="text-lg font-bold tracking-tight">Mapa de puntos</h1>
           <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
         </div>
-        <Select value={routeId} onChange={(e) => { setRouteId(e.target.value); setCity('') }} className="flex-1">
-          <option value="">Toda ruta</option>
-          {routes.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </Select>
-        <Select value={city} onChange={(e) => setCity(e.target.value)} className="flex-1">
-          <option value="">Toda ciudad</option>
-          {cities.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </Select>
-        <Select value={timePreset} onChange={(e) => setTimePreset(Number(e.target.value))} className="flex-1">
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={routeId} onChange={(e) => { setRouteId(e.target.value); setCity('') }}>
+            <option value="">Toda ruta</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
+          <Select value={city} onChange={(e) => setCity(e.target.value)}>
+            <option value="">Toda ciudad</option>
+            {cities.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </Select>
+        </div>
+        <Select value={timePreset} onChange={(e) => setTimePreset(Number(e.target.value))}>
           {TIME_PRESETS.map((t, i) => (
             <option key={t.label} value={i}>{t.label}</option>
           ))}
         </Select>
-        <p className="w-full text-xs font-semibold text-primary">
-          {activePoints.length} de {cityFilteredPoints.length} puntos coinciden con tu horario
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-2">
+          <span className="text-sm font-semibold text-primary">
+            {activePoints.length} de {cityFilteredPoints.length} puntos coinciden
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" /> Activo
+            <span className="ml-1 h-2.5 w-2.5 rounded-full bg-gray-400 opacity-45" /> Fuera de horario
+          </span>
+        </div>
       </div>
 
       <MapContainer center={GUATEMALA_CENTER} zoom={9} scrollWheelZoom style={{ height: '100%', width: '100%' }}>

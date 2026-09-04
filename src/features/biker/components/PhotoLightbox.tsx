@@ -72,7 +72,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
           key={photo.id}
           src={previewUrl(photo)}
           alt={photo.eventTitle}
-          className="max-h-full max-w-full animate-[lightbox-in_.25s_ease-out] rounded-2xl object-contain shadow-2xl"
+          className="max-h-full max-w-full animate-[lightbox-in_.25s_ease-out] rounded-3xl object-contain shadow-2xl"
         />
         {index < photos.length - 1 && (
           <button
@@ -90,7 +90,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
             key={p.id}
             onClick={() => onNavigate(i)}
             className={cn(
-              'h-14 w-11 shrink-0 overflow-hidden rounded-lg transition-all duration-150',
+              'h-14 w-11 shrink-0 overflow-hidden rounded-xl transition-all duration-150',
               i === index ? 'opacity-100 ring-2 ring-white' : 'opacity-40 hover:opacity-75',
             )}
           >
@@ -99,32 +99,36 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4 sm:px-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-bold text-white">Q{photo.price}</span>
-            {photo.moto_brand && <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70">{photo.moto_brand}</span>}
+      {/* Barra flotante de acciones, tipo Mobbin — no un bloque pegado al
+          borde inferior, sino una tarjeta redondeada centrada. */}
+      <div className="flex justify-center px-4 pb-5 pt-1 sm:px-6">
+        <div className="flex w-full max-w-xl flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/5 px-5 py-3.5 backdrop-blur-md">
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-bold text-white">Q{photo.price}</span>
+              {photo.moto_brand && <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70">{photo.moto_brand}</span>}
+            </div>
+            <p className="mt-0.5 text-xs text-white/50">Con marca de agua — el original llega sin marca al comprar.</p>
           </div>
-          <p className="mt-1 text-xs text-white/50">Vista previa con marca de agua — al comprar recibes el archivo original sin marca de agua.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => toggleFavorite(photo.id)}
-            className={cn('flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-lg hover:bg-white/20', isFavorite && 'text-red-500')}
-            aria-label="Favorito"
-          >
-            {isFavorite ? '♥' : '♡'}
-          </button>
-          <Button
-            onClick={() =>
-              inCart
-                ? remove(photo.id)
-                : add({ photoId: photo.id, eventId: photo.event_id, eventTitle: photo.eventTitle, photographerId: photo.photographer_id, photographerName: photo.photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
-            }
-            variant={inCart ? 'secondary' : 'primary'}
-          >
-            {inCart ? '✓ En el carrito' : 'Agregar al carrito'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => toggleFavorite(photo.id)}
+              className={cn('flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-lg transition-colors hover:bg-white/20', isFavorite && 'text-red-500')}
+              aria-label="Favorito"
+            >
+              {isFavorite ? '♥' : '♡'}
+            </button>
+            <Button
+              onClick={() =>
+                inCart
+                  ? remove(photo.id)
+                  : add({ photoId: photo.id, eventId: photo.event_id, eventTitle: photo.eventTitle, photographerId: photo.photographer_id, photographerName: photo.photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
+              }
+              variant={inCart ? 'secondary' : 'primary'}
+            >
+              {inCart ? '✓ En el carrito' : 'Agregar al carrito'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>,

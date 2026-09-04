@@ -99,7 +99,7 @@ export function PhotographerProfile() {
           )}
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-4 rounded-lg bg-muted p-6 text-center">
+        <div className="mt-8 grid grid-cols-2 gap-4 rounded-3xl border border-border bg-card p-6 text-center">
           <div>
             <p className="text-2xl font-bold">{events.length}</p>
             <p className="text-sm text-muted-foreground">Rodadas cubiertas</p>
@@ -128,7 +128,7 @@ export function PhotographerProfile() {
             </button>
           </div>
           {tab === 'fotos' && (
-            <div className="mb-2 flex gap-1 rounded-md bg-muted p-1">
+            <div className="mb-2 flex gap-1 rounded-full bg-muted p-1">
               <button
                 onClick={() => setGalleryLayout('muro')}
                 aria-label="Vista muro"

@@ -71,7 +71,7 @@ export function ReleasesAdmin() {
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="rounded-md border-2 border-transparent bg-muted px-4 py-2 text-sm outline-none transition-colors focus:border-primary focus:bg-background"
+            className="rounded-full border-2 border-transparent bg-muted px-4 py-2 text-sm outline-none transition-colors focus:border-primary focus:bg-background"
             placeholder="Resumen breve de esta versión..."
           />
         </div>
@@ -81,7 +81,7 @@ export function ReleasesAdmin() {
             rows={4}
             value={highlightsText}
             onChange={(e) => setHighlightsText(e.target.value)}
-            className="rounded-md border-2 border-transparent bg-muted px-4 py-2 text-sm outline-none transition-colors focus:border-primary focus:bg-background"
+            className="rounded-full border-2 border-transparent bg-muted px-4 py-2 text-sm outline-none transition-colors focus:border-primary focus:bg-background"
             placeholder={'Carrito funcionando\nPerfil de fotógrafo\nMapa de puntos'}
           />
         </div>

@@ -75,7 +75,7 @@ export function BugReportsAdmin() {
 
       <div className="flex flex-col gap-3">
         {filtered.map((r) => (
-          <div key={r.id} className="rounded-lg bg-muted p-5">
+          <div key={r.id} className="rounded-3xl border border-border bg-card p-5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="secondary">{PAGE_LABEL[r.page] ?? r.page}</Badge>
@@ -96,7 +96,7 @@ export function BugReportsAdmin() {
                     <button
                       key={s}
                       onClick={() => setStatus(r.id, s)}
-                      className="rounded-full rounded-2xl border border-border px-3 py-1 text-xs font-medium hover:bg-background"
+                      className="rounded-full border border-border px-3 py-1 text-xs font-medium transition-colors hover:bg-background"
                     >
                       Marcar {STATUS_LABEL[s].toLowerCase()}
                     </button>
