@@ -83,35 +83,37 @@ function PlanCard({
   return (
     <div
       className={cn(
-        'relative flex flex-col rounded-3xl border p-6',
-        isCurrent ? 'border-2 border-accent bg-accent/5' : 'border-border bg-card',
+        'flex flex-col rounded-3xl p-6',
+        isCurrent ? 'bg-accent/10' : 'border border-border bg-card',
       )}
     >
-      {isCurrent && (
-        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-background border border-accent px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-accent">
-          Tu plan actual
-        </span>
-      )}
-      {isPending && (
-        <span className="absolute -top-3 left-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-background border border-foreground px-3 py-1 text-[10px] font-bold uppercase tracking-wide">
-          Entra en tu próxima renovación
-        </span>
-      )}
-      <h3 className="font-studio text-2xl font-bold tracking-tight2">{plan.name}</h3>
+      <div className="flex items-center gap-2">
+        <h3 className="text-2xl font-bold tracking-tight">{plan.name}</h3>
+        {isCurrent && (
+          <span className="rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-accent-foreground">
+            Tu plan
+          </span>
+        )}
+        {isPending && (
+          <span className="rounded-full bg-foreground px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-background">
+            Próximo
+          </span>
+        )}
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">{copy?.tagline}</p>
 
       <div className="mt-5 flex items-baseline gap-1">
-        <span className="font-studio text-4xl font-bold">
+        <span className="text-4xl font-bold">
           {plan.price_monthly_gtq === 0 ? 'Gratis' : `Q${plan.price_monthly_gtq}`}
         </span>
-        {plan.price_monthly_gtq > 0 && <span className="font-studio-mono text-xs text-muted-foreground">/ mes</span>}
+        {plan.price_monthly_gtq > 0 && <span className="text-xs text-muted-foreground">/ mes</span>}
       </div>
-      <p className="mt-1 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">{plan.gb_limit} GB de espacio</p>
+      <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{plan.gb_limit} GB de espacio</p>
 
-      <ul className="mt-6 flex flex-1 flex-col gap-2 text-sm">
+      <ul className="mt-6 flex flex-1 flex-col gap-2.5 text-sm">
         {copy?.features.map((f) => (
           <li key={f} className="flex items-start gap-2">
-            <span className="mt-0.5 text-accent">✓</span>
+            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[10px] text-accent">✓</span>
             <span>{f}</span>
           </li>
         ))}
