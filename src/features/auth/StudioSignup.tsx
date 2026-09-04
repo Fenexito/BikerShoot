@@ -105,7 +105,7 @@ export function StudioSignup() {
           </Button>
         </form>
 
-        <div className="my-8 flex items-center gap-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <div className="my-8 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <span className="h-px flex-1 bg-border" />o<span className="h-px flex-1 bg-border" />
         </div>
 
@@ -114,10 +114,10 @@ export function StudioSignup() {
           Continuar con Google
         </Button>
 
-        <p className="mt-8 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <p className="mt-8 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           ¿Ya tienes cuenta? <Link to="/studio/login" className="text-accent">Entrar</Link>
         </p>
-        <p className="mt-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           ¿Eres biker? <Link to="/signup" className="text-accent">Ir al sitio principal</Link>
         </p>
     </AuthSplitLayout>

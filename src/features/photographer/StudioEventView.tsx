@@ -33,7 +33,7 @@ function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: s
       {photo.delivered_path && (
         <span className="shrink-0 bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Vendida</span>
       )}
-      <button onClick={() => onDelete(photo.id)} className="shrink-0 text-xs font-semibold uppercase tracking-wider2 text-muted-foreground hover:text-accent">
+      <button onClick={() => onDelete(photo.id)} className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-accent">
         Eliminar
       </button>
     </div>
@@ -93,16 +93,16 @@ function PhotoGallery({ photos, onDelete }: { photos: EventPhoto[]; onDelete: (i
   return (
     <div>
       <div className="mb-3 flex items-center justify-end">
-        <div className="flex rounded-2xl border border-border">
+        <div className="flex gap-1 rounded-full bg-muted p-1">
           <button
             onClick={() => setView('grid')}
-            className={cn('px-2 py-1 text-[10px] uppercase tracking-wider2', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground')}
+            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
           >
             Grid
           </button>
           <button
             onClick={() => setView('list')}
-            className={cn('px-2 py-1 text-[10px] uppercase tracking-wider2', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground')}
+            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
           >
             Lista
           </button>
@@ -126,7 +126,7 @@ function PhotoGallery({ photos, onDelete }: { photos: EventPhoto[]; onDelete: (i
       {visibleCount < photos.length && (
         <button
           onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-          className="mt-4 w-full rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wider2 text-muted-foreground hover:text-foreground"
+          className="mt-4 w-full rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
         >
           Ver más fotos ({photos.length - visibleCount} más)
         </button>
@@ -331,13 +331,13 @@ export function StudioEventView() {
       )}
 
       <div className={STUDIO_PAGE_WIDE}>
-        <Link to="/studio/eventos" className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground">
+        <Link to="/studio/eventos" className="text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground">
           ← Todos tus eventos
         </Link>
 
         <div className="sticky top-16 z-20 mt-6 flex flex-wrap items-center justify-between gap-4 border-b border-border bg-background py-4 -mx-6 px-6 md:-mx-16 md:px-16">
           <div className="flex flex-wrap items-center gap-3">
-            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-[10px] uppercase tracking-wider2" />
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-[10px] uppercase tracking-wide" />
             <p className="font-semibold">{event.title}</p>
             <p className="text-sm text-muted-foreground">
               {event.city}{event.venue ? ` · ${event.venue}` : ''} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -378,15 +378,15 @@ export function StudioEventView() {
         <div className="mt-6 grid grid-cols-3 gap-3 border-y border-border py-5 text-center">
           <div>
             <p className="font-studio text-xl font-bold">Q{event.price_per_photo}</p>
-            <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
+            <p className="text-[10px] uppercase text-muted-foreground">Por foto</p>
           </div>
           <div>
             <p className="font-studio text-xl font-bold">{event.event_points.length}</p>
-            <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
+            <p className="text-[10px] uppercase text-muted-foreground">Puntos</p>
           </div>
           <div>
             <p className="font-studio text-xl font-bold">{photos.length}</p>
-            <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
+            <p className="text-[10px] uppercase text-muted-foreground">Fotos</p>
           </div>
         </div>
 

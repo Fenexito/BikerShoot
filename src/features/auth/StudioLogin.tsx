@@ -55,7 +55,7 @@ export function StudioLogin() {
       <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Correo" type="email" placeholder="tu@estudio.com" error={errors.email?.message} {...register('email')} />
           <Input label="Contraseña" type="password" placeholder="••••••••" error={errors.password?.message} {...register('password')} />
-          <Link to="/studio/forgot-password" className="-mt-3 self-end font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-accent">
+          <Link to="/studio/forgot-password" className="-mt-3 self-end text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-accent">
             ¿Olvidaste tu contraseña?
           </Link>
 
@@ -66,7 +66,7 @@ export function StudioLogin() {
           </Button>
         </form>
 
-        <div className="my-8 flex items-center gap-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <div className="my-8 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <span className="h-px flex-1 bg-border" />o<span className="h-px flex-1 bg-border" />
         </div>
 
@@ -75,10 +75,10 @@ export function StudioLogin() {
           Continuar con Google
         </Button>
 
-        <p className="mt-8 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <p className="mt-8 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           ¿No tienes cuenta? <Link to="/studio/signup" className="text-accent">Regístrate</Link>
         </p>
-        <p className="mt-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           ¿Eres biker? <Link to="/login" className="text-accent">Ir al sitio principal</Link>
         </p>
     </AuthSplitLayout>

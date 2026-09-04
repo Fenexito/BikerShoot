@@ -72,7 +72,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
           key={photo.id}
           src={previewUrl(photo)}
           alt={photo.eventTitle}
-          className="max-h-full max-w-full animate-[lightbox-in_.25s_ease-out] rounded-lg object-contain shadow-2xl"
+          className="max-h-full max-w-full animate-[lightbox-in_.25s_ease-out] rounded-2xl object-contain shadow-2xl"
         />
         {index < photos.length - 1 && (
           <button
@@ -90,7 +90,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
             key={p.id}
             onClick={() => onNavigate(i)}
             className={cn(
-              'h-14 w-11 shrink-0 overflow-hidden rounded-md transition-all duration-150',
+              'h-14 w-11 shrink-0 overflow-hidden rounded-lg transition-all duration-150',
               i === index ? 'opacity-100 ring-2 ring-white' : 'opacity-40 hover:opacity-75',
             )}
           >

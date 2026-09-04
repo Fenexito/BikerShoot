@@ -79,7 +79,7 @@ export function StudioEvents() {
                       dot={statusStyle.dot}
                       text={statusStyle.text}
                       label={statusStyle.label}
-                      className="shrink-0 font-studio-mono text-[10px] uppercase tracking-wider2"
+                      className="shrink-0 text-[10px] uppercase tracking-wide"
                     />
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -88,15 +88,15 @@ export function StudioEvents() {
                   <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
                     <div>
                       <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
-                      <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Por foto</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">Por foto</p>
                     </div>
                     <div>
                       <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
-                      <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Puntos</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">Puntos</p>
                     </div>
                     <div>
                       <p className="font-studio text-lg font-bold">{photoCount}</p>
-                      <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">Fotos</p>
                     </div>
                   </div>
                 </div>

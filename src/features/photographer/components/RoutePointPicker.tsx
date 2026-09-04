@@ -159,7 +159,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
 
       {pointFormOpen && (
         <div className="mt-4">
-          <p className="mb-3 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Haz clic en el mapa para marcar el punto
           </p>
           <MapPointPicker lat={newLat} lng={newLng} onPick={(lat, lng) => { setNewLat(lat); setNewLng(lng) }} />

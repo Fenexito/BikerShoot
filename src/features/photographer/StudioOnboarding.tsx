@@ -68,7 +68,7 @@ export function StudioOnboarding() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
       <div className="w-full max-w-lg">
-        <span className="font-studio-mono text-xs uppercase tracking-widest2 text-accent">Un último paso</span>
+        <span className="text-xs uppercase tracking-wide text-accent">Un último paso</span>
         <h1 className="mt-4 font-studio text-4xl font-bold tracking-tight2 md:text-5xl">
           Completa tu estudio
         </h1>
@@ -82,7 +82,7 @@ export function StudioOnboarding() {
           <Input label="WhatsApp de contacto" placeholder="Ej. +502 5555 5555" error={errors.whatsapp?.message} {...register('whatsapp')} />
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Sobre ti</label>
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sobre ti</label>
             <textarea
               rows={4}
               className="rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"

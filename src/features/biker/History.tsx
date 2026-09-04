@@ -60,7 +60,7 @@ export function History() {
 
       <div className="flex flex-col gap-6">
         {orders.map((order) => (
-          <div key={order.id} className="rounded-lg bg-muted p-5">
+          <div key={order.id} className="rounded-3xl border border-border bg-card p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -72,9 +72,9 @@ export function History() {
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {order.order_items.map((item) => (
-                <div key={item.id} className="group relative aspect-[4/5] overflow-hidden rounded-md bg-background">
+                <div key={item.id} className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted">
                   {item.photo && <img src={previewUrl(item.photo)} alt="" className="h-full w-full object-cover" />}
-                  <span className="absolute bottom-1 left-1 right-1 truncate rounded bg-black/60 px-1.5 py-0.5">
+                  <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate rounded-full bg-black/60 px-2 py-1">
                     <StatusPill
                       dot={getOrderStatusStyle(item.status).dot}
                       text="text-white"
@@ -86,13 +86,13 @@ export function History() {
                     <button
                       onClick={() => download(item.photo_id, item.photo!)}
                       disabled={downloading === item.photo_id}
-                      className="absolute inset-x-0 top-0 flex items-center justify-center bg-black/60 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/75"
+                      className="absolute inset-x-1.5 top-1.5 flex items-center justify-center rounded-full bg-black/70 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/85"
                     >
                       {downloading === item.photo_id ? 'Generando…' : '⬇ Descargar original'}
                     </button>
                   )}
                   {PAID_STATUSES.has(item.status) && item.photo?.preview_path && !item.photo.delivered_path && (
-                    <span className="absolute inset-x-0 top-0 bg-black/60 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">
+                    <span className="absolute inset-x-1.5 top-1.5 rounded-full bg-black/70 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">
                       El fotógrafo está editando tu foto
                     </span>
                   )}

@@ -62,7 +62,7 @@ export function RouteMap() {
 
   return (
     <div className="relative font-flat" style={{ height: 'calc(100dvh - 64px)' }}>
-      <div className="absolute left-4 right-4 top-4 z-[500] flex flex-wrap items-center gap-3 rounded-lg bg-background/95 p-4 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
+      <div className="absolute left-4 right-4 top-4 z-[500] flex flex-wrap items-center gap-3 rounded-3xl bg-background/95 p-4 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
         <div className="w-full">
           <h1 className="text-lg font-bold tracking-tight">Mapa de puntos</h1>
           <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>

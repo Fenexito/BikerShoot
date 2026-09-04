@@ -20,14 +20,14 @@ export function StudioSample() {
     <div className="min-h-screen bg-background px-6 py-16 text-foreground md:px-16 md:py-24">
       <div className="mx-auto flex max-w-5xl flex-col gap-24">
         <header className="flex items-center justify-between border-b border-border pb-6">
-          <span className="font-studio-mono text-xs uppercase tracking-widest2 text-muted-foreground">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
             Bold Typography — Studio
           </span>
           <ThemeToggle />
         </header>
 
         <section>
-          <span className="font-studio-mono text-sm uppercase tracking-wider2 text-accent">
+          <span className="text-sm font-medium uppercase tracking-wide text-accent">
             Fotógrafos profesionales
           </span>
           <h1 className="mt-4 font-studio text-6xl font-extrabold leading-tight tracking-tight2 md:text-8xl">

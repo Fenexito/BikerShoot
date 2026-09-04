@@ -8,11 +8,11 @@ export function EventCard({ event }: { event: PublicEvent }) {
   return (
     <Link
       to={`/app/eventos/${event.id}`}
-      className="group block overflow-hidden rounded-lg bg-muted transition-transform duration-200 hover:scale-[1.02]"
+      className="group block overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-sm"
     >
       <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100">
-        <span className="text-4xl opacity-40">🏍️</span>
-        <div className="absolute left-2 top-2">
+        <span className="text-4xl opacity-40 transition-transform duration-500 group-hover:scale-110">🏍️</span>
+        <div className="absolute left-3 top-3">
           <Badge tone="accent">{event.category}</Badge>
         </div>
       </div>

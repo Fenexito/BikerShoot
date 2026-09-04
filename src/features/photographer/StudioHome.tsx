@@ -48,19 +48,19 @@ export function StudioHome() {
 
       <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card bordered className="text-center">
-          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">Ventas (activas)</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ventas (activas)</p>
           <p className="mt-2 font-studio text-3xl font-bold">Q{totalSalesQ}</p>
         </Card>
         <Card bordered className="text-center">
-          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">Pend. de pago</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pend. de pago</p>
           <p className="mt-2 font-studio text-3xl font-bold text-accent">{pendingPayment.length}</p>
         </Card>
         <Card bordered className="text-center">
-          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">En preparación</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">En preparación</p>
           <p className="mt-2 font-studio text-3xl font-bold">{inPreparation.length}</p>
         </Card>
         <Card bordered className="text-center">
-          <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">Fotos subidas</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fotos subidas</p>
           <p className="mt-2 font-studio text-3xl font-bold">{photoCount}</p>
         </Card>
       </div>
@@ -68,7 +68,7 @@ export function StudioHome() {
       <section className="mt-14">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-studio text-xl font-bold tracking-tight2">Necesita tu atención</h2>
-          <Link to="/studio/pedidos" className="font-studio-mono text-xs uppercase tracking-wider2 text-accent">
+          <Link to="/studio/pedidos" className="text-xs font-medium uppercase tracking-wide text-accent">
             Ver todos los pedidos →
           </Link>
         </div>
@@ -92,7 +92,7 @@ export function StudioHome() {
                     dot={getOrderStatusStyle(order.status).dot}
                     text={getOrderStatusStyle(order.status).text}
                     label={getOrderStatusStyle(order.status).label}
-                    className="font-studio-mono text-xs uppercase tracking-wider2"
+                    className="text-xs font-medium uppercase tracking-wide"
                   />
                   <span className="font-bold">Q{order.total}</span>
                 </div>
@@ -131,7 +131,7 @@ export function StudioHome() {
                       dot={EVENT_STATUS_STYLE[event.status].dot}
                       text={EVENT_STATUS_STYLE[event.status].text}
                       label={EVENT_STATUS_STYLE[event.status].label}
-                      className="font-studio-mono text-xs uppercase tracking-wider2"
+                      className="text-xs font-medium uppercase tracking-wide"
                     />
                   </div>
                   <h3 className="mt-3 font-studio text-lg font-bold">{event.title}</h3>

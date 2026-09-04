@@ -189,7 +189,7 @@ export function StudioProfilePage() {
         ) : (
           <span className="text-6xl opacity-20">🏍️</span>
         )}
-        <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold uppercase tracking-wider2 text-white opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
           {uploadingCover ? 'Subiendo…' : 'Cambiar portada'}
         </span>
       </button>

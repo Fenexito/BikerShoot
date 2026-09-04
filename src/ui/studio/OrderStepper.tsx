@@ -30,7 +30,7 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
                   complete: { backgroundColor: 'rgb(var(--color-accent))', color: 'rgb(var(--color-accent-foreground))', scale: 1 },
                 }}
                 transition={{ duration: 0.3 }}
-                className="flex h-9 w-9 items-center justify-center border-2 border-accent font-studio-mono text-xs font-bold"
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-accent text-xs font-bold"
               >
                 {status === 'complete' ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4">
@@ -47,7 +47,7 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
                   i + 1
                 )}
               </motion.div>
-              <span className="whitespace-nowrap text-center font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+              <span className="whitespace-nowrap text-center text-[10px] uppercase tracking-wide text-muted-foreground">
                 {label}
               </span>
             </div>

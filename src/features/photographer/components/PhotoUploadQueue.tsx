@@ -268,7 +268,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         className={cn(
-          'flex flex-col items-center justify-center gap-2 border-2 border-dashed px-6 py-8 text-center transition-colors',
+          'flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed px-6 py-8 text-center transition-colors',
           dragging ? 'border-accent bg-accent/5' : 'border-border',
         )}
       >
@@ -276,7 +276,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={checkingDuplicates}
-          className="border border-foreground px-4 py-2 text-xs font-semibold uppercase tracking-wider2 transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
+          className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {checkingDuplicates ? 'Revisando duplicados…' : 'Elegir archivos'}
         </button>
@@ -286,7 +286,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       {items.length > 0 && (
         <div className="mt-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {doneCount}/{items.length} listas
               {busyCount > 0 && ` · ${busyCount} en cola`}
               {errorCount > 0 && ` · ${errorCount} fallidas`}
@@ -295,16 +295,16 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
               {errorCount > 0 && (
                 <Button variant="ghost" onClick={retryAllFailed}>Reintentar todos los fallidos</Button>
               )}
-              <div className="flex rounded-2xl border border-border">
+              <div className="flex gap-1 rounded-full bg-muted p-1">
                 <button
                   onClick={() => setView('grid')}
-                  className={cn('px-2 py-1 text-xs uppercase tracking-wider2', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground')}
+                  className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
                 >
                   Grid
                 </button>
                 <button
                   onClick={() => setView('list')}
-                  className={cn('px-2 py-1 text-xs uppercase tracking-wider2', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground')}
+                  className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
                 >
                   Lista
                 </button>
@@ -340,7 +340,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                       className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 p-2 text-center text-[10px] text-white"
                     >
                       <span>{item.errorMessage ?? 'Error al subir'}</span>
-                      <span className="font-bold uppercase tracking-wider2 text-accent">Reintentar</span>
+                      <span className="font-bold uppercase tracking-wide text-accent">Reintentar</span>
                     </button>
                   )}
                 </a>
@@ -353,7 +353,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                   <img src={item.localPreview} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{item.name}</p>
-                    <p className="font-studio-mono text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
                   </div>
                   <div className="w-32 shrink-0">
                     {item.status === 'error' ? (
@@ -370,12 +370,12 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                   <div className="w-16 shrink-0 text-right">
                     {item.status === 'lista' && <span className="text-emerald-500">✓</span>}
                     {item.status === 'error' && (
-                      <button onClick={() => retry(item.id)} className="text-xs font-semibold uppercase tracking-wider2 text-accent hover:underline">
+                      <button onClick={() => retry(item.id)} className="text-xs font-semibold uppercase tracking-wide text-accent hover:underline">
                         Reintentar
                       </button>
                     )}
                     {(item.status === 'pendiente' || item.status === 'subiendo') && (
-                      <span className="font-studio-mono text-[10px] text-muted-foreground">{Math.round(item.progress)}%</span>
+                      <span className="text-[10px] text-muted-foreground">{Math.round(item.progress)}%</span>
                     )}
                   </div>
                 </div>

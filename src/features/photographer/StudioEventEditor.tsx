@@ -353,7 +353,7 @@ export function StudioEventEditor() {
           ))}
         </Select>
         <div className="sm:col-span-2">
-          <label className="mb-2 block text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Descripción</label>
+          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Descripción</label>
           <textarea
             rows={3}
             value={description}
@@ -459,14 +459,14 @@ export function StudioEventEditor() {
                     type="time"
                     value={pt.timeStart}
                     onChange={(e) => updatePointTime(pt.id, 'timeStart', e.target.value)}
-                    className="rounded-2xl border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
+                    className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
                   />
                   <span className="text-xs text-muted-foreground">–</span>
                   <input
                     type="time"
                     value={pt.timeEnd}
                     onChange={(e) => updatePointTime(pt.id, 'timeEnd', e.target.value)}
-                    className="rounded-2xl border border-border bg-input px-2 py-1 font-studio-mono text-xs text-foreground outline-none focus:border-accent"
+                    className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
                   />
                   <button onClick={() => removePoint(pt.id)} className="ml-2 text-sm text-muted-foreground hover:text-accent">
                     Quitar

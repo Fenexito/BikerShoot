@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents } from './usePublicData'
 import { EventCard } from './components/EventCard'
 import { Select } from '../../ui/flat/Select'
+import { cn } from '../../lib/cn'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
 
@@ -33,16 +34,33 @@ export function Events() {
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Eventos</h1>
       <p className="mb-6 text-muted-foreground">{filtered.length} eventos</p>
 
-      <div className="mb-8 flex flex-wrap gap-3">
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setParam('categoria', undefined)}
+            className={cn(
+              'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+              !category ? 'bg-primary text-white' : 'bg-muted text-foreground hover:bg-border',
+            )}
+          >
+            Todas
+          </button>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => setParam('categoria', category === c ? undefined : c)}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                category === c ? 'bg-primary text-white' : 'bg-muted text-foreground hover:bg-border',
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
         <Select value={city} onChange={(e) => setParam('ciudad', e.target.value || undefined)} className="w-44">
           <option value="">Toda ciudad</option>
           {CITIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </Select>
-        <Select value={category} onChange={(e) => setParam('categoria', e.target.value || undefined)} className="w-44">
-          <option value="">Toda categoría</option>
-          {CATEGORIES.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </Select>

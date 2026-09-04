@@ -95,7 +95,7 @@ export function Checkout() {
       <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3">
           {items.map((item) => (
-            <div key={item.photoId} className="flex items-center gap-3 rounded-lg bg-muted p-3 sm:gap-4">
+            <div key={item.photoId} className="flex items-center gap-3 rounded-2xl bg-muted p-3 sm:gap-4">
               <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 shrink-0 rounded object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{item.eventTitle}</p>
@@ -143,7 +143,7 @@ export function Checkout() {
                   key={m}
                   onClick={() => setMethod(m)}
                   className={cn(
-                    'flex items-center gap-3 rounded-md border-2 px-4 py-3 text-left text-sm font-medium transition-colors',
+                    'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-sm font-medium transition-colors',
                     method === m ? 'border-primary bg-blue-50' : 'border-transparent bg-muted',
                   )}
                 >

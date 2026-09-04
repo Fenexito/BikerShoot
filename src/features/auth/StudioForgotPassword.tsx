@@ -34,7 +34,7 @@ export function StudioForgotPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
       <div className="w-full max-w-md">
-        <Link to="/" className="mb-10 inline-block font-studio-mono text-xs uppercase tracking-widest2 text-muted-foreground">
+        <Link to="/" className="mb-10 inline-block text-xs uppercase tracking-wide text-muted-foreground">
           MotoShots Studio
         </Link>
 
@@ -61,7 +61,7 @@ export function StudioForgotPassword() {
           </>
         )}
 
-        <p className="mt-8 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+        <p className="mt-8 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <Link to="/studio/login" className="text-accent">Volver a iniciar sesión</Link>
         </p>
       </div>
