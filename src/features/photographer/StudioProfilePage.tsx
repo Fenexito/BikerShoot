@@ -197,13 +197,13 @@ export function StudioProfilePage() {
 
       <div className={STUDIO_PAGE_WIDE}>
         <div className="-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
-          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-28 w-28 shrink-0" disabled={uploadingAvatar}>
+          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-28 w-28 shrink-0 rounded-full" disabled={uploadingAvatar}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt={profile.display_name} className="h-28 w-28 border-4 border-background object-cover" />
+              <img src={avatarUrl} alt={profile.display_name} className="h-28 w-28 rounded-full border-4 border-background object-cover shadow-sm" />
             ) : (
-              <InitialsAvatar name={profile.display_name || 'S'} className="h-28 w-28 border-4 border-background bg-foreground text-2xl text-background" />
+              <InitialsAvatar name={profile.display_name || 'S'} className="h-28 w-28 rounded-full border-4 border-background bg-foreground text-2xl text-background shadow-sm" />
             )}
-            <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
               {uploadingAvatar ? '…' : 'Cambiar'}
             </span>
           </button>
@@ -229,35 +229,35 @@ export function StudioProfilePage() {
         </div>
 
         {!details?.approved && (
-          <p className="mt-6 rounded-2xl border border-border px-4 py-3 text-sm text-muted-foreground">
+          <p className="mt-6 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
             Tu cuenta está en revisión. Podrás publicar eventos y vender fotos en cuanto un administrador la apruebe.
           </p>
         )}
 
         <div className="mt-8 flex flex-wrap gap-4">
-          <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border px-6 py-5 text-center sm:w-72">
+          <div className="grid grid-cols-2 gap-4 rounded-3xl border border-border bg-card px-6 py-5 text-center sm:w-72">
             <div>
-              <p className="font-studio text-2xl font-bold">{events.length}</p>
-              <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Rodadas cubiertas</p>
+              <p className="text-2xl font-bold">{events.length}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rodadas cubiertas</p>
             </div>
             <div>
-              <p className="font-studio text-2xl font-bold">{photoCount}</p>
-              <p className="font-studio-mono text-[10px] uppercase text-muted-foreground">Fotos publicadas</p>
+              <p className="text-2xl font-bold">{photoCount}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Fotos publicadas</p>
             </div>
           </div>
 
           {details?.storage_plan && (
-            <div className="flex-1 rounded-2xl border border-border px-6 py-5" style={{ minWidth: 240 }}>
+            <div className="flex-1 rounded-3xl border border-border bg-card px-6 py-5" style={{ minWidth: 240 }}>
               <div className="flex items-center justify-between gap-3">
-                <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Almacenamiento · Plan {details.storage_plan.name}
                 </p>
-                <Link to="/studio/planes" className="font-studio-mono text-[10px] uppercase tracking-wider2 text-accent hover:underline">
+                <Link to="/studio/planes" className="text-[11px] font-semibold uppercase tracking-wide text-accent hover:underline">
                   Ver planes →
                 </Link>
               </div>
-              <div className="mt-2 h-2 w-full overflow-hidden bg-muted">
-                <div className={cn('h-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className={cn('h-full rounded-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB usados
@@ -267,7 +267,7 @@ export function StudioProfilePage() {
         </div>
 
         {editing ? (
-          <form className="mt-8 flex flex-col gap-5 border-t border-border pt-8" onSubmit={handleSubmit(onSubmit)}>
+          <form className="mt-8 flex flex-col gap-5 rounded-3xl border border-border bg-card p-6 sm:p-8" onSubmit={handleSubmit(onSubmit)}>
             <p className="text-sm text-muted-foreground">Esto es lo que ve un biker en tu perfil público.</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <Input label="Nombre del estudio" error={errors.displayName?.message} {...register('displayName')} />
@@ -275,7 +275,7 @@ export function StudioProfilePage() {
               <Input label="WhatsApp de contacto" {...register('whatsapp')} />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Sobre ti</label>
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sobre ti</label>
               <textarea
                 rows={4}
                 className="rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
@@ -283,7 +283,7 @@ export function StudioProfilePage() {
               />
             </div>
             <div>
-              <p className="mb-3 text-xs font-medium uppercase tracking-wider2 text-muted-foreground">Redes sociales (opcional)</p>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Redes sociales (opcional)</p>
               <div className="grid gap-5 sm:grid-cols-3">
                 <Input label="Instagram" placeholder="https://instagram.com/tu_estudio" {...register('instagramUrl')} />
                 <Input label="Facebook" placeholder="https://facebook.com/tu_estudio" {...register('facebookUrl')} />
@@ -298,12 +298,12 @@ export function StudioProfilePage() {
           photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>
         )}
 
-        <div className="mt-8 flex gap-1 border-b border-border">
+        <div className="mt-8 flex flex-wrap gap-2">
           <button
             onClick={() => setTab('destacadas')}
             className={cn(
-              'border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
-              tab === 'destacadas' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
+              'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+              tab === 'destacadas' ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
             )}
           >
             Fotos destacadas
@@ -311,8 +311,8 @@ export function StudioProfilePage() {
           <button
             onClick={() => setTab('eventos')}
             className={cn(
-              'border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
-              tab === 'eventos' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
+              'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+              tab === 'eventos' ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
             )}
           >
             Eventos ({events.length})
@@ -357,10 +357,10 @@ export function StudioProfilePage() {
               {events.map((event) => {
                 const statusStyle = EVENT_STATUS_STYLE[event.status]
                 return (
-                  <Link key={event.id} to={`/studio/eventos/${event.id}`} className="rounded-2xl border border-border p-4 transition-colors hover:border-border-hover">
+                  <Link key={event.id} to={`/studio/eventos/${event.id}`} className="rounded-3xl border border-border bg-card p-5 transition-all hover:border-accent/40 hover:shadow-sm">
                     <div className="flex items-center justify-between">
                       <Badge>{event.category}</Badge>
-                      <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-[10px] uppercase tracking-wider2" />
+                      <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-[11px]" />
                     </div>
                     <p className="mt-3 font-semibold">{event.title}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}</p>

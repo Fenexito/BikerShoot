@@ -113,14 +113,14 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   }
 
   return (
-    <div className="rounded-2xl border border-border">
+    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-accent/40 hover:shadow-sm">
       <div
         onClick={handleTileClick}
         className={cn('relative aspect-[4/5] overflow-hidden bg-muted', clickable && 'cursor-pointer')}
         title={delivered ? 'Ver entrega final' : hasPreview ? 'Ver con marca de agua' : undefined}
       >
         {hasPreview ? (
-          <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+          <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-muted-foreground">
             Vista previa liberada
@@ -129,7 +129,7 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
           </div>
         )}
         {openingDelivered && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-semibold uppercase tracking-wider2 text-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold text-white">
             Abriendo…
           </div>
         )}
@@ -140,21 +140,24 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
             aria-label="Destacar en tu perfil público"
             title="Destacar en tu perfil público"
             className={cn(
-              'absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center text-base transition-colors',
-              photo.featured ? 'bg-accent text-white' : 'bg-black/60 text-white hover:bg-black/80',
+              'absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-base shadow-sm transition-colors',
+              photo.featured ? 'bg-accent text-white' : 'bg-white/90 text-foreground hover:bg-white',
             )}
           >
             ★
           </button>
         )}
-        <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1.5 text-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="absolute inset-x-2 bottom-2">
           {delivered ? (
-            <span className="block text-[10px] font-semibold uppercase tracking-wider2 text-emerald-400">✓ Entregada — clic para ver</span>
+            <span className="flex items-center justify-center rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm">
+              ✓ Entregada — ver
+            </span>
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
               disabled={uploading}
-              className="w-full text-[10px] font-semibold uppercase tracking-wider2 text-white"
+              className="flex w-full items-center justify-center rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-white"
             >
               {uploading ? 'Subiendo…' : 'Subir entrega final'}
             </button>
@@ -164,15 +167,15 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
         )}
       </div>
-      <div className="p-2">
-        <p className="truncate font-studio-mono text-[10px] text-muted-foreground" title={photo.original_filename ?? undefined}>
+      <div className="p-3">
+        <p className="truncate text-xs text-muted-foreground" title={photo.original_filename ?? undefined}>
           {photo.original_filename ?? 'Sin nombre registrado'}
         </p>
         {photo.raw_path && (
           <button
             onClick={downloadRaw}
             disabled={downloadingRaw}
-            className="mt-1 block text-[10px] font-semibold uppercase tracking-wider2 text-accent hover:underline disabled:opacity-50"
+            className="mt-1 block text-xs font-semibold text-accent hover:underline disabled:opacity-50"
           >
             {downloadingRaw ? 'Generando…' : '⬇ Descargar original (respaldo)'}
           </button>
@@ -237,40 +240,40 @@ export function StudioOrderDetail() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <Link to="/studio/pedidos" className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground hover:text-foreground">
+      <Link to="/studio/pedidos" className="text-sm font-medium text-muted-foreground hover:text-foreground">
         ← Todos los pedidos
       </Link>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-6 border-b border-border pb-6">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-6 rounded-3xl border border-border bg-card p-6 sm:p-8">
         <div className="flex items-center gap-4">
-          <InitialsAvatar name={order.bikerName} className="h-14 w-14 bg-foreground text-lg text-background" />
+          <InitialsAvatar name={order.bikerName} className="h-16 w-16 bg-foreground text-lg text-background" />
           <div>
-            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">Comprador</p>
-            <h1 className="font-studio text-2xl font-bold tracking-tight2">{order.bikerName}</h1>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
+            <h1 className="text-2xl font-bold tracking-tight">{order.bikerName}</h1>
             <p className="text-muted-foreground">{order.eventTitle}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="text-right">
-            <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="rounded-2xl bg-muted px-4 py-2.5 text-right">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
             </p>
-            <p className="font-studio text-2xl font-bold">Q{order.total}</p>
+            <p className="text-xl font-bold">Q{order.total}</p>
           </div>
           {order.paymentMethod === 'transferencia' && (
             <Button variant="secondary" size="sm" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
               Ver comprobante
             </Button>
           )}
-          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="font-studio-mono text-xs uppercase tracking-wider2" />
+          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs" />
         </div>
       </div>
 
       {order.status !== 'cancelado' && <OrderStepper steps={FLOW_LABELS} currentIndex={stepIndex} className="mt-10" />}
 
       <section className="mt-12">
-        <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">{order.items.length} fotos compradas</h2>
-        <p className="mb-4 text-sm text-muted-foreground">{SECTION_COPY[order.status]}</p>
+        <h2 className="mb-1 text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
+        <p className="mb-5 text-sm text-muted-foreground">{SECTION_COPY[order.status]}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
         </div>

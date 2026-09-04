@@ -25,9 +25,9 @@ function ActionButton({ label, description, busy, onClick }: { label: string; de
     <button
       onClick={onClick}
       disabled={busy}
-      className="flex flex-col gap-0.5 rounded-2xl border border-border px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5 disabled:opacity-50"
+      className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-accent hover:bg-accent/5 disabled:opacity-50"
     >
-      <span className="font-studio-mono text-[10px] font-bold uppercase tracking-wider2">{busy ? 'Procesando…' : label}</span>
+      <span className="text-xs font-bold uppercase tracking-wide">{busy ? 'Procesando…' : label}</span>
       <span className="text-[11px] text-muted-foreground">{description}</span>
     </button>
   )
@@ -106,7 +106,7 @@ function DeleteUnsoldButton({ pointId, eventId, label: scopeLabel }: { pointId?:
 function ActionGroup({ title, eventId, pointId, scopeLabel }: { title: string; eventId: string; pointId?: string; scopeLabel: string }) {
   return (
     <div>
-      <p className="mb-2 font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">{title}</p>
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <DeleteUnsoldButton eventId={eventId} pointId={pointId} label={scopeLabel} />
         <CleanupSoldButton
@@ -132,24 +132,24 @@ function EventRow({ event }: { event: EventStorage }) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="rounded-2xl border border-border">
-      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left">
+    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-accent/30">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
         <div className="min-w-0">
           <p className="truncate font-semibold">{event.title}</p>
-          <p className="font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {new Date(event.eventDate).toLocaleDateString('es-GT')} · {event.totalPhotos} fotos · {event.soldPhotos} vendidas
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-4">
-          <span className="font-studio-mono text-sm">{formatBytes(event.bytes)}</span>
-          <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold">{formatBytes(event.bytes)}</span>
+          <span className={cn('text-muted-foreground transition-transform', open && 'rotate-180')}>▼</span>
         </div>
       </button>
 
       {open && (
         <div className="border-t border-border p-4">
-          <div className="mb-5 border-2 border-accent bg-accent/5 p-4">
-            <p className="mb-3 font-studio-mono text-[10px] uppercase tracking-wider2 text-accent">
+          <div className="mb-5 rounded-2xl border border-accent/30 bg-accent/5 p-4">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-accent">
               Acciones de este evento — afecta los {event.points.length || 0} puntos y todo lo que no tenga punto asignado
             </p>
             <ActionGroup title="Acciones de este evento" eventId={event.id} scopeLabel={event.title} />
@@ -159,21 +159,21 @@ function EventRow({ event }: { event: EventStorage }) {
             <p className="text-sm text-muted-foreground">Este evento no tiene puntos.</p>
           ) : (
             <div className="flex flex-col gap-0">
-              <p className="mb-2 font-studio-mono text-[10px] uppercase tracking-wider2 text-muted-foreground">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {event.points.length} puntos de este evento — cada uno se administra por separado
               </p>
               {event.points.map((pt, i) => (
                 <div key={pt.id} className="flex gap-3 border-l-2 border-border pl-4">
                   <div className="flex flex-col items-center pt-1">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full rounded-2xl border border-border font-studio-mono text-[10px] font-bold text-muted-foreground">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-bold text-muted-foreground">
                       {i + 1}
                     </span>
                     {i < event.points.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
                   </div>
-                  <div className="mb-4 flex-1 rounded-2xl border border-border bg-muted/30 p-3">
+                  <div className="mb-4 flex-1 rounded-2xl border border-border bg-muted/30 p-4">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold">{pt.label}</p>
-                      <span className="font-studio-mono text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {formatBytes(pt.bytes)} · {pt.totalPhotos} fotos · {pt.soldPhotos} vendidas
                       </span>
                     </div>
@@ -211,11 +211,11 @@ export function StudioStorage() {
       <p className="mt-2 text-muted-foreground">Revisa qué eventos ocupan más espacio y libera lo que ya no necesitas.</p>
 
       {details?.storage_plan && (
-        <div className="mt-6 rounded-2xl border border-border p-5">
+        <div className="mt-6 rounded-3xl border border-border bg-card p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>Uso total</span>
-              <span className="text-foreground">
+              <span className="font-semibold text-foreground">
                 {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB
               </span>
               <span>· Plan {details.storage_plan.name}</span>
@@ -227,19 +227,22 @@ export function StudioStorage() {
             </Link>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div className={cn('h-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
+            <div className={cn('h-full rounded-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
 
-      <div className="mt-8 flex items-center justify-between">
-        <h2 className="font-studio text-lg font-bold tracking-tight2">Tus eventos</h2>
-        <div className="flex rounded-2xl border border-border">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-bold tracking-tight">Tus eventos</h2>
+        <div className="flex gap-1 rounded-full bg-muted p-1">
           {(['oldest', 'newest', 'biggest'] as SortMode[]).map((s) => (
             <button
               key={s}
               onClick={() => setSort(s)}
-              className={cn('px-2 py-1 text-[10px] uppercase tracking-wider2', sort === s ? 'bg-foreground text-background' : 'text-muted-foreground')}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                sort === s ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+              )}
             >
               {s === 'oldest' ? 'Más antiguos' : s === 'newest' ? 'Más recientes' : 'Más pesados'}
             </button>

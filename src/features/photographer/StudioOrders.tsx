@@ -27,7 +27,7 @@ export function StudioOrders() {
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Pedidos</h1>
       <p className="mt-2 text-muted-foreground">{orders.length} pedidos en total</p>
 
-      <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border">
+      <div className="mt-8 flex flex-wrap gap-2">
         {TABS.map((t) => {
           const count = t.value === 'todos' ? orders.length : orders.filter((o) => o.status === t.value).length
           return (
@@ -35,11 +35,11 @@ export function StudioOrders() {
               key={t.value}
               onClick={() => setTab(t.value)}
               className={cn(
-                'whitespace-nowrap border-b-2 px-4 py-3 font-studio-mono text-xs uppercase tracking-wider2 transition-colors',
-                tab === t.value ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
+                'whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                tab === t.value ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
               )}
             >
-              {t.label} ({count})
+              {t.label} <span className="opacity-70">({count})</span>
             </button>
           )
         })}
@@ -51,29 +51,29 @@ export function StudioOrders() {
         <p className="mt-10 text-center text-muted-foreground">No hay pedidos en esta categoría.</p>
       )}
 
-      <div className="mt-6 flex flex-col divide-y divide-border rounded-2xl border border-border">
+      <div className="mt-6 flex flex-col gap-3">
         {filtered.map((order) => (
           <Link
             key={order.orderId}
             to={`/studio/pedidos/${order.orderId}`}
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-3xl border border-border bg-card px-5 py-4 transition-all hover:border-accent/40 hover:shadow-sm"
           >
-            <InitialsAvatar name={order.bikerName} className="h-10 w-10 shrink-0 bg-foreground text-sm text-background" />
+            <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{order.bikerName}</p>
               <p className="truncate text-sm text-muted-foreground">{order.eventTitle} · {order.items.length} fotos</p>
             </div>
-            <div className="ml-[52px] flex w-full flex-wrap items-center gap-3 sm:ml-0 sm:w-auto sm:justify-end">
-              <span className="font-studio-mono text-xs uppercase tracking-wider2 text-muted-foreground">
+            <div className="ml-[60px] flex w-full flex-wrap items-center gap-3 sm:ml-0 sm:w-auto sm:justify-end">
+              <span className="text-xs text-muted-foreground">
                 {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
               </span>
               <StatusPill
                 dot={getOrderStatusStyle(order.status).dot}
                 text={getOrderStatusStyle(order.status).text}
                 label={getOrderStatusStyle(order.status).label}
-                className="font-studio-mono text-xs uppercase tracking-wider2"
+                className="text-xs"
               />
-              <span className="font-bold">Q{order.total}</span>
+              <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
             </div>
           </Link>
         ))}
