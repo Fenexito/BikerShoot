@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 
@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(true)
+  const loadedUserId = useRef<string | null>(null)
 
   // Nunca deja profile/profileLoading en un estado ambiguo: los guards de
   // ruta (RequireStudio/RequireBiker) niegan acceso por defecto mientras
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       setProfile(data ?? null)
+      loadedUserId.current = userId
     } finally {
       setProfileLoading(false)
     }
@@ -73,11 +75,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
-      if (newSession?.user) {
-        await loadProfile(newSession.user.id)
-      } else {
+      if (!newSession?.user) {
+        loadedUserId.current = null
         setProfile(null)
         setProfileLoading(false)
+        return
+      }
+      // Supabase dispara este evento también en cada refresco silencioso de
+      // token (p.ej. al volver a la pestaña), no solo en un login real. Si
+      // recargábamos el perfil cada vez, profileLoading pasaba a true y los
+      // guards de ruta desmontaban toda la página — cancelando cualquier
+      // formulario a medio llenar (editar perfil, subir fotos). Ahora solo
+      // se recarga si el usuario realmente cambió.
+      if (newSession.user.id !== loadedUserId.current) {
+        await loadProfile(newSession.user.id)
       }
     })
 

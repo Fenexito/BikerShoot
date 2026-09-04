@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../lib/cn'
 import { HeaderPublic } from '../ui/layout/HeaderPublic'
@@ -11,6 +12,7 @@ import { TypedConfirmDialog } from '../ui/overlays/TypedConfirmDialog'
 import { ScrollRestoration } from './ScrollRestoration'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
+import { RouteFallback } from '../ui/shared/RouteFallback'
 
 const AUTH_PATHS = [
   '/login',
@@ -41,7 +43,9 @@ export function PortalLayout() {
         isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
       )}
       <div className="flex-1">
-        <Outlet />
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
       </div>
       {!isUserPortal && !isStudioPortal && !isAdminPortal && !isAuthPage && <Footer />}
       <Toaster />
