@@ -7,6 +7,7 @@ import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { cn } from '../../lib/cn'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 
 const TABS: { value: OrderItemStatus | 'todos'; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -45,10 +46,13 @@ export function StudioOrders() {
         })}
       </div>
 
-      {isLoading && <p className="mt-10 text-center text-muted-foreground">Cargando…</p>}
+      {isLoading && <SkeletonRows count={5} className="mt-6" />}
 
       {!isLoading && filtered.length === 0 && (
-        <p className="mt-10 text-center text-muted-foreground">No hay pedidos en esta categoría.</p>
+        <div className="mt-6 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
+          <span className="text-4xl opacity-40">🧾</span>
+          <p className="font-semibold">No hay pedidos en esta categoría</p>
+        </div>
       )}
 
       <div className="mt-6 flex flex-col gap-3">

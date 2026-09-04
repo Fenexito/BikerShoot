@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
@@ -97,7 +98,7 @@ export function StoragePlansAdmin() {
       </div>
 
       <h2 className="mb-4 text-xl font-bold tracking-tight">Uso por fotógrafo</h2>
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {isLoading && <SkeletonRows count={4} />}
       {!isLoading && usage.length === 0 && <p className="text-muted-foreground">No hay fotógrafos todavía.</p>}
 
       <div className="flex flex-col gap-3">

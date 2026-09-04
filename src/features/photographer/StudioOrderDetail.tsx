@@ -15,6 +15,7 @@ import { OrderStepper } from '../../ui/studio/OrderStepper'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
+import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 
 interface DeliverablePhoto {
@@ -203,7 +204,15 @@ export function StudioOrderDetail() {
   const { data: order, isLoading } = useOrderGroup(user?.id, id)
   const push = useToastStore((s) => s.push)
 
-  if (isLoading) return <p className="px-6 py-16 text-center text-muted-foreground">Cargando pedido…</p>
+  if (isLoading) {
+    return (
+      <div className={STUDIO_PAGE_WIDE}>
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="mt-6 h-24 w-full rounded-3xl" />
+        <SkeletonGrid count={6} className="mt-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" />
+      </div>
+    )
+  }
   if (!order) return <PlaceholderPage title="Pedido no encontrado" />
 
   const stepIndex = FLOW.indexOf(order.status)

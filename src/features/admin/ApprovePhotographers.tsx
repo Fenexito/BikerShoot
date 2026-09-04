@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Button } from '../../ui/flat/Button'
@@ -57,7 +58,7 @@ export function ApprovePhotographers() {
         Solo los fotógrafos aprobados pueden publicar eventos y vender fotos.
       </p>
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {isLoading && <SkeletonRows count={4} />}
       {error && <p className="text-red-600">No se pudo cargar la lista.</p>}
 
       {pending.length > 0 && (

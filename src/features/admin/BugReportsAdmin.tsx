@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
@@ -68,7 +69,7 @@ export function BugReportsAdmin() {
         ))}
       </Select>
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {isLoading && <SkeletonRows count={4} />}
       {error && <p className="text-red-600">No se pudieron cargar los reportes.</p>}
       {!isLoading && filtered.length === 0 && <p className="text-muted-foreground">No hay reportes en esta categoría.</p>}
 

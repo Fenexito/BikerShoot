@@ -9,6 +9,7 @@ import { Badge } from '../../ui/flat/Badge'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 
 const PAID_STATUSES = new Set<OrderItemStatus>(['en_preparacion', 'entregado'])
 
@@ -37,7 +38,11 @@ export function History() {
   }
 
   if (isLoading) {
-    return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando tus compras…</div>
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10 font-flat md:px-8">
+        <SkeletonRows count={3} />
+      </div>
+    )
   }
 
   if (orders.length === 0) {

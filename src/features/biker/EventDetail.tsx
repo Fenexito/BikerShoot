@@ -9,6 +9,7 @@ import { Badge } from '../../ui/flat/Badge'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useCartStore } from '../cart/cartStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
+import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 
 export function EventDetail() {
   const { id } = useParams()
@@ -51,7 +52,15 @@ export function EventDetail() {
 
   const selectedFromEvent = useMemo(() => cartItems.filter((i) => i.eventId === id).length, [cartItems, id])
 
-  if (isLoading) return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando evento…</div>
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="mt-3 h-4 w-1/3" />
+        <SkeletonGrid count={8} className="mt-8" />
+      </div>
+    )
+  }
   if (!event) return <PlaceholderPage title="Evento no encontrado" />
 
   const date = new Date(event.event_date)

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
@@ -90,7 +91,7 @@ export function ReleasesAdmin() {
       </Card>
 
       <h2 className="mb-4 text-xl font-bold tracking-tight">Historial</h2>
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {isLoading && <SkeletonRows count={4} />}
       <div className="flex flex-col gap-4">
         {releases.map((r) => (
           <Card key={r.id}>

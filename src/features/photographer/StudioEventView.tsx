@@ -20,6 +20,7 @@ import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { cn } from '../../lib/cn'
 import type { EventStatus } from '../../types/db'
+import { Skeleton } from '../../ui/shared/Skeleton'
 
 const PAGE_SIZE = 12
 
@@ -298,7 +299,21 @@ export function StudioEventView() {
     navigate('/studio/eventos')
   }
 
-  if (isLoading) return <p className="px-6 py-16 text-center text-muted-foreground">Cargando evento…</p>
+  if (isLoading) {
+    return (
+      <div>
+        <div className="h-[360px] w-full animate-pulse bg-muted md:h-[420px]" />
+        <div className={STUDIO_PAGE_WIDE}>
+          <Skeleton className="mt-6 h-6 w-72" />
+          <div className="mt-8 flex flex-col gap-3">
+            <Skeleton className="h-24 w-full rounded-3xl" />
+            <Skeleton className="h-24 w-full rounded-3xl" />
+            <Skeleton className="h-24 w-full rounded-3xl" />
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (!event) return <PlaceholderPage title="Evento no encontrado" />
 
   const statusStyle = EVENT_STATUS_STYLE[event.status]

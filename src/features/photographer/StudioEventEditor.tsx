@@ -13,6 +13,7 @@ import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import type { EventStatus } from '../../types/db'
+import { Skeleton } from '../../ui/shared/Skeleton'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos'] as const
 const AUTODROMOS = ['Autodromo Pedro Cofiño', 'Autodromo GT', 'Guatemala Raceway (1/4 de Milla)']
@@ -306,7 +307,16 @@ export function StudioEventEditor() {
   }
 
   if (!isNew && isLoading) {
-    return <p className="px-6 py-16 text-center text-muted-foreground">Cargando evento…</p>
+    return (
+      <div className={STUDIO_PAGE_WIDE}>
+        <Skeleton className="h-8 w-56" />
+        <div className="mt-8 space-y-5">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    )
   }
 
   return (

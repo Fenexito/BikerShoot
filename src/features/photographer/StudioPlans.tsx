@@ -8,6 +8,7 @@ import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { Accordion } from '../../ui/shared/Accordion'
+import { Skeleton } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 
 const FAQ_ITEMS = [
@@ -152,7 +153,19 @@ export function StudioPlans() {
   const push = useToastStore((s) => s.push)
   const [busy, setBusy] = useState(false)
 
-  if (!details || !plans) return <p className="px-6 py-16 text-center text-muted-foreground">Cargando…</p>
+  if (!details || !plans) {
+    return (
+      <div className={STUDIO_PAGE_WIDE}>
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="mt-3 h-4 w-96" />
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-80 w-full rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   const currentPlan = details.storage_plan
   const pendingPlan = plans.find((p) => p.id === details.pending_plan_id)

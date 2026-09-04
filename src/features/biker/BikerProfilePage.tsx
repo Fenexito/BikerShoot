@@ -11,6 +11,7 @@ import { Input } from '../../ui/flat/Input'
 import { Card } from '../../ui/flat/Card'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { Skeleton } from '../../ui/shared/Skeleton'
 
 const schema = z.object({
   displayName: z.string().min(2, 'Ingresa tu nombre'),
@@ -73,7 +74,20 @@ export function BikerProfilePage() {
   }
 
   if (isLoading || !profile) {
-    return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando perfil…</div>
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-16 font-flat">
+        <Skeleton className="h-8 w-40" />
+        <div className="mt-8 flex items-center gap-4">
+          <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="mt-8 space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents } from './usePublicData'
 import { EventCard } from './components/EventCard'
 import { Select } from '../../ui/flat/Select'
+import { SkeletonGrid } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
@@ -66,14 +67,25 @@ export function Events() {
         </Select>
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
-      {!isLoading && filtered.length === 0 && <p className="text-muted-foreground">No hay eventos con esos filtros.</p>}
+      {isLoading && <SkeletonGrid count={6} className="sm:grid-cols-2 lg:grid-cols-3" />}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((event) => (
-          <EventCard key={event.id} event={event} />
-        ))}
-      </div>
+      {!isLoading && filtered.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
+          <span className="text-4xl opacity-40">🔍</span>
+          <p className="font-semibold">No hay eventos con esos filtros</p>
+          <p className="text-sm text-muted-foreground">Prueba con otra ciudad o categoría.</p>
+        </div>
+      )}
+
+      {!isLoading && filtered.length > 0 && (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((event, i) => (
+            <div key={event.id} className="animate-[fade-in-up_.4s_ease-out_backwards]" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+              <EventCard event={event} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

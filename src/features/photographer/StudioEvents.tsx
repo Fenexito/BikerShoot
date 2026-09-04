@@ -11,6 +11,7 @@ import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import type { EventStatus } from '../../types/db'
+import { SkeletonGrid } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 
 export function StudioEvents() {
@@ -42,13 +43,16 @@ export function StudioEvents() {
         </Link>
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+      {isLoading && <SkeletonGrid count={6} className="md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
       {error && <p className="text-accent">No se pudieron cargar tus eventos.</p>}
 
       {events && events.length === 0 && (
-        <div className="rounded-2xl border border-border px-6 py-16 text-center text-muted-foreground">
-          Todavía no tienes eventos.{' '}
-          <Link to="/studio/eventos/new" className="text-accent">Crea el primero.</Link>
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border px-6 py-20 text-center">
+          <span className="text-4xl opacity-40">🏍️</span>
+          <p className="font-semibold">Todavía no tienes eventos</p>
+          <Link to="/studio/eventos/new">
+            <Button variant="secondary" size="sm" className="mt-2">+ Crear tu primer evento</Button>
+          </Link>
         </div>
       )}
 

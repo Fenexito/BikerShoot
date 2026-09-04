@@ -51,7 +51,7 @@ export function Search() {
 
   const effectiveBrand = onlyMyBrand ? bikerDetails?.moto_brand ?? '' : motoBrand
 
-  const { data: rawResults = [] } = useSearchPhotos({
+  const { data: rawResults = [], isLoading: resultsLoading } = useSearchPhotos({
     query: query || undefined,
     city: city || undefined,
     category: category || undefined,
@@ -172,7 +172,7 @@ export function Search() {
           </div>
         )}
 
-        <PhotoGrid photos={results} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+        <PhotoGrid photos={results} isLoading={resultsLoading} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
       </div>
 
       <SearchFilterModal

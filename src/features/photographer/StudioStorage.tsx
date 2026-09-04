@@ -9,6 +9,7 @@ import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
+import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 
 function formatBytes(n: number) {
@@ -251,8 +252,13 @@ export function StudioStorage() {
       </div>
 
       <div className="mt-4 flex flex-col gap-3">
-        {isLoading && <p className="text-muted-foreground">Cargando…</p>}
-        {!isLoading && sorted.length === 0 && <p className="text-muted-foreground">Todavía no tienes eventos.</p>}
+        {isLoading && <SkeletonRows count={4} />}
+        {!isLoading && sorted.length === 0 && (
+          <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-16 text-center">
+            <span className="text-4xl opacity-40">💾</span>
+            <p className="font-semibold">Todavía no tienes eventos</p>
+          </div>
+        )}
         {sorted.map((event) => (
           <EventRow key={event.id} event={event} />
         ))}

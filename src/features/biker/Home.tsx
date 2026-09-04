@@ -126,12 +126,16 @@ export function Home() {
         </div>
 
         {events.length === 0 ? (
-          <p className="text-muted-foreground">Todavía no hay eventos publicados.</p>
+          <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
+            <span className="text-4xl opacity-40">📅</span>
+            <p className="font-semibold">Todavía no hay eventos publicados</p>
+            <p className="text-sm text-muted-foreground">Vuelve pronto o explora fotógrafos mientras tanto.</p>
+          </div>
         ) : (
           <div className="grid gap-5 lg:grid-cols-3">
             {featuredEvent && (
               <div className="lg:col-span-2 lg:row-span-2">
-                <Link to={`/app/eventos/${featuredEvent.id}`} className="group block h-full overflow-hidden rounded-lg bg-muted">
+                <Link to={`/app/eventos/${featuredEvent.id}`} className="group block h-full overflow-hidden rounded-3xl border border-border bg-muted transition-all hover:border-primary/30 hover:shadow-sm">
                   <div className="relative flex h-72 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100 lg:h-full">
                     <span className="text-6xl opacity-30">🏍️</span>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
@@ -163,7 +167,10 @@ export function Home() {
             </Link>
           </div>
           {photographers.length === 0 ? (
-            <p className="text-muted-foreground">Todavía no hay fotógrafos aprobados.</p>
+            <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border bg-background py-16 text-center">
+              <span className="text-4xl opacity-40">📷</span>
+              <p className="font-semibold">Todavía no hay fotógrafos aprobados</p>
+            </div>
           ) : (
             <div className="flex gap-4 overflow-x-auto pb-2">
               {photographers.map((p) => (
@@ -178,18 +185,18 @@ export function Home() {
       <section className="mx-auto max-w-6xl px-6 py-16 md:px-16">
         <h2 className="mb-8 text-center text-2xl font-bold tracking-tight md:text-3xl">¿Por dónde quieres empezar?</h2>
         <div className="grid gap-5 sm:grid-cols-3">
-          <Link to="/app/buscar" className="group rounded-lg bg-blue-50 p-8 text-center transition-transform duration-200 hover:scale-[1.02]">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-white text-2xl transition-transform duration-200 group-hover:scale-110">🔍</div>
+          <Link to="/app/buscar" className="group rounded-3xl border border-border bg-blue-50 p-8 text-center transition-all hover:shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm transition-transform duration-200 group-hover:scale-110">🔍</div>
             <h3 className="mt-4 text-lg font-bold">Búsqueda avanzada</h3>
             <p className="mt-1 text-sm text-muted-foreground">Filtra por marca de moto, fecha y más.</p>
           </Link>
-          <Link to="/app/mapa" className="group rounded-lg bg-emerald-50 p-8 text-center transition-transform duration-200 hover:scale-[1.02]">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-white text-2xl transition-transform duration-200 group-hover:scale-110">🗺️</div>
+          <Link to="/app/mapa" className="group rounded-3xl border border-border bg-emerald-50 p-8 text-center transition-all hover:shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm transition-transform duration-200 group-hover:scale-110">🗺️</div>
             <h3 className="mt-4 text-lg font-bold">Mapa de ruta</h3>
             <p className="mt-1 text-sm text-muted-foreground">Encuentra tu punto exacto por hora de salida.</p>
           </Link>
-          <Link to="/app/fotografos" className="group rounded-lg bg-amber-50 p-8 text-center transition-transform duration-200 hover:scale-[1.02]">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-white text-2xl transition-transform duration-200 group-hover:scale-110">📷</div>
+          <Link to="/app/fotografos" className="group rounded-3xl border border-border bg-amber-50 p-8 text-center transition-all hover:shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm transition-transform duration-200 group-hover:scale-110">📷</div>
             <h3 className="mt-4 text-lg font-bold">Explorar fotógrafos</h3>
             <p className="mt-1 text-sm text-muted-foreground">Descubre a quién seguir en tu ciudad.</p>
           </Link>

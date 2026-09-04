@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DbPhoto } from '../../../types/db'
 import { PhotoCard } from './PhotoCard'
-import { Skeleton } from '../../../ui/flat/Skeleton'
+import { Skeleton, SkeletonGrid } from '../../../ui/shared/Skeleton'
 import { cn } from '../../../lib/cn'
 
 const BATCH_SIZE = 36
@@ -15,9 +15,10 @@ interface PhotoGridProps {
   photos: GridPhoto[]
   onOpenPhoto: (photos: GridPhoto[], index: number) => void
   layout?: 'grid' | 'mosaic'
+  isLoading?: boolean
 }
 
-export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid' }: PhotoGridProps) {
+export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false }: PhotoGridProps) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -48,6 +49,10 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid' }: PhotoGridPro
 
   const visible = useMemo(() => photos.slice(0, visibleCount), [photos, visibleCount])
 
+  if (isLoading) {
+    return <SkeletonGrid count={12} className="sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" />
+  }
+
   if (photos.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
@@ -67,15 +72,20 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid' }: PhotoGridPro
             : 'grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:gap-3',
         )}
       >
-        {visible.map((photo) => (
-          <PhotoCard
+        {visible.map((photo, i) => (
+          <div
             key={photo.id}
-            photo={photo}
-            eventTitle={photo.eventTitle}
-            photographerName={photo.photographerName}
-            layout={layout}
-            onOpen={() => onOpenPhoto(visible, visible.indexOf(photo))}
-          />
+            className={cn(layout === 'mosaic' && 'break-inside-avoid', i < 24 && 'animate-[fade-in-up_.35s_ease-out_backwards]')}
+            style={i < 24 ? { animationDelay: `${(i % 12) * 25}ms` } : undefined}
+          >
+            <PhotoCard
+              photo={photo}
+              eventTitle={photo.eventTitle}
+              photographerName={photo.photographerName}
+              layout={layout}
+              onOpen={() => onOpenPhoto(visible, visible.indexOf(photo))}
+            />
+          </div>
         ))}
         {loadingMore &&
           layout !== 'mosaic' &&

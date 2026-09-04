@@ -11,6 +11,7 @@ import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
 import { IconVerified } from '../../ui/shared/icons'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
+import { Skeleton } from '../../ui/shared/Skeleton'
 
 export function PhotographerProfile() {
   const { id } = useParams()
@@ -30,7 +31,22 @@ export function PhotographerProfile() {
     })
   }, [photos, events, photographer])
 
-  if (isLoading) return <div className="px-6 py-16 text-center text-muted-foreground font-flat">Cargando…</div>
+  if (isLoading) {
+    return (
+      <div className="font-flat">
+        <div className="h-48 w-full animate-pulse bg-muted md:h-64" />
+        <div className="mx-auto max-w-6xl px-4 md:px-8">
+          <div className="-mt-14 flex items-end gap-4">
+            <Skeleton className="h-28 w-28 shrink-0 rounded-full border-4 border-background" />
+            <div className="flex-1 space-y-2 pb-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (!photographer) return <PlaceholderPage title="Fotógrafo no encontrado" />
 
   const avatarUrl = photographer.avatar_url

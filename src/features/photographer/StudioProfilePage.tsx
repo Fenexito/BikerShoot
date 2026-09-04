@@ -18,6 +18,7 @@ import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
 import { IconVerified } from '../../ui/shared/icons'
+import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import DriftWall from '../../ui/reactbits/DriftWall'
 import { cn } from '../../lib/cn'
@@ -169,7 +170,20 @@ export function StudioProfilePage() {
   }
 
   if (isLoading || !profile || !photographer) {
-    return <div className="px-6 py-16 text-center text-muted-foreground">Cargando perfil…</div>
+    return (
+      <div>
+        <div className="h-48 w-full animate-pulse bg-muted md:h-64" />
+        <div className={STUDIO_PAGE_WIDE}>
+          <div className="-mt-16 flex items-end gap-4">
+            <Skeleton className="h-28 w-28 shrink-0 rounded-full border-4 border-background" />
+            <div className="flex-1 space-y-2 pb-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const avatarUrl = profile.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
