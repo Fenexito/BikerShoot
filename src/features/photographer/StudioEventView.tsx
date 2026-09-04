@@ -135,6 +135,100 @@ function PhotoGallery({ photos, onDelete }: { photos: EventPhoto[]; onDelete: (i
   )
 }
 
+function PointStack({ photos }: { photos: EventPhoto[] }) {
+  const preview = photos.slice(0, 3)
+  if (preview.length === 0) {
+    return (
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-dashed border-border text-lg opacity-40">
+        📷
+      </div>
+    )
+  }
+  return (
+    <div className="relative h-16 w-16 shrink-0">
+      {preview.map((photo, i) => (
+        <img
+          key={photo.id}
+          src={previewUrl(photo)}
+          alt=""
+          className="absolute h-14 w-14 rounded-2xl border-2 border-background object-cover shadow-sm"
+          style={{ left: i * 8, top: i * 6, zIndex: preview.length - i }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function PointCard({
+  point,
+  photos,
+  eventId,
+  photographerId,
+  price,
+  watermarkPath,
+  onDelete,
+  onUploaded,
+}: {
+  point: { id: string; label: string; time_start: string; time_end: string }
+  photos: EventPhoto[]
+  eventId: string
+  photographerId: string
+  price: number
+  watermarkPath: string | null
+  onDelete: (id: string) => void
+  onUploaded: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const sold = photos.filter((p) => p.delivered_path).length
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
+      <button onClick={() => setExpanded((e) => !e)} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
+        <PointStack photos={photos} />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-studio text-lg font-bold tracking-tight2">{point.label}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {point.time_start.slice(0, 5)} – {point.time_end.slice(0, 5)} · {photos.length} fotos
+            {sold > 0 && ` · ${sold} vendidas`}
+          </p>
+        </div>
+        <span
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm transition-transform duration-200',
+            expanded && 'rotate-180',
+          )}
+        >
+          ↓
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border p-5">
+          <div className="mb-4 flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
+              {uploadOpen ? 'Cerrar' : '+ Subir fotos a este punto'}
+            </Button>
+          </div>
+          {uploadOpen && (
+            <div className="mb-6">
+              <PhotoUploadQueue
+                eventId={eventId}
+                pointId={point.id}
+                photographerId={photographerId}
+                price={price}
+                watermarkPath={watermarkPath}
+                onItemUploaded={onUploaded}
+              />
+            </div>
+          )}
+          <PhotoGallery photos={photos} onDelete={onDelete} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function StudioEventView() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -142,7 +236,6 @@ export function StudioEventView() {
   const push = useToastStore((s) => s.push)
   const { data: event, isLoading } = useEvent(id)
   const { data: photos = [] } = useEventPhotosDetailed(id)
-  const [uploadOpenFor, setUploadOpenFor] = useState<string | null>(null)
 
   const photosByPoint = useMemo(() => {
     const map = new Map<string, EventPhoto[]>()
@@ -297,47 +390,29 @@ export function StudioEventView() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col gap-10">
-          {event.event_points.map((pt) => {
-            const ptPhotos = photosByPoint.get(pt.id) ?? []
-            return (
-              <section key={pt.id}>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="font-studio text-lg font-bold tracking-tight2">{pt.label}</h2>
-                    <p className="font-studio-mono text-xs text-muted-foreground">
-                      {pt.time_start.slice(0, 5)} – {pt.time_end.slice(0, 5)} · {ptPhotos.length} fotos
-                    </p>
-                  </div>
-                  <Button variant="ghost" onClick={() => setUploadOpenFor(uploadOpenFor === pt.id ? null : pt.id)}>
-                    {uploadOpenFor === pt.id ? 'Cerrar' : '+ Subir fotos a este punto'}
-                  </Button>
-                </div>
-                {uploadOpenFor === pt.id && (
-                  <div className="mb-6">
-                    <PhotoUploadQueue
-                      eventId={event.id}
-                      pointId={pt.id}
-                      photographerId={event.photographer_id}
-                      price={event.price_per_photo}
-                      watermarkPath={event.watermark_path}
-                      onItemUploaded={() => {
-                        queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
-                        queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
-                      }}
-                    />
-                  </div>
-                )}
-                <PhotoGallery photos={ptPhotos} onDelete={deletePhoto} />
-              </section>
-            )
-          })}
+        <div className="mt-10 flex flex-col gap-4">
+          {event.event_points.map((pt) => (
+            <PointCard
+              key={pt.id}
+              point={pt}
+              photos={photosByPoint.get(pt.id) ?? []}
+              eventId={event.id}
+              photographerId={event.photographer_id}
+              price={event.price_per_photo}
+              watermarkPath={event.watermark_path}
+              onDelete={deletePhoto}
+              onUploaded={() => {
+                queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
+                queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
+              }}
+            />
+          ))}
 
           {unassigned.length > 0 && (
-            <section>
+            <div className="overflow-hidden rounded-3xl border border-border bg-card p-5">
               <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
               <PhotoGallery photos={unassigned} onDelete={deletePhoto} />
-            </section>
+            </div>
           )}
 
           {event.event_points.length === 0 && (

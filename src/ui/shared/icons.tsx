@@ -132,6 +132,25 @@ export function IconTiktok(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconFilter(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="11" y1="18" x2="13" y2="18" />
+    </svg>
+  )
+}
+
+export function IconBell(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  )
+}
+
 export function IconSearch(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

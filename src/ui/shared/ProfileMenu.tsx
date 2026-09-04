@@ -18,6 +18,13 @@ interface ProfileMenuProps {
   themeSwitcher?: ReactNode
 }
 
+const FOOTER_LINKS: ProfileMenuLink[] = [
+  { to: '/privacidad', label: 'Privacidad' },
+  { to: '/terminos', label: 'Términos' },
+  { to: '/derechos-de-autor', label: 'Derechos de autor' },
+  { to: '/changelog', label: 'Novedades' },
+]
+
 /** Menú flotante oscuro al hacer clic en el avatar — mismo patrón en los dos
  * portales (Studio y biker), independiente del tema de la página: siempre
  * "panel de comando" oscuro flotando sobre lo que sea, como en la
@@ -90,6 +97,14 @@ export function ProfileMenu({ name, email, avatar, links, themeSwitcher }: Profi
                 </button>
               )
             })}
+          </div>
+
+          <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-white/10 px-4 py-3 text-[11px] text-white/40">
+            {FOOTER_LINKS.map((link) => (
+              <Link key={link.label} to={link.to!} onClick={() => setOpen(false)} className="transition-colors hover:text-white/70">
+                {link.label}
+              </Link>
+            ))}
           </div>
         </div>
       )}

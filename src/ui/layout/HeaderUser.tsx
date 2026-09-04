@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useCartStore } from '../../features/cart/cartStore'
 import { r2Url } from '../../lib/r2'
@@ -7,6 +7,8 @@ import { IconHeart, IconCart, IconUser, IconLogOut, IconMenu, IconClose, IconSea
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
+import { NotificationsMenu } from '../shared/NotificationsMenu'
+import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
@@ -51,11 +53,21 @@ export function HeaderUser() {
           MotoShots
         </Link>
 
-        <nav className="hidden shrink-0 items-center gap-5 text-sm font-medium text-foreground lg:flex">
+        <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
           {NAV_ITEMS.slice(0, 4).map((item) => (
-            <Link key={item.to} to={item.to} className="transition-colors hover:text-primary">
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/app'}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-full px-3.5 py-2 transition-colors',
+                  isActive ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
 
@@ -74,7 +86,7 @@ export function HeaderUser() {
             to="/app/favoritos"
             aria-label="Favoritos"
             title="Favoritos"
-            className="hidden h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted sm:flex"
+            className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
           >
             <IconHeart className="h-5 w-5" />
           </Link>
@@ -82,7 +94,7 @@ export function HeaderUser() {
             to="/app/checkout"
             aria-label="Carrito"
             title="Carrito"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
           >
             <IconCart className="h-5 w-5" />
             {itemCount > 0 && (
@@ -91,6 +103,7 @@ export function HeaderUser() {
               </span>
             )}
           </Link>
+          <NotificationsMenu />
           <ProfileMenu
             name={profile?.display_name ?? 'Biker'}
             avatar={
@@ -119,14 +132,14 @@ export function HeaderUser() {
         </div>
         <nav className="flex flex-col gap-1 px-4 py-4 text-base font-medium">
           {NAV_ITEMS.map((item) => (
-            <Link
+            <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setMenuOpen(false)}
-              className="border-b border-border py-4 text-foreground"
+              className={({ isActive }) => cn('border-b border-border py-4', isActive ? 'font-semibold text-primary' : 'text-foreground')}
             >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
           <Link to="/app/perfil" onClick={() => setMenuOpen(false)} className="border-b border-border py-4 text-foreground">
             Mi perfil

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../studio/ThemeToggle'
 import { useAuth } from '../../features/auth/AuthContext'
 import { r2Url } from '../../lib/r2'
@@ -7,6 +7,7 @@ import { IconUser, IconLogOut, IconMenu, IconClose } from '../shared/icons'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
+import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -40,16 +41,28 @@ export function HeaderStudio() {
         <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">
           MotoShots Studio
         </Link>
-        <nav className="ml-4 hidden flex-1 items-center gap-6 text-sm font-medium text-muted-foreground md:flex">
+        <nav className="ml-2 hidden flex-1 items-center gap-1 text-sm font-medium md:flex">
           {NAV_ITEMS.map((item) => (
-            <Link key={item.to} to={item.to} className="transition-colors duration-150 hover:text-foreground">
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-full px-3.5 py-2 transition-colors duration-150',
+                  isActive ? 'bg-accent/10 font-semibold text-accent' : 'text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <div className="hidden md:block">
+          <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted md:flex">
             <ThemeToggle />
+          </div>
+          <div className="hidden md:block">
+            <NotificationsMenu />
           </div>
           <ProfileMenu
             name={profile?.display_name ?? 'Estudio'}
@@ -86,14 +99,14 @@ export function HeaderStudio() {
         </div>
         <nav className="flex flex-col gap-1 px-6 py-6 text-sm font-medium">
           {NAV_ITEMS.map((item) => (
-            <Link
+            <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setMenuOpen(false)}
-              className="border-b border-border py-4 text-foreground"
+              className={({ isActive }) => cn('border-b border-border py-4', isActive ? 'font-semibold text-accent' : 'text-foreground')}
             >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
           <Link to="/studio/perfil" onClick={() => setMenuOpen(false)} className="border-b border-border py-4 text-foreground">
             Perfil

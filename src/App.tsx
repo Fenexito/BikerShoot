@@ -43,6 +43,9 @@ import { BugReportsAdmin } from './features/admin/BugReportsAdmin'
 import { ReleasesAdmin } from './features/admin/ReleasesAdmin'
 import { StoragePlansAdmin } from './features/admin/StoragePlansAdmin'
 import { AuthCallback } from './features/auth/AuthCallback'
+import { PrivacyPage } from './features/legal/PrivacyPage'
+import { TermsPage } from './features/legal/TermsPage'
+import { CopyrightPage } from './features/legal/CopyrightPage'
 
 export default function App() {
   return (
@@ -67,6 +70,9 @@ export default function App() {
         <Route path="/eventos" element={<PlaceholderPage title="Eventos" />} />
         <Route path="/precios" element={<PlaceholderPage title="Precios" />} />
         <Route path="/changelog" element={<ChangelogPage />} />
+        <Route path="/privacidad" element={<PrivacyPage />} />
+        <Route path="/terminos" element={<TermsPage />} />
+        <Route path="/derechos-de-autor" element={<CopyrightPage />} />
 
         {/* Biker (requiere sesión) */}
         <Route path="/app" element={<RequireBiker><BikerHome /></RequireBiker>} />

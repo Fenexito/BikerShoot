@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { Button } from '../flat/Button'
 import { IconMenu, IconClose } from '../shared/icons'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
+import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
   { to: '/eventos', label: 'Eventos' },
@@ -24,13 +25,22 @@ export function HeaderPublic() {
             MotoShots
           </Link>
         </div>
-        <nav className="hidden gap-7 text-sm font-medium text-foreground md:flex">
+        <nav className="hidden items-center gap-1 text-sm font-medium md:flex">
           {NAV_ITEMS.map((item) => (
-            <Link key={item.to} to={item.to} className="transition-colors hover:text-primary">
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-full px-3.5 py-2 transition-colors',
+                  isActive ? 'bg-primary/10 font-semibold text-primary' : 'text-foreground hover:text-primary',
+                )
+              }
+            >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
-          <Link to="/studio/login" className="text-muted-foreground transition-colors hover:text-foreground">
+          <Link to="/studio/login" className="px-3.5 py-2 text-muted-foreground transition-colors hover:text-foreground">
             Soy fotógrafo
           </Link>
         </nav>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useBikerDetails } from './useBikerDetails'
@@ -6,8 +6,10 @@ import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type Search
 import { useRoutes } from '../shared/useRoutes'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
-import { Select } from '../../ui/flat/Select'
+import { SearchFilterModal } from './components/SearchFilterModal'
 import { Badge } from '../../ui/flat/Badge'
+import { IconFilter, IconSearch } from '../../ui/shared/icons'
+import { cn } from '../../lib/cn'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
 
@@ -19,6 +21,17 @@ export function Search() {
   const { data: routes = [] } = useRoutes()
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 140)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const query = searchParams.get('q') ?? ''
   const city = searchParams.get('ciudad') ?? ''
@@ -74,94 +87,111 @@ export function Search() {
     routeId && { key: 'ruta', label: routes.find((r) => r.id === routeId)?.name ?? '' },
   ].filter(Boolean) as { key: string; label: string }[]
 
-  return (
-    <div className="mx-auto max-w-[1800px] px-4 py-8 font-flat md:px-8">
-      <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Buscar fotos</h1>
-      <p className="mb-6 text-muted-foreground">{results.length} fotos encontradas</p>
+  const activeFilterCount = activeChips.length
 
-      <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
-        <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+  return (
+    <div className="font-flat">
+      {/* Hero — se colapsa al hacer scroll, como la referencia */}
+      <div
+        className={cn(
+          'overflow-hidden px-4 text-center transition-all duration-300 md:px-8',
+          scrolled ? 'max-h-0 py-0 opacity-0' : 'max-h-96 py-14 opacity-100',
+        )}
+      >
+        <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">Encuentra tus fotos en segundos.</h1>
+        <p className="mx-auto mt-3 max-w-md text-muted-foreground">
+          Busca por evento, ruta, ciudad o fotógrafo — {results.length} fotos disponibles ahora mismo.
+        </p>
+        <div className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-full bg-muted px-5 shadow-sm">
+          <IconSearch className="h-5 w-5 shrink-0 text-muted-foreground" />
           <input
             value={query}
             onChange={(e) => setParam('q', e.target.value || undefined)}
-            placeholder="Evento, ciudad, fotógrafo..."
-            className="h-12 rounded-md border-2 border-transparent bg-muted px-4 text-sm outline-none transition-colors duration-200 focus:border-primary focus:bg-background"
+            placeholder="Evento, ciudad, fotógrafo…"
+            className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
           />
-
-          <Select label="Ruta" value={routeId} onChange={(e) => setParam('ruta', e.target.value || undefined)}>
-            <option value="">Todas</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </Select>
-
-          <Select label="Ciudad" value={city} onChange={(e) => setParam('ciudad', e.target.value || undefined)}>
-            <option value="">Todas</option>
-            {CITIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </Select>
-
-          <Select label="Categoría" value={category} onChange={(e) => setParam('categoria', e.target.value || undefined)}>
-            <option value="">Todas</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </Select>
-
-          <Select
-            label="Marca de moto"
-            value={motoBrand}
-            disabled={onlyMyBrand}
-            onChange={(e) => setParam('marca', e.target.value || undefined)}
-          >
-            <option value="">Todas</option>
-            {MOTO_BRANDS.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </Select>
-
-          {bikerDetails?.moto_brand && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={onlyMyBrand}
-                onChange={(e) => setParam('mi_moto', e.target.checked ? '1' : undefined)}
-                className="h-4 w-4 accent-primary"
-              />
-              Solo mi moto ({bikerDetails.moto_brand})
-            </label>
-          )}
-
-          <Select label="Ordenar por" value={sort} onChange={(e) => setParam('orden', e.target.value)}>
-            <option value="relevancia">Relevancia</option>
-            <option value="precio-asc">Precio: menor a mayor</option>
-            <option value="precio-desc">Precio: mayor a menor</option>
-          </Select>
-        </aside>
-
-        <div>
-          {activeChips.length > 0 && (
-            <div className="mb-5 flex flex-wrap gap-2">
-              {activeChips.map((chip) => (
-                <button key={chip.key} onClick={() => setParam(chip.key, undefined)}>
-                  <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
-                    {chip.label} ✕
-                  </Badge>
-                </button>
-              ))}
-              <button
-                onClick={() => setSearchParams({}, { replace: true })}
-                className="text-sm font-medium text-muted-foreground underline"
-              >
-                Limpiar todo
-              </button>
-            </div>
-          )}
-
-          <PhotoGrid photos={results} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => setParam('categoria', category === c ? undefined : c)}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                category === c ? 'bg-primary text-white' : 'bg-muted text-foreground hover:bg-border',
+              )}
+            >
+              {c}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Barra compacta — siempre visible, se pega debajo del header al hacer scroll */}
+      <div
+        className={cn(
+          'sticky top-[4.5rem] z-20 mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 py-4 transition-colors md:top-20 md:px-8',
+          scrolled && 'rounded-b-3xl bg-background/95 shadow-sm backdrop-blur-md',
+        )}
+      >
+        <div>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
+          </p>
+        </div>
+        <button
+          onClick={() => setFiltersOpen(true)}
+          className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"
+        >
+          <IconFilter className="h-4 w-4" />
+          Filtros
+          {activeFilterCount > 0 && (
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="mx-auto max-w-[1800px] px-4 pb-8 md:px-8">
+        {activeChips.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {activeChips.map((chip) => (
+              <button key={chip.key} onClick={() => setParam(chip.key, undefined)}>
+                <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
+                  {chip.label} ✕
+                </Badge>
+              </button>
+            ))}
+            <button
+              onClick={() => setSearchParams({}, { replace: true })}
+              className="text-sm font-medium text-muted-foreground underline"
+            >
+              Limpiar todo
+            </button>
+          </div>
+        )}
+
+        <PhotoGrid photos={results} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+      </div>
+
+      <SearchFilterModal
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        routeOptions={routes.map((r) => ({ value: r.id, label: r.name }))}
+        cityOptions={CITIES.map((c) => ({ value: c, label: c }))}
+        categoryOptions={CATEGORIES.map((c) => ({ value: c, label: c }))}
+        brandOptions={MOTO_BRANDS.map((b) => ({ value: b, label: b }))}
+        routeId={routeId}
+        city={city}
+        category={category}
+        motoBrand={motoBrand}
+        onlyMyBrand={onlyMyBrand}
+        myBrand={bikerDetails?.moto_brand ?? undefined}
+        sort={sort}
+        onChange={setParam}
+        resultCount={results.length}
+      />
 
       {lightbox && (
         <PhotoLightbox
