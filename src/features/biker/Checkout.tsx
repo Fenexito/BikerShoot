@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useCartStore } from '../cart/cartStore'
+import { useCartStore, type CartItem } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
@@ -38,6 +38,21 @@ export function Checkout() {
   }, [items])
 
   const total = subtotal - discount
+
+  const photographerGroups = useMemo(() => {
+    const map = new Map<string, { photographerName: string; items: CartItem[] }>()
+    for (const item of items) {
+      const g = map.get(item.photographerId) ?? { photographerName: item.photographerName, items: [] }
+      g.items.push(item)
+      map.set(item.photographerId, g)
+    }
+    return Array.from(map.entries()).map(([photographerId, g]) => ({
+      photographerId,
+      photographerName: g.photographerName,
+      items: g.items,
+      subtotal: g.items.reduce((s, i) => s + i.price, 0),
+    }))
+  }, [items])
 
   async function placeOrder() {
     if (!user) return
@@ -93,25 +108,38 @@ export function Checkout() {
       <h1 className="mb-8 text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
 
       <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-3">
-          {items.map((item) => (
-            <div key={item.photoId} className="flex items-center gap-3 rounded-2xl bg-muted p-3 sm:gap-4">
-              <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 shrink-0 rounded object-cover" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{item.eventTitle}</p>
-                <p className="truncate text-sm text-muted-foreground">{item.photographerName}</p>
-                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">Resolución completa · JPEG alta calidad · Descarga válida por siempre</p>
+        <div className="flex flex-col gap-6">
+          {photographerGroups.length > 1 && (
+            <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              🧾 Este pedido incluye fotos de <strong>{photographerGroups.length} fotógrafos distintos</strong> — cada uno se
+              muestra por separado con su propio subtotal.
+            </div>
+          )}
+          {photographerGroups.map((group) => (
+            <div key={group.photographerId} className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2 px-1">
+                <h3 className="font-bold">{group.photographerName}</h3>
+                <span className="text-sm text-muted-foreground">{group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <p className="font-bold">Q{item.price}</p>
-                <button
-                  onClick={() => remove(item.photoId)}
-                  className="text-xs text-muted-foreground hover:text-red-600"
-                  aria-label="Quitar"
-                >
-                  Quitar
-                </button>
-              </div>
+              {group.items.map((item) => (
+                <div key={item.photoId} className="flex items-center gap-3 rounded-2xl bg-muted p-3 sm:gap-4">
+                  <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 shrink-0 rounded object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{item.eventTitle}</p>
+                    <p className="mt-0.5 text-xs leading-snug text-muted-foreground">Resolución completa · JPEG alta calidad · Descarga válida por siempre</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <p className="font-bold">Q{item.price}</p>
+                    <button
+                      onClick={() => remove(item.photoId)}
+                      className="text-xs text-muted-foreground hover:text-red-600"
+                      aria-label="Quitar"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -119,6 +147,16 @@ export function Checkout() {
         <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
           <Card>
             <h2 className="mb-4 font-bold">Resumen</h2>
+            {photographerGroups.length > 1 && (
+              <div className="mb-3 flex flex-col gap-1.5 border-b border-border pb-3">
+                {photographerGroups.map((g) => (
+                  <div key={g.photographerId} className="flex justify-between text-sm">
+                    <span className="truncate text-muted-foreground">{g.photographerName} ({g.items.length})</span>
+                    <span className="shrink-0">Q{g.subtotal.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">{items.length} fotos</span>
               <span>Q{subtotal.toFixed(2)}</span>

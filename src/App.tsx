@@ -29,6 +29,7 @@ const BikerCheckout = lazy(() => import('./features/biker/Checkout').then((m) =>
 const OrderSuccess = lazy(() => import('./features/biker/OrderSuccess').then((m) => ({ default: m.OrderSuccess })))
 const BikerFavorites = lazy(() => import('./features/biker/Favorites').then((m) => ({ default: m.Favorites })))
 const BikerHistory = lazy(() => import('./features/biker/History').then((m) => ({ default: m.History })))
+const BikerHistoryOrderDetail = lazy(() => import('./features/biker/HistoryOrderDetail').then((m) => ({ default: m.HistoryOrderDetail })))
 const RouteMap = lazy(() => import('./features/biker/RouteMap').then((m) => ({ default: m.RouteMap })))
 const StudioOnboarding = lazy(() => import('./features/photographer/StudioOnboarding').then((m) => ({ default: m.StudioOnboarding })))
 const StudioProfilePage = lazy(() => import('./features/photographer/StudioProfilePage').then((m) => ({ default: m.StudioProfilePage })))
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="/app/fotografos/:id" element={<RequireBiker><PhotographerProfile /></RequireBiker>} />
           <Route path="/app/favoritos" element={<RequireBiker><BikerFavorites /></RequireBiker>} />
           <Route path="/app/historial" element={<RequireBiker><BikerHistory /></RequireBiker>} />
+          <Route path="/app/historial/:id" element={<RequireBiker><BikerHistoryOrderDetail /></RequireBiker>} />
           <Route path="/app/perfil" element={<RequireBiker><BikerProfilePage /></RequireBiker>} />
           <Route path="/app/checkout" element={<RequireBiker><BikerCheckout /></RequireBiker>} />
           <Route path="/app/pedido-confirmado" element={<RequireBiker><OrderSuccess /></RequireBiker>} />

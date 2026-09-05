@@ -5,6 +5,7 @@ import type { OrderItemStatus } from '../../lib/orderStatus'
 export interface MyOrderItem {
   id: string
   photo_id: string
+  photographer_id: string
   price: number
   status: OrderItemStatus
   photo: { storage_path: string | null; preview_path: string | null; delivered_path: string | null } | null
@@ -19,6 +20,17 @@ export interface MyOrder {
   total: number
   created_at: string
   order_items: MyOrderItem[]
+}
+
+/** Mismo criterio que el lado del fotógrafo (useMyOrders.ts de Studio): un
+ * grupo de fotos no está "Entregado" hasta que TODAS las no canceladas lo
+ * estén, y cualquier pago pendiente domina sobre lo demás. */
+export function deriveGroupStatus(items: { status: OrderItemStatus }[]): OrderItemStatus {
+  const active = items.filter((i) => i.status !== 'cancelado')
+  if (active.length === 0) return 'cancelado'
+  if (active.some((i) => i.status === 'pendiente_pago')) return 'pendiente_pago'
+  if (active.every((i) => i.status === 'entregado')) return 'entregado'
+  return 'en_preparacion'
 }
 
 export function useMyOrders(bikerId: string | undefined) {

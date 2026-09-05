@@ -1,41 +1,15 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useMyOrders } from './useMyOrders'
-import { previewUrl, r2Url } from '../../lib/r2'
-import { supabase } from '../../lib/supabase'
+import { PurchasedPhotoTile } from './components/PurchasedPhotoTile'
 import { Button } from '../../ui/flat/Button'
 import { Badge } from '../../ui/flat/Badge'
-import { StatusPill } from '../../ui/shared/StatusPill'
-import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
-import { useToastStore } from '../../ui/overlays/toastStore'
+import { formatOrderCode } from '../../lib/orderStatus'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
-
-const PAID_STATUSES = new Set<OrderItemStatus>(['en_preparacion', 'entregado'])
 
 export function History() {
   const { user } = useAuth()
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
-  const push = useToastStore((s) => s.push)
-  const [downloading, setDownloading] = useState<string | null>(null)
-
-  async function download(photoId: string, photo: { storage_path: string | null; preview_path: string | null; delivered_path: string | null }) {
-    if (!photo.preview_path) {
-      // Foto de antes de proteger el original — el único archivo que existe ya es público.
-      window.open(r2Url(photo.storage_path ?? ''), '_blank')
-      return
-    }
-    setDownloading(photoId)
-    try {
-      const { data, error } = await supabase.functions.invoke('r2-download-url', { body: { photoId } })
-      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace de descarga')
-      window.open(data.downloadUrl, '_blank')
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
-    } finally {
-      setDownloading(null)
-    }
-  }
 
   if (isLoading) {
     return (
@@ -65,7 +39,11 @@ export function History() {
 
       <div className="flex flex-col gap-6">
         {orders.map((order) => (
-          <div key={order.id} className="rounded-3xl border border-border bg-card p-5">
+          <Link
+            key={order.id}
+            to={`/app/historial/${order.id}`}
+            className="block rounded-3xl border border-border bg-card p-5 transition-colors hover:border-primary/30"
+          >
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -76,35 +54,14 @@ export function History() {
               <Badge tone="secondary">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}</Badge>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {order.order_items.map((item) => (
-                <div key={item.id} className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted">
-                  {item.photo && <img src={previewUrl(item.photo)} alt="" className="h-full w-full object-cover" />}
-                  <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate rounded-full bg-black/60 px-2 py-1">
-                    <StatusPill
-                      dot={getOrderStatusStyle(item.status).dot}
-                      text="text-white"
-                      label={getOrderStatusStyle(item.status).label}
-                      className="text-[10px]"
-                    />
-                  </span>
-                  {PAID_STATUSES.has(item.status) && item.photo && (item.photo.delivered_path || !item.photo.preview_path) && (
-                    <button
-                      onClick={() => download(item.photo_id, item.photo!)}
-                      disabled={downloading === item.photo_id}
-                      className="absolute inset-x-1.5 top-1.5 flex items-center justify-center rounded-full bg-black/70 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/85"
-                    >
-                      {downloading === item.photo_id ? 'Generando…' : '⬇ Descargar original'}
-                    </button>
-                  )}
-                  {PAID_STATUSES.has(item.status) && item.photo?.preview_path && !item.photo.delivered_path && (
-                    <span className="absolute inset-x-1.5 top-1.5 rounded-full bg-black/70 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">
-                      El fotógrafo está editando tu foto
-                    </span>
-                  )}
-                </div>
+              {order.order_items.slice(0, 8).map((item) => (
+                <PurchasedPhotoTile key={item.id} photoId={item.photo_id} photo={item.photo} status={item.status} />
               ))}
             </div>
-          </div>
+            {order.order_items.length > 8 && (
+              <p className="mt-3 text-center text-sm font-semibold text-primary">Ver detalle del pedido →</p>
+            )}
+          </Link>
         ))}
       </div>
     </div>
