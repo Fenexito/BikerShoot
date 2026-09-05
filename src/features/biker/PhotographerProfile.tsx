@@ -66,7 +66,7 @@ export function PhotographerProfile() {
               <img
                 src={r2Url(photographer.logo_path)}
                 alt={photographer.display_name}
-                className="max-h-[35%] max-w-[55%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
+                className="max-h-[60%] max-w-[80%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
               />
             ) : undefined
           }
@@ -178,10 +178,13 @@ export function PhotographerProfile() {
               featuredPhotos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Este fotógrafo todavía no ha destacado fotos en su perfil.</p>
               ) : (
-                <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen" style={{ height: '75vh', minHeight: 480 }}>
+                <div
+                  className="w-screen"
+                  style={{ height: '75vh', minHeight: 480, marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}
+                >
                   <DriftWall
                     items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
-                    columns={Math.min(8, Math.max(3, featuredPhotos.length))}
+                    columns={Math.max(3, Math.min(8, Math.floor(featuredPhotos.length / 4)))}
                     tileWidth={220}
                     tileHeight={220}
                     gap={6}

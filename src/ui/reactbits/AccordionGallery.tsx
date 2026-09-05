@@ -36,6 +36,12 @@ interface AccordionGalleryProps {
   grayscale?: boolean
   className?: string
   onOpen?: (index: number) => void
+  /** Si se da, CUALQUIER click en un panel lo dispara de inmediato — sin
+   * esperar a que termine de expandirse ni exigir que ya esté activo. Para
+   * selección múltiple rápida (Studio), donde esperar la animación por cada
+   * foto sería demasiado lento. No reemplaza `onOpen` (que sigue exigiendo
+   * el panel ya activo, para no abrir el visor sin querer al hacer hover). */
+  onPanelClick?: (index: number) => void
 }
 
 const AccordionGallery = ({
@@ -59,6 +65,7 @@ const AccordionGallery = ({
   grayscale = true,
   className = '',
   onOpen,
+  onPanelClick,
 }: AccordionGalleryProps) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const panelRefs = useRef<(HTMLElement | null)[]>([])
@@ -172,6 +179,12 @@ const AccordionGallery = ({
   }
 
   const handleClick = (i: number, e: React.MouseEvent) => {
+    if (onPanelClick) {
+      e.preventDefault()
+      onPanelClick(i)
+      if (i !== active) setActive(i)
+      return
+    }
     if (i !== active) {
       e.preventDefault()
       setActive(i)

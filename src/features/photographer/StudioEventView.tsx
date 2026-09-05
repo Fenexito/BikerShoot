@@ -14,7 +14,8 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconTrash } from '../../ui/shared/icons'
+import { IconTrash, IconEdit } from '../../ui/shared/icons'
+import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
@@ -101,6 +102,7 @@ function AccordionRow({
           </>
         ),
       }))}
+      onPanelClick={(i) => onToggleSelect(photos[i].id)}
       height={260}
       radius={16}
       expandRatio={0.3}
@@ -506,24 +508,12 @@ export function StudioEventView() {
                     Pausar
                   </button>
                 )}
-                <Link
-                  to={`/studio/eventos/${id}/editar`}
-                  className={cn(
-                    'flex items-center justify-center rounded-full border border-border font-semibold transition-colors hover:bg-muted',
-                    scrolled ? 'h-9 w-9' : 'px-5 py-2.5 text-sm',
-                  )}
-                  title="Editar evento"
-                >
-                  {scrolled ? '✎' : 'Editar evento'}
-                </Link>
-                <button
-                  onClick={deleteEvent}
-                  aria-label="Eliminar evento"
-                  title="Eliminar evento"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-accent transition-colors hover:border-accent hover:bg-accent hover:text-accent-foreground"
-                >
-                  <IconTrash className="h-4 w-4" />
-                </button>
+                <ActionMenu
+                  items={[
+                    { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
+                    { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
+                  ]}
+                />
               </div>
             </div>
 

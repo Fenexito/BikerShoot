@@ -5,15 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
-import { usePublicPhotographer, usePhotographerEvents, useFeaturedPhotographerPhotos, usePhotographerPhotoCount } from '../biker/usePublicData'
+import { usePublicPhotographer, useFeaturedPhotographerPhotos, usePhotographerPhotoCount } from '../biker/usePublicData'
+import { useMyEvents } from './useMyEvents'
+import { StudioEventCard } from './components/StudioEventCard'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
-import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
 import { Button } from '../../ui/studio/Button'
 import { Input } from '../../ui/studio/Input'
-import { Badge } from '../../ui/studio/Badge'
-import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
@@ -45,7 +44,7 @@ export function StudioProfilePage() {
   const { data: details } = usePhotographerDetails(user?.id)
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: photographer, isLoading } = usePublicPhotographer(user?.id)
-  const { data: events = [] } = usePhotographerEvents(user?.id)
+  const { data: events = [] } = useMyEvents(user?.id)
   const { data: featuredPhotos = [] } = useFeaturedPhotographerPhotos(user?.id)
   const { data: photoCount = 0 } = usePhotographerPhotoCount(user?.id)
   const push = useToastStore((s) => s.push)
@@ -252,7 +251,7 @@ export function StudioProfilePage() {
                 <img
                   src={r2Url(details.logo_path)}
                   alt={profile.display_name}
-                  className="max-h-[35%] max-w-[55%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
+                  className="max-h-[60%] max-w-[80%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
                 />
               ) : undefined
             }
@@ -273,23 +272,16 @@ export function StudioProfilePage() {
             <span className="text-6xl opacity-20">🏍️</span>
           </div>
         )}
-        <button
-          onClick={() => coverInputRef.current?.click()}
-          disabled={uploadingCover}
-          className="absolute right-4 top-4 z-10 rounded-full bg-black/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-black/80"
-        >
-          {uploadingCover ? 'Subiendo…' : 'Cambiar portada'}
-        </button>
       </div>
       <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
 
       <div className={STUDIO_PAGE_WIDE}>
         <div className="-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
-          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-28 w-28 shrink-0 rounded-full" disabled={uploadingAvatar}>
+          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-36 w-36 shrink-0 rounded-full" disabled={uploadingAvatar}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt={profile.display_name} className="h-28 w-28 rounded-full border-4 border-background object-cover shadow-sm" />
+              <img src={avatarUrl} alt={profile.display_name} className="h-36 w-36 rounded-full border-4 border-background object-cover shadow-sm" />
             ) : (
-              <InitialsAvatar name={profile.display_name || 'S'} className="h-28 w-28 rounded-full border-4 border-background bg-foreground text-2xl text-background shadow-sm" />
+              <InitialsAvatar name={profile.display_name || 'S'} className="h-36 w-36 rounded-full border-4 border-background bg-foreground text-3xl text-background shadow-sm" />
             )}
             <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
               {uploadingAvatar ? '…' : 'Cambiar'}
@@ -311,9 +303,14 @@ export function StudioProfilePage() {
             />
           </div>
 
-          <Button variant={editing ? 'secondary' : 'dark'} onClick={() => setEditing((e) => !e)}>
-            {editing ? 'Cancelar' : 'Editar perfil'}
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="secondary" onClick={() => coverInputRef.current?.click()} loading={uploadingCover}>
+              Cambiar portada
+            </Button>
+            <Button variant={editing ? 'secondary' : 'dark'} onClick={() => setEditing((e) => !e)}>
+              {editing ? 'Cancelar' : 'Editar perfil'}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-muted/30 px-4 py-3">
@@ -444,10 +441,13 @@ export function StudioProfilePage() {
               {featuredPhotos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>
               ) : (
-                <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen" style={{ height: '75vh', minHeight: 480 }}>
+                <div
+                  className="w-screen"
+                  style={{ height: '75vh', minHeight: 480, marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}
+                >
                   <DriftWall
                     items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
-                    columns={Math.min(8, Math.max(3, featuredPhotos.length))}
+                    columns={Math.max(3, Math.min(8, Math.floor(featuredPhotos.length / 4)))}
                     tileWidth={220}
                     tileHeight={220}
                     gap={6}
@@ -468,20 +468,10 @@ export function StudioProfilePage() {
               )}
             </>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => {
-                const statusStyle = EVENT_STATUS_STYLE[event.status]
-                return (
-                  <Link key={event.id} to={`/studio/eventos/${event.id}`} className="rounded-3xl border border-border bg-card p-5 transition-all hover:border-accent/40 hover:shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <Badge>{event.category}</Badge>
-                      <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-[11px]" />
-                    </div>
-                    <p className="mt-3 font-semibold">{event.title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}</p>
-                  </Link>
-                )
-              })}
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {events.map((event) => (
+                <StudioEventCard key={event.id} event={event} photographerId={user?.id} />
+              ))}
               {events.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tienes eventos.</p>}
             </div>
           )}
