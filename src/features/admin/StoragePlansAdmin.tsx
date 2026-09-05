@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Card } from '../../ui/flat/Card'
-import { Select } from '../../ui/flat/Select'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { Badge } from '../../ui/flat/Badge'
 import { useToastStore } from '../../ui/overlays/toastStore'
 
@@ -114,11 +114,13 @@ export function StoragePlansAdmin() {
                 <p className="font-bold">{row.profiles?.display_name ?? 'Fotógrafo'}</p>
                 <div className="flex items-center gap-3">
                   {overLimit && <Badge tone="accent">Sobre el límite</Badge>}
-                  <Select value={row.storage_plan_id} onChange={(e) => changePlan(row.profile_id, e.target.value)} className="w-40">
-                    {plans.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </Select>
+                  <FancySelect
+                    value={row.storage_plan_id}
+                    onChange={(v) => changePlan(row.profile_id, v)}
+                    options={plans.map((p) => ({ value: p.id, label: p.name }))}
+                    clearable={false}
+                    className="w-40"
+                  />
                 </div>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-background">

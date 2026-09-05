@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 import { useRoutePoints, createRoutePoint } from '../../shared/useRoutes'
 import { MapPointPicker } from './MapPointPicker'
 import { Input } from '../../../ui/studio/Input'
-import { Select } from '../../../ui/studio/Select'
+import { FancySelect } from '../../../ui/shared/FancySelect'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 
@@ -148,13 +148,13 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   return (
     <div className="rounded-2xl border border-border p-5">
       {usingRoute && (
-        <Select label="Punto en esta ruta" value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')} onChange={(e) => handlePointChange(e.target.value)}>
-          <option value="">Selecciona un punto</option>
-          {routePoints.map((p) => (
-            <option key={p.id} value={p.id}>{p.label}</option>
-          ))}
-          <option value={NEW_POINT}>+ Nuevo punto en esta ruta</option>
-        </Select>
+        <FancySelect
+          label="Punto en esta ruta"
+          value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')}
+          onChange={handlePointChange}
+          options={[...routePoints.map((p) => ({ value: p.id, label: p.label })), { value: NEW_POINT, label: '+ Nuevo punto en esta ruta' }]}
+          placeholder="Selecciona un punto"
+        />
       )}
 
       {pointFormOpen && (

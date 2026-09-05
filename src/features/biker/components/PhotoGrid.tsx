@@ -9,6 +9,7 @@ const BATCH_SIZE = 36
 export interface GridPhoto extends DbPhoto {
   eventTitle: string
   photographerName: string
+  pointLabel?: string
 }
 
 interface PhotoGridProps {

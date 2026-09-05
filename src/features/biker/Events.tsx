@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useFeaturedEventPhotos } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
 import { EventCard } from './components/EventCard'
-import { Select } from '../../ui/flat/Select'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 import type { DbPhoto } from '../../types/db'
@@ -104,27 +104,30 @@ export function Events() {
             </button>
           ))}
         </div>
-        <Select value={city} onChange={(e) => setParam('ciudad', e.target.value || undefined)} className="w-40">
-          <option value="">Toda ciudad</option>
-          {CITIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </Select>
+        <FancySelect
+          value={city}
+          onChange={(v) => setParam('ciudad', v || undefined)}
+          options={CITIES.map((c) => ({ value: c, label: c }))}
+          placeholder="Toda ciudad"
+          className="w-40"
+        />
         {routes.length > 0 && (
-          <Select value={routeId} onChange={(e) => setParam('ruta', e.target.value || undefined)} className="w-44">
-            <option value="">Toda ruta</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </Select>
+          <FancySelect
+            value={routeId}
+            onChange={(v) => setParam('ruta', v || undefined)}
+            options={routes.map((r) => ({ value: r.id, label: r.name }))}
+            placeholder="Toda ruta"
+            className="w-44"
+          />
         )}
         {photographers.length > 0 && (
-          <Select value={photographerId} onChange={(e) => setParam('fotografo', e.target.value || undefined)} className="w-48">
-            <option value="">Todo fotógrafo</option>
-            {photographers.map((p) => (
-              <option key={p.id} value={p.id}>{p.display_name}</option>
-            ))}
-          </Select>
+          <FancySelect
+            value={photographerId}
+            onChange={(v) => setParam('fotografo', v || undefined)}
+            options={photographers.map((p) => ({ value: p.id, label: p.display_name }))}
+            placeholder="Todo fotógrafo"
+            className="w-48"
+          />
         )}
         {activeFilterCount > 0 && (
           <button

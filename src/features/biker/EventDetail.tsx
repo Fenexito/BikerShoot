@@ -54,7 +54,7 @@ function PointSection({
 }: {
   point: PublicEventPoint
   photos: DbPhoto[]
-  onOpenLightbox: (photos: DbPhoto[], index: number) => void
+  onOpenLightbox: (photos: DbPhoto[], index: number, pointLabel?: string) => void
   onSeeMore: (point: PublicEventPoint) => void
 }) {
   const [rowA, rowB] = splitInTwo(photos)
@@ -79,8 +79,8 @@ function PointSection({
       </div>
 
       <div className="flex flex-col gap-3">
-        <PointAccordionRow rowPhotos={rowA} allPhotos={photos} onOpen={(i) => onOpenLightbox(photos, i)} />
-        <PointAccordionRow rowPhotos={rowB} allPhotos={photos} onOpen={(i) => onOpenLightbox(photos, i)} />
+        <PointAccordionRow rowPhotos={rowA} allPhotos={photos} onOpen={(i) => onOpenLightbox(photos, i, point.label)} />
+        <PointAccordionRow rowPhotos={rowB} allPhotos={photos} onOpen={(i) => onOpenLightbox(photos, i, point.label)} />
       </div>
     </section>
   )
@@ -111,12 +111,12 @@ export function EventDetail() {
 
   const selectedFromEvent = useMemo(() => cartItems.filter((i) => i.eventId === id).length, [cartItems, id])
 
-  function toGridPhotos(list: DbPhoto[]): GridPhoto[] {
-    return list.map((p) => ({ ...p, eventTitle: event?.title ?? '', photographerName: event?.photographer?.display_name ?? '' }))
+  function toGridPhotos(list: DbPhoto[], pointLabel?: string): GridPhoto[] {
+    return list.map((p) => ({ ...p, eventTitle: event?.title ?? '', photographerName: event?.photographer?.display_name ?? '', pointLabel }))
   }
 
-  function openLightbox(list: DbPhoto[], index: number) {
-    setLightbox({ photos: toGridPhotos(list), index })
+  function openLightbox(list: DbPhoto[], index: number, pointLabel?: string) {
+    setLightbox({ photos: toGridPhotos(list, pointLabel), index })
   }
 
   function seeMoreOfPoint(point: PublicEventPoint) {

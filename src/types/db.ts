@@ -58,6 +58,7 @@ export interface DbPhoto {
   price: number
   moto_brand: string | null
   featured: boolean
+  original_filename: string | null
   created_at: string
 }
 

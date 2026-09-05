@@ -14,7 +14,7 @@ export interface PublicEvent extends Omit<DbEvent, 'event_points'> {
 export interface PublicPhoto extends DbPhoto {
   event: { title: string; city: string; category: string; deleted_at: string | null; status: string } | null
   photographer: { display_name: string } | null
-  point: { route_point: { route_id: string } | null } | null
+  point: { label: string; route_point: { route_id: string } | null } | null
 }
 
 export interface MapPoint extends DbEventPoint {
@@ -249,7 +249,7 @@ export function useSearchPhotos(filters: SearchFilters) {
     queryFn: async (): Promise<PublicPhoto[]> => {
       const { data, error } = await supabase
         .from('photos')
-        .select('*, event:events(title, city, category, deleted_at, status), photographer:profiles(display_name), point:event_points(route_point:route_points(route_id))')
+        .select('*, event:events(title, city, category, deleted_at, status), photographer:profiles(display_name), point:event_points(label, route_point:route_points(route_id))')
       if (error) throw error
       return (data as unknown as PublicPhoto[]) ?? []
     },

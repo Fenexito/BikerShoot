@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Badge } from '../../ui/flat/Badge'
-import { Select } from '../../ui/flat/Select'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import type { BugReport, BugReportStatus } from '../bug-reports/types'
 
@@ -62,12 +62,13 @@ export function BugReportsAdmin() {
       <h1 className="mb-2 text-3xl font-bold tracking-tight">Reportes de bugs</h1>
       <p className="mb-8 text-muted-foreground">{reports.length} reportes en total</p>
 
-      <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="mb-8 w-56">
-        <option value="todos">Todos</option>
-        {Object.entries(STATUS_LABEL).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
-        ))}
-      </Select>
+      <FancySelect
+        value={filter}
+        onChange={(v) => setFilter(v as typeof filter)}
+        options={[{ value: 'todos', label: 'Todos' }, ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
+        clearable={false}
+        className="mb-8 w-56"
+      />
 
       {isLoading && <SkeletonRows count={4} />}
       {error && <p className="text-red-600">No se pudieron cargar los reportes.</p>}

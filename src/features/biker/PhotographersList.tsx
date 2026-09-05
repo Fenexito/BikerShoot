@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useApprovedPhotographers, usePublicEvents, useFeaturedEventPhotos } from './usePublicData'
 import { PhotoCarousel } from './components/PhotoCarousel'
 import { previewUrl, r2Url } from '../../lib/r2'
-import { Select } from '../../ui/flat/Select'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { IconVerified } from '../../ui/shared/icons'
@@ -191,12 +191,7 @@ export function PhotographersList() {
             ))}
           </div>
           {CITIES.length > 0 && (
-            <Select value={city} onChange={(e) => setCity(e.target.value)} className="w-48">
-              <option value="">Toda ciudad</option>
-              {CITIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </Select>
+            <FancySelect value={city} onChange={setCity} options={CITIES.map((c) => ({ value: c, label: c }))} placeholder="Toda ciudad" className="w-48" />
           )}
         </div>
       )}

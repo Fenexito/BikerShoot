@@ -72,6 +72,7 @@ export function Search() {
         ...p,
         eventTitle: p.event?.title ?? '',
         photographerName: p.photographer?.display_name ?? '',
+        pointLabel: p.point?.label,
       })),
     [rawResults],
   )

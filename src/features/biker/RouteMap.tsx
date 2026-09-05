@@ -5,7 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useMapPoints, pointMatchesTime } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
-import { Select } from '../../ui/flat/Select'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/flat/Button'
 import type { MapPoint } from './usePublicData'
 
@@ -68,24 +68,20 @@ export function RouteMap() {
           <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Select value={routeId} onChange={(e) => { setRouteId(e.target.value); setCity('') }}>
-            <option value="">Toda ruta</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </Select>
-          <Select value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">Toda ciudad</option>
-            {cities.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </Select>
+          <FancySelect
+            value={routeId}
+            onChange={(v) => { setRouteId(v); setCity('') }}
+            options={routes.map((r) => ({ value: r.id, label: r.name }))}
+            placeholder="Toda ruta"
+          />
+          <FancySelect value={city} onChange={setCity} options={cities.map((c) => ({ value: c, label: c }))} placeholder="Toda ciudad" />
         </div>
-        <Select value={timePreset} onChange={(e) => setTimePreset(Number(e.target.value))}>
-          {TIME_PRESETS.map((t, i) => (
-            <option key={t.label} value={i}>{t.label}</option>
-          ))}
-        </Select>
+        <FancySelect
+          value={String(timePreset)}
+          onChange={(v) => setTimePreset(Number(v))}
+          options={TIME_PRESETS.map((t, i) => ({ value: String(i), label: t.label }))}
+          clearable={false}
+        />
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-2">
           <span className="text-sm font-semibold text-primary">
             {activePoints.length} de {cityFilteredPoints.length} puntos coinciden

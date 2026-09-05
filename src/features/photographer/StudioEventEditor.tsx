@@ -8,7 +8,7 @@ import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
 import { Input } from '../../ui/studio/Input'
-import { Select } from '../../ui/studio/Select'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
@@ -330,38 +330,44 @@ export function StudioEventEditor() {
         <div className="sm:col-span-2">
           <Input label="Título del evento" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Rodada Nocturna Antigua" />
         </div>
-        <Select label="Categoría" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
-          {CATEGORIES.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </Select>
+        <FancySelect
+          label="Categoría"
+          value={category}
+          onChange={(v) => setCategory(v as typeof category)}
+          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+          clearable={false}
+        />
         {category === 'Rodada' && (
-          <Select label="Ruta" value={routeId} onChange={(e) => setRouteId(e.target.value)}>
-            <option value="">Selecciona una ruta</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </Select>
+          <FancySelect
+            label="Ruta"
+            value={routeId}
+            onChange={setRouteId}
+            options={routes.map((r) => ({ value: r.id, label: r.name }))}
+            placeholder="Selecciona una ruta"
+          />
         )}
         <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
         {category !== 'Rodada' && <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />}
         {category === 'Pista' && (
-          <Select label="Autódromo" value={venue} onChange={(e) => setVenue(e.target.value)}>
-            <option value="">Selecciona un autódromo</option>
-            {AUTODROMOS.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </Select>
+          <FancySelect
+            label="Autódromo"
+            value={venue}
+            onChange={setVenue}
+            options={AUTODROMOS.map((a) => ({ value: a, label: a }))}
+            placeholder="Selecciona un autódromo"
+          />
         )}
         {category === 'Sesión de Fotos' && (
           <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
         )}
         <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
-        <Select label="Estado" value={status} onChange={(e) => setStatus(e.target.value as EventStatus)}>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </Select>
+        <FancySelect
+          label="Estado"
+          value={status}
+          onChange={(v) => setStatus(v as EventStatus)}
+          options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
+          clearable={false}
+        />
         <div className="sm:col-span-2">
           <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Descripción</label>
           <textarea
