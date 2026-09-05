@@ -6,6 +6,7 @@ import { useStorageOverview, type EventStorage } from './useStorageOverview'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/studio/Button'
+import { FancySelect } from '../../ui/shared/FancySelect'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
@@ -20,38 +21,67 @@ function formatBytes(n: number) {
 }
 
 type SortMode = 'oldest' | 'newest' | 'biggest'
+type CleanupScope = 'unsold' | 'sold' | 'all'
 
-function ActionButton({ label, description, busy, onClick }: { label: string; description: string; busy: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={busy}
-      className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-accent hover:bg-accent/5 disabled:opacity-50"
-    >
-      <span className="text-xs font-bold uppercase tracking-wide">{busy ? 'Procesando…' : label}</span>
-      <span className="text-[11px] text-muted-foreground">{description}</span>
-    </button>
-  )
-}
+const SCOPE_OPTIONS = [
+  { value: 'unsold', label: 'No vendidas' },
+  { value: 'sold', label: 'Vendidas' },
+  { value: 'all', label: 'Todas' },
+]
 
-function CleanupSoldButton({ eventId, pointId, clear, label, description }: { eventId: string; pointId?: string; clear: 'preview' | 'raw' | 'both'; label: string; description: string }) {
+/** Un solo control para liberar espacio, en vez de 3 botones confusos.
+ * "No vendidas" borra por completo (nunca se vendieron, nada que proteger).
+ * "Vendidas" borra el preview + respaldo crudo pero JAMÁS la entrega final
+ * — el biker que ya compró esa foto conserva acceso para siempre. "Todas"
+ * aplica ambas cosas de una vez. */
+function CleanupControl({ eventId, pointId, scopeLabel }: { eventId: string; pointId?: string; scopeLabel: string }) {
   const push = useToastStore((s) => s.push)
+  const [scope, setScope] = useState<CleanupScope>('unsold')
   const [busy, setBusy] = useState(false)
 
+  async function deleteUnsold() {
+    const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: pointId ? { pointId } : { eventId } })
+    if (error) throw new Error(error.message)
+    return { deleted: data.deleted as number, bytesFreed: 0 }
+  }
+
+  async function cleanupSold() {
+    const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { eventId, pointId, clear: 'both' } })
+    if (error) throw new Error(error.message)
+    return { deleted: data.cleaned as number, bytesFreed: data.bytesFreed as number }
+  }
+
   async function run() {
-    const what = clear === 'preview' ? 'la vista previa' : clear === 'raw' ? 'el respaldo crudo' : 'la vista previa y el respaldo crudo'
+    const descriptions: Record<CleanupScope, string> = {
+      unsold: `Borra permanentemente las fotos de "${scopeLabel}" que nadie ha comprado.`,
+      sold: `Borra el preview y el respaldo crudo de las fotos ya vendidas de "${scopeLabel}". La entrega final del comprador NUNCA se toca.`,
+      all: `Borra las fotos no vendidas de "${scopeLabel}" por completo, y libera el preview/respaldo de las vendidas. La entrega final del comprador NUNCA se toca.`,
+    }
     const ok = await confirmDialog.ask({
-      title: '¿Liberar espacio de fotos ya vendidas y entregadas?',
-      description: `Se borrará ${what} de esas fotos. La entrega final del comprador NUNCA se toca.`,
+      title: '¿Liberar espacio?',
+      description: descriptions[scope],
       confirmLabel: 'Liberar espacio',
       tone: 'danger',
     })
     if (!ok) return
     setBusy(true)
     try {
-      const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { eventId, pointId, clear } })
-      if (error) throw new Error(error.message)
-      push({ type: 'success', title: `${data.cleaned} fotos limpiadas`, description: `${formatBytes(data.bytesFreed)} liberados` })
+      let deleted = 0
+      let bytesFreed = 0
+      if (scope === 'unsold' || scope === 'all') {
+        const r = await deleteUnsold()
+        deleted += r.deleted
+      }
+      if (scope === 'sold' || scope === 'all') {
+        const r = await cleanupSold()
+        deleted += r.deleted
+        bytesFreed += r.bytesFreed
+      }
+      push({
+        type: 'success',
+        title: `${deleted} foto${deleted === 1 ? '' : 's'} liberada${deleted === 1 ? '' : 's'}`,
+        description: bytesFreed > 0 ? `${formatBytes(bytesFreed)} liberados` : undefined,
+      })
       queryClient.invalidateQueries({ queryKey: ['storage-overview'] })
       queryClient.invalidateQueries({ queryKey: ['photographer-usage-bytes'] })
     } catch (err) {
@@ -61,132 +91,78 @@ function CleanupSoldButton({ eventId, pointId, clear, label, description }: { ev
     }
   }
 
-  return <ActionButton label={label} description={description} busy={busy} onClick={run} />
-}
-
-function DeleteUnsoldButton({ pointId, eventId, label: scopeLabel }: { pointId?: string; eventId?: string; label: string }) {
-  const push = useToastStore((s) => s.push)
-  const [busy, setBusy] = useState(false)
-
-  async function run() {
-    const ok = await confirmDialog.ask({
-      title: `¿Eliminar todas las fotos NO vendidas de "${scopeLabel}"?`,
-      description: 'Esta acción borra los archivos de forma permanente. Las fotos ya vendidas se conservan intactas.',
-      confirmLabel: 'Eliminar',
-      tone: 'danger',
-    })
-    if (!ok) return
-    setBusy(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: pointId ? { pointId } : { eventId } })
-      if (error) throw new Error(error.message)
-      push({
-        type: 'success',
-        title: `${data.deleted} fotos eliminadas`,
-        description: data.skippedSold > 0 ? `${data.skippedSold} ya vendidas se conservaron` : undefined,
-      })
-      queryClient.invalidateQueries({ queryKey: ['storage-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['photographer-usage-bytes'] })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo eliminar', description: (err as Error).message })
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
-    <ActionButton
-      label="Eliminar no vendidas"
-      description="Borra permanentemente las fotos que nadie ha comprado."
-      busy={busy}
-      onClick={run}
-    />
-  )
-}
-
-function ActionGroup({ title, eventId, pointId, scopeLabel }: { title: string; eventId: string; pointId?: string; scopeLabel: string }) {
-  return (
-    <div>
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <DeleteUnsoldButton eventId={eventId} pointId={pointId} label={scopeLabel} />
-        <CleanupSoldButton
-          eventId={eventId}
-          pointId={pointId}
-          clear="preview"
-          label="Liberar vista previa"
-          description="De fotos ya vendidas. La entrega final no se toca."
-        />
-        <CleanupSoldButton
-          eventId={eventId}
-          pointId={pointId}
-          clear="raw"
-          label="Liberar respaldo crudo"
-          description="De fotos ya vendidas. La entrega final no se toca."
-        />
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <FancySelect value={scope} onChange={(v) => setScope(v as CleanupScope)} options={SCOPE_OPTIONS} clearable={false} className="w-40" />
+      <Button variant="secondary" size="sm" onClick={run} loading={busy}>
+        Liberar espacio
+      </Button>
     </div>
   )
 }
 
-function EventRow({ event }: { event: EventStorage }) {
-  const [open, setOpen] = useState(false)
-
+function EventDetail({ event, onBack }: { event: EventStorage; onBack: () => void }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-accent/30">
-      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
-        <div className="min-w-0">
-          <p className="truncate font-semibold">{event.title}</p>
-          <p className="text-xs text-muted-foreground">
-            {new Date(event.eventDate).toLocaleDateString('es-GT')} · {event.totalPhotos} fotos · {event.soldPhotos} vendidas
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold">{formatBytes(event.bytes)}</span>
-          <span className={cn('text-muted-foreground transition-transform', open && 'rotate-180')}>▼</span>
-        </div>
+    <div>
+      <button onClick={onBack} className="mb-6 flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+        ← Todos los eventos
       </button>
 
-      {open && (
-        <div className="border-t border-border p-4">
-          <div className="mb-5 rounded-2xl border border-accent/30 bg-accent/5 p-4">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-accent">
-              Acciones de este evento — afecta los {event.points.length || 0} puntos y todo lo que no tenga punto asignado
-            </p>
-            <ActionGroup title="Acciones de este evento" eventId={event.id} scopeLabel={event.title} />
-          </div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">{event.title}</h2>
+          <p className="text-sm text-muted-foreground">
+            {new Date(event.eventDate).toLocaleDateString('es-GT')} · {event.totalPhotos} fotos · {event.soldPhotos} vendidas · {formatBytes(event.bytes)}
+          </p>
+        </div>
+      </div>
 
-          {event.points.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Este evento no tiene puntos.</p>
-          ) : (
-            <div className="flex flex-col gap-0">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {event.points.length} puntos de este evento — cada uno se administra por separado
-              </p>
-              {event.points.map((pt, i) => (
-                <div key={pt.id} className="flex gap-3 border-l-2 border-border pl-4">
-                  <div className="flex flex-col items-center pt-1">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-bold text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    {i < event.points.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
-                  </div>
-                  <div className="mb-4 flex-1 rounded-2xl border border-border bg-muted/30 p-4">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">{pt.label}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {formatBytes(pt.bytes)} · {pt.totalPhotos} fotos · {pt.soldPhotos} vendidas
-                      </span>
-                    </div>
-                    <ActionGroup title="Acciones de este punto" eventId={event.id} pointId={pt.id} scopeLabel={pt.label} />
-                  </div>
-                </div>
-              ))}
+      <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/5 p-4">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-accent">
+          Acciones de todo el evento — afecta los {event.points.length || 0} puntos y lo que no tenga punto asignado
+        </p>
+        <CleanupControl eventId={event.id} scopeLabel={event.title} />
+      </div>
+
+      {event.points.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Este evento no tiene puntos.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {event.points.length} puntos — cada uno se administra por separado
+          </p>
+          {event.points.map((pt) => (
+            <div key={pt.id} className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{pt.label}</p>
+                <span className="text-xs text-muted-foreground">
+                  {formatBytes(pt.bytes)} · {pt.totalPhotos} fotos · {pt.soldPhotos} vendidas
+                </span>
+              </div>
+              <CleanupControl eventId={event.id} pointId={pt.id} scopeLabel={pt.label} />
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
+  )
+}
+
+function EventCard({ event, onOpen }: { event: EventStorage; onOpen: () => void }) {
+  return (
+    <button
+      onClick={onOpen}
+      className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-5 text-left transition-all hover:border-accent/40 hover:shadow-sm"
+    >
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{event.title}</p>
+        <p className="text-xs text-muted-foreground">{new Date(event.eventDate).toLocaleDateString('es-GT')}</p>
+      </div>
+      <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
+        <span className="font-bold">{formatBytes(event.bytes)}</span>
+        <span className="text-xs text-muted-foreground">{event.totalPhotos} fotos · {event.soldPhotos} vendidas</span>
+      </div>
+    </button>
   )
 }
 
@@ -196,12 +172,15 @@ export function StudioStorage() {
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: events, isLoading } = useStorageOverview(user?.id)
   const [sort, setSort] = useState<SortMode>('oldest')
+  const [openEventId, setOpenEventId] = useState<string | null>(null)
 
   const sorted = [...(events ?? [])].sort((a, b) => {
     if (sort === 'oldest') return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
     if (sort === 'newest') return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
     return b.bytes - a.bytes
   })
+
+  const openEvent = sorted.find((e) => e.id === openEventId)
 
   const limitBytes = details?.storage_plan ? details.storage_plan.gb_limit * 1024 * 1024 * 1024 : 0
   const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
@@ -233,36 +212,44 @@ export function StudioStorage() {
         </div>
       )}
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold tracking-tight">Tus eventos</h2>
-        <div className="flex gap-1 rounded-full bg-muted p-1">
-          {(['oldest', 'newest', 'biggest'] as SortMode[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => setSort(s)}
-              className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                sort === s ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {s === 'oldest' ? 'Más antiguos' : s === 'newest' ? 'Más recientes' : 'Más pesados'}
-            </button>
-          ))}
+      {openEvent ? (
+        <div className="mt-8">
+          <EventDetail event={openEvent} onBack={() => setOpenEventId(null)} />
         </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3">
-        {isLoading && <SkeletonRows count={4} />}
-        {!isLoading && sorted.length === 0 && (
-          <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-16 text-center">
-            <span className="text-4xl opacity-40">💾</span>
-            <p className="font-semibold">Todavía no tienes eventos</p>
+      ) : (
+        <>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold tracking-tight">Tus eventos</h2>
+            <div className="flex gap-1 rounded-full bg-muted p-1">
+              {(['oldest', 'newest', 'biggest'] as SortMode[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                    sort === s ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {s === 'oldest' ? 'Más antiguos' : s === 'newest' ? 'Más recientes' : 'Más pesados'}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-        {sorted.map((event) => (
-          <EventRow key={event.id} event={event} />
-        ))}
-      </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {isLoading && <SkeletonRows count={3} />}
+            {!isLoading && sorted.length === 0 && (
+              <div className="col-span-full flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-16 text-center">
+                <span className="text-4xl opacity-40">💾</span>
+                <p className="font-semibold">Todavía no tienes eventos</p>
+              </div>
+            )}
+            {sorted.map((event) => (
+              <EventCard key={event.id} event={event} onOpen={() => setOpenEventId(event.id)} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
