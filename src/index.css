@@ -125,7 +125,7 @@ html {
   --color-card-foreground: 17 24 39;
   --color-ring: 59 130 246;
 
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter Tight', Inter, system-ui, sans-serif;
 }
 
 /* ---------- Bold Typography (studio / fotógrafo) — claro y oscuro ---------- */

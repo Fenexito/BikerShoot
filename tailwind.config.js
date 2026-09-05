@@ -27,8 +27,9 @@ export default {
         studio: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
         'studio-display': ['"Playfair Display"', 'Georgia', 'serif'],
         'studio-mono': ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
-        // Flat Design (público / biker)
-        flat: ['Outfit', 'sans-serif'],
+        // Flat Design (público / biker) — unificado con Studio (Mobbin usa
+        // una sola tipografía en todo el producto, sin importar la sección)
+        flat: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
       },
       letterSpacing: {
         tighter2: '-0.06em',
