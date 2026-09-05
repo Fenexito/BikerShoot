@@ -1,0 +1,18 @@
+/* Overrides puntuales sobre las variables CSS que expone
+   yet-another-react-lightbox — mantiene su comportamiento (zoom, gestos,
+   scroll-lock) intacto, solo ajusta colores/bordes al lenguaje visual
+   oscuro y redondeado del resto de la app. */
+.motoshots-lightbox {
+  --yarl__color_backdrop: rgba(0, 0, 0, 0.95);
+  --yarl__thumbnails_container_background_color: transparent;
+  --yarl__thumbnails_thumbnail_background: rgba(255, 255, 255, 0.05);
+  --yarl__thumbnails_thumbnail_border_radius: 14px;
+  --yarl__thumbnails_thumbnail_border: 0;
+  --yarl__thumbnails_thumbnail_active_border_color: #fff;
+  --yarl__thumbnails_thumbnail_gap: 8px;
+  --yarl__thumbnails_thumbnail_padding: 0;
+}
+
+.motoshots-lightbox [class*='yarl__slide_image'] {
+  border-radius: 20px;
+}
