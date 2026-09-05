@@ -80,28 +80,57 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
     }
   }
 
+  function backToEmail() {
+    setStep('email')
+    setPassword('')
+    setError(null)
+  }
+
   return (
     <AuthSplitLayout logoTo="/" logoLabel={logoLabel}>
-      <h1 className="mb-2 text-3xl font-bold tracking-tight">Bienvenido de vuelta</h1>
-      <p className="mb-8 text-muted-foreground">
-        Entra para continuar. {portal === 'studio' ? 'Ingresa el correo de tu estudio o fotógrafo.' : 'Ingresa el correo de tu cuenta de usuario.'}
-      </p>
+      <div className="mb-8 transition-all duration-500 ease-in-out">
+        {step === 'password' ? (
+          <>
+            <button
+              onClick={backToEmail}
+              className="mb-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              ← Volver
+            </button>
+            <h1 className="mb-2 text-3xl font-bold tracking-tight">Ingresa tu contraseña</h1>
+            <p className="text-muted-foreground">Continuando como <span className="font-semibold text-foreground">{email}</span></p>
+          </>
+        ) : (
+          <>
+            <h1 className="mb-2 text-3xl font-bold tracking-tight">Bienvenido de vuelta</h1>
+            <p className="text-muted-foreground">
+              Entra para continuar. {portal === 'studio' ? 'Ingresa el correo de tu estudio o fotógrafo.' : 'Ingresa el correo de tu cuenta de usuario.'}
+            </p>
+          </>
+        )}
+      </div>
 
       <form onSubmit={step === 'email' || step === 'not-found' ? handleEmailSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
-        <Input
-          id="email"
-          label="Correo"
-          type="email"
-          placeholder="tu@correo.com"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value)
-            if (step !== 'email') setStep('email')
-          }}
-        />
+        <div
+          className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
+        >
+          <div className="min-h-0">
+            <Input
+              id="email"
+              label="Correo"
+              type="email"
+              placeholder="tu@correo.com"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (step !== 'email') setStep('email')
+              }}
+            />
+          </div>
+        </div>
 
         <div
-          className={`grid overflow-hidden transition-all duration-300 ease-out ${step === 'password' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+          className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
         >
           <div className="flex min-h-0 flex-col gap-2">
             <Input
@@ -135,14 +164,19 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
         </Button>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />o continúa con<span className="h-px flex-1 bg-border" />
+      <div
+        className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
+      >
+        <div className="min-h-0">
+          <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />o continúa con<span className="h-px flex-1 bg-border" />
+          </div>
+          <Button variant="secondary" size="lg" onClick={onGoogle} loading={googleLoading} className="w-full">
+            <GoogleIcon className="h-5 w-5" />
+            Continuar con Google
+          </Button>
+        </div>
       </div>
-
-      <Button variant="secondary" size="lg" onClick={onGoogle} loading={googleLoading} className="w-full">
-        <GoogleIcon className="h-5 w-5" />
-        Continuar con Google
-      </Button>
 
       <div className="mt-8 flex justify-center">
         <PortalSwitch current={portal} />

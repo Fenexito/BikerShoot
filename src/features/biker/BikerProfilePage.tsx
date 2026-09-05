@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,8 +11,16 @@ import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
 import { Card } from '../../ui/flat/Card'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { IconBookmark, IconCart, IconMap, IconUser, IconLogOut } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { Skeleton } from '../../ui/shared/Skeleton'
+
+const QUICK_LINKS = [
+  { to: '/app/mapa', label: 'Mapa', icon: <IconMap className="h-5 w-5" /> },
+  { to: '/app/fotografos', label: 'Fotógrafos', icon: <IconUser className="h-5 w-5" /> },
+  { to: '/app/favoritos', label: 'Favoritos', icon: <IconBookmark className="h-5 w-5" /> },
+  { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-5 w-5" /> },
+]
 
 const schema = z.object({
   displayName: z.string().min(2, 'Ingresa tu nombre'),
@@ -23,9 +32,21 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export function BikerProfilePage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, signOut } = useAuth()
   const { data: details, isLoading } = useBikerDetails(user?.id)
   const push = useToastStore((s) => s.push)
+  const navigate = useNavigate()
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   const {
     register,
@@ -100,6 +121,19 @@ export function BikerProfilePage() {
         </div>
       </div>
 
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 md:hidden">
+        {QUICK_LINKS.map((link) => (
+          <Link
+            key={link.to}
+            to={link.to}
+            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-primary/30"
+          >
+            {link.icon}
+            {link.label}
+          </Link>
+        ))}
+      </div>
+
       <Card tint="blue" className="cursor-default hover:scale-100">
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
           <div className="sm:col-span-2">
@@ -120,6 +154,15 @@ export function BikerProfilePage() {
           </div>
         </form>
       </Card>
+
+      <button
+        onClick={handleSignOut}
+        disabled={signingOut}
+        className="mt-8 flex items-center gap-2 text-sm font-medium text-muted-foreground disabled:opacity-50 md:hidden"
+      >
+        <IconLogOut className="h-4 w-4" />
+        {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
+      </button>
     </div>
   )
 }

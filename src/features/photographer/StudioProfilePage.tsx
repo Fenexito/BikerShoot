@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,7 +16,8 @@ import { Input } from '../../ui/studio/Input'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
-import { IconVerified } from '../../ui/shared/icons'
+import { IconVerified, IconCreditCard, IconSettings, IconLogOut } from '../../ui/shared/icons'
+import { ThemeToggle } from '../../ui/studio/ThemeToggle'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import DriftWall from '../../ui/reactbits/DriftWall'
@@ -40,7 +41,19 @@ function formatBytes(n: number) {
 }
 
 export function StudioProfilePage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, signOut } = useAuth()
+  const navigate = useNavigate()
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/studio/login')
+    } finally {
+      setSigningOut(false)
+    }
+  }
   const { data: details } = usePhotographerDetails(user?.id)
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: photographer, isLoading } = usePublicPhotographer(user?.id)
@@ -475,6 +488,34 @@ export function StudioProfilePage() {
               {events.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tienes eventos.</p>}
             </div>
           )}
+        </div>
+
+        <div className="mt-10 grid grid-cols-2 gap-3 border-t border-border pt-8 md:hidden">
+          <Link
+            to="/studio/planes"
+            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-accent/40"
+          >
+            <IconCreditCard className="h-5 w-5" />
+            Planes y facturación
+          </Link>
+          <Link
+            to="/studio/ajustes"
+            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-accent/40"
+          >
+            <IconSettings className="h-5 w-5" />
+            Configuración
+          </Link>
+        </div>
+        <div className="mt-4 flex items-center justify-between md:hidden">
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground disabled:opacity-50"
+          >
+            <IconLogOut className="h-4 w-4" />
+            {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
+          </button>
+          <ThemeToggle />
         </div>
       </div>
     </div>

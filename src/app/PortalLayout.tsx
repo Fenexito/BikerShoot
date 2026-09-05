@@ -53,7 +53,7 @@ export function PortalLayout() {
       {!isAuthPage && (
         isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
       )}
-      <div className="flex-1">
+      <div className={cn('flex-1', (isUserPortal || isStudioPortal) && !isAuthPage && 'pb-20 md:pb-0')}>
         <Suspense fallback={<RouteFallback />}>
           <Outlet />
         </Suspense>

@@ -574,7 +574,7 @@ export function StudioEventView() {
       <ScrollToTopButton />
 
       {selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
+        <div className="fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 md:bottom-6">
           <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-border bg-background px-5 py-3 shadow-lg">
             <span className="text-sm font-semibold">{selectedIds.size} seleccionada{selectedIds.size > 1 ? 's' : ''}</span>
             <Dropdown

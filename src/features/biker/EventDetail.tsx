@@ -236,7 +236,7 @@ export function EventDetail() {
       </div>
 
       {selectedFromEvent > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 px-4 py-4 backdrop-blur">
+        <div className="fixed bottom-16 left-0 right-0 z-30 border-t border-border bg-background/95 px-4 py-4 backdrop-blur md:bottom-0">
           <div className="mx-auto flex max-w-5xl items-center justify-between">
             <p className="font-semibold">
               {selectedFromEvent} foto{selectedFromEvent > 1 ? 's' : ''} seleccionada{selectedFromEvent > 1 ? 's' : ''} de este evento

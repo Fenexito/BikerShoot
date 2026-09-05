@@ -61,6 +61,45 @@ export function IconMoreHorizontal(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconHome(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5.5 10v9a1 1 0 0 0 1 1H9v-6h6v6h2.5a1 1 0 0 0 1-1v-9" />
+    </svg>
+  )
+}
+
+export function IconImages(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="6" width="14" height="14" rx="2" />
+      <path d="M7 2h12a2 2 0 0 1 2 2v12" />
+      <circle cx="8" cy="11" r="1.5" />
+      <path d="M4 17l3.5-3.5a1.5 1.5 0 0 1 2 0L13 17" />
+    </svg>
+  )
+}
+
+export function IconMap(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 4 3 6.5v14L9 18l6 2.5L21 18V4l-6 2.5L9 4Z" />
+      <path d="M9 4v14" />
+      <path d="M15 6.5v14" />
+    </svg>
+  )
+}
+
+export function IconPlus(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  )
+}
+
 export function IconLogOut(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>
