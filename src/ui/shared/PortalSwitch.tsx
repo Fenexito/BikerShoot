@@ -11,15 +11,15 @@ export function PortalSwitch({ current }: { current: 'biker' | 'studio' }) {
     <div className="flex gap-1 rounded-full bg-muted p-1 text-sm font-medium">
       <button
         onClick={() => navigate('/login')}
-        className={cn('rounded-full px-4 py-2 transition-colors', current === 'biker' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+        className={cn('rounded-full px-4 py-2 text-xs uppercase tracking-wide transition-colors', current === 'biker' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
       >
-        Biker
+        Soy biker
       </button>
       <button
         onClick={() => navigate('/studio/login')}
-        className={cn('rounded-full px-4 py-2 transition-colors', current === 'studio' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+        className={cn('rounded-full px-4 py-2 text-xs uppercase tracking-wide transition-colors', current === 'studio' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
       >
-        Fotógrafo
+        Soy fotógrafo
       </button>
     </div>
   )

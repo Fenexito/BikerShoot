@@ -25,6 +25,12 @@ const AUTH_PATHS = [
   '/studio/onboarding',
 ]
 
+// Estas páginas de entrada al portal Studio siempre se ven oscuras,
+// sin importar qué tema haya elegido el usuario la última vez dentro de
+// la app ya autenticada — son la primera impresión de marca, no un lugar
+// donde la preferencia guardada deba pisar el diseño.
+const STUDIO_ALWAYS_DARK_PATHS = ['/studio/login', '/studio/signup', '/studio/forgot-password']
+
 export function PortalLayout() {
   const { pathname } = useLocation()
   const studioTheme = useStudioTheme((s) => s.theme)
@@ -34,7 +40,9 @@ export function PortalLayout() {
   const isAdminPortal = pathname.startsWith('/admin')
   const isAuthPage = AUTH_PATHS.includes(pathname)
 
-  const themeClass = isStudioPortal ? cn('theme-studio', studioTheme) : 'theme-flat'
+  const themeClass = isStudioPortal
+    ? cn('theme-studio', STUDIO_ALWAYS_DARK_PATHS.includes(pathname) ? 'dark' : studioTheme)
+    : 'theme-flat'
 
   return (
     <div

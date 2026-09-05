@@ -64,11 +64,15 @@ export function PhotographerProfile() {
           title={photographer.display_name}
           scrollHint="Desliza para ver el perfil"
           useWindowScroll
-          startRadius={0}
-          endRadius={0}
-          mediaZoom={1.12}
-          scrollDistance={0.2}
-          holdDistance={0.05}
+          startWidth={60}
+          startHeight={60}
+          startRadius={36}
+          endRadius={1}
+          mediaZoom={1.5}
+          scrollDistance={1}
+          holdDistance={0.45}
+          smoothing={0.3}
+          overlayScrim={0.5}
         />
       ) : (
         <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-200 to-emerald-200 md:h-64">

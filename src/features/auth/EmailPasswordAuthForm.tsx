@@ -83,7 +83,9 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
   return (
     <AuthSplitLayout logoTo="/" logoLabel={logoLabel}>
       <h1 className="mb-2 text-3xl font-bold tracking-tight">Bienvenido de vuelta</h1>
-      <p className="mb-8 text-muted-foreground">Entra para continuar.</p>
+      <p className="mb-8 text-muted-foreground">
+        Entra para continuar. {portal === 'studio' ? 'Ingresa el correo de tu estudio o fotógrafo.' : 'Ingresa el correo de tu cuenta de usuario.'}
+      </p>
 
       <form onSubmit={step === 'email' || step === 'not-found' ? handleEmailSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
         <Input
@@ -96,7 +98,6 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
             setEmail(e.target.value)
             if (step !== 'email') setStep('email')
           }}
-          autoFocus
         />
 
         <div
@@ -112,7 +113,7 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
               onChange={(e) => setPassword(e.target.value)}
               autoFocus={step === 'password'}
             />
-            <Link to={forgotPasswordTo} className="-mt-1 self-end text-sm font-medium text-primary">
+            <Link to={forgotPasswordTo} className="-mt-1 self-end text-sm font-medium text-foreground underline decoration-border hover:decoration-foreground">
               ¿Olvidaste tu contraseña?
             </Link>
           </div>
@@ -121,7 +122,7 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
         {step === 'not-found' && (
           <div className="rounded-2xl bg-muted px-4 py-3 text-sm">
             No encontramos una cuenta con este correo.{' '}
-            <Link to={`${signupTo}?email=${encodeURIComponent(email)}`} className="font-semibold text-primary">
+            <Link to={`${signupTo}?email=${encodeURIComponent(email)}`} className="font-semibold text-foreground underline">
               Crear cuenta
             </Link>
           </div>
@@ -129,7 +130,7 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <Button type="submit" size="lg" loading={checking || signingIn} className="mt-2">
+        <Button type="submit" variant="dark" size="lg" loading={checking || signingIn} className="mt-2">
           {step === 'password' ? 'Iniciar sesión' : 'Continuar'}
         </Button>
       </form>

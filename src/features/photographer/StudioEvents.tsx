@@ -63,29 +63,34 @@ export function StudioEvents() {
           return (
             <div
               key={event.id}
-              className="group overflow-hidden rounded-2xl border border-border transition-colors duration-150 hover:border-border-hover"
+              className="group overflow-hidden rounded-3xl border border-border transition-all duration-300 hover:-translate-y-1 hover:border-border-hover hover:shadow-xl"
             >
               <Link to={`/studio/eventos/${event.id}`} className="block">
-                <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted">
+                <div className="relative flex h-56 items-center justify-center overflow-hidden bg-muted">
                   {event.cover_path ? (
-                    <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={r2Url(event.cover_path)}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
+                    />
                   ) : (
                     <span className="text-3xl opacity-30">📷</span>
                   )}
+                  <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   <div className="absolute left-3 top-3">
                     <Badge className="border-white/20 bg-black/70 text-white">{event.category}</Badge>
                   </div>
-                </div>
-                <div className="px-5 pt-5">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-studio text-lg font-bold">{event.title}</h3>
+                  <div className="absolute right-3 top-3">
                     <StatusPill
                       dot={statusStyle.dot}
                       text={statusStyle.text}
                       label={statusStyle.label}
-                      className="shrink-0 text-[10px] uppercase tracking-wide"
+                      className="rounded-full bg-black/70 px-2.5 py-1 text-[10px] uppercase tracking-wide"
                     />
                   </div>
+                </div>
+                <div className="px-5 pt-5">
+                  <h3 className="font-studio text-lg font-bold">{event.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
                   </p>

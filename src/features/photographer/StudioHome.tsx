@@ -133,14 +133,14 @@ export function StudioHome() {
                   )}
                   <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   <div className="absolute left-3 top-3">
-                    <Badge>{event.category}</Badge>
+                    <Badge className="border-white/20 bg-black/70 text-white">{event.category}</Badge>
                   </div>
                   <div className="absolute right-3 top-3">
                     <StatusPill
                       dot={EVENT_STATUS_STYLE[event.status].dot}
                       text={EVENT_STATUS_STYLE[event.status].text}
                       label={EVENT_STATUS_STYLE[event.status].label}
-                      className="text-xs font-medium uppercase tracking-wide"
+                      className="rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium uppercase tracking-wide"
                     />
                   </div>
                 </div>

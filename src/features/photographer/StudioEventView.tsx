@@ -438,11 +438,15 @@ export function StudioEventView() {
           title={event.title}
           scrollHint="Desliza para ver el evento"
           useWindowScroll
-          startRadius={0}
-          endRadius={0}
-          mediaZoom={1.12}
-          scrollDistance={0.35}
-          holdDistance={0.05}
+          startWidth={60}
+          startHeight={60}
+          startRadius={36}
+          endRadius={1}
+          mediaZoom={1.5}
+          scrollDistance={1}
+          holdDistance={0.45}
+          smoothing={0.3}
+          overlayScrim={0.5}
         />
       ) : (
         <div className="relative flex h-[280px] w-full items-center justify-center overflow-hidden bg-muted md:h-[380px]">
