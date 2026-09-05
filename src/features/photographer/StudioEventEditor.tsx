@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
+import { FeaturedPhotosUploader, MAX_FEATURED } from './components/FeaturedPhotosUploader'
 import { Input } from '../../ui/studio/Input'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/studio/Button'
@@ -457,6 +458,17 @@ export function StudioEventEditor() {
           </div>
         </div>
       </section>
+
+      {!isNew && id && user && (
+        <section className="mt-14 border-t border-border pt-10">
+          <h2 className="font-studio text-xl font-bold tracking-tight2">Fotos destacadas</h2>
+          <p className="mt-1 mb-6 text-sm text-muted-foreground">
+            Tu portafolio de este evento — hasta {MAX_FEATURED} fotos en alta calidad, sin marca de agua. No están a la venta;
+            aparecen en esta página del evento, en tu perfil público y pueden usarse en el muro de bienvenida.
+          </p>
+          <FeaturedPhotosUploader eventId={id} photographerId={user.id} />
+        </section>
+      )}
 
       {/* Puntos de cobertura */}
       <section className="mt-14 border-t border-border pt-10">

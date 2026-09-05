@@ -5,6 +5,12 @@
 export const PREVIEW_MAX_SIDE = 1600
 export const PREVIEW_QUALITY = 0.5
 
+// Fotos destacadas: portafolio del fotógrafo, no están a la venta y nunca
+// llevan marca de agua — se suben en calidad alta (Full HD) en vez de la
+// calidad reducida de las fotos normales del evento.
+export const FEATURED_MAX_SIDE = 1920
+export const FEATURED_QUALITY = 0.92
+
 export function uploadWithProgress(url: string, body: Blob, contentType: string, onProgress: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -75,5 +81,25 @@ export async function createWatermarkedPreview(file: File, watermarkImage: Image
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar el preview'))), 'image/jpeg', PREVIEW_QUALITY)
+  })
+}
+
+/** Igual reescalado que `createWatermarkedPreview`, pero sin marca de agua y
+ * en calidad alta — para fotos destacadas (portafolio, no vendibles). */
+export async function createFullQualityPreview(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, FEATURED_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+  const width = Math.round(bitmap.width * scale)
+  const height = Math.round(bitmap.height * scale)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No se pudo preparar el lienzo del preview')
+  ctx.drawImage(bitmap, 0, 0, width, height)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar el preview'))), 'image/jpeg', FEATURED_QUALITY)
   })
 }

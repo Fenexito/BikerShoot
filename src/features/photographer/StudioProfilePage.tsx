@@ -21,6 +21,7 @@ import { IconVerified } from '../../ui/shared/icons'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import DriftWall from '../../ui/reactbits/DriftWall'
+import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import { cn } from '../../lib/cn'
 
 const schema = z.object({
@@ -238,21 +239,48 @@ export function StudioProfilePage() {
 
   return (
     <div>
-      {/* Banner — misma estructura que el perfil público que ve el biker (PhotographerProfile.tsx) */}
-      <button
-        onClick={() => coverInputRef.current?.click()}
-        disabled={uploadingCover}
-        className="group relative flex h-48 w-full items-center justify-center overflow-hidden bg-muted md:h-64"
-      >
+      {/* Banner — misma animación de portada que ve el biker en su perfil público
+          (PhotographerProfile.tsx), con el único añadido de poder cambiarla aquí. */}
+      <div className="relative">
         {details?.profile_cover_path ? (
-          <img src={r2Url(details.profile_cover_path)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <ScrollExpand
+            src={r2Url(details.profile_cover_path)}
+            alt={profile.display_name}
+            title={details?.logo_path ? undefined : profile.display_name}
+            titleNode={
+              details?.logo_path ? (
+                <img
+                  src={r2Url(details.logo_path)}
+                  alt={profile.display_name}
+                  className="max-h-[35%] max-w-[55%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
+                />
+              ) : undefined
+            }
+            scrollHint="Desliza para ver tu perfil"
+            useWindowScroll
+            startWidth={60}
+            startHeight={60}
+            startRadius={36}
+            endRadius={1}
+            mediaZoom={1.5}
+            scrollDistance={1}
+            holdDistance={0.45}
+            smoothing={0.3}
+            overlayScrim={0.5}
+          />
         ) : (
-          <span className="text-6xl opacity-20">🏍️</span>
+          <div className="flex h-48 items-center justify-center bg-muted md:h-64">
+            <span className="text-6xl opacity-20">🏍️</span>
+          </div>
         )}
-        <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          onClick={() => coverInputRef.current?.click()}
+          disabled={uploadingCover}
+          className="absolute right-4 top-4 z-10 rounded-full bg-black/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-black/80"
+        >
           {uploadingCover ? 'Subiendo…' : 'Cambiar portada'}
-        </span>
-      </button>
+        </button>
+      </div>
       <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
 
       <div className={STUDIO_PAGE_WIDE}>
@@ -409,8 +437,9 @@ export function StudioProfilePage() {
           {tab === 'destacadas' ? (
             <>
               <p className="mb-4 text-sm text-muted-foreground">
-                Marca fotos como destacadas (★) desde la vista de cada evento — estas mismas aparecen aquí, en la
-                página del evento y en tu perfil público. No están a la venta ni disponibles para descarga.
+                Sube tus fotos destacadas desde el editor de cada evento (junto a la portada y la marca de agua) —
+                estas mismas aparecen aquí, en la página del evento y en tu perfil público. No están a la venta ni
+                disponibles para descarga.
               </p>
               {featuredPhotos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>

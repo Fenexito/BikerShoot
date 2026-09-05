@@ -43,6 +43,8 @@ function PhotographerSpotlight({ photographer, eventCount, photos }: { photograp
         <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100 md:aspect-auto">
           {photos.length > 0 ? (
             <PhotoCarousel photos={photos} />
+          ) : photographer.profile_cover_path ? (
+            <img src={r2Url(photographer.profile_cover_path)} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-5xl opacity-30">🏍️</div>
           )}
@@ -90,6 +92,14 @@ function PhotographerGridCard({ photographer, eventCount, photos }: { photograph
               />
             </div>
           ))
+        ) : photographer.profile_cover_path ? (
+          <div className="col-span-2 overflow-hidden">
+            <img
+              src={r2Url(photographer.profile_cover_path)}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          </div>
         ) : (
           <div className="col-span-2 flex items-center justify-center text-3xl opacity-30">📷</div>
         )}
