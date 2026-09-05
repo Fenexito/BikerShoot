@@ -15,9 +15,13 @@ import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import type { DbPhoto } from '../../types/db'
 
+const MAX_PER_ROW = 12
+const MAX_PER_POINT = MAX_PER_ROW * 2
+
 function splitInTwo<T>(arr: T[]): [T[], T[]] {
-  const mid = Math.ceil(arr.length / 2)
-  return [arr.slice(0, mid), arr.slice(mid)]
+  const capped = arr.slice(0, MAX_PER_POINT)
+  const mid = Math.ceil(capped.length / 2)
+  return [capped.slice(0, mid), capped.slice(mid)]
 }
 
 /** Fila de galería tipo acordeón para el biker — misma animación hover que

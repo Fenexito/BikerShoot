@@ -237,7 +237,7 @@ export function StudioProfilePage() {
             />
           </div>
 
-          <Button variant={editing ? 'secondary' : 'primary'} onClick={() => setEditing((e) => !e)}>
+          <Button variant={editing ? 'secondary' : 'dark'} onClick={() => setEditing((e) => !e)}>
             {editing ? 'Cancelar' : 'Editar perfil'}
           </Button>
         </div>
@@ -266,15 +266,16 @@ export function StudioProfilePage() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Almacenamiento · Plan {details.storage_plan.name}
                 </p>
-                <Link to="/studio/planes" className="text-[11px] font-semibold uppercase tracking-wide text-accent hover:underline">
+                <Link to="/studio/planes" className="text-[11px] font-semibold uppercase tracking-wide text-foreground underline">
                   Ver planes →
                 </Link>
               </div>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div className={cn('h-full rounded-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
+                <div className={cn('h-full rounded-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-foreground')} style={{ width: `${pct}%` }} />
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB usados
+                {pct > 90 && <span className="ml-1 font-semibold text-red-500">· casi sin espacio</span>}
               </p>
             </div>
           )}
@@ -304,7 +305,7 @@ export function StudioProfilePage() {
                 <Input label="TikTok" placeholder="https://tiktok.com/@tu_estudio" {...register('tiktokUrl')} />
               </div>
             </div>
-            <Button type="submit" size="lg" loading={isSubmitting} className="mt-2 w-fit">
+            <Button type="submit" variant="dark" size="lg" loading={isSubmitting} className="mt-2 w-fit">
               Guardar cambios
             </Button>
           </form>
@@ -317,7 +318,7 @@ export function StudioProfilePage() {
             onClick={() => setTab('destacadas')}
             className={cn(
               'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-              tab === 'destacadas' ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
+              tab === 'destacadas' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
             )}
           >
             Fotos destacadas
@@ -326,7 +327,7 @@ export function StudioProfilePage() {
             onClick={() => setTab('eventos')}
             className={cn(
               'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-              tab === 'eventos' ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
+              tab === 'eventos' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
             )}
           >
             Eventos ({events.length})
@@ -337,8 +338,8 @@ export function StudioProfilePage() {
           {tab === 'destacadas' ? (
             <>
               <p className="mb-4 text-sm text-muted-foreground">
-                Para destacar una foto aquí, márcala al entregar el archivo final en un pedido — así solo se muestran
-                fotos que ya editaste y entregaste, no las miles que puedas tener subidas.
+                Marca fotos como destacadas (★) desde la vista de cada evento — estas mismas aparecen aquí, en la
+                página del evento y en tu perfil público. No están a la venta ni disponibles para descarga.
               </p>
               {featuredPhotos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>

@@ -3,7 +3,6 @@ import { previewUrl } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { timeAgo } from '../../../lib/timeAgo'
-import { InitialsAvatar } from '../../../ui/shared/InitialsAvatar'
 import { IconBookmark } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 
@@ -54,37 +53,37 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           onClick={() => toggleFavorite(photo.id)}
           aria-label="Guardar"
           className={cn(
-            'flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
+            'flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
             isFavorite ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
-          <IconBookmark className="h-4 w-4" filled={isFavorite} />
+          <IconBookmark className="h-3.5 w-3.5" filled={isFavorite} />
         </button>
       </div>
 
-      {/* Barra inferior: fotógrafo + agregar al carrito */}
-      <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-between gap-2 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
-        <div className="flex min-w-0 items-center gap-2 text-white">
-          <InitialsAvatar name={photographerName} className="h-7 w-7 shrink-0 border-2 border-white/80 bg-primary text-[10px] text-white" />
-          <div className="min-w-0">
-            <p className="truncate text-xs font-semibold leading-tight">{photographerName}</p>
-            <p className="truncate text-[10px] leading-tight text-white/70">{eventTitle}</p>
-          </div>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            inCart
-              ? remove(photo.id)
-              : add({ photoId: photo.id, eventId: photo.event_id, eventTitle, photographerId: photo.photographer_id, photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
-          }}
-          className={cn(
-            'pointer-events-auto flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-all duration-200',
-            inCart ? 'bg-secondary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
-          )}
-        >
-          {inCart ? '✓ En carrito' : `Q${photo.price} · Agregar`}
-        </button>
+      {/* Barra inferior: solo agregar al carrito — sin recuadro de fotógrafo/evento
+          (esa info ya vive en el visor). Las destacadas no están a la venta. */}
+      <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-end gap-2 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+        {photo.featured ? (
+          <span className="pointer-events-auto flex h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-3 text-xs font-semibold text-black shadow-sm">
+            ★ Destacada
+          </span>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              inCart
+                ? remove(photo.id)
+                : add({ photoId: photo.id, eventId: photo.event_id, eventTitle, photographerId: photo.photographer_id, photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
+            }}
+            className={cn(
+              'pointer-events-auto flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-all duration-200',
+              inCart ? 'bg-secondary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
+            )}
+          >
+            {inCart ? '✓ En carrito' : `Q${photo.price} · Agregar`}
+          </button>
+        )}
       </div>
     </div>
   )

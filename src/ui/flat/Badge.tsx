@@ -1,12 +1,13 @@
 import { type HTMLAttributes } from 'react'
 import { cn } from '../../lib/cn'
 
-type Tone = 'primary' | 'secondary' | 'accent'
+type Tone = 'primary' | 'secondary' | 'accent' | 'dark'
 
 const toneClasses: Record<Tone, string> = {
   primary: 'bg-primary text-primary-foreground',
   secondary: 'bg-secondary text-secondary-foreground',
   accent: 'bg-accent text-accent-foreground',
+  dark: 'border border-white/20 bg-black/70 text-white',
 }
 
 export function Badge({

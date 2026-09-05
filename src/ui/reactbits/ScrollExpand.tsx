@@ -98,7 +98,10 @@ const ScrollExpand = ({
 
     media.style.transform = `scale(${c.mediaZoom + (1 - c.mediaZoom) * e})`
 
-    if (scrimRef.current) scrimRef.current.style.opacity = `${c.overlayScrim * e}`
+    // Piso mínimo de oscurecimiento — sin esto, con p=0 (antes de scrollear) el
+    // scrim queda en 0 y un título/logo blanco se pierde sobre una portada
+    // clara; el resto de la rampa sigue intacta para el efecto de "revelar".
+    if (scrimRef.current) scrimRef.current.style.opacity = `${Math.max(0.35, c.overlayScrim * e)}`
 
     if (titleRef.current) {
       const out = smoothstep(0.4, 0.88, p)

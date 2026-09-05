@@ -31,7 +31,7 @@ export function PhotoCarousel({ photos, dots = true, className }: { photos: Caro
           src={previewUrl(photo)}
           alt=""
           className={cn(
-            'absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out group-hover:scale-105',
+            'absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-125',
             i === active ? 'opacity-100' : 'opacity-0',
             className,
           )}

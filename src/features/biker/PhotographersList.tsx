@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApprovedPhotographers, usePublicEvents, useFeaturedEventPhotos } from './usePublicData'
 import { PhotoCarousel } from './components/PhotoCarousel'
-import { previewUrl } from '../../lib/r2'
+import { previewUrl, r2Url } from '../../lib/r2'
 import { Select } from '../../ui/flat/Select'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
@@ -22,6 +22,20 @@ function dayOfYear() {
   return Math.floor((+now - +start) / 86_400_000)
 }
 
+function avatarSrc(photographer: DbPhotographer) {
+  if (!photographer.avatar_url) return null
+  return photographer.avatar_url.startsWith('http') ? photographer.avatar_url : r2Url(photographer.avatar_url)
+}
+
+function PhotographerAvatar({ photographer, className }: { photographer: DbPhotographer; className: string }) {
+  const src = avatarSrc(photographer)
+  return src ? (
+    <img src={src} alt={photographer.display_name} className={cn(className, 'object-cover')} />
+  ) : (
+    <InitialsAvatar name={photographer.display_name} className={cn(className, 'bg-primary text-white')} />
+  )
+}
+
 function PhotographerSpotlight({ photographer, eventCount, photos }: { photographer: DbPhotographer; eventCount: number; photos: DbPhoto[] }) {
   return (
     <div className="mb-10 overflow-hidden rounded-3xl border border-border bg-card">
@@ -38,7 +52,7 @@ function PhotographerSpotlight({ photographer, eventCount, photos }: { photograp
             ✨ Fotógrafo destacado
           </span>
           <div className="flex items-center gap-3">
-            <InitialsAvatar name={photographer.display_name} className="h-14 w-14 shrink-0 rounded-full bg-primary text-lg text-white" />
+            <PhotographerAvatar photographer={photographer} className="h-14 w-14 shrink-0 rounded-full" />
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-xl font-bold">{photographer.display_name}</p>
@@ -81,7 +95,7 @@ function PhotographerGridCard({ photographer, eventCount, photos }: { photograph
         )}
       </div>
       <div className="flex items-center gap-3 p-4">
-        <InitialsAvatar name={photographer.display_name} className="h-12 w-12 shrink-0 rounded-full bg-primary text-sm text-white" />
+        <PhotographerAvatar photographer={photographer} className="h-12 w-12 shrink-0 rounded-full" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
             <p className="truncate font-bold">{photographer.display_name}</p>

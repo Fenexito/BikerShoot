@@ -26,7 +26,7 @@ import { Skeleton } from '../../ui/shared/Skeleton'
 const PAGE_SIZE = 12
 const HEADER_SCROLL_THRESHOLD = 200
 
-function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
+function PhotoListRow({ photo, onDelete, onToggleFeatured }: { photo: EventPhoto; onDelete: (id: string) => void; onToggleFeatured: (id: string, current: boolean) => void }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2">
       <img src={previewUrl(photo)} alt="" className="h-12 w-12 shrink-0 rounded-2xl border border-border object-cover" />
@@ -36,6 +36,13 @@ function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: s
       {photo.delivered_path && (
         <span className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Vendida</span>
       )}
+      <button
+        onClick={() => onToggleFeatured(photo.id, photo.featured)}
+        className={cn('shrink-0 text-xs font-semibold uppercase tracking-wide transition-colors', photo.featured ? 'text-foreground' : 'text-muted-foreground hover:text-foreground')}
+        title={photo.featured ? 'Quitar de destacadas' : 'Destacar esta foto'}
+      >
+        {photo.featured ? '★ Destacada' : '☆ Destacar'}
+      </button>
       <button onClick={() => onDelete(photo.id)} className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-accent">
         Eliminar
       </button>
@@ -58,11 +65,13 @@ function AccordionRow({
   selectedIds,
   onToggleSelect,
   onDelete,
+  onToggleFeatured,
 }: {
   photos: EventPhoto[]
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onDelete: (id: string) => void
+  onToggleFeatured: (id: string, current: boolean) => void
 }) {
   return (
     <AccordionGallery
@@ -75,6 +84,20 @@ function AccordionRow({
                 Vendida
               </span>
             )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleFeatured(photo.id, photo.featured)
+              }}
+              aria-label={photo.featured ? 'Quitar de destacadas' : 'Destacar esta foto'}
+              title={photo.featured ? 'Quitar de destacadas' : 'Destacar esta foto'}
+              className={cn(
+                'absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full text-sm opacity-100 transition-colors sm:opacity-0 sm:group-hover:opacity-100',
+                photo.featured ? 'bg-amber-400 text-black' : 'bg-black/40 text-white hover:bg-black/60',
+              )}
+            >
+              {photo.featured ? '★' : '☆'}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -119,9 +142,10 @@ interface PhotoGalleryProps {
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onDelete: (id: string) => void
+  onToggleFeatured: (id: string, current: boolean) => void
 }
 
-function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGalleryProps) {
+function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete, onToggleFeatured }: PhotoGalleryProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const loadMoreZoneRef = useRef<HTMLDivElement>(null)
@@ -164,13 +188,13 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGa
       {view === 'grid' ? (
         <div className="flex flex-col gap-3">
           {chunk(visible, PAGE_SIZE).map((rowPhotos, i) => (
-            <AccordionRow key={i} photos={rowPhotos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+            <AccordionRow key={i} photos={rowPhotos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} onToggleFeatured={onToggleFeatured} />
           ))}
         </div>
       ) : (
         <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
           {visible.map((photo) => (
-            <PhotoListRow key={photo.id} photo={photo} onDelete={onDelete} />
+            <PhotoListRow key={photo.id} photo={photo} onDelete={onDelete} onToggleFeatured={onToggleFeatured} />
           ))}
         </div>
       )}
@@ -226,10 +250,11 @@ interface PointCardProps {
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onDelete: (id: string) => void
+  onToggleFeatured: (id: string, current: boolean) => void
   onUploaded: () => void
 }
 
-function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onDelete, onUploaded }: PointCardProps) {
+function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onDelete, onToggleFeatured, onUploaded }: PointCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const sold = photos.filter((p) => p.delivered_path).length
@@ -274,7 +299,7 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
               />
             </div>
           )}
-          <PhotoGallery photos={photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+          <PhotoGallery photos={photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} onToggleFeatured={onToggleFeatured} />
         </div>
       )}
     </div>
@@ -344,6 +369,18 @@ export function StudioEventView() {
       return next
     })
     invalidatePhotos()
+  }
+
+  async function toggleFeatured(photoId: string, current: boolean) {
+    const { error } = await supabase.from('photos').update({ featured: !current }).eq('id', photoId)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: current ? 'Quitada de destacadas' : '★ Agregada a tus destacadas' })
+    invalidatePhotos()
+    queryClient.invalidateQueries({ queryKey: ['featured-photographer-photos'] })
+    queryClient.invalidateQueries({ queryKey: ['featured-event-photos'] })
   }
 
   async function bulkMoveTo(pointId: string) {
@@ -561,6 +598,7 @@ export function StudioEventView() {
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onDelete={deletePhoto}
+              onToggleFeatured={toggleFeatured}
               onUploaded={invalidatePhotos}
             />
           ))}
@@ -568,7 +606,7 @@ export function StudioEventView() {
           {unassigned.length > 0 && (
             <div className="overflow-hidden rounded-3xl border border-border bg-card p-5">
               <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
-              <PhotoGallery photos={unassigned} selectedIds={selectedIds} onToggleSelect={toggleSelect} onDelete={deletePhoto} />
+              <PhotoGallery photos={unassigned} selectedIds={selectedIds} onToggleSelect={toggleSelect} onDelete={deletePhoto} onToggleFeatured={toggleFeatured} />
             </div>
           )}
 

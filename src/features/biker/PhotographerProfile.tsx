@@ -10,7 +10,7 @@ import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
-import { IconVerified } from '../../ui/shared/icons'
+import { IconVerified, IconWhatsapp } from '../../ui/shared/icons'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton } from '../../ui/shared/Skeleton'
 
@@ -104,7 +104,10 @@ export function PhotographerProfile() {
           </div>
           {photographer.whatsapp ? (
             <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
-              <Button size="lg">Contactar por WhatsApp</Button>
+              <Button size="lg" style={{ backgroundColor: '#25D366' }}>
+                <IconWhatsapp className="h-5 w-5" />
+                Contactar por WhatsApp
+              </Button>
             </a>
           ) : (
             <Button size="lg" disabled>Sin contacto</Button>
