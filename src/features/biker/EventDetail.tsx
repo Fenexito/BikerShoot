@@ -1,56 +1,128 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { usePublicEvent, useEventPhotos } from './usePublicData'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { usePublicEvent, useEventPhotos, type PublicEventPoint } from './usePublicData'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
-import { Select } from '../../ui/flat/Select'
 import { Button } from '../../ui/flat/Button'
 import { Badge } from '../../ui/flat/Badge'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { IconChevronRight } from '../../ui/shared/icons'
 import { useCartStore } from '../cart/cartStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
+import { r2Url, previewUrl } from '../../lib/r2'
+import ScrollExpand from '../../ui/reactbits/ScrollExpand'
+import AccordionGallery from '../../ui/reactbits/AccordionGallery'
+import type { DbPhoto } from '../../types/db'
+
+function splitInTwo<T>(arr: T[]): [T[], T[]] {
+  const mid = Math.ceil(arr.length / 2)
+  return [arr.slice(0, mid), arr.slice(mid)]
+}
+
+/** Fila de galería tipo acordeón para el biker — misma animación hover que
+ * el portal del fotógrafo, pero sin overlay de administración (solo abre
+ * el lightbox), y más alta porque casi todas las fotos son verticales. */
+function PointAccordionRow({ rowPhotos, allPhotos, onOpen }: { rowPhotos: DbPhoto[]; allPhotos: DbPhoto[]; onOpen: (index: number) => void }) {
+  if (rowPhotos.length === 0) return null
+  return (
+    <AccordionGallery
+      items={rowPhotos.map((photo) => ({ image: previewUrl(photo) }))}
+      onOpen={(i) => onOpen(allPhotos.indexOf(rowPhotos[i]))}
+      height={440}
+      radius={20}
+      expandRatio={0.34}
+      tilt={6}
+      parallax={0.3}
+      accentColor="rgb(37 99 235)"
+      overlayColor="#000000"
+      showLabels={false}
+      defaultIndex={0}
+    />
+  )
+}
+
+function PointSection({
+  point,
+  photos,
+  onOpenLightbox,
+  onSeeMore,
+}: {
+  point: PublicEventPoint
+  photos: DbPhoto[]
+  onOpenLightbox: (photos: DbPhoto[], index: number) => void
+  onSeeMore: (point: PublicEventPoint) => void
+}) {
+  const [rowA, rowB] = splitInTwo(photos)
+  if (photos.length === 0) return null
+
+  return (
+    <section className="mt-10">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="text-lg font-bold tracking-tight">📍 {point.label}</h3>
+          <p className="text-sm text-muted-foreground">
+            {point.time_start.slice(0, 5)}–{point.time_end.slice(0, 5)} · {photos.length} fotos
+          </p>
+        </div>
+        <button
+          onClick={() => onSeeMore(point)}
+          className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+        >
+          Ver todas las fotos de este punto
+          <IconChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <PointAccordionRow rowPhotos={rowA} allPhotos={photos} onOpen={(i) => onOpenLightbox(photos, i)} />
+        <PointAccordionRow rowPhotos={rowB} allPhotos={photos} onOpen={(i) => onOpenLightbox(photos, i)} />
+      </div>
+    </section>
+  )
+}
 
 export function EventDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
   const { data: event, isLoading } = usePublicEvent(id)
   const { data: photos = [] } = useEventPhotos(id)
-  const [motoBrand, setMotoBrand] = useState('')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
   const cartItems = useCartStore((s) => s.items)
 
-  const pointId = searchParams.get('punto') ?? ''
-  const selectedPoint = event?.event_points.find((pt) => pt.id === pointId)
+  const featuredPhotos = useMemo(() => photos.filter((p) => p.featured), [photos])
 
-  useEffect(() => {
-    if (pointId && event && !selectedPoint) {
-      const next = new URLSearchParams(searchParams)
-      next.delete('punto')
-      setSearchParams(next, { replace: true })
+  const photosByPoint = useMemo(() => {
+    const map = new Map<string, DbPhoto[]>()
+    for (const p of photos) {
+      if (!p.point_id) continue
+      const list = map.get(p.point_id) ?? []
+      list.push(p)
+      map.set(p.point_id, list)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointId, event, selectedPoint])
+    return map
+  }, [photos])
 
-  function setPointId(value: string) {
-    const next = new URLSearchParams(searchParams)
-    if (value) next.set('punto', value)
-    else next.delete('punto')
-    setSearchParams(next, { replace: true })
-  }
-
-  const brands = useMemo(() => Array.from(new Set(photos.map((p) => p.moto_brand).filter(Boolean))) as string[], [photos])
-  const pointFilteredPhotos = pointId ? photos.filter((p) => p.point_id === pointId) : photos
-  const filteredPhotos = motoBrand ? pointFilteredPhotos.filter((p) => p.moto_brand === motoBrand) : pointFilteredPhotos
-
-  const gridPhotos: GridPhoto[] = filteredPhotos.map((p) => ({
-    ...p,
-    eventTitle: event?.title ?? '',
-    photographerName: event?.photographer?.display_name ?? '',
-  }))
+  const unassignedPhotos = useMemo(() => photos.filter((p) => !p.point_id), [photos])
 
   const selectedFromEvent = useMemo(() => cartItems.filter((i) => i.eventId === id).length, [cartItems, id])
+
+  function toGridPhotos(list: DbPhoto[]): GridPhoto[] {
+    return list.map((p) => ({ ...p, eventTitle: event?.title ?? '', photographerName: event?.photographer?.display_name ?? '' }))
+  }
+
+  function openLightbox(list: DbPhoto[], index: number) {
+    setLightbox({ photos: toGridPhotos(list), index })
+  }
+
+  function seeMoreOfPoint(point: PublicEventPoint) {
+    const params = new URLSearchParams()
+    if (id) params.set('evento', id)
+    if (event?.photographer_id) params.set('fotografo', event.photographer_id)
+    if (point.route_point?.route_id) params.set('ruta', point.route_point.route_id)
+    params.set('punto', point.id)
+    navigate(`/app/buscar?${params.toString()}`)
+  }
 
   if (isLoading) {
     return (
@@ -64,45 +136,62 @@ export function EventDetail() {
   if (!event) return <PlaceholderPage title="Evento no encontrado" />
 
   const date = new Date(event.event_date)
-  const pd = event.photographer?.photographer_details
-  const whatsapp = pd ? (Array.isArray(pd) ? pd[0]?.whatsapp : pd.whatsapp) : null
+  const coverUrl = event.cover_path ? r2Url(event.cover_path) : null
 
   return (
     <div className="pb-24 font-flat">
-      <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-200 to-emerald-200 md:h-80">
-        <span className="text-7xl opacity-30">🏍️</span>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-5xl px-4 pb-6 text-white md:px-8">
-          <Badge tone="accent">{event.category}</Badge>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight md:text-4xl">{event.title}</h1>
-          <p className="mt-1 text-white/90">
-            {date.toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
-            {event.venue ? ` · ${event.venue}` : ''}, {event.city}
-          </p>
+      {coverUrl ? (
+        <ScrollExpand
+          src={coverUrl}
+          alt={event.title}
+          title={event.title}
+          scrollHint="Desliza para ver el evento"
+          useWindowScroll
+          startWidth={60}
+          startHeight={60}
+          startRadius={36}
+          endRadius={1}
+          mediaZoom={1.5}
+          scrollDistance={1}
+          holdDistance={0.45}
+          smoothing={0.3}
+          overlayScrim={0.5}
+        />
+      ) : (
+        <div className="relative flex h-56 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-200 to-emerald-200 md:h-80">
+          <span className="text-7xl opacity-30">🏍️</span>
         </div>
-      </div>
+      )}
 
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-border bg-card p-5">
-          <Link to={`/app/fotografos/${event.photographer_id}`} className="flex items-center gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Badge tone="accent">{event.category}</Badge>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight md:text-4xl">{event.title}</h1>
+            <p className="mt-1 text-muted-foreground">
+              {date.toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
+              {event.venue ? ` · ${event.venue}` : ''}, {event.city}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Desde</p>
+            <p className="text-2xl font-bold text-primary">Q{event.price_per_photo} / foto</p>
+          </div>
+        </div>
+
+        <Link
+          to={`/app/fotografos/${event.photographer_id}`}
+          className="mt-6 flex items-center justify-between gap-4 rounded-3xl border border-border bg-card p-5 transition-colors hover:border-primary/30"
+        >
+          <div className="flex items-center gap-3">
             <InitialsAvatar name={event.photographer?.display_name ?? '?'} className="h-12 w-12 rounded-full bg-primary text-sm text-white" />
             <div>
               <p className="font-bold">{event.photographer?.display_name}</p>
               <p className="text-sm text-muted-foreground">Ver perfil del fotógrafo</p>
             </div>
-          </Link>
-          <div className="flex items-center gap-4">
-            {whatsapp && (
-              <a href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
-                <Button style={{ backgroundColor: '#25D366' }}>💬 Escribir por WhatsApp</Button>
-              </a>
-            )}
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Desde</p>
-              <p className="text-xl font-bold text-primary">Q{event.price_per_photo} / foto</p>
-            </div>
           </div>
-        </div>
+          <IconChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+        </Link>
 
         {event.description && <p className="mt-6 max-w-2xl text-muted-foreground">{event.description}</p>}
 
@@ -110,44 +199,36 @@ export function EventDetail() {
           💡 Compra 5 fotos o más de este evento y ahorra 15% automáticamente en el carrito.
         </div>
 
-        {selectedPoint && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-primary/10 px-4 py-3 text-sm">
-            <span>
-              📍 Viendo solo el punto <strong>{selectedPoint.label}</strong> ({selectedPoint.time_start.slice(0, 5)}–{selectedPoint.time_end.slice(0, 5)})
-            </span>
-            <button onClick={() => setPointId('')} className="font-semibold text-primary underline">
-              Ver todas las fotos del evento
-            </button>
-          </div>
+        {featuredPhotos.length > 0 && (
+          <section className="mt-10">
+            <h2 className="mb-4 text-xl font-bold tracking-tight">✨ Fotos destacadas</h2>
+            <PhotoGrid photos={toGridPhotos(featuredPhotos)} onOpenPhoto={(list, i) => setLightbox({ photos: list, index: i })} />
+          </section>
         )}
 
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold tracking-tight">{filteredPhotos.length} fotos {selectedPoint ? 'de este punto' : 'del evento'}</h2>
-          <div className="flex flex-wrap gap-3">
-            {event.event_points.length > 1 && (
-              <Select value={pointId} onChange={(e) => setPointId(e.target.value)} className="w-56">
-                <option value="">Todos los puntos</option>
-                {event.event_points.map((pt) => (
-                  <option key={pt.id} value={pt.id}>
-                    {pt.label} ({pt.time_start.slice(0, 5)}–{pt.time_end.slice(0, 5)})
-                  </option>
-                ))}
-              </Select>
-            )}
-            {brands.length > 0 && (
-              <Select value={motoBrand} onChange={(e) => setMotoBrand(e.target.value)} className="w-48">
-                <option value="">Toda marca de moto</option>
-                {brands.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </Select>
-            )}
-          </div>
-        </div>
+        {event.event_points.map((point) => (
+          <PointSection
+            key={point.id}
+            point={point}
+            photos={photosByPoint.get(point.id) ?? []}
+            onOpenLightbox={openLightbox}
+            onSeeMore={seeMoreOfPoint}
+          />
+        ))}
 
-        <div className="mt-6">
-          <PhotoGrid photos={gridPhotos} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
-        </div>
+        {unassignedPhotos.length > 0 && (
+          <section className="mt-10">
+            <h2 className="mb-4 text-xl font-bold tracking-tight">Más fotos del evento</h2>
+            <PhotoGrid photos={toGridPhotos(unassignedPhotos)} onOpenPhoto={(list, i) => setLightbox({ photos: list, index: i })} />
+          </section>
+        )}
+
+        {photos.length === 0 && (
+          <div className="mt-10 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
+            <span className="text-4xl opacity-40">📷</span>
+            <p className="font-semibold">Este evento todavía no tiene fotos publicadas</p>
+          </div>
+        )}
       </div>
 
       {selectedFromEvent > 0 && (

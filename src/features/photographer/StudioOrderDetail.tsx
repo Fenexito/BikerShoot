@@ -6,7 +6,7 @@ import { useOrderGroup, type PhotographerOrderGroup } from './useMyOrders'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
-import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
+import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
@@ -246,7 +246,7 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
 
 export function StudioOrderDetail() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { data: order, isLoading } = useOrderGroup(user?.id, id)
   const push = useToastStore((s) => s.push)
   const [cancelReason, setCancelReason] = useState('')
@@ -344,7 +344,7 @@ export function StudioOrderDetail() {
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
             <h1 className="text-2xl font-bold tracking-tight">{order.bikerName}</h1>
-            <p className="text-muted-foreground">{order.eventTitle}</p>
+            <p className="text-muted-foreground">{formatOrderCode(order.orderNumber, profile?.display_name)} · {order.eventTitle}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-4">

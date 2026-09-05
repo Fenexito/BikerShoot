@@ -14,6 +14,7 @@ export interface MyOrderItem {
 
 export interface MyOrder {
   id: string
+  order_number: number | null
   payment_method: 'tarjeta' | 'transferencia'
   total: number
   created_at: string

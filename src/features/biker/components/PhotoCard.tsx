@@ -4,6 +4,7 @@ import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { timeAgo } from '../../../lib/timeAgo'
 import { InitialsAvatar } from '../../../ui/shared/InitialsAvatar'
+import { IconBookmark } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 
 interface PhotoCardProps {
@@ -51,13 +52,13 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
         )}
         <button
           onClick={() => toggleFavorite(photo.id)}
-          aria-label="Favorito"
+          aria-label="Guardar"
           className={cn(
-            'flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-base shadow-sm transition-transform duration-200 hover:scale-110',
-            isFavorite && 'text-red-500',
+            'flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
+            isFavorite ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
-          {isFavorite ? '♥' : '♡'}
+          <IconBookmark className="h-4 w-4" filled={isFavorite} />
         </button>
       </div>
 

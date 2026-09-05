@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { usePublicPhotographer, usePhotographerEvents, useFeaturedPhotographerPhotos, usePhotographerPhotoCount } from './usePublicData'
+import { usePublicPhotographer, usePhotographerEvents, useFeaturedPhotographerPhotos } from './usePublicData'
 import { r2Url, previewUrl } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
@@ -19,7 +19,6 @@ export function PhotographerProfile() {
   const { data: photographer, isLoading } = usePublicPhotographer(id)
   const { data: events = [] } = usePhotographerEvents(id)
   const { data: photos = [] } = useFeaturedPhotographerPhotos(id)
-  const { data: photoCount = 0 } = usePhotographerPhotoCount(id)
   const [tab, setTab] = useState<'fotos' | 'eventos'>('fotos')
   const [galleryLayout, setGalleryLayout] = useState<'grid' | 'mosaic' | 'muro'>('muro')
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
@@ -112,15 +111,9 @@ export function PhotographerProfile() {
           )}
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-4 rounded-3xl border border-border bg-card p-6 text-center">
-          <div>
-            <p className="text-2xl font-bold">{events.length}</p>
-            <p className="text-sm text-muted-foreground">Rodadas cubiertas</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{photoCount}</p>
-            <p className="text-sm text-muted-foreground">Fotos publicadas</p>
-          </div>
+        <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-border bg-card px-6 py-3">
+          <p className="text-2xl font-bold">{events.length}</p>
+          <p className="text-sm text-muted-foreground">evento{events.length === 1 ? '' : 's'} cubierto{events.length === 1 ? '' : 's'}</p>
         </div>
 
         {photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>}

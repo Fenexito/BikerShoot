@@ -40,6 +40,8 @@ export function Search() {
   const motoBrand = searchParams.get('marca') ?? ''
   const photographerId = searchParams.get('fotografo') ?? ''
   const routeId = searchParams.get('ruta') ?? ''
+  const eventId = searchParams.get('evento') ?? ''
+  const pointId = searchParams.get('punto') ?? ''
   const sort = (searchParams.get('orden') as SearchFilters['sort']) ?? 'relevancia'
   const onlyMyBrand = searchParams.get('mi_moto') === '1'
 
@@ -59,6 +61,8 @@ export function Search() {
     motoBrand: effectiveBrand || undefined,
     photographerId: photographerId || undefined,
     routeId: routeId || undefined,
+    eventId: eventId || undefined,
+    pointId: pointId || undefined,
     sort,
   })
 
@@ -86,6 +90,11 @@ export function Search() {
     onlyMyBrand && bikerDetails?.moto_brand && { key: 'mi_moto', label: `Mi moto: ${bikerDetails.moto_brand}` },
     photographerId && { key: 'fotografo', label: photographers.find((p) => p.id === photographerId)?.display_name ?? '' },
     routeId && { key: 'ruta', label: routes.find((r) => r.id === routeId)?.name ?? '' },
+    eventId && { key: 'evento', label: events.find((e) => e.id === eventId)?.title ?? '' },
+    pointId && {
+      key: 'punto',
+      label: events.find((e) => e.id === eventId)?.event_points.find((pt) => pt.id === pointId)?.label ?? 'Punto',
+    },
   ].filter(Boolean) as { key: string; label: string }[]
 
   const activeFilterCount = activeChips.length

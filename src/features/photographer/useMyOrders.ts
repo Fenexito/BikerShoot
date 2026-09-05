@@ -19,11 +19,12 @@ interface RawOrderItem {
   cancelled_at: string | null
   photo: { id: string; storage_path: string | null; preview_path: string | null; delivered_path: string | null; raw_path: string | null; original_filename: string | null; featured: boolean } | null
   event: { title: string } | null
-  order: { payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { id: string; display_name: string; phone: string | null } | null } | null
+  order: { order_number: number; payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { id: string; display_name: string; phone: string | null } | null } | null
 }
 
 export interface PhotographerOrderGroup {
   orderId: string
+  orderNumber: number | null
   bikerId: string | null
   bikerName: string
   bikerPhone: string | null
@@ -46,7 +47,7 @@ function useRawOrderItems(photographerId: string | undefined) {
     queryFn: async (): Promise<RawOrderItem[]> => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured), event:events(title), order:orders(payment_method, created_at, biker:profiles(id, display_name, phone))')
+        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured), event:events(title), order:orders(order_number, payment_method, created_at, biker:profiles(id, display_name, phone))')
         .eq('photographer_id', photographerId)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -81,6 +82,7 @@ export function usePhotographerOrders(photographerId: string | undefined) {
     }
     return Array.from(byOrder.entries()).map(([orderId, items]) => ({
       orderId,
+      orderNumber: items[0].order?.order_number ?? null,
       bikerId: items[0].order?.biker?.id ?? null,
       bikerName: items[0].order?.biker?.display_name ?? 'Biker',
       bikerPhone: items[0].order?.biker?.phone ?? null,

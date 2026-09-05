@@ -4,7 +4,7 @@ import { useAuth } from '../../features/auth/AuthContext'
 import { useBikerDetails } from '../../features/biker/useBikerDetails'
 import { useCartStore } from '../../features/cart/cartStore'
 import { r2Url } from '../../lib/r2'
-import { IconHeart, IconCart, IconUser, IconLogOut, IconMenu, IconClose, IconSearch, IconSparkles } from '../shared/icons'
+import { IconBookmark, IconCart, IconUser, IconLogOut, IconMenu, IconClose, IconSearch, IconSparkles } from '../shared/icons'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
@@ -90,7 +90,7 @@ export function HeaderUser() {
             title="Favoritos"
             className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
           >
-            <IconHeart className="h-5 w-5" />
+            <IconBookmark className="h-5 w-5" />
           </Link>
           <Link
             to="/app/checkout"
@@ -125,7 +125,7 @@ export function HeaderUser() {
               [
                 { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
                 { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-4 w-4" /> },
-                { to: '/app/favoritos', label: 'Favoritos', icon: <IconHeart className="h-4 w-4" /> },
+                { to: '/app/favoritos', label: 'Favoritos', icon: <IconBookmark className="h-4 w-4" /> },
               ],
               [
                 { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },

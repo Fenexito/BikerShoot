@@ -5,6 +5,7 @@ import { previewUrl } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { Button } from '../../../ui/flat/Button'
+import { IconBookmark } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 import type { GridPhoto } from './PhotoGrid'
 
@@ -113,10 +114,10 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
           <div className="flex items-center gap-2">
             <button
               onClick={() => toggleFavorite(photo.id)}
-              className={cn('flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-lg transition-colors hover:bg-white/20', isFavorite && 'text-red-500')}
-              aria-label="Favorito"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+              aria-label="Guardar"
             >
-              {isFavorite ? '♥' : '♡'}
+              <IconBookmark className="h-5 w-5" filled={isFavorite} />
             </button>
             <Button
               onClick={() =>

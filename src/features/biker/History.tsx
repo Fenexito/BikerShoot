@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/flat/Button'
 import { Badge } from '../../ui/flat/Badge'
 import { StatusPill } from '../../ui/shared/StatusPill'
-import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
+import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
 
@@ -69,7 +69,7 @@ export function History() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  {formatOrderCode(order.order_number)} · {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
                 </p>
                 <p className="font-bold">Q{order.total} · {order.order_items.length} fotos</p>
               </div>

@@ -22,7 +22,7 @@ export function Favorites() {
   if (favoritePhotos.length === 0) {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center font-flat">
-        <span className="text-5xl">♡</span>
+        <span className="text-5xl">🔖</span>
         <h1 className="text-2xl font-bold tracking-tight">Sin favoritos todavía</h1>
         <p className="text-muted-foreground">Toca el corazón en cualquier foto para guardarla aquí.</p>
         <Link to="/app/buscar">

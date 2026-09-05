@@ -25,6 +25,14 @@ export function IconUser(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  )
+}
+
 export function IconLogOut(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>
@@ -63,6 +71,14 @@ export function IconHeart({ filled, ...props }: SVGProps<SVGSVGElement> & { fill
   return (
     <svg {...base(props)} fill={filled ? 'currentColor' : 'none'}>
       <path d="M12 21s-7.5-4.6-10-9.1C.6 8.7 2 5 5.5 5c2 0 3.4 1.1 4.2 2.4C10.5 6.1 11.9 5 13.9 5 17.4 5 18.8 8.7 17.4 11.9 15.5 16.4 12 21 12 21z" />
+    </svg>
+  )
+}
+
+export function IconBookmark({ filled, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean }) {
+  return (
+    <svg {...base(props)} fill={filled ? 'currentColor' : 'none'}>
+      <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.2-7 4.2V4.5a1 1 0 0 1 1-1z" />
     </svg>
   )
 }

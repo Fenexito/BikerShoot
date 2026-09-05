@@ -5,7 +5,7 @@ import { usePhotographerOrders, type PhotographerOrderGroup } from './useMyOrder
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { getOrderStatusStyle, type OrderItemStatus } from '../../lib/orderStatus'
+import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
@@ -37,7 +37,7 @@ function urgencyClass(order: PhotographerOrderGroup) {
 }
 
 export function StudioOrders() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { data: orders = [], isLoading } = usePhotographerOrders(user?.id)
   const push = useToastStore((s) => s.push)
   const [tab, setTab] = useState<OrderItemStatus | 'todos'>('todos')
@@ -170,7 +170,9 @@ export function StudioOrders() {
                 <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{order.bikerName}</p>
-                  <p className="truncate text-sm text-muted-foreground">{order.eventTitle} · {order.items.length} fotos</p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {formatOrderCode(order.orderNumber, profile?.display_name)} · {order.eventTitle} · {order.items.length} fotos
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                   <span className={cn('text-xs', urgent ?? 'text-muted-foreground')}>

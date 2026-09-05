@@ -2,7 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { DbEvent, DbEventPoint, DbPhoto, DbPhotographer } from '../../types/db'
 
-export interface PublicEvent extends DbEvent {
+export interface PublicEventPoint extends DbEventPoint {
+  route_point: { route_id: string } | null
+}
+
+export interface PublicEvent extends Omit<DbEvent, 'event_points'> {
+  event_points: PublicEventPoint[]
   photographer: { display_name: string; photographer_details: { whatsapp: string | null }[] | { whatsapp: string | null } | null } | null
 }
 
@@ -62,7 +67,7 @@ export function usePublicEvents() {
     queryFn: async (): Promise<PublicEvent[]> => {
       const { data, error } = await supabase
         .from('events')
-        .select('*, event_points(*), photographer:profiles(display_name)')
+        .select('*, event_points(*, route_point:route_points(route_id)), photographer:profiles(display_name)')
         .is('deleted_at', null)
         .neq('status', 'pausado')
         .order('event_date', { ascending: false })
@@ -78,7 +83,7 @@ export function usePublicEvent(eventId: string | undefined) {
     queryFn: async (): Promise<PublicEvent | null> => {
       const { data, error } = await supabase
         .from('events')
-        .select('*, event_points(*), photographer:profiles(display_name, photographer_details(whatsapp))')
+        .select('*, event_points(*, route_point:route_points(route_id)), photographer:profiles(display_name, photographer_details(whatsapp))')
         .eq('id', eventId)
         .is('deleted_at', null)
         .neq('status', 'pausado')
@@ -166,7 +171,7 @@ export function usePhotographerEvents(photographerId: string | undefined) {
     queryFn: async (): Promise<PublicEvent[]> => {
       const { data, error } = await supabase
         .from('events')
-        .select('*, event_points(*), photographer:profiles(display_name)')
+        .select('*, event_points(*, route_point:route_points(route_id)), photographer:profiles(display_name)')
         .eq('photographer_id', photographerId)
         .is('deleted_at', null)
         .neq('status', 'pausado')
@@ -196,6 +201,26 @@ export function useFeaturedPhotographerPhotos(photographerId: string | undefined
       ).filter((p) => !p.event?.deleted_at && p.event?.status !== 'pausado')
     },
     enabled: !!photographerId,
+  })
+}
+
+/** Fotos destacadas de TODOS los fotógrafos, para el carrusel animado de la
+ * tarjeta de evento en el visor — liviano porque "destacada" es un flag que
+ * el fotógrafo cura a mano, nunca todas las fotos del evento (que pueden ser
+ * miles). Se agrupan por event_id en el componente que las consume. */
+export function useFeaturedEventPhotos() {
+  return useQuery({
+    queryKey: ['featured-event-photos'],
+    queryFn: async (): Promise<DbPhoto[]> => {
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*, event:events(deleted_at, status)')
+        .eq('featured', true)
+      if (error) throw error
+      return (
+        (data as unknown as (DbPhoto & { event: { deleted_at: string | null; status: string } | null })[]) ?? []
+      ).filter((p) => !p.event?.deleted_at && p.event?.status !== 'pausado')
+    },
   })
 }
 
