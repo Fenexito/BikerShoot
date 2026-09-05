@@ -90,12 +90,12 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, the
                 const content = (
                   <>
                     {link.icon && <span className="flex h-4 w-4 shrink-0 items-center justify-center">{link.icon}</span>}
-                    <span className="flex-1">{link.label}</span>
-                    {link.external && <span className="text-white/40">↗</span>}
+                    <span className="truncate">{link.label}</span>
+                    {link.external && <span className="ml-auto text-white/40">↗</span>}
                   </>
                 )
                 const itemClass = cn(
-                  'flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/10',
+                  'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/10',
                   link.tone === 'danger' ? 'text-red-400' : 'text-white/90',
                 )
                 return link.to ? (
@@ -124,9 +124,14 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, the
             </div>
           ))}
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-white/10 px-4 py-3 text-[11px] text-white/40">
-            {FOOTER_LINKS.map((link) => (
-              <Link key={link.label} to={link.to!} onClick={() => setOpen(false)} className="transition-colors hover:text-white/70">
+          <div className="grid grid-cols-3 gap-2 border-t border-white/10 px-4 py-3 text-[11px] text-white/40">
+            {FOOTER_LINKS.map((link, i) => (
+              <Link
+                key={link.label}
+                to={link.to!}
+                onClick={() => setOpen(false)}
+                className={cn('truncate transition-colors hover:text-white/70', i === 0 ? 'text-left' : i === 1 ? 'text-center' : 'text-right')}
+              >
                 {link.label}
               </Link>
             ))}

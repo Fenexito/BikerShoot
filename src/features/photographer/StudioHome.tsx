@@ -119,18 +119,23 @@ export function StudioHome() {
               <Link
                 key={event.id}
                 to={`/studio/eventos/${event.id}`}
-                className="group overflow-hidden rounded-2xl border border-border transition-all hover:border-border-hover hover:shadow-sm"
+                className="group overflow-hidden rounded-3xl border border-border transition-all duration-300 hover:-translate-y-1 hover:border-border-hover hover:shadow-xl"
               >
-                <div className="flex h-36 items-center justify-center overflow-hidden bg-muted">
+                <div className="relative flex h-56 items-center justify-center overflow-hidden bg-muted">
                   {event.cover_path ? (
-                    <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img
+                      src={r2Url(event.cover_path)}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
+                    />
                   ) : (
                     <span className="text-3xl opacity-30">📷</span>
                   )}
-                </div>
-                <div className="p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  <div className="absolute left-3 top-3">
                     <Badge>{event.category}</Badge>
+                  </div>
+                  <div className="absolute right-3 top-3">
                     <StatusPill
                       dot={EVENT_STATUS_STYLE[event.status].dot}
                       text={EVENT_STATUS_STYLE[event.status].text}
@@ -138,7 +143,9 @@ export function StudioHome() {
                       className="text-xs font-medium uppercase tracking-wide"
                     />
                   </div>
-                  <h3 className="mt-3 font-studio text-lg font-bold">{event.title}</h3>
+                </div>
+                <div className="p-5">
+                  <h3 className="font-studio text-lg font-bold">{event.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Q{event.price_per_photo} por foto · {event.event_points.length} puntos · {event.photos?.[0]?.count ?? 0} fotos
                   </p>

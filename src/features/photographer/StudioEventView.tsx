@@ -16,7 +16,9 @@ import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { IconTrash } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
+import { Dropdown } from '../../ui/shared/Dropdown'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
+import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { cn } from '../../lib/cn'
 import type { EventStatus } from '../../types/db'
 import { Skeleton } from '../../ui/shared/Skeleton'
@@ -41,88 +43,74 @@ function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: s
   )
 }
 
-/** Foto limpia por defecto — el overlay (nombre, destacar, eliminar) se
- * activa con CLICK, no hover (el hover no sirve en touch y aquí además la
- * foto ya tiene su propia animación de escala al hacer scroll). Checkbox
- * de selección múltiple siempre visible en la esquina superior izquierda. */
-function PhotoTile({
-  photo,
-  selected,
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+/** Fila de la galería tipo "acordeón" (hover expande la foto activa) — el
+ * mismo estilo visual que el fotógrafo ya tenía y quiso conservar. El
+ * overlay (seleccionar + eliminar) vive encima, revelado solo con hover
+ * vía `group-hover` (el panel de reactbits ya trae la clase `group`). */
+function AccordionRow({
+  photos,
+  selectedIds,
   onToggleSelect,
-  onSetCover,
   onDelete,
 }: {
-  photo: EventPhoto
-  selected: boolean
+  photos: EventPhoto[]
+  selectedIds: Set<string>
   onToggleSelect: (id: string) => void
-  onSetCover: (id: string) => void
   onDelete: (id: string) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-
   return (
-    <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted">
-      <img
-        src={previewUrl(photo)}
-        alt={photo.original_filename ?? ''}
-        onClick={() => setExpanded((e) => !e)}
-        className={cn('h-full w-full cursor-pointer object-cover transition-transform duration-300', expanded && 'scale-105')}
-      />
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggleSelect(photo.id)
-        }}
-        aria-label="Seleccionar foto"
-        className={cn(
-          'absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-colors',
-          selected ? 'border-foreground bg-foreground text-background' : 'border-white/80 bg-black/25 text-transparent hover:bg-black/40',
-        )}
-      >
-        ✓
-      </button>
-
-      {photo.delivered_path ? (
-        <span className="absolute right-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-          Vendida
-        </span>
-      ) : (
-        photo.featured && (
-          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-[10px] text-background">★</span>
-        )
-      )}
-
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2.5 pb-2.5 pt-8 transition-opacity duration-200',
-          expanded ? 'opacity-100' : 'opacity-0',
-        )}
-      >
-        <p className="truncate text-[11px] text-white/90">{photo.original_filename ?? 'Sin nombre registrado'}</p>
-        <div className="pointer-events-auto mt-1.5 flex gap-1.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onSetCover(photo.id)
-            }}
-            className="flex-1 rounded-full bg-white/15 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-white/25"
-          >
-            ★ Portada del evento
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(photo.id)
-            }}
-            aria-label="Eliminar foto"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-red-500/80"
-          >
-            <IconTrash className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    </div>
+    <AccordionGallery
+      items={photos.map((photo) => ({
+        image: previewUrl(photo),
+        overlay: (
+          <>
+            {photo.delivered_path && (
+              <span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                Vendida
+              </span>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSelect(photo.id)
+              }}
+              aria-label="Seleccionar foto"
+              className={cn(
+                'absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold opacity-100 transition-colors sm:opacity-0 sm:group-hover:opacity-100',
+                selectedIds.has(photo.id) ? 'border-white bg-white text-black' : 'border-white/80 bg-black/30 text-transparent hover:bg-black/50',
+              )}
+            >
+              ✓
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(photo.id)
+              }}
+              aria-label="Eliminar foto"
+              className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
+            >
+              <IconTrash className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ),
+      }))}
+      height={260}
+      radius={16}
+      expandRatio={0.3}
+      tilt={6}
+      parallax={0.3}
+      accentColor="rgb(255 61 0)"
+      overlayColor="#000000"
+      showLabels={false}
+      defaultIndex={0}
+    />
   )
 }
 
@@ -130,14 +118,13 @@ interface PhotoGalleryProps {
   photos: EventPhoto[]
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
-  onSetCover: (id: string) => void
   onDelete: (id: string) => void
 }
 
-function PhotoGallery({ photos, selectedIds, onToggleSelect, onSetCover, onDelete }: PhotoGalleryProps) {
+function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGalleryProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [view, setView] = useState<'grid' | 'list'>('grid')
-  const loadMoreRef = useRef<HTMLButtonElement>(null)
+  const loadMoreZoneRef = useRef<HTMLDivElement>(null)
   const visible = photos.slice(0, visibleCount)
 
   if (photos.length === 0) {
@@ -145,11 +132,11 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onSetCover, onDelet
   }
 
   function handleLoadMore() {
-    const prevTop = loadMoreRef.current?.getBoundingClientRect().top ?? 0
+    const prevTop = loadMoreZoneRef.current?.getBoundingClientRect().top ?? 0
     setVisibleCount((c) => c + PAGE_SIZE)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const newTop = loadMoreRef.current?.getBoundingClientRect().top
+        const newTop = loadMoreZoneRef.current?.getBoundingClientRect().top
         if (newTop != null) window.scrollBy({ top: newTop - prevTop, behavior: 'smooth' })
       })
     })
@@ -175,16 +162,9 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onSetCover, onDelet
       </div>
 
       {view === 'grid' ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {visible.map((photo) => (
-            <PhotoTile
-              key={photo.id}
-              photo={photo}
-              selected={selectedIds.has(photo.id)}
-              onToggleSelect={onToggleSelect}
-              onSetCover={onSetCover}
-              onDelete={onDelete}
-            />
+        <div className="flex flex-col gap-3">
+          {chunk(visible, PAGE_SIZE).map((rowPhotos, i) => (
+            <AccordionRow key={i} photos={rowPhotos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
           ))}
         </div>
       ) : (
@@ -195,15 +175,19 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onSetCover, onDelet
         </div>
       )}
 
-      {visibleCount < photos.length && (
-        <button
-          ref={loadMoreRef}
-          onClick={handleLoadMore}
-          className="mt-4 w-full rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Ver más fotos ({photos.length - visibleCount} más)
-        </button>
-      )}
+      {/* Zona ancla siempre presente (con o sin botón) — así el scroll a la
+          última fila funciona incluso cuando "ver más" ya no tiene sentido
+          por no quedar más fotos. */}
+      <div ref={loadMoreZoneRef}>
+        {visibleCount < photos.length && (
+          <button
+            onClick={handleLoadMore}
+            className="mt-4 w-full rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Ver más fotos ({photos.length - visibleCount} más)
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -241,12 +225,11 @@ interface PointCardProps {
   watermarkPath: string | null
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
-  onSetCover: (id: string) => void
   onDelete: (id: string) => void
   onUploaded: () => void
 }
 
-function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onSetCover, onDelete, onUploaded }: PointCardProps) {
+function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onDelete, onUploaded }: PointCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const sold = photos.filter((p) => p.delivered_path).length
@@ -291,7 +274,7 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
               />
             </div>
           )}
-          <PhotoGallery photos={photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onSetCover={onSetCover} onDelete={onDelete} />
+          <PhotoGallery photos={photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
         </div>
       )}
     </div>
@@ -306,7 +289,6 @@ export function StudioEventView() {
   const { data: event, isLoading } = useEvent(id)
   const { data: photos = [] } = useEventPhotosDetailed(id)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [moveTarget, setMoveTarget] = useState('')
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -364,32 +346,6 @@ export function StudioEventView() {
     invalidatePhotos()
   }
 
-  async function setCoverPhoto(photoId: string) {
-    if (!event) return
-    push({ type: 'info', title: 'Preparando portada…' })
-    const { data, error } = await supabase.functions.invoke('r2-set-event-cover', { body: { photoId, eventId: event.id } })
-    if (error || !data?.coverPath) {
-      push({ type: 'error', title: 'No se pudo usar como portada', description: error?.message })
-      return
-    }
-    const { error: updateError } = await supabase.from('events').update({ cover_path: data.coverPath }).eq('id', event.id)
-    if (updateError) {
-      push({ type: 'error', title: 'No se pudo guardar la portada', description: updateError.message })
-      return
-    }
-    push({ type: 'success', title: 'Portada del evento actualizada' })
-    queryClient.invalidateQueries({ queryKey: ['event', id] })
-    queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
-    queryClient.invalidateQueries({ queryKey: ['public-events'] })
-  }
-
-  async function bulkSetCover() {
-    const first = Array.from(selectedIds)[0]
-    if (!first) return
-    await setCoverPhoto(first)
-    setSelectedIds(new Set())
-  }
-
   async function bulkMoveTo(pointId: string) {
     if (!pointId) return
     const ids = Array.from(selectedIds)
@@ -400,7 +356,6 @@ export function StudioEventView() {
     }
     push({ type: 'success', title: `${ids.length} foto${ids.length > 1 ? 's' : ''} movida${ids.length > 1 ? 's' : ''}` })
     setSelectedIds(new Set())
-    setMoveTarget('')
     invalidatePhotos()
   }
 
@@ -601,7 +556,6 @@ export function StudioEventView() {
               watermarkPath={event.watermark_path}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
-              onSetCover={setCoverPhoto}
               onDelete={deletePhoto}
               onUploaded={invalidatePhotos}
             />
@@ -610,7 +564,7 @@ export function StudioEventView() {
           {unassigned.length > 0 && (
             <div className="overflow-hidden rounded-3xl border border-border bg-card p-5">
               <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
-              <PhotoGallery photos={unassigned} selectedIds={selectedIds} onToggleSelect={toggleSelect} onSetCover={setCoverPhoto} onDelete={deletePhoto} />
+              <PhotoGallery photos={unassigned} selectedIds={selectedIds} onToggleSelect={toggleSelect} onDelete={deletePhoto} />
             </div>
           )}
 
@@ -629,24 +583,19 @@ export function StudioEventView() {
         <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
           <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-border bg-background px-5 py-3 shadow-lg">
             <span className="text-sm font-semibold">{selectedIds.size} seleccionada{selectedIds.size > 1 ? 's' : ''}</span>
-            <button onClick={bulkSetCover} className="rounded-full bg-muted px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-border">
-              ★ Portada
-            </button>
-            <select
-              value={moveTarget}
-              onChange={(e) => {
-                setMoveTarget(e.target.value)
-                bulkMoveTo(e.target.value)
-              }}
-              className="rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold outline-none"
+            <Dropdown
+              label="Mover a…"
+              onSelect={bulkMoveTo}
+              options={[
+                ...event.event_points.map((pt) => ({ value: pt.id, label: pt.label })),
+                { value: '__none__', label: 'Sin punto asignado' },
+              ]}
+            />
+            <button
+              onClick={bulkDelete}
+              className="flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"
             >
-              <option value="">Mover a…</option>
-              {event.event_points.map((pt) => (
-                <option key={pt.id} value={pt.id}>{pt.label}</option>
-              ))}
-              <option value="__none__">Sin punto asignado</option>
-            </select>
-            <button onClick={bulkDelete} className="rounded-full bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90">
+              <IconTrash className="h-3.5 w-3.5" />
               Eliminar
             </button>
             <button onClick={() => setSelectedIds(new Set())} aria-label="Cancelar selección" className="ml-1 text-muted-foreground hover:text-foreground">

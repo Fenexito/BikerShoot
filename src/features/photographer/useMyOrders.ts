@@ -12,19 +12,31 @@ interface RawOrderItem {
   price: number
   status: OrderItemStatus
   created_at: string
+  photographer_note: string | null
+  cancellation_reason: string | null
+  paid_at: string | null
+  delivered_at: string | null
+  cancelled_at: string | null
   photo: { id: string; storage_path: string | null; preview_path: string | null; delivered_path: string | null; raw_path: string | null; original_filename: string | null; featured: boolean } | null
   event: { title: string } | null
-  order: { payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { display_name: string } | null } | null
+  order: { payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { id: string; display_name: string; phone: string | null } | null } | null
 }
 
 export interface PhotographerOrderGroup {
   orderId: string
+  bikerId: string | null
   bikerName: string
+  bikerPhone: string | null
   eventTitle: string
   paymentMethod: 'tarjeta' | 'transferencia'
   createdAt: string
   status: OrderItemStatus
   total: number
+  note: string | null
+  paidAt: string | null
+  deliveredAt: string | null
+  cancelledAt: string | null
+  cancellationReason: string | null
   items: RawOrderItem[]
 }
 
@@ -34,7 +46,7 @@ function useRawOrderItems(photographerId: string | undefined) {
     queryFn: async (): Promise<RawOrderItem[]> => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured), event:events(title), order:orders(payment_method, created_at, biker:profiles(display_name))')
+        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured), event:events(title), order:orders(payment_method, created_at, biker:profiles(id, display_name, phone))')
         .eq('photographer_id', photographerId)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -69,12 +81,21 @@ export function usePhotographerOrders(photographerId: string | undefined) {
     }
     return Array.from(byOrder.entries()).map(([orderId, items]) => ({
       orderId,
+      bikerId: items[0].order?.biker?.id ?? null,
       bikerName: items[0].order?.biker?.display_name ?? 'Biker',
+      bikerPhone: items[0].order?.biker?.phone ?? null,
       eventTitle: items[0].event?.title ?? '',
       paymentMethod: items[0].order?.payment_method ?? 'tarjeta',
       createdAt: items[0].order?.created_at ?? items[0].created_at,
       status: deriveOrderStatus(items),
       total: items.reduce((sum, i) => sum + i.price, 0),
+      note: items.find((i) => i.photographer_note)?.photographer_note ?? null,
+      paidAt: items.find((i) => i.paid_at)?.paid_at ?? null,
+      deliveredAt: items.every((i) => i.delivered_at || i.status === 'cancelado')
+        ? items.map((i) => i.delivered_at).filter(Boolean).sort().slice(-1)[0] ?? null
+        : null,
+      cancelledAt: items.find((i) => i.cancelled_at)?.cancelled_at ?? null,
+      cancellationReason: items.find((i) => i.cancellation_reason)?.cancellation_reason ?? null,
       items,
     }))
   }, [query.data])
