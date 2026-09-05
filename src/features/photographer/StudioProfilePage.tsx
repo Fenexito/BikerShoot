@@ -50,8 +50,10 @@ export function StudioProfilePage() {
   const push = useToastStore((s) => s.push)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [editing, setEditing] = useState(false)
   const [tab, setTab] = useState<'destacadas' | 'eventos'>('destacadas')
 
@@ -85,6 +87,50 @@ export function StudioProfilePage() {
     } finally {
       setUploadingCover(false)
     }
+  }
+
+  async function handleLogoFile(file: File | undefined) {
+    if (!file || !user) return
+    if (!file.type.startsWith('image/')) {
+      push({ type: 'error', title: 'El logo debe ser una imagen' })
+      return
+    }
+    setUploadingLogo(true)
+    try {
+      const { data: signed, error: signError } = await supabase.functions.invoke('r2-profile-logo-upload-url', {
+        body: { fileName: file.name, contentType: file.type },
+      })
+      if (signError || !signed?.uploadUrl) throw new Error(signError?.message ?? 'No se pudo obtener la URL de subida')
+
+      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+
+      const { error: updateError } = await supabase
+        .from('photographer_details')
+        .update({ logo_path: signed.logoPath })
+        .eq('profile_id', user.id)
+      if (updateError) throw updateError
+
+      queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+      push({ type: 'success', title: 'Logo actualizado' })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo actualizar el logo', description: (err as Error).message })
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  async function removeLogo() {
+    if (!user) return
+    const { error } = await supabase.from('photographer_details').update({ logo_path: null }).eq('profile_id', user.id)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo quitar el logo', description: error.message })
+      return
+    }
+    queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
+    queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+    push({ type: 'success', title: 'Logo removido' })
   }
 
   async function handleAvatarFile(file: File | undefined) {
@@ -240,6 +286,31 @@ export function StudioProfilePage() {
           <Button variant={editing ? 'secondary' : 'dark'} onClick={() => setEditing((e) => !e)}>
             {editing ? 'Cancelar' : 'Editar perfil'}
           </Button>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-muted/30 px-4 py-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+            {details?.logo_path ? (
+              <img src={r2Url(details.logo_path)} alt="Logo" className="h-full w-full object-contain" />
+            ) : (
+              <span className="text-lg opacity-30">🖼️</span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Logo PNG (opcional)</p>
+            <p className="text-xs text-muted-foreground">Aparece en vez de tu nombre sobre la animación de portada de tu perfil.</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="secondary" size="sm" onClick={() => logoInputRef.current?.click()} loading={uploadingLogo}>
+              {details?.logo_path ? 'Cambiar' : 'Subir logo'}
+            </Button>
+            {details?.logo_path && (
+              <Button variant="ghost" size="sm" onClick={removeLogo}>
+                Quitar
+              </Button>
+            )}
+          </div>
+          <input ref={logoInputRef} type="file" accept="image/png,image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0])} />
         </div>
 
         {!details?.approved && (

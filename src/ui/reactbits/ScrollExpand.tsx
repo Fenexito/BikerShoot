@@ -17,6 +17,10 @@ interface ScrollExpandProps {
   poster?: string
   alt?: string
   title?: string
+  /** Reemplaza el título de texto por contenido libre (ej. el logo PNG de un
+   * fotógrafo) — misma animación de fundido/traslado que `title`, solo con
+   * otro contenido. Si se da, `title` se ignora. */
+  titleNode?: ReactNode
   scrollHint?: string
   startWidth?: number
   startHeight?: number
@@ -40,6 +44,7 @@ const ScrollExpand = ({
   poster = '',
   alt = '',
   title = '',
+  titleNode,
   scrollHint = '',
   startWidth = 42,
   startHeight = 58,
@@ -251,9 +256,9 @@ const ScrollExpand = ({
               </div>
             ) : null}
           </div>
-          {title ? (
+          {titleNode || title ? (
             <div ref={titleRef} className="scroll-expand__title">
-              {title}
+              {titleNode ?? title}
             </div>
           ) : null}
           {scrollHint ? (

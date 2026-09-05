@@ -43,18 +43,32 @@ export interface SearchFilters {
 }
 
 /** Muestra liviana de fotos públicas para muros decorativos (login, landing) —
- * no trae datos de ningún fotógrafo en particular, solo variedad visual. */
+ * no trae datos de ningún fotógrafo en particular, solo variedad visual.
+ * Prioriza fotos ★ destacadas (curadas a mano por cada fotógrafo) y solo
+ * rellena con fotos recientes cualquiera si no hay suficientes destacadas. */
 export function usePublicPhotoSample(limit = 40) {
   return useQuery({
     queryKey: ['public-photo-sample', limit],
     queryFn: async (): Promise<{ preview_path: string | null; storage_path: string | null }[]> => {
-      const { data, error } = await supabase
+      const { data: featured, error: featuredError } = await supabase
+        .from('photos')
+        .select('preview_path, storage_path')
+        .eq('featured', true)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (featuredError) throw featuredError
+      if ((featured?.length ?? 0) >= limit) return featured!
+
+      const { data: recent, error: recentError } = await supabase
         .from('photos')
         .select('preview_path, storage_path')
         .order('created_at', { ascending: false })
         .limit(limit)
-      if (error) throw error
-      return data ?? []
+      if (recentError) throw recentError
+
+      const seen = new Set((featured ?? []).map((p) => p.preview_path ?? p.storage_path))
+      const fill = (recent ?? []).filter((p) => !seen.has(p.preview_path ?? p.storage_path))
+      return [...(featured ?? []), ...fill].slice(0, limit)
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -113,7 +127,7 @@ export function useApprovedPhotographers() {
     queryFn: async (): Promise<DbPhotographer[]> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url, profile_cover_path)')
+        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url, profile_cover_path, logo_path)')
         .eq('role', 'photographer')
       if (error) throw error
       return (data ?? []).map((row: any) => {
@@ -130,6 +144,7 @@ export function useApprovedPhotographers() {
           facebook_url: pd?.facebook_url ?? null,
           tiktok_url: pd?.tiktok_url ?? null,
           profile_cover_path: pd?.profile_cover_path ?? null,
+          logo_path: pd?.logo_path ?? null,
         }
       })
     },
@@ -142,7 +157,7 @@ export function usePublicPhotographer(photographerId: string | undefined) {
     queryFn: async (): Promise<DbPhotographer | null> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url, profile_cover_path)')
+        .select('id, display_name, avatar_url, phone, photographer_details(bio, city, whatsapp, instagram_url, facebook_url, tiktok_url, profile_cover_path, logo_path)')
         .eq('id', photographerId)
         .single()
       if (error) throw error
@@ -159,6 +174,7 @@ export function usePublicPhotographer(photographerId: string | undefined) {
         facebook_url: pd?.facebook_url ?? null,
         tiktok_url: pd?.tiktok_url ?? null,
         profile_cover_path: pd?.profile_cover_path ?? null,
+        logo_path: pd?.logo_path ?? null,
       }
     },
     enabled: !!photographerId,

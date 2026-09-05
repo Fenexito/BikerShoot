@@ -17,6 +17,7 @@ export interface PhotographerDetails {
   facebook_url: string | null
   tiktok_url: string | null
   profile_cover_path: string | null
+  logo_path: string | null
   onboarding_completed: boolean
   approved: boolean
   approved_at: string | null

@@ -74,4 +74,5 @@ export interface DbPhotographer {
   facebook_url: string | null
   tiktok_url: string | null
   profile_cover_path: string | null
+  logo_path: string | null
 }

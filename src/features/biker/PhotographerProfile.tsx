@@ -60,7 +60,16 @@ export function PhotographerProfile() {
         <ScrollExpand
           src={coverUrl}
           alt={photographer.display_name}
-          title={photographer.display_name}
+          title={photographer.logo_path ? undefined : photographer.display_name}
+          titleNode={
+            photographer.logo_path ? (
+              <img
+                src={r2Url(photographer.logo_path)}
+                alt={photographer.display_name}
+                className="max-h-[35%] max-w-[55%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
+              />
+            ) : undefined
+          }
           scrollHint="Desliza para ver el perfil"
           useWindowScroll
           startWidth={60}
