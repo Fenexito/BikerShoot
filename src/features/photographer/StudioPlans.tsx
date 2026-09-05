@@ -85,13 +85,13 @@ function PlanCard({
     <div
       className={cn(
         'flex flex-col rounded-3xl p-6',
-        isCurrent ? 'bg-accent/10' : 'border border-border bg-card',
+        isCurrent ? 'bg-foreground/5' : 'border border-border bg-card',
       )}
     >
       <div className="flex items-center gap-2">
         <h3 className="text-2xl font-bold tracking-tight">{plan.name}</h3>
         {isCurrent && (
-          <span className="rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-accent-foreground">
+          <span className="rounded-full bg-foreground px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-background">
             Tu plan
           </span>
         )}
@@ -114,7 +114,7 @@ function PlanCard({
       <ul className="mt-6 flex flex-1 flex-col gap-2.5 text-sm">
         {copy?.features.map((f) => (
           <li key={f} className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[10px] text-accent">✓</span>
+            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[10px] text-foreground">✓</span>
             <span>{f}</span>
           </li>
         ))}
@@ -131,7 +131,7 @@ function PlanCard({
           </Button>
         ) : (
           <Button
-            variant={isDowngrade ? 'secondary' : 'primary'}
+            variant={isDowngrade ? 'secondary' : 'dark'}
             size="sm"
             className="w-full justify-center"
             disabled={busy}
@@ -282,7 +282,7 @@ export function StudioPlans() {
         <ul className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           {COMMON_FEATURES.map((f) => (
             <li key={f} className="flex items-start gap-2">
-              <span className="mt-0.5 text-accent">✓</span>
+              <span className="mt-0.5 text-foreground">✓</span>
               <span>{f}</span>
             </li>
           ))}

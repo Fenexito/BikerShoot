@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos } from './usePublicData'
-import { previewUrl } from '../../lib/r2'
+import { previewUrl, r2Url } from '../../lib/r2'
 import { EventCard } from './components/EventCard'
 import { PhotographerCard } from './components/PhotographerCard'
 import { Button } from '../../ui/flat/Button'
@@ -137,7 +137,11 @@ export function Home() {
               <div className="lg:col-span-2 lg:row-span-2">
                 <Link to={`/app/eventos/${featuredEvent.id}`} className="group block h-full overflow-hidden rounded-3xl border border-border bg-muted transition-all hover:border-primary/30 hover:shadow-sm">
                   <div className="relative flex h-72 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100 lg:h-full">
-                    <span className="text-6xl opacity-30">🏍️</span>
+                    {featuredEvent.cover_path ? (
+                      <img src={r2Url(featuredEvent.cover_path)} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <span className="text-6xl opacity-30">🏍️</span>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                     <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                       <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">

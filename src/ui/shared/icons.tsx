@@ -160,6 +160,44 @@ export function IconSearch(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconSettings(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.96a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.04z" />
+    </svg>
+  )
+}
+
+export function IconArchive(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+      <line x1="10" y1="13" x2="14" y2="13" />
+    </svg>
+  )
+}
+
+export function IconCreditCard(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <line x1="2.5" y1="9.5" x2="21.5" y2="9.5" />
+      <line x1="6" y1="15" x2="10" y2="15" />
+    </svg>
+  )
+}
+
+export function IconSparkles(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)} fill="currentColor" stroke="none">
+      <path d="M11 2l1.3 4.2L16.5 7.5l-4.2 1.3L11 13l-1.3-4.2L5.5 7.5l4.2-1.3L11 2z" />
+      <path d="M18.5 13l.8 2.6 2.6.8-2.6.8-.8 2.6-.8-2.6-2.6-.8 2.6-.8.8-2.6z" />
+    </svg>
+  )
+}
+
 export function IconTrash(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

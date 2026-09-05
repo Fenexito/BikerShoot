@@ -61,8 +61,8 @@ export function HeaderAdmin() {
           <ProfileMenu
             name={profile?.display_name ?? 'Admin'}
             avatar={<InitialsAvatar name={profile?.display_name ?? 'A'} className="h-full w-full bg-foreground text-sm text-background" />}
-            links={[
-              { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+            sections={[
+              [{ onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' }],
             ]}
           />
         </div>

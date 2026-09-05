@@ -37,7 +37,10 @@ export function PortalLayout() {
   const themeClass = isStudioPortal ? cn('theme-studio', studioTheme) : 'theme-flat'
 
   return (
-    <div id="portal-theme-root" className={cn('flex min-h-screen flex-col bg-background text-foreground', themeClass)}>
+    <div
+      id="portal-theme-root"
+      className={cn('flex min-h-screen flex-col bg-background text-foreground transition-colors duration-300', themeClass)}
+    >
       <ScrollRestoration />
       {!isAuthPage && (
         isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />

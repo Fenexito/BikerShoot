@@ -26,11 +26,11 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
                 initial={false}
                 variants={{
                   inactive: { backgroundColor: 'rgb(var(--color-muted))', color: 'rgb(var(--color-muted-foreground))', scale: 1 },
-                  active: { backgroundColor: 'rgb(var(--color-accent))', color: 'rgb(var(--color-accent-foreground))', scale: 1.1 },
-                  complete: { backgroundColor: 'rgb(var(--color-accent))', color: 'rgb(var(--color-accent-foreground))', scale: 1 },
+                  active: { backgroundColor: 'rgb(var(--color-foreground))', color: 'rgb(var(--color-background))', scale: 1.1 },
+                  complete: { backgroundColor: 'rgb(var(--color-foreground))', color: 'rgb(var(--color-background))', scale: 1 },
                 }}
                 transition={{ duration: 0.3 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-accent text-xs font-bold"
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-foreground text-xs font-bold"
               >
                 {status === 'complete' ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4">
@@ -54,7 +54,7 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
             {i < steps.length - 1 && (
               <div className="mx-2 h-0.5 flex-1 bg-border">
                 <motion.div
-                  className="h-full bg-accent"
+                  className="h-full bg-foreground"
                   initial={false}
                   animate={{ width: i < currentIndex ? '100%' : '0%' }}
                   transition={{ duration: 0.4 }}

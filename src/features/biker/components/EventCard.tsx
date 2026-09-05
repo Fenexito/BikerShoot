@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { PublicEvent } from '../usePublicData'
 import { Badge } from '../../../ui/flat/Badge'
+import { r2Url } from '../../../lib/r2'
 
 export function EventCard({ event }: { event: PublicEvent }) {
   const date = new Date(event.event_date)
@@ -11,7 +12,11 @@ export function EventCard({ event }: { event: PublicEvent }) {
       className="group block overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-sm"
     >
       <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-100 to-emerald-100">
-        <span className="text-4xl opacity-40 transition-transform duration-500 group-hover:scale-110">🏍️</span>
+        {event.cover_path ? (
+          <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <span className="text-4xl opacity-40 transition-transform duration-500 group-hover:scale-110">🏍️</span>
+        )}
         <div className="absolute left-3 top-3">
           <Badge tone="accent">{event.category}</Badge>
         </div>

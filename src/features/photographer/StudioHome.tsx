@@ -68,7 +68,7 @@ export function StudioHome() {
       <section className="mt-14">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-studio text-xl font-bold tracking-tight2">Necesita tu atención</h2>
-          <Link to="/studio/pedidos" className="text-xs font-medium uppercase tracking-wide text-accent">
+          <Link to="/studio/pedidos" className="text-xs font-medium uppercase tracking-wide text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
             Ver todos los pedidos →
           </Link>
         </div>
@@ -116,10 +116,14 @@ export function StudioHome() {
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {events.slice(0, 6).map((event) => (
-              <div key={event.id} className="overflow-hidden rounded-2xl border border-border transition-colors duration-150 hover:border-border-hover">
+              <Link
+                key={event.id}
+                to={`/studio/eventos/${event.id}`}
+                className="group overflow-hidden rounded-2xl border border-border transition-all hover:border-border-hover hover:shadow-sm"
+              >
                 <div className="flex h-36 items-center justify-center overflow-hidden bg-muted">
                   {event.cover_path ? (
-                    <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover" />
+                    <img src={r2Url(event.cover_path)} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   ) : (
                     <span className="text-3xl opacity-30">📷</span>
                   )}
@@ -138,13 +142,8 @@ export function StudioHome() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     Q{event.price_per_photo} por foto · {event.event_points.length} puntos · {event.photos?.[0]?.count ?? 0} fotos
                   </p>
-                  <div className="mt-4">
-                    <Link to={`/studio/eventos/${event.id}`}>
-                      <Button variant="secondary" size="sm" className="w-full justify-center">Ver evento</Button>
-                    </Link>
-                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

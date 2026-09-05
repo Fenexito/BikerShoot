@@ -3,12 +3,14 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../studio/ThemeToggle'
 import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
 import { useAuth } from '../../features/auth/AuthContext'
+import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
-import { IconUser, IconLogOut, IconMenu, IconClose } from '../shared/icons'
+import { IconUser, IconLogOut, IconMenu, IconClose, IconArchive, IconCreditCard, IconSettings, IconSparkles } from '../shared/icons'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
+import { SocialLinks } from '../shared/SocialLinks'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -19,7 +21,8 @@ const NAV_ITEMS = [
 ]
 
 export function HeaderStudio() {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
+  const { data: details } = usePhotographerDetails(user?.id)
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -35,6 +38,7 @@ export function HeaderStudio() {
   }
 
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
+  const profileIncomplete = !!details && (!details.bio || !details.city || !details.whatsapp)
 
   return (
     <div className="sticky top-3 z-30 px-3 md:top-4 md:px-6">
@@ -50,7 +54,7 @@ export function HeaderStudio() {
               className={({ isActive }) =>
                 cn(
                   'rounded-full px-3.5 py-2 transition-colors duration-150',
-                  isActive ? 'bg-accent/10 font-semibold text-accent' : 'text-muted-foreground hover:text-foreground',
+                  isActive ? 'bg-foreground/10 font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )
               }
             >
@@ -64,6 +68,7 @@ export function HeaderStudio() {
           </div>
           <ProfileMenu
             name={profile?.display_name ?? 'Estudio'}
+            email={user?.email}
             avatar={
               avatarUrl ? (
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -71,12 +76,27 @@ export function HeaderStudio() {
                 <InitialsAvatar name={profile?.display_name ?? 'S'} className="h-full w-full bg-accent text-sm text-accent-foreground" />
               )
             }
+            socialLinks={
+              <SocialLinks
+                instagramUrl={details?.instagram_url}
+                facebookUrl={details?.facebook_url}
+                tiktokUrl={details?.tiktok_url}
+                iconClassName="text-white/50 hover:text-white"
+              />
+            }
+            editProfile={profileIncomplete ? { label: 'Completar perfil', to: '/studio/perfil' } : undefined}
             themeSwitcher={<ThemeSwitcherInline />}
-            links={[
-              { to: '/studio/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
-              { to: '/studio/almacenamiento', label: 'Almacenamiento' },
-              { to: '/studio/planes', label: 'Planes y facturación' },
-              { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+            sections={[
+              [
+                { to: '/studio/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
+                { to: '/studio/almacenamiento', label: 'Almacenamiento', icon: <IconArchive className="h-4 w-4" /> },
+                { to: '/studio/planes', label: 'Planes y facturación', icon: <IconCreditCard className="h-4 w-4" /> },
+              ],
+              [
+                { to: '/studio/ajustes', label: 'Configuración', icon: <IconSettings className="h-4 w-4" /> },
+                { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
+                { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+              ],
             ]}
           />
           <button

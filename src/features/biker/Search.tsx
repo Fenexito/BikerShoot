@@ -9,6 +9,7 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { SearchFilterModal } from './components/SearchFilterModal'
 import { Badge } from '../../ui/flat/Badge'
 import { IconFilter, IconSearch } from '../../ui/shared/icons'
+import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { cn } from '../../lib/cn'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
@@ -127,33 +128,35 @@ export function Search() {
         </div>
       </div>
 
-      {/* Barra compacta — siempre visible, se pega debajo del header al hacer scroll */}
-      <div
-        className={cn(
-          'sticky top-[4.5rem] z-20 mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 py-4 transition-colors md:top-20 md:px-8',
-          scrolled && 'rounded-b-3xl bg-background/95 shadow-sm backdrop-blur-md',
-        )}
-      >
-        <div>
+      {/* Barra compacta — mismo patrón de header flotante intercambiable que
+          la vista de evento del Studio: se pega justo debajo del header
+          principal y gana su propia tarjeta redondeada al hacer scroll. */}
+      <div className="sticky top-[4.75rem] z-20 px-4 md:top-[5rem] md:px-8">
+        <div
+          className={cn(
+            'mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-3 rounded-3xl px-4 py-3 transition-all duration-300',
+            scrolled && 'border border-border bg-background/95 shadow-sm backdrop-blur-md',
+          )}
+        >
           <p className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
           </p>
+          <button
+            onClick={() => setFiltersOpen(true)}
+            className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"
+          >
+            <IconFilter className="h-4 w-4" />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"
-        >
-          <IconFilter className="h-4 w-4" />
-          Filtros
-          {activeFilterCount > 0 && (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
       </div>
 
-      <div className="mx-auto max-w-[1800px] px-4 pb-8 md:px-8">
+      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-4 md:px-8">
         {activeChips.length > 0 && (
           <div className="mb-5 flex flex-wrap gap-2">
             {activeChips.map((chip) => (
@@ -201,6 +204,8 @@ export function Search() {
           onNavigate={(index) => setLightbox({ photos: lightbox.photos, index })}
         />
       )}
+
+      <ScrollToTopButton />
     </div>
   )
 }

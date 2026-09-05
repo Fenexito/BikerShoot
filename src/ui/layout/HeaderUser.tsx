@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
+import { useBikerDetails } from '../../features/biker/useBikerDetails'
 import { useCartStore } from '../../features/cart/cartStore'
 import { r2Url } from '../../lib/r2'
-import { IconHeart, IconCart, IconUser, IconLogOut, IconMenu, IconClose, IconSearch } from '../shared/icons'
+import { IconHeart, IconCart, IconUser, IconLogOut, IconMenu, IconClose, IconSearch, IconSparkles } from '../shared/icons'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
@@ -19,7 +20,8 @@ const NAV_ITEMS = [
 ]
 
 export function HeaderUser() {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
+  const { data: bikerDetails } = useBikerDetails(user?.id)
   const navigate = useNavigate()
   const itemCount = useCartStore((s) => s.items.length)
   const [signingOut, setSigningOut] = useState(false)
@@ -106,6 +108,7 @@ export function HeaderUser() {
           <NotificationsMenu />
           <ProfileMenu
             name={profile?.display_name ?? 'Biker'}
+            email={user?.email}
             avatar={
               avatarUrl ? (
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -113,11 +116,21 @@ export function HeaderUser() {
                 <InitialsAvatar name={profile?.display_name ?? 'B'} className="h-full w-full bg-primary text-sm text-white" />
               )
             }
-            links={[
-              { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
-              { to: '/app/historial', label: 'Mis compras' },
-              { to: '/app/favoritos', label: 'Favoritos' },
-              { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+            editProfile={
+              bikerDetails && (!bikerDetails.city || !bikerDetails.moto_brand)
+                ? { label: 'Completar perfil', to: '/app/perfil' }
+                : undefined
+            }
+            sections={[
+              [
+                { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
+                { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-4 w-4" /> },
+                { to: '/app/favoritos', label: 'Favoritos', icon: <IconHeart className="h-4 w-4" /> },
+              ],
+              [
+                { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
+                { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+              ],
             ]}
           />
         </div>

@@ -32,6 +32,7 @@ const BikerHistory = lazy(() => import('./features/biker/History').then((m) => (
 const RouteMap = lazy(() => import('./features/biker/RouteMap').then((m) => ({ default: m.RouteMap })))
 const StudioOnboarding = lazy(() => import('./features/photographer/StudioOnboarding').then((m) => ({ default: m.StudioOnboarding })))
 const StudioProfilePage = lazy(() => import('./features/photographer/StudioProfilePage').then((m) => ({ default: m.StudioProfilePage })))
+const StudioSettings = lazy(() => import('./features/photographer/StudioSettings').then((m) => ({ default: m.StudioSettings })))
 const StudioStorage = lazy(() => import('./features/photographer/StudioStorage').then((m) => ({ default: m.StudioStorage })))
 const StudioPlans = lazy(() => import('./features/photographer/StudioPlans').then((m) => ({ default: m.StudioPlans })))
 const StudioHome = lazy(() => import('./features/photographer/StudioHome').then((m) => ({ default: m.StudioHome })))
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/studio/pedidos" element={<RequireStudio><StudioOrders /></RequireStudio>} />
           <Route path="/studio/pedidos/:id" element={<RequireStudio><StudioOrderDetail /></RequireStudio>} />
           <Route path="/studio/perfil" element={<RequireStudio><StudioProfilePage /></RequireStudio>} />
+          <Route path="/studio/ajustes" element={<RequireStudio><StudioSettings /></RequireStudio>} />
           <Route path="/studio/almacenamiento" element={<RequireStudio><StudioStorage /></RequireStudio>} />
           <Route path="/studio/planes" element={<RequireStudio><StudioPlans /></RequireStudio>} />
 

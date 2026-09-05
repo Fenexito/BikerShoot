@@ -6,6 +6,7 @@ import { EventCard } from './components/EventCard'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import DriftWall from '../../ui/reactbits/DriftWall'
+import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
@@ -56,16 +57,24 @@ export function PhotographerProfile() {
 
   return (
     <div className="font-flat">
-      <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-200 to-emerald-200 md:h-64">
-        {coverUrl ? (
-          <>
-            <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
-          </>
-        ) : (
+      {coverUrl ? (
+        <ScrollExpand
+          src={coverUrl}
+          alt={photographer.display_name}
+          title={photographer.display_name}
+          scrollHint="Desliza para ver el perfil"
+          useWindowScroll
+          startRadius={0}
+          endRadius={0}
+          mediaZoom={1.12}
+          scrollDistance={0.2}
+          holdDistance={0.05}
+        />
+      ) : (
+        <div className="relative flex h-48 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-200 to-emerald-200 md:h-64">
           <span className="text-6xl opacity-30">🏍️</span>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="mx-auto max-w-5xl px-4 md:px-8">
         <div className="relative -mt-14 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
