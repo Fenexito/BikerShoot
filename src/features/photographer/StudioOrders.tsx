@@ -36,6 +36,64 @@ function urgencyClass(order: PhotographerOrderGroup) {
   return null
 }
 
+function OrderRow({
+  order,
+  profileName,
+  canSelect,
+  selected,
+  onToggleSelect,
+}: {
+  order: PhotographerOrderGroup
+  profileName?: string
+  canSelect: boolean
+  selected: boolean
+  onToggleSelect: () => void
+}) {
+  const urgent = urgencyClass(order)
+  const statusStyle = getOrderStatusStyle(order.status)
+  const borderColor = statusStyle.dot.replace('bg-', 'border-')
+
+  return (
+    <div
+      className={cn(
+        'flex flex-wrap items-center gap-x-4 gap-y-2 rounded-3xl border-l-4 border-y border-r border-border bg-card px-5 py-4 transition-all hover:shadow-sm',
+        borderColor,
+      )}
+    >
+      {canSelect && (
+        <button
+          onClick={onToggleSelect}
+          aria-label="Seleccionar pedido"
+          className={cn(
+            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors',
+            selected ? 'border-foreground bg-foreground text-background' : 'border-border text-transparent hover:border-foreground/40',
+          )}
+        >
+          ✓
+        </button>
+      )}
+      <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 items-center gap-4">
+        <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold">{order.bikerName}</p>
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+          </div>
+          <p className="truncate text-sm text-muted-foreground">
+            {formatOrderCode(order.orderNumber, profileName)} · {order.eventTitle} · {order.items.length} fotos
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+          <span className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
+            {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+          </span>
+          <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+        </div>
+      </Link>
+    </div>
+  )
+}
+
 export function StudioOrders() {
   const { user, profile } = useAuth()
   const { data: orders = [], isLoading } = usePhotographerOrders(user?.id)
@@ -51,6 +109,8 @@ export function StudioOrders() {
     if (q) list = list.filter((o) => o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q))
     return list
   }, [orders, tab, query])
+
+  const urgentOrders = useMemo(() => orders.filter((o) => urgencyClass(o) !== null), [orders])
 
   const summary = useMemo(() => {
     const collected = orders.filter((o) => o.status === 'entregado' || o.status === 'en_preparacion').reduce((s, o) => s + o.total, 0)
@@ -138,6 +198,26 @@ export function StudioOrders() {
 
       {isLoading && <SkeletonRows count={5} className="mt-6" />}
 
+      {!isLoading && urgentOrders.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-red-500">
+            🔥 Urgente <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs">{urgentOrders.length}</span>
+          </h2>
+          <div className="flex flex-col gap-3">
+            {urgentOrders.map((order) => (
+              <OrderRow
+                key={order.orderId}
+                order={order}
+                profileName={profile?.display_name}
+                canSelect={order.status === 'pendiente_pago'}
+                selected={selectedIds.has(order.orderId)}
+                onToggleSelect={() => toggleSelect(order.orderId)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {!isLoading && filtered.length === 0 && (
         <div className="mt-6 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
           <span className="text-4xl opacity-40">🧾</span>
@@ -146,50 +226,19 @@ export function StudioOrders() {
       )}
 
       <div className="mt-6 flex flex-col gap-3 pb-20">
-        {filtered.map((order) => {
-          const urgent = urgencyClass(order)
-          const canSelect = order.status === 'pendiente_pago'
-          return (
-            <div
-              key={order.orderId}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-3xl border border-border bg-card px-5 py-4 transition-all hover:border-accent/40 hover:shadow-sm"
-            >
-              {canSelect && (
-                <button
-                  onClick={() => toggleSelect(order.orderId)}
-                  aria-label="Seleccionar pedido"
-                  className={cn(
-                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors',
-                    selectedIds.has(order.orderId) ? 'border-foreground bg-foreground text-background' : 'border-border text-transparent hover:border-foreground/40',
-                  )}
-                >
-                  ✓
-                </button>
-              )}
-              <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 items-center gap-4">
-                <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{order.bikerName}</p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {formatOrderCode(order.orderNumber, profile?.display_name)} · {order.eventTitle} · {order.items.length} fotos
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                  <span className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
-                    {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
-                  </span>
-                  <StatusPill
-                    dot={getOrderStatusStyle(order.status).dot}
-                    text={getOrderStatusStyle(order.status).text}
-                    label={getOrderStatusStyle(order.status).label}
-                    className="text-xs"
-                  />
-                  <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
-                </div>
-              </Link>
-            </div>
-          )
-        })}
+        {urgentOrders.length > 0 && filtered.length > 0 && (
+          <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted-foreground">Todos los pedidos</h2>
+        )}
+        {filtered.map((order) => (
+          <OrderRow
+            key={order.orderId}
+            order={order}
+            profileName={profile?.display_name}
+            canSelect={order.status === 'pendiente_pago'}
+            selected={selectedIds.has(order.orderId)}
+            onToggleSelect={() => toggleSelect(order.orderId)}
+          />
+        ))}
       </div>
 
       {selectedIds.size > 0 && (

@@ -393,13 +393,13 @@ export function StudioEventView() {
 
   async function deleteEvent() {
     if (!event) return
-    const ok = await typedConfirmDialog.ask({
+    const { confirmed } = await typedConfirmDialog.ask({
       title: `Esto elimina "${event.title}" por completo, incluyendo todas sus fotos (vendidas o no).`,
       description: 'Los bikers que ya compraron fotos de este evento conservan su entrega — esto no les quita nada.',
       matchText: event.title,
       confirmLabel: 'Eliminar evento',
     })
-    if (!ok) return
+    if (!confirmed) return
     const { error } = await supabase.from('events').update({ deleted_at: new Date().toISOString() }).eq('id', event.id)
     if (error) {
       push({ type: 'error', title: 'No se pudo eliminar', description: error.message })

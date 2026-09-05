@@ -13,7 +13,7 @@ import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { Button } from '../../ui/studio/Button'
 import { OrderStepper } from '../../ui/studio/OrderStepper'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { confirmDialog } from '../../ui/overlays/confirmStore'
+import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
@@ -212,6 +212,10 @@ interface TimelineEvent {
 }
 
 function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
+  const activeItems = order.items.filter((i) => i.status !== 'cancelado')
+  const deliveredCount = activeItems.filter((i) => i.delivered_at).length
+  const partial = deliveredCount > 0 && deliveredCount < activeItems.length
+
   const events: TimelineEvent[] =
     order.status === 'cancelado'
       ? [
@@ -219,8 +223,10 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
           { label: 'Cancelado', at: order.cancelledAt, done: true },
         ]
       : [
-          { label: 'Pedido creado', at: order.createdAt, done: true },
+          { label: 'Pedido creado (pendiente de pago)', at: order.createdAt, done: true },
           { label: 'Pago confirmado', at: order.paidAt, done: order.status !== 'pendiente_pago' },
+          { label: 'Fotos en preparación', at: order.paidAt, done: order.status === 'en_preparacion' || order.status === 'entregado' },
+          ...(partial ? [{ label: `Entrega parcial (${deliveredCount}/${activeItems.length})`, at: null, done: true }] : []),
           { label: 'Entregado', at: order.deliveredAt, done: order.status === 'entregado' },
         ]
 
@@ -249,8 +255,6 @@ export function StudioOrderDetail() {
   const { user, profile } = useAuth()
   const { data: order, isLoading } = useOrderGroup(user?.id, id)
   const push = useToastStore((s) => s.push)
-  const [cancelReason, setCancelReason] = useState('')
-  const [showCancelReason, setShowCancelReason] = useState(false)
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
@@ -301,18 +305,19 @@ export function StudioOrderDetail() {
   }
 
   async function cancelOrder() {
-    if (!showCancelReason) {
-      setShowCancelReason(true)
-      return
-    }
-    const ok = await confirmDialog.ask({
-      title: '¿Cancelar este pedido?',
-      description: 'El biker verá el pedido como cancelado. Esta acción no se puede deshacer desde aquí.',
+    if (!order) return
+    const orderCode = String(order.orderNumber ?? '').padStart(6, '0')
+    const { confirmed, extraValue } = await typedConfirmDialog.ask({
+      title: `Esto cancela el pedido de ${order.bikerName} — el biker pierde acceso a estas fotos y recibe una notificación.`,
+      description: 'Esta acción no se puede deshacer desde aquí.',
+      matchText: orderCode,
+      matchLabel: `Escribe el número de pedido (${orderCode}) para confirmar`,
       confirmLabel: 'Cancelar pedido',
-      tone: 'danger',
+      extraFieldLabel: 'Motivo de la cancelación',
+      extraFieldPlaceholder: 'El biker verá este motivo en su notificación',
     })
-    if (!ok) return
-    await setStatus('cancelado', { cancelled_at: new Date().toISOString(), cancellation_reason: cancelReason || null })
+    if (!confirmed) return
+    await setStatus('cancelado', { cancelled_at: new Date().toISOString(), cancellation_reason: extraValue || null })
   }
 
   async function saveNote() {
@@ -338,57 +343,49 @@ export function StudioOrderDetail() {
         ← Todos los pedidos
       </Link>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-6 rounded-3xl border border-border bg-card p-6 sm:p-8">
-        <div className="flex items-center gap-4">
-          <InitialsAvatar name={order.bikerName} className="h-16 w-16 bg-foreground text-lg text-background" />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
-            <h1 className="text-2xl font-bold tracking-tight">{order.bikerName}</h1>
-            <p className="text-muted-foreground">{formatOrderCode(order.orderNumber, profile?.display_name)} · {order.eventTitle}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="rounded-2xl bg-muted px-4 py-2.5 text-right">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
-            </p>
-            <p className="text-xl font-bold">Q{order.total}</p>
-          </div>
-          {order.paymentMethod === 'transferencia' && (
-            <Button variant="secondary" size="sm" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
-              Ver comprobante
-            </Button>
-          )}
-          {order.bikerPhone && (
-            <a
-              href={`https://wa.me/${order.bikerPhone.replace(/[^0-9]/g, '')}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-              title="Escribir por WhatsApp"
-              aria-label="Escribir por WhatsApp"
-            >
-              💬
-            </a>
-          )}
-          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs" />
-        </div>
-      </div>
-
-      {order.status !== 'cancelado' && <OrderStepper steps={FLOW_LABELS} currentIndex={stepIndex} className="mt-10" />}
-
-      <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_280px]">
-        <div>
-          <section>
-            <h2 className="mb-1 text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
-            <p className="mb-5 text-sm text-muted-foreground">{SECTION_COPY[order.status]}</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-              {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
+      <div className="mt-6 rounded-3xl border border-border bg-card p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <InitialsAvatar name={order.bikerName} className="h-16 w-16 bg-foreground text-lg text-background" />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
+              <h1 className="text-2xl font-bold tracking-tight">{order.bikerName}</h1>
+              <p className="text-muted-foreground">{formatOrderCode(order.orderNumber, profile?.display_name)} · {order.eventTitle}</p>
             </div>
-          </section>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="rounded-2xl bg-muted px-4 py-2.5 text-right">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
+              </p>
+              <p className="text-xl font-bold">Q{order.total}</p>
+            </div>
+            {order.paymentMethod === 'transferencia' && (
+              <Button variant="secondary" size="sm" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
+                Ver comprobante
+              </Button>
+            )}
+            {order.bikerPhone && (
+              <a
+                href={`https://wa.me/${order.bikerPhone.replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+                title="Escribir por WhatsApp"
+                aria-label="Escribir por WhatsApp"
+              >
+                💬
+              </a>
+            )}
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs" />
+          </div>
+        </div>
 
-          <section className="mt-10 rounded-3xl border border-border bg-card p-6">
-            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Desglose del cobro</h3>
+        {order.status !== 'cancelado' && <OrderStepper steps={FLOW_LABELS} currentIndex={stepIndex} className="mt-8" />}
+
+        <div className="mt-8 grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
+          <div>
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Desglose del cobro</h3>
             {sameUnitPrice ? (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{order.items.length} × Q{unitPrice}</span>
@@ -408,58 +405,49 @@ export function StudioOrderDetail() {
               <span>Total</span>
               <span>Q{order.total}</span>
             </div>
-          </section>
+          </div>
 
-          {order.status === 'cancelado' && order.cancellationReason && (
-            <section className="mt-6 rounded-3xl border border-border bg-muted/40 p-6">
-              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">Razón de cancelación</h3>
-              <p className="text-sm">{order.cancellationReason}</p>
-            </section>
-          )}
-
-          {showCancelReason && (
-            <section className="mt-6 rounded-3xl border border-accent/30 bg-accent/5 p-6">
-              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-accent">¿Por qué se cancela?</h3>
-              <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                rows={2}
-                placeholder="Opcional — le ayuda a que quede registro de por qué"
-                className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-sm outline-none focus:border-accent"
-              />
-              <div className="mt-3 flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setShowCancelReason(false)}>Volver</Button>
-                <Button size="sm" onClick={cancelOrder}>Confirmar cancelación</Button>
-              </div>
-            </section>
-          )}
-
-          <section className="mt-6 rounded-3xl border border-border bg-card p-6">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">Nota interna</h3>
-            <p className="mb-3 text-xs text-muted-foreground">Solo la ves tú — el biker nunca la ve.</p>
+          <div>
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Nota interna</h3>
+            <p className="mb-2 text-xs text-muted-foreground">Solo la ves tú — el biker nunca la ve.</p>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              rows={3}
+              rows={2}
               placeholder="Ej. Cliente pidió reenviar por WhatsApp…"
               className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-sm outline-none focus:border-accent"
             />
-            <Button variant="secondary" size="sm" className="mt-3" onClick={saveNote} loading={savingNote}>
+            <Button variant="secondary" size="sm" className="mt-2" onClick={saveNote} loading={savingNote}>
               Guardar nota
             </Button>
-          </section>
-
-          {!showCancelReason && (
-            <div className="mt-8 flex items-center justify-between">
-              {canCancel ? (
-                <Button variant="ghost" onClick={cancelOrder}>Cancelar pedido</Button>
-              ) : (
-                <span />
-              )}
-              {action && <Button onClick={confirmAction}>{action.label}</Button>}
-            </div>
-          )}
+          </div>
         </div>
+
+        {order.status === 'cancelado' && order.cancellationReason && (
+          <div className="mt-6 rounded-2xl border border-border bg-muted/40 p-4">
+            <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Razón de cancelación</h3>
+            <p className="text-sm">{order.cancellationReason}</p>
+          </div>
+        )}
+
+        <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
+          {canCancel ? (
+            <Button variant="danger" onClick={cancelOrder}>Cancelar pedido</Button>
+          ) : (
+            <span />
+          )}
+          {action && <Button onClick={confirmAction}>{action.label}</Button>}
+        </div>
+      </div>
+
+      <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_280px]">
+        <section>
+          <h2 className="mb-1 text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
+          <p className="mb-5 text-sm text-muted-foreground">{SECTION_COPY[order.status]}</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
+          </div>
+        </section>
 
         <aside className="rounded-3xl border border-border bg-card p-6 lg:sticky lg:top-24 lg:self-start">
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Línea de tiempo</h3>

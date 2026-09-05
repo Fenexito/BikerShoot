@@ -7,20 +7,29 @@ export interface TypedConfirmRequest {
   matchLabel?: string
   confirmLabel?: string
   cancelLabel?: string
+  /** Si se da, agrega un textarea opcional (ej. "motivo de cancelación")
+   * debajo del campo de confirmación — su valor viaja en el resultado. */
+  extraFieldLabel?: string
+  extraFieldPlaceholder?: string
+}
+
+export interface TypedConfirmResult {
+  confirmed: boolean
+  extraValue: string
 }
 
 interface TypedConfirmState {
   request: (TypedConfirmRequest & { id: string }) | null
-  resolve: ((value: boolean) => void) | null
-  ask: (request: TypedConfirmRequest) => Promise<boolean>
-  settle: (value: boolean) => void
+  resolve: ((value: TypedConfirmResult) => void) | null
+  ask: (request: TypedConfirmRequest) => Promise<TypedConfirmResult>
+  settle: (value: TypedConfirmResult) => void
 }
 
 export const useTypedConfirmStore = create<TypedConfirmState>((set, get) => ({
   request: null,
   resolve: null,
   ask: (request) =>
-    new Promise<boolean>((resolve) => {
+    new Promise<TypedConfirmResult>((resolve) => {
       set({ request: { ...request, id: crypto.randomUUID() }, resolve })
     }),
   settle: (value) => {

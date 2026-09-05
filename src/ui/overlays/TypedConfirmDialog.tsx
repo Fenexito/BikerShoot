@@ -11,10 +11,12 @@ export function TypedConfirmDialog() {
   const settle = useTypedConfirmStore((s) => s.settle)
   const [closing, setClosing] = useState(false)
   const [value, setValue] = useState('')
+  const [extraValue, setExtraValue] = useState('')
 
   useEffect(() => {
     setClosing(false)
     setValue('')
+    setExtraValue('')
   }, [request?.id])
 
   useEffect(() => {
@@ -29,9 +31,9 @@ export function TypedConfirmDialog() {
 
   if (!request) return null
 
-  function close(result: boolean) {
+  function close(confirmed: boolean) {
     setClosing(true)
-    setTimeout(() => settle(result), CLOSE_DURATION)
+    setTimeout(() => settle({ confirmed, extraValue }), CLOSE_DURATION)
   }
 
   const matches = value.trim() === request.matchText
@@ -73,6 +75,19 @@ export function TypedConfirmDialog() {
             placeholder={request.matchText}
           />
         </label>
+
+        {request.extraFieldLabel && (
+          <label className="mt-4 block">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{request.extraFieldLabel}</span>
+            <textarea
+              value={extraValue}
+              onChange={(e) => setExtraValue(e.target.value)}
+              rows={2}
+              placeholder={request.extraFieldPlaceholder}
+              className="mt-2 w-full rounded-2xl border border-border bg-input px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
+            />
+          </label>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <button
