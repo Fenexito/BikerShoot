@@ -32,6 +32,7 @@ interface AuthState {
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
   refreshProfile: () => Promise<void>
+  updateProfileLocal: (patch: Partial<Profile>) => void
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -164,6 +165,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (session?.user) await loadProfile(session.user.id)
   }
 
+  // A diferencia de refreshProfile(), no pasa por profileLoading — evita el
+  // "parpadeo" donde RequireStudio/RequireBiker desmontan la página entera
+  // (profileLoading=true → return null) por un cambio menor ya confirmado
+  // en el backend (ej. un toggle de notificación), perdiendo el estado local
+  // de la pantalla (la pestaña activa de Configuración, por ejemplo).
+  function updateProfileLocal(patch: Partial<Profile>) {
+    setProfile((prev) => (prev ? { ...prev, ...patch } : prev))
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -180,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         requestPasswordReset,
         updatePassword,
         refreshProfile,
+        updateProfileLocal,
       }}
     >
       {children}

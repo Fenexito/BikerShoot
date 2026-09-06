@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import { getPortalRoot } from '../../ui/shared/portalRoot'
+import { IconClose, IconFilter } from '../../ui/shared/icons'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerOrders, type PhotographerOrderGroup } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
@@ -95,6 +98,97 @@ function OrderRow({
   )
 }
 
+/** Modal de filtros para móvil — mismo panel oscuro flotante que
+ * `SearchFilterModal.tsx` del lado biker (buscador), para no inventar un
+ * segundo lenguaje visual de filtros dentro de la misma app. En escritorio
+ * no se usa: ahí la búsqueda y las pestañas ya caben cómodas en una fila. */
+function OrdersFilterModal({
+  open,
+  onClose,
+  query,
+  onQuery,
+  tab,
+  onTab,
+  resultCount,
+}: {
+  open: boolean
+  onClose: () => void
+  query: string
+  onQuery: (v: string) => void
+  tab: OrderItemStatus | 'todos'
+  onTab: (v: OrderItemStatus | 'todos') => void
+  resultCount: number
+}) {
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto p-4 pt-16 sm:pt-24">
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg animate-menu-in rounded-3xl border border-white/10 bg-neutral-900 p-6 text-white shadow-2xl">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold">Filtros</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+            <IconClose className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Buscar</span>
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-3">
+            <IconSearch className="h-4 w-4 shrink-0 text-white/50" />
+            <input
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              placeholder="Biker o evento…"
+              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/40"
+            />
+          </div>
+        </label>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Estado</span>
+          <div className="flex flex-wrap gap-2">
+            {TABS.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => onTab(t.value)}
+                className={cn(
+                  'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                  tab === t.value ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/20',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-8 flex w-full items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+        >
+          Ver {resultCount} pedido{resultCount === 1 ? '' : 's'}
+        </button>
+      </div>
+    </div>,
+    getPortalRoot(),
+  )
+}
+
 export function StudioOrders() {
   const { user, profile } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
@@ -105,6 +199,7 @@ export function StudioOrders() {
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const filtered = useMemo(() => {
     let list = tab === 'todos' ? orders : orders.filter((o) => o.status === tab)
@@ -155,12 +250,12 @@ export function StudioOrders() {
       <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Pedidos</h1>
       <p className="mt-2 text-muted-foreground">{orders.length} pedidos en total</p>
 
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cobrado (activo)</p>
           <p className="mt-1 text-2xl font-bold">Q{summary.collected}</p>
         </div>
-        <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="hidden rounded-3xl border border-border bg-card p-5 sm:block">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pendiente por cobrar</p>
           <p className="mt-1 text-2xl font-bold">Q{summary.pending}</p>
         </div>
@@ -170,7 +265,23 @@ export function StudioOrders() {
         </div>
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center gap-3">
+      {/* Móvil: un solo botón que abre el modal de filtros (buscador +
+          estado) — tres controles en fila no cabían cómodos en pantalla
+          angosta. Escritorio: todo inline, como antes. */}
+      <div className="mt-8 sm:hidden">
+        <button
+          onClick={() => setFiltersOpen(true)}
+          className="flex w-full items-center justify-between gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-medium"
+        >
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <IconFilter className="h-4 w-4" />
+            {tab === 'todos' && !query ? 'Filtros' : `${TABS.find((t) => t.value === tab)?.label}${query ? ` · "${query}"` : ''}`}
+          </span>
+          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">{filtered.length}</span>
+        </button>
+      </div>
+
+      <div className="mt-8 hidden flex-wrap items-center gap-3 sm:flex">
         <div className="flex flex-1 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:max-w-xs">
           <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
@@ -198,6 +309,16 @@ export function StudioOrders() {
           })}
         </div>
       </div>
+
+      <OrdersFilterModal
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        query={query}
+        onQuery={setQuery}
+        tab={tab}
+        onTab={setTab}
+        resultCount={filtered.length}
+      />
 
       {isLoading && <SkeletonRows count={5} className="mt-6" />}
 

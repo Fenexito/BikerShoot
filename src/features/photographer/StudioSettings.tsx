@@ -38,13 +38,16 @@ function Section({ title, description, children }: { title: string; description?
   )
 }
 
-/** Fila "click para editar" — el valor se convierte en un campo editable con
- * un color propio (acento) en el mismo lugar, y el botón Editar se
- * sustituye por Guardar/Cancelar ahí mismo, en vez de abrir un formulario
- * aparte. Deja claro cuándo algo está en modo edición vs. ya guardado. */
+const inputClass = 'w-full rounded-2xl border border-border bg-input px-4 py-2.5 text-sm outline-none focus:border-accent'
+
+/** Mismo patrón observado en vivo en mobbin.com/settings: "Editar" no
+ * convierte el valor en un input en el mismo sitio — expande un bloque
+ * debajo con una descripción corta, el campo editable y un botón "Guardar";
+ * "Editar" se sustituye por "Cancelar" en su mismo lugar mientras tanto. */
 function EditableRow({
   label,
   value,
+  description,
   placeholder,
   onSave,
   type = 'text',
@@ -52,6 +55,7 @@ function EditableRow({
 }: {
   label: string
   value: string
+  description?: string
   placeholder?: string
   onSave: (next: string) => Promise<void>
   type?: string
@@ -75,32 +79,29 @@ function EditableRow({
     }
   }
 
-  const fieldClass = 'mt-2 w-full max-w-sm rounded-2xl border-2 border-accent bg-accent/5 px-4 py-2.5 text-sm outline-none'
-
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border py-4 last:border-b-0">
-      <div className="min-w-0 flex-1">
+    <div className="border-b border-border py-4 last:border-b-0">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold">{label}</p>
-        {editing ? (
-          multiline ? (
-            <textarea autoFocus rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} className={fieldClass} />
+        <button onClick={() => setEditing((e) => !e)} className="shrink-0 text-xs font-semibold text-accent hover:underline">
+          {editing ? 'Cancelar' : 'Editar'}
+        </button>
+      </div>
+      {editing ? (
+        <div className="mt-3">
+          {description && <p className="mb-2 text-xs text-muted-foreground">{description}</p>}
+          {multiline ? (
+            <textarea autoFocus rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} className={inputClass} />
           ) : (
-            <input autoFocus type={type} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} className={fieldClass} />
-          )
-        ) : (
-          <p className="text-sm text-muted-foreground">{value || placeholder || '—'}</p>
-        )}
-      </div>
-      <div className="shrink-0">
-        {editing ? (
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>Cancelar</Button>
-            <Button variant="dark" size="sm" onClick={handleSave} loading={saving}>Guardar</Button>
-          </div>
-        ) : (
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Editar</Button>
-        )}
-      </div>
+            <input autoFocus type={type} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} className={inputClass} />
+          )}
+          <Button variant="dark" size="sm" className="mt-3" onClick={handleSave} loading={saving}>
+            Guardar
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">{value || placeholder || '—'}</p>
+      )}
     </div>
   )
 }
@@ -119,13 +120,115 @@ function NotificationToggle({ enabled, onChange }: { enabled: boolean; onChange:
       aria-checked={checked}
       className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', checked ? 'bg-foreground' : 'bg-muted')}
     >
-      <span className={cn('absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform', checked ? 'translate-x-5' : 'translate-x-0.5')} />
+      <span
+        className={cn(
+          'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
+          checked ? 'translate-x-5' : 'translate-x-0',
+        )}
+      />
     </button>
   )
 }
 
+interface PublicInfoDraft {
+  name: string
+  city: string
+  whatsapp: string
+  bio: string
+  instagram: string
+  facebook: string
+  tiktok: string
+}
+
+/** Un solo botón "Editar" para todo el bloque de información pública —
+ * antes cada línea tenía su propio "Editar", que se sentía excesivo para
+ * un grupo de campos que casi siempre se actualizan juntos. */
+function PublicInfoSection({ draft: current, onSave }: { draft: PublicInfoDraft; onSave: (next: PublicInfoDraft) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(current)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!editing) setDraft(current)
+  }, [current, editing])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await onSave(draft)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Section title="Información pública" description="Esto es lo que ve un biker en tu perfil.">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">Nombre, ciudad, WhatsApp, bio y redes sociales.</p>
+        <Button variant={editing ? 'secondary' : 'dark'} size="sm" onClick={() => setEditing((e) => !e)}>
+          {editing ? 'Cancelar' : 'Editar'}
+        </Button>
+      </div>
+
+      {editing ? (
+        <div className="mt-5 flex flex-col gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nombre del estudio</span>
+            <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ciudad</span>
+            <input value={draft.city} onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))} className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">WhatsApp de contacto</span>
+            <input value={draft.whatsapp} onChange={(e) => setDraft((d) => ({ ...d, whatsapp: e.target.value }))} className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sobre ti</span>
+            <textarea rows={3} value={draft.bio} onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))} placeholder="Cuéntale a los bikers de tu trabajo" className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instagram</span>
+            <input value={draft.instagram} onChange={(e) => setDraft((d) => ({ ...d, instagram: e.target.value }))} placeholder="https://instagram.com/tu_estudio" className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Facebook</span>
+            <input value={draft.facebook} onChange={(e) => setDraft((d) => ({ ...d, facebook: e.target.value }))} placeholder="https://facebook.com/tu_estudio" className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">TikTok</span>
+            <input value={draft.tiktok} onChange={(e) => setDraft((d) => ({ ...d, tiktok: e.target.value }))} placeholder="https://tiktok.com/@tu_estudio" className={inputClass} />
+          </label>
+          <Button variant="dark" size="sm" className="self-start" onClick={handleSave} loading={saving}>
+            Guardar cambios
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-5 flex flex-col divide-y divide-border">
+          {[
+            ['Nombre del estudio', current.name],
+            ['Ciudad', current.city],
+            ['WhatsApp', current.whatsapp],
+            ['Sobre ti', current.bio],
+            ['Instagram', current.instagram],
+            ['Facebook', current.facebook],
+            ['TikTok', current.tiktok],
+          ].map(([label, value]) => (
+            <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 py-3 first:pt-0 last:pb-0">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+              <span className="max-w-[70%] truncate text-sm">{value || '—'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  )
+}
+
 export function StudioSettings() {
-  const { user, profile, refreshProfile, signOut, signOutEverywhere, updatePassword } = useAuth()
+  const { user, profile, updateProfileLocal, signOut, signOutEverywhere, updatePassword } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
   const push = useToastStore((s) => s.push)
   const navigate = useNavigate()
@@ -146,14 +249,32 @@ export function StudioSettings() {
   const [signingOutEverywhere, setSigningOutEverywhere] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
 
-  async function saveProfileField(field: 'display_name', value: string) {
+  function invalidateDetails() {
     if (!user) return
-    const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', user.id)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo guardar', description: error.message })
-      throw error
+    queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
+    queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+  }
+
+  async function savePublicInfo(next: PublicInfoDraft) {
+    if (!user) return
+    const { error: nameError } = await supabase.from('profiles').update({ display_name: next.name }).eq('id', user.id)
+    const { error: detailsError } = await supabase
+      .from('photographer_details')
+      .update({
+        city: next.city || null,
+        whatsapp: next.whatsapp || null,
+        bio: next.bio || null,
+        instagram_url: next.instagram || null,
+        facebook_url: next.facebook || null,
+        tiktok_url: next.tiktok || null,
+      })
+      .eq('profile_id', user.id)
+    if (nameError || detailsError) {
+      push({ type: 'error', title: 'No se pudo guardar', description: (nameError ?? detailsError)?.message })
+      throw nameError ?? detailsError
     }
-    await refreshProfile()
+    updateProfileLocal({ display_name: next.name })
+    invalidateDetails()
     push({ type: 'success', title: 'Guardado' })
   }
 
@@ -164,8 +285,7 @@ export function StudioSettings() {
       push({ type: 'error', title: 'No se pudo guardar', description: error.message })
       throw error
     }
-    queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-    queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+    invalidateDetails()
     push({ type: 'success', title: 'Guardado' })
   }
 
@@ -185,7 +305,7 @@ export function StudioSettings() {
       if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
       const { error: updateError } = await supabase.from('profiles').update({ avatar_url: signed.avatarPath }).eq('id', user.id)
       if (updateError) throw updateError
-      await refreshProfile()
+      updateProfileLocal({ avatar_url: signed.avatarPath })
       queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
       push({ type: 'success', title: 'Foto de perfil actualizada' })
     } catch (err) {
@@ -211,14 +331,24 @@ export function StudioSettings() {
       if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
       const { error: updateError } = await supabase.from('photographer_details').update({ profile_cover_path: signed.coverPath }).eq('profile_id', user.id)
       if (updateError) throw updateError
-      queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+      invalidateDetails()
       push({ type: 'success', title: 'Portada actualizada' })
     } catch (err) {
       push({ type: 'error', title: 'No se pudo actualizar la portada', description: (err as Error).message })
     } finally {
       setUploadingCover(false)
     }
+  }
+
+  async function removeCover() {
+    if (!user) return
+    const { error } = await supabase.from('photographer_details').update({ profile_cover_path: null }).eq('profile_id', user.id)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo quitar la portada', description: error.message })
+      return
+    }
+    invalidateDetails()
+    push({ type: 'success', title: 'Portada removida' })
   }
 
   async function handleLogoFile(file: File | undefined) {
@@ -237,8 +367,7 @@ export function StudioSettings() {
       if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
       const { error: updateError } = await supabase.from('photographer_details').update({ logo_path: signed.logoPath }).eq('profile_id', user.id)
       if (updateError) throw updateError
-      queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+      invalidateDetails()
       push({ type: 'success', title: 'Logo actualizado' })
     } catch (err) {
       push({ type: 'error', title: 'No se pudo actualizar el logo', description: (err as Error).message })
@@ -254,8 +383,7 @@ export function StudioSettings() {
       push({ type: 'error', title: 'No se pudo quitar el logo', description: error.message })
       return
     }
-    queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-    queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
+    invalidateDetails()
     push({ type: 'success', title: 'Logo removido' })
   }
 
@@ -287,13 +415,18 @@ export function StudioSettings() {
 
   async function toggleNotification(type: NotificationType, enabled: boolean) {
     if (!user || !profile) return
-    const next = { ...profile.notification_prefs, [type]: enabled }
+    const previous = profile.notification_prefs
+    const next = { ...previous, [type]: enabled }
+    // Actualiza el estado local al instante (sin pasar por profileLoading) y
+    // guarda en el backend en segundo plano — refreshProfile() aquí causaba
+    // que el guard de ruta desmontara la página completa por un instante,
+    // sintiéndose como una recarga que además perdía la pestaña activa.
+    updateProfileLocal({ notification_prefs: next })
     const { error } = await supabase.from('profiles').update({ notification_prefs: next }).eq('id', user.id)
     if (error) {
+      updateProfileLocal({ notification_prefs: previous })
       push({ type: 'error', title: 'No se pudo guardar', description: error.message })
-      return
     }
-    await refreshProfile()
   }
 
   async function handleSignOutClick() {
@@ -354,20 +487,35 @@ export function StudioSettings() {
 
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
 
+  const publicInfo: PublicInfoDraft = {
+    name: profile?.display_name ?? '',
+    city: details?.city ?? '',
+    whatsapp: details?.whatsapp ?? '',
+    bio: details?.bio ?? '',
+    instagram: details?.instagram_url ?? '',
+    facebook: details?.facebook_url ?? '',
+    tiktok: details?.tiktok_url ?? '',
+  }
+
   return (
     <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Configuración</h1>
       <p className="mt-2 text-muted-foreground">Tu perfil visual, tu cuenta y tus notificaciones.</p>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[200px_1fr]">
-        <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[180px_1fr]">
+        {/* Móvil: pestañas horizontales subrayadas (mismo patrón que el
+            propio mobbin.com/settings en su versión angosta). Escritorio:
+            lista vertical a la izquierda, la activa marcada con un borde. */}
+        <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'shrink-0 rounded-full px-4 py-2.5 text-left text-sm font-medium transition-colors lg:rounded-2xl',
-                tab === t.id ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
+                'shrink-0 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                tab === t.id
+                  ? 'border-foreground font-bold text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {t.label}
@@ -378,32 +526,27 @@ export function StudioSettings() {
         <div className="flex flex-col gap-6">
           {tab === 'perfil' && (
             <>
-              <Section title="Foto de perfil y portada">
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <Section title="Foto de perfil, portada y logo">
+                <div className="flex flex-wrap gap-8">
                   <div className="flex items-center gap-4">
-                    <button onClick={() => avatarInputRef.current?.click()} className="group relative h-20 w-20 shrink-0 rounded-full" disabled={uploadingAvatar}>
+                    <button onClick={() => avatarInputRef.current?.click()} className="relative h-16 w-16 shrink-0 rounded-full" disabled={uploadingAvatar}>
                       {avatarUrl ? (
-                        <img src={avatarUrl} alt="" className="h-20 w-20 rounded-full border-2 border-border object-cover" />
+                        <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full border-2 border-border object-cover" />
                       ) : (
-                        <InitialsAvatar name={profile?.display_name || 'S'} className="h-20 w-20 rounded-full border-2 border-border bg-foreground text-xl text-background" />
+                        <InitialsAvatar name={profile?.display_name || 'S'} className="h-16 w-16 rounded-full border-2 border-border bg-foreground text-lg text-background" />
                       )}
-                      <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-[9px] font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        {uploadingAvatar ? '…' : 'Cambiar'}
-                      </span>
                     </button>
                     <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
                     <div>
                       <p className="text-sm font-semibold">Foto de perfil</p>
-                      <button onClick={() => avatarInputRef.current?.click()} className="text-xs font-semibold text-accent hover:underline">Cambiar</button>
+                      <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} className="text-xs font-semibold text-accent hover:underline">
+                        {uploadingAvatar ? 'Subiendo…' : 'Cambiar'}
+                      </button>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => coverInputRef.current?.click()}
-                      className="relative h-14 w-24 shrink-0 overflow-hidden rounded-xl border-2 border-border bg-muted"
-                      disabled={uploadingCover}
-                    >
+                    <button onClick={() => coverInputRef.current?.click()} className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted" disabled={uploadingCover}>
                       {details?.profile_cover_path ? (
                         <img src={r2Url(details.profile_cover_path)} alt="" className="h-full w-full object-cover" />
                       ) : (
@@ -413,42 +556,46 @@ export function StudioSettings() {
                     <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
                     <div>
                       <p className="text-sm font-semibold">Foto de portada</p>
-                      <button onClick={() => coverInputRef.current?.click()} className="text-xs font-semibold text-accent hover:underline" disabled={uploadingCover}>
-                        {uploadingCover ? 'Subiendo…' : 'Cambiar'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="text-xs font-semibold text-accent hover:underline">
+                          {uploadingCover ? 'Subiendo…' : 'Cambiar'}
+                        </button>
+                        {details?.profile_cover_path && (
+                          <button onClick={removeCover} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => logoInputRef.current?.click()} className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-border bg-muted" disabled={uploadingLogo}>
+                      {details?.logo_path ? (
+                        <img src={r2Url(details.logo_path)} alt="" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="text-lg opacity-30">🖼️</span>
+                      )}
+                    </button>
+                    <input ref={logoInputRef} type="file" accept="image/png,image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0])} />
+                    <div>
+                      <p className="text-sm font-semibold">Logo (opcional)</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="text-xs font-semibold text-accent hover:underline">
+                          {uploadingLogo ? 'Subiendo…' : 'Cambiar'}
+                        </button>
+                        {details?.logo_path && (
+                          <button onClick={removeLogo} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                            Quitar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </Section>
 
-              <Section title="Logo PNG (opcional)" description="Aparece en vez de tu nombre sobre la animación de portada de tu perfil.">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-border bg-muted">
-                    {details?.logo_path ? (
-                      <img src={r2Url(details.logo_path)} alt="" className="h-full w-full object-contain" />
-                    ) : (
-                      <span className="text-lg opacity-30">🖼️</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => logoInputRef.current?.click()} loading={uploadingLogo}>
-                      {details?.logo_path ? 'Cambiar' : 'Subir logo'}
-                    </Button>
-                    {details?.logo_path && <Button variant="ghost" size="sm" onClick={removeLogo}>Quitar</Button>}
-                  </div>
-                  <input ref={logoInputRef} type="file" accept="image/png,image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0])} />
-                </div>
-              </Section>
-
-              <Section title="Información pública" description="Esto es lo que ve un biker en tu perfil.">
-                <EditableRow label="Nombre del estudio" value={profile?.display_name ?? ''} onSave={(v) => saveProfileField('display_name', v)} />
-                <EditableRow label="Ciudad" value={details?.city ?? ''} onSave={(v) => saveDetailsField('city', v)} />
-                <EditableRow label="WhatsApp de contacto" value={details?.whatsapp ?? ''} onSave={(v) => saveDetailsField('whatsapp', v)} />
-                <EditableRow label="Sobre ti" value={details?.bio ?? ''} onSave={(v) => saveDetailsField('bio', v)} multiline placeholder="Cuéntale a los bikers de tu trabajo" />
-                <EditableRow label="Instagram" value={details?.instagram_url ?? ''} onSave={(v) => saveDetailsField('instagram_url', v)} placeholder="https://instagram.com/tu_estudio" />
-                <EditableRow label="Facebook" value={details?.facebook_url ?? ''} onSave={(v) => saveDetailsField('facebook_url', v)} placeholder="https://facebook.com/tu_estudio" />
-                <EditableRow label="TikTok" value={details?.tiktok_url ?? ''} onSave={(v) => saveDetailsField('tiktok_url', v)} placeholder="https://tiktok.com/@tu_estudio" />
-              </Section>
+              <PublicInfoSection draft={publicInfo} onSave={savePublicInfo} />
             </>
           )}
 
@@ -459,58 +606,62 @@ export function StudioSettings() {
               </Section>
 
               <Section title="Datos personales">
-                <EditableRow label="Correo" value={user?.email ?? ''} type="email" onSave={saveEmail} />
+                <EditableRow label="Correo" value={user?.email ?? ''} type="email" onSave={saveEmail} description="Te enviaremos un enlace de confirmación al nuevo correo." />
 
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border py-4 last:border-b-0">
-                  <div className="min-w-0 flex-1">
+                <div className="border-b border-border py-4 last:border-b-0">
+                  <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold">Contraseña</p>
-                    {editingPassword ? (
+                    <button onClick={() => setEditingPassword((e) => !e)} className="shrink-0 text-xs font-semibold text-accent hover:underline">
+                      {editingPassword ? 'Cancelar' : 'Cambiar'}
+                    </button>
+                  </div>
+                  {editingPassword ? (
+                    <div className="mt-3">
                       <input
                         autoFocus
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="Nueva contraseña"
-                        className="mt-2 w-full max-w-sm rounded-2xl border-2 border-accent bg-accent/5 px-4 py-2.5 text-sm outline-none"
+                        className={inputClass}
                       />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">••••••••</p>
-                    )}
-                  </div>
-                  <div className="shrink-0">
-                    {editingPassword ? (
-                      <div className="flex gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => { setEditingPassword(false); setNewPassword('') }}>Cancelar</Button>
-                        <Button variant="dark" size="sm" onClick={savePassword} loading={savingPassword}>Guardar</Button>
-                      </div>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => setEditingPassword(true)}>Cambiar</Button>
-                    )}
-                  </div>
+                      <Button variant="dark" size="sm" className="mt-3" onClick={savePassword} loading={savingPassword}>
+                        Guardar
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted-foreground">••••••••</p>
+                  )}
                 </div>
               </Section>
 
               <Section title="Administrar cuenta">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-4">
+                <div className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold">Cerrar sesión</p>
                     <p className="text-sm text-muted-foreground">Sales de este dispositivo.</p>
                   </div>
-                  <Button variant="secondary" size="sm" onClick={handleSignOutClick} loading={signingOut}>Cerrar sesión</Button>
+                  <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={handleSignOutClick} loading={signingOut}>
+                    Cerrar sesión
+                  </Button>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-4">
+                <div className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold">Cerrar sesión en todos los dispositivos</p>
                     <p className="text-sm text-muted-foreground">Te desconecta de cualquier otro navegador o teléfono donde hayas iniciado sesión.</p>
                   </div>
-                  <Button variant="secondary" size="sm" onClick={handleSignOutEverywhere} loading={signingOutEverywhere}>Cerrar en todos lados</Button>
+                  <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={handleSignOutEverywhere} loading={signingOutEverywhere}>
+                    Cerrar en todos lados
+                  </Button>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold">Eliminar cuenta</p>
                     <p className="text-sm text-muted-foreground">Borra tu cuenta, eventos y fotos de forma permanente.</p>
                   </div>
-                  <Button variant="danger" size="sm" onClick={handleDeleteAccount} loading={deletingAccount}>Eliminar cuenta</Button>
+                  <Button variant="danger" size="sm" className="w-full sm:w-auto" onClick={handleDeleteAccount} loading={deletingAccount}>
+                    Eliminar cuenta
+                  </Button>
                 </div>
               </Section>
             </>

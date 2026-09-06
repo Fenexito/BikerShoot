@@ -106,7 +106,7 @@ export function StudioProfilePage() {
       )}
 
       <div className={STUDIO_PAGE_WIDE}>
-        <div className="-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+        <div className="-mt-20 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           {avatarUrl ? (
             <img src={avatarUrl} alt={profile.display_name} className="h-36 w-36 rounded-full border-4 border-background object-cover shadow-sm" />
           ) : (

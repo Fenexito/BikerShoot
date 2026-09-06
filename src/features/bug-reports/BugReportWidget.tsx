@@ -107,6 +107,12 @@ export function BugReportWidget() {
   })
 
   useEffect(() => {
+    if (!expanded) return
+    const timer = setTimeout(() => setExpanded(false), 3000)
+    return () => clearTimeout(timer)
+  }, [expanded])
+
+  useEffect(() => {
     if (!open) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false)

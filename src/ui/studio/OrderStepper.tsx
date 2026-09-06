@@ -14,13 +14,19 @@ interface OrderStepperProps {
 
 export function OrderStepper({ steps, currentIndex, className }: OrderStepperProps) {
   return (
-    <div className={cn('flex w-full items-center overflow-x-auto py-1.5', className)}>
+    // Los 4 pasos deben caber SIEMPRE en una sola fila, incluso en pantallas
+    // angostas — en vez de dejar que el texto de cada etiqueta empuje el
+    // ancho total (causando scroll horizontal), solo el paso activo muestra
+    // su etiqueta en móvil; los demás quedan como círculo solo (secundarios,
+    // ya completados o por completar). En escritorio (sm:) las 4 etiquetas
+    // se ven siempre, hay espacio de sobra.
+    <div className={cn('flex w-full items-center py-1.5', className)}>
       {steps.map((label, i) => {
         const isFinalStep = i === steps.length - 1
         const status = i < currentIndex || (i === currentIndex && isFinalStep) ? 'complete' : i === currentIndex ? 'active' : 'inactive'
         return (
           <div key={label} className="flex flex-1 items-center last:flex-none">
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
               <motion.div
                 animate={status}
                 initial={false}
@@ -30,10 +36,10 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
                   complete: { backgroundColor: 'rgb(var(--color-foreground))', color: 'rgb(var(--color-background))', scale: 1 },
                 }}
                 transition={{ duration: 0.3 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-foreground text-xs font-bold"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-foreground text-[11px] font-bold sm:h-9 sm:w-9 sm:text-xs"
               >
                 {status === 'complete' ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                     <motion.path
                       initial={{ pathLength: 0 }}
                       animate={{ pathLength: 1 }}
@@ -47,12 +53,17 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
                   i + 1
                 )}
               </motion.div>
-              <span className="whitespace-nowrap text-center text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span
+                className={cn(
+                  'whitespace-nowrap text-center text-[9px] uppercase tracking-wide text-muted-foreground sm:text-[10px]',
+                  status !== 'active' && 'hidden sm:inline',
+                )}
+              >
                 {label}
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className="mx-2 h-0.5 flex-1 bg-border">
+              <div className="mx-1 h-0.5 flex-1 bg-border sm:mx-2">
                 <motion.div
                   className="h-full bg-foreground"
                   initial={false}

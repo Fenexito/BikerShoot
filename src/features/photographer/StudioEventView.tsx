@@ -19,6 +19,7 @@ import { IconTrash, IconEdit } from '../../ui/shared/icons'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
+import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { cn } from '../../lib/cn'
@@ -265,16 +266,25 @@ interface PointCardProps {
   onToggleSelect: (id: string) => void
   onDelete: (id: string) => void
   onUploaded: () => void
+  registerRef?: (el: HTMLDivElement | null) => void
+  onExpandedChange?: (expanded: boolean) => void
 }
 
-function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onDelete, onUploaded }: PointCardProps) {
+function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onDelete, onUploaded, registerRef, onExpandedChange }: PointCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const sold = photos.filter((p) => p.delivered_path).length
 
+  function toggleExpanded() {
+    setExpanded((e) => {
+      onExpandedChange?.(!e)
+      return !e
+    })
+  }
+
   return (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
-      <button onClick={() => setExpanded((e) => !e)} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
+    <div ref={registerRef} className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
+      <button onClick={toggleExpanded} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
         <PointStack photos={photos} />
         <div className="min-w-0 flex-1">
           <h2 className="font-studio text-lg font-bold tracking-tight2">{point.label}</h2>
@@ -328,10 +338,42 @@ export function StudioEventView() {
   const { data: photos = [] } = useEventPhotosDetailed(id)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [scrolled, setScrolled] = useState(false)
+  const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
+  const headerHidden = useAutoHideHeader()
+  const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const expandedPointsRef = useRef<Set<string>>(new Set())
+  const eventPointsRef = useRef<{ id: string; label: string }[]>([])
 
   useEffect(() => {
+    eventPointsRef.current = event?.event_points ?? []
+  }, [event])
+
+  function handlePointExpandedChange(pointId: string, expanded: boolean) {
+    if (expanded) expandedPointsRef.current.add(pointId)
+    else expandedPointsRef.current.delete(pointId)
+  }
+
+  useEffect(() => {
+    // Mientras el fotógrafo hace scroll DENTRO de un punto abierto (con
+    // cientos de fotos, el punto se pierde de vista rápido), el header
+    // pegajoso muestra su nombre — solo mientras ese punto sigue cruzando
+    // la línea justo debajo del propio header. Se calcula con refs (no
+    // estado) para no tener que re-registrar el listener en cada render.
+    const STICKY_BAR_BOTTOM = 168
     function onScroll() {
       setScrolled(window.scrollY > HEADER_SCROLL_THRESHOLD)
+      let current: string | null = null
+      for (const pt of eventPointsRef.current) {
+        if (!expandedPointsRef.current.has(pt.id)) continue
+        const el = pointRefs.current[pt.id]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top <= STICKY_BAR_BOTTOM && rect.bottom >= STICKY_BAR_BOTTOM) {
+          current = pt.label
+          break
+        }
+      }
+      setActivePointLabel(current)
     }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -504,10 +546,44 @@ export function StudioEventView() {
           <span aria-hidden>←</span> Volver a eventos
         </Link>
 
-        <div className={cn('sticky z-20 mt-6 top-[4.75rem] md:top-[5.5rem]')}>
+        <div
+          className={cn(
+            'sticky z-20 mt-6 transition-[top] duration-300',
+            headerHidden ? 'top-3' : 'top-[4.75rem] md:top-[5.5rem]',
+          )}
+        >
+          {/* Móvil: flecha atrás + título + estado + menú de tres puntos —
+              la barra de stats y el thumbnail no caben cómodos aquí, y el
+              botón de pausar/publicar se mueve dentro del menú. */}
+          <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:hidden">
+            <Link
+              to="/studio/eventos"
+              aria-label="Volver a eventos"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg text-foreground transition-colors hover:bg-muted"
+            >
+              ←
+            </Link>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
+                <h1 className="truncate text-sm font-bold tracking-tight2">{event.title}</h1>
+              </div>
+              {scrolled && activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
+            </div>
+            <ActionMenu
+              items={[
+                event.status === 'pausado'
+                  ? { onClick: () => toggleStatus('activo'), label: 'Publicar evento' }
+                  : { onClick: () => toggleStatus('pausado'), label: 'Pausar evento' },
+                { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
+                { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
+              ]}
+            />
+          </div>
+
           <div
             className={cn(
-              'rounded-3xl border border-border bg-background/95 shadow-sm backdrop-blur-md transition-all duration-300',
+              'hidden rounded-3xl border border-border bg-background/95 shadow-sm backdrop-blur-md transition-all duration-300 sm:block',
               scrolled ? 'px-4 py-2.5' : 'px-5 py-5 sm:px-6',
             )}
           >
@@ -530,6 +606,7 @@ export function StudioEventView() {
                     {event.venue ? ` · ${event.venue}` : ''} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
                   </p>
                 )}
+                {scrolled && activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {event.status === 'pausado' ? (
@@ -593,6 +670,8 @@ export function StudioEventView() {
               onToggleSelect={toggleSelect}
               onDelete={deletePhoto}
               onUploaded={invalidatePhotos}
+              registerRef={(el) => (pointRefs.current[pt.id] = el)}
+              onExpandedChange={(exp) => handlePointExpandedChange(pt.id, exp)}
             />
           ))}
 
