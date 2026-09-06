@@ -13,6 +13,7 @@ import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { cn } from '../../lib/cn'
 import { IconUser, IconSettings, IconBell, IconUsers } from '../../ui/shared/icons'
+import { useBackButton } from '../../ui/shared/useBackButton'
 import type { NotificationType } from '../notifications/useNotifications'
 
 const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description: string }[] = [
@@ -229,6 +230,7 @@ function PublicInfoSection({ draft: current, onSave }: { draft: PublicInfoDraft;
 }
 
 export function StudioSettings() {
+  useBackButton('/studio/perfil')
   const { user, profile, updateProfileLocal, signOut, signOutEverywhere, updatePassword } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
   const push = useToastStore((s) => s.push)

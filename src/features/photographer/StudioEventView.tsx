@@ -15,11 +15,12 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconTrash, IconEdit, IconChevronLeft } from '../../ui/shared/icons'
+import { IconTrash, IconEdit } from '../../ui/shared/icons'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
 import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
+import { useBackButton } from '../../ui/shared/useBackButton'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { cn } from '../../lib/cn'
@@ -328,6 +329,7 @@ export function StudioEventView() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const push = useToastStore((s) => s.push)
+  useBackButton('/studio/eventos')
   const { data: event, isLoading } = useEvent(id)
   const { data: photos = [] } = useEventPhotosDetailed(id)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -537,16 +539,6 @@ export function StudioEventView() {
       )}
 
       <div className={STUDIO_PAGE_WIDE}>
-        {/* En móvil la flecha de volver ya vive dentro de la barra del
-            evento (más abajo) — este link aparte solo tiene sentido en
-            escritorio, donde esa barra no tiene flecha propia. */}
-        <Link
-          to="/studio/eventos"
-          className="hidden w-fit items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:inline-flex"
-        >
-          <span aria-hidden>←</span> Volver a eventos
-        </Link>
-
         <div
           className={cn(
             'sticky z-20 mt-6 transition-[top] duration-300',
@@ -562,13 +554,6 @@ export function StudioEventView() {
               thumbnail no caben cómodos aquí, y pausar/publicar se mueve
               dentro del menú. */}
           <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:hidden">
-            <Link
-              to="/studio/eventos"
-              aria-label="Volver a eventos"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
-            >
-              <IconChevronLeft className="h-5 w-5" />
-            </Link>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-bold tracking-tight2">{event.title}</h1>
               {scrolled && activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}

@@ -15,6 +15,7 @@ import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import type { EventStatus } from '../../types/db'
 import { Skeleton } from '../../ui/shared/Skeleton'
+import { useBackButton } from '../../ui/shared/useBackButton'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos'] as const
 const AUTODROMOS = ['Autodromo Pedro Cofiño', 'Autodromo GT', 'Guatemala Raceway (1/4 de Milla)']
@@ -42,6 +43,7 @@ export function StudioEventEditor() {
   const push = useToastStore((s) => s.push)
   // /studio/eventos/new no tiene :id — id llega undefined en esa ruta.
   const isNew = !id || id === 'new'
+  useBackButton(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)
   const { data: existing, isLoading } = useEvent(id)
   const { data: routes = [] } = useRoutes()
 

@@ -14,6 +14,7 @@ import { r2Url, previewUrl } from '../../lib/r2'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import type { DbPhoto } from '../../types/db'
+import { useBackButton } from '../../ui/shared/useBackButton'
 
 const MAX_PER_ROW = 12
 const MAX_PER_POINT = MAX_PER_ROW * 2
@@ -89,6 +90,7 @@ function PointSection({
 export function EventDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  useBackButton('back')
   const { data: event, isLoading } = usePublicEvent(id)
   const { data: photos = [] } = useEventPhotos(id)
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)

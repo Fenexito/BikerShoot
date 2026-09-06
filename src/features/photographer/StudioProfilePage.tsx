@@ -107,7 +107,11 @@ export function StudioProfilePage() {
       )}
 
       <div className={STUDIO_PAGE_WIDE}>
-        <div className="-mt-[136px] flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+        {/* `relative z-10`: el stage de ScrollExpand queda "stuck" (position:
+            sticky) durante todo el resto de su track, incluyendo el tramo
+            donde el avatar debe traslaparlo — sin un z explícito, el avatar
+            terminaba pintándose debajo una vez la portada quedaba fija. */}
+        <div className="relative z-10 -mt-[136px] flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           {avatarUrl ? (
             <img src={avatarUrl} alt={profile.display_name} className="h-44 w-44 shrink-0 rounded-full border-4 border-background object-cover shadow-sm" />
           ) : (

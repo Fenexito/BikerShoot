@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useOrderGroup, type PhotographerOrderGroup } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
@@ -9,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
 import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
-import { IconChevronLeft } from '../../ui/shared/icons'
+import { useBackButton } from '../../ui/shared/useBackButton'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { Button } from '../../ui/studio/Button'
@@ -277,6 +276,7 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
 
 export function StudioOrderDetail() {
   const { id } = useParams()
+  useBackButton('/studio/pedidos')
   const { user, profile } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
   const orderCodeName = details?.order_nickname ?? profile?.display_name
@@ -370,13 +370,6 @@ export function StudioOrderDetail() {
       <div className="rounded-3xl border border-border bg-card p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <Link
-              to="/studio/pedidos"
-              aria-label="Todos los pedidos"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted"
-            >
-              <IconChevronLeft className="h-5 w-5" />
-            </Link>
             <InitialsAvatar name={order.bikerName} className="h-16 w-16 bg-foreground text-lg text-background" />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>

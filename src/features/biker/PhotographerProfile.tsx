@@ -13,9 +13,11 @@ import { SocialLinks } from '../../ui/shared/SocialLinks'
 import { IconVerified, IconWhatsapp } from '../../ui/shared/icons'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton } from '../../ui/shared/Skeleton'
+import { useBackButton } from '../../ui/shared/useBackButton'
 
 export function PhotographerProfile() {
   const { id } = useParams()
+  useBackButton('back')
   const { data: photographer, isLoading } = usePublicPhotographer(id)
   const { data: events = [] } = usePhotographerEvents(id)
   const { data: photos = [] } = useFeaturedPhotographerPhotos(id)

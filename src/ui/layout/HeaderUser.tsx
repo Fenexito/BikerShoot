@@ -10,6 +10,7 @@ import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
+import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -55,6 +56,7 @@ export function HeaderUser() {
         )}
       >
         <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background/90 px-3 shadow-sm backdrop-blur-md md:gap-5 md:px-4">
+          <HeaderBackSlot />
           <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
             MotoShots
           </Link>

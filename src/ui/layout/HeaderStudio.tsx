@@ -11,6 +11,7 @@ import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { SocialLinks } from '../shared/SocialLinks'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
+import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -49,6 +50,7 @@ export function HeaderStudio() {
         )}
       >
         <header className="mx-auto flex h-16 max-w-screen-xl items-center gap-4 rounded-full border border-border bg-background/90 px-4 shadow-sm backdrop-blur-md md:px-6">
+          <HeaderBackSlot />
           <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">
             MotoShots Studio
           </Link>

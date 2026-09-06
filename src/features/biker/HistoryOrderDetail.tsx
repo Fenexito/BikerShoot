@@ -8,12 +8,14 @@ import { OrderStepper } from '../../ui/studio/OrderStepper'
 import { getOrderStatusStyle, formatOrderCode } from '../../lib/orderStatus'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
+import { useBackButton } from '../../ui/shared/useBackButton'
 
 const FLOW = ['pendiente_pago', 'en_preparacion', 'entregado'] as const
 const FLOW_LABELS = FLOW.map((s) => getOrderStatusStyle(s).label)
 
 export function HistoryOrderDetail() {
   const { id } = useParams()
+  useBackButton('/app/historial')
   const { user } = useAuth()
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
   const order = orders.find((o) => o.id === id)
@@ -49,11 +51,7 @@ export function HistoryOrderDetail() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 font-flat md:px-8">
-      <Link to="/app/historial" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-        ← Mis compras
-      </Link>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card p-5 sm:p-6">
         <div>
           <p className="text-sm text-muted-foreground">
             {formatOrderCode(order.order_number)} · {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
