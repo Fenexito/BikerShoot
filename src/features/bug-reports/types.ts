@@ -15,6 +15,7 @@ export interface BugReport {
   reporter_id: string | null
   page: BugReportPage
   route: string
+  context_label: string | null
   kind: BugReportKind
   description: string
   screenshot_url: string | null

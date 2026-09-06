@@ -9,6 +9,7 @@ import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
+import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -43,10 +44,16 @@ export function HeaderUser() {
   }
 
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
+  const hidden = useAutoHideHeader()
 
   return (
     <>
-      <div className="sticky top-3 z-30 px-3 md:top-4 md:px-4">
+      <div
+        className={cn(
+          'fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-4 md:pt-0 md:!translate-y-0',
+          hidden ? '-translate-y-[calc(100%+1rem)]' : 'translate-y-0',
+        )}
+      >
         <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background/90 px-3 shadow-sm backdrop-blur-md md:gap-5 md:px-4">
           <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
             MotoShots

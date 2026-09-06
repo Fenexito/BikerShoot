@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { getPortalRoot } from '../../ui/shared/portalRoot'
-import { IconClose } from '../../ui/shared/icons'
+import { IconClose, IconChevronRight } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { supabase } from '../../lib/supabase'
 import type { BugReportKind, BugReportPage } from './types'
@@ -23,6 +23,47 @@ function guessPage(pathname: string): BugReportPage {
   if (pathname.startsWith('/studio')) return 'studio-fotografo'
   if (pathname.startsWith('/admin')) return 'admin'
   return 'publico'
+}
+
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
+/** Etiqueta legible de dónde vino el reporte — mucho más útil para investigar
+ * que solo la ruta cruda ("/studio/eventos/3f2a...-editar"). Cubre las
+ * páginas reales de la app; lo que no reconoce cae de vuelta a la ruta. */
+function describeRoute(pathname: string): string {
+  const p = pathname.replace(UUID_RE, ':id').replace(/\/$/, '') || '/'
+  const map: Record<string, string> = {
+    '/': 'Landing pública',
+    '/login': 'Login (biker)',
+    '/signup': 'Registro (biker)',
+    '/studio/login': 'Login (Studio)',
+    '/studio/signup': 'Registro (Studio)',
+    '/app': 'Inicio (biker)',
+    '/app/buscar': 'Búsqueda de fotos',
+    '/app/mapa': 'Mapa de puntos',
+    '/app/eventos': 'Lista de eventos (biker)',
+    '/app/eventos/:id': 'Detalle de evento (biker, público)',
+    '/app/fotografos': 'Lista de fotógrafos',
+    '/app/fotografos/:id': 'Perfil de fotógrafo (público)',
+    '/app/favoritos': 'Favoritos',
+    '/app/historial': 'Mis compras',
+    '/app/historial/:id': 'Detalle de pedido (biker)',
+    '/app/checkout': 'Carrito',
+    '/app/pedido-confirmado': 'Confirmación de compra',
+    '/app/perfil': 'Perfil (biker)',
+    '/studio': 'Inicio (Studio)',
+    '/studio/eventos': 'Lista de eventos (Studio)',
+    '/studio/eventos/new': 'Crear evento (editor)',
+    '/studio/eventos/:id': 'Vista de evento (Studio)',
+    '/studio/eventos/:id/editar': 'Editor de evento (Studio)',
+    '/studio/pedidos': 'Lista de pedidos (Studio)',
+    '/studio/pedidos/:id': 'Detalle de pedido (Studio)',
+    '/studio/almacenamiento': 'Almacenamiento (Studio)',
+    '/studio/planes': 'Planes y facturación (Studio)',
+    '/studio/perfil': 'Perfil público del Studio',
+    '/studio/ajustes': 'Configuración (Studio)',
+  }
+  return map[p] ?? pathname
 }
 
 const pageLabels: Record<BugReportPage, string> = {
@@ -45,9 +86,11 @@ const selectClass =
   'h-11 rounded-full border border-white/10 bg-white/5 px-4 text-sm text-white outline-none transition-colors focus:border-white/30'
 
 export function BugReportWidget() {
+  const [expanded, setExpanded] = useState(false)
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const push = useToastStore((s) => s.push)
+  const contextLabel = describeRoute(location.pathname)
 
   const {
     register,
@@ -81,6 +124,7 @@ export function BugReportWidget() {
     const { error } = await supabase.from('bug_reports').insert({
       page: values.page,
       route: location.pathname,
+      context_label: contextLabel,
       kind: values.kind,
       description: values.description,
       status: 'abierto',
@@ -94,16 +138,29 @@ export function BugReportWidget() {
     push({ type: 'success', title: 'Gracias, reporte enviado' })
     reset()
     setOpen(false)
+    setExpanded(false)
   }
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-20 left-5 z-40 flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-3 text-sm font-medium text-white shadow-lg transition-colors hover:bg-neutral-800 md:bottom-5"
-      >
-        🐞 Reportar bug
-      </button>
+      <div className="fixed bottom-20 left-0 z-40 flex items-center md:bottom-5">
+        {expanded ? (
+          <button
+            onClick={() => setOpen(true)}
+            className="ml-0 flex items-center gap-2 rounded-r-full bg-neutral-900 py-3 pl-4 pr-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-neutral-800"
+          >
+            🐞 Reportar bug
+          </button>
+        ) : (
+          <button
+            onClick={() => setExpanded(true)}
+            aria-label="Mostrar botón de reportar bug"
+            className="flex h-11 w-6 items-center justify-center rounded-r-full bg-neutral-900 text-white/60 shadow-lg transition-colors hover:bg-neutral-800 hover:text-white"
+          >
+            <IconChevronRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       {open &&
         createPortal(
@@ -122,6 +179,12 @@ export function BugReportWidget() {
               </div>
 
               <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
+                <div className="rounded-2xl bg-white/5 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/50">Se reporta desde</p>
+                  <p className="mt-0.5 text-sm font-semibold">{contextLabel}</p>
+                  <p className="mt-0.5 truncate text-xs text-white/40">{location.pathname}</p>
+                </div>
+
                 <label className="flex flex-col gap-2">
                   <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Página</span>
                   <select className={selectClass} {...register('page')}>
@@ -154,8 +217,6 @@ export function BugReportWidget() {
                   />
                   {errors.description && <span className="text-xs text-red-400">{errors.description.message}</span>}
                 </label>
-
-                <p className="text-xs text-white/40">Ruta actual: {location.pathname}</p>
 
                 <div className="mt-2 flex justify-end gap-2">
                   <button

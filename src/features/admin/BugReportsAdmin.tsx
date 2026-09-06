@@ -81,6 +81,7 @@ export function BugReportsAdmin() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="secondary">{PAGE_LABEL[r.page] ?? r.page}</Badge>
                 <Badge tone="accent">{KIND_LABEL[r.kind] ?? r.kind}</Badge>
+                <span className="text-xs font-semibold text-foreground">{r.context_label ?? r.route}</span>
                 <span className="text-xs text-muted-foreground">{r.route}</span>
               </div>
               <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Badge>
