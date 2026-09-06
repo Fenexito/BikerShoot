@@ -62,8 +62,11 @@ export function TypedConfirmDialog() {
 
         <label className="mt-5 block">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {request.matchLabel ?? `Escribe "${request.matchText}" para confirmar`}
+            {request.matchLabel ?? 'Escribe el siguiente texto para confirmar'}
           </span>
+          {/* En su propia línea — antes iba embebido en la misma frase que la
+              instrucción y un correo largo partía el texto de forma rara. */}
+          <p className="mt-1.5 break-all rounded-xl bg-muted px-3 py-2 text-sm font-semibold">{request.matchText}</p>
           <input
             autoFocus
             value={value}

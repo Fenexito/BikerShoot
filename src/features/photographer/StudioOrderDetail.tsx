@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
 import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { IconChevronLeft } from '../../ui/shared/icons'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { Button } from '../../ui/studio/Button'
@@ -338,7 +339,7 @@ export function StudioOrderDetail() {
       title: `Esto cancela el pedido de ${order.bikerName} — el biker pierde acceso a estas fotos y recibe una notificación.`,
       description: 'Esta acción no se puede deshacer desde aquí.',
       matchText: orderCode,
-      matchLabel: `Escribe el número de pedido (${orderCode}) para confirmar`,
+      matchLabel: 'Escribe el número de pedido para confirmar',
       confirmLabel: 'Cancelar pedido',
       extraFieldLabel: 'Motivo de la cancelación',
       extraFieldPlaceholder: 'El biker verá este motivo en su notificación',
@@ -366,16 +367,16 @@ export function StudioOrderDetail() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <Link
-        to="/studio/pedidos"
-        className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-      >
-        <span aria-hidden>←</span> Todos los pedidos
-      </Link>
-
-      <div className="mt-6 rounded-3xl border border-border bg-card p-6 sm:p-8">
+      <div className="rounded-3xl border border-border bg-card p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-4">
+            <Link
+              to="/studio/pedidos"
+              aria-label="Todos los pedidos"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted"
+            >
+              <IconChevronLeft className="h-5 w-5" />
+            </Link>
             <InitialsAvatar name={order.bikerName} className="h-16 w-16 bg-foreground text-lg text-background" />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
@@ -413,8 +414,6 @@ export function StudioOrderDetail() {
 
         {order.status !== 'cancelado' && <OrderStepper steps={TOP_STEP_LABELS} currentIndex={stepIndex} className="mt-8" />}
 
-        {order.status !== 'cancelado' && <ActionChecklist status={order.status} />}
-
         {order.status === 'cancelado' && order.cancellationReason && (
           <div className="mt-6 rounded-2xl border border-border bg-muted/40 p-4">
             <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Razón de cancelación</h3>
@@ -432,7 +431,10 @@ export function StudioOrderDetail() {
           </button>
 
           {detailsOpen && (
-            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            <div className="mt-4 flex flex-col gap-6">
+              {order.status !== 'cancelado' && <ActionChecklist status={order.status} />}
+
+              <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Desglose del cobro</h3>
                 {sameUnitPrice ? (
@@ -470,9 +472,10 @@ export function StudioOrderDetail() {
                   Guardar nota
                 </Button>
               </div>
+              </div>
 
               {canCancel && (
-                <div className="sm:col-span-2 flex justify-end border-t border-border pt-4">
+                <div className="flex justify-end border-t border-border pt-4">
                   <button onClick={cancelOrder} className="text-xs font-medium text-muted-foreground transition-colors hover:text-red-500">
                     Cancelar pedido
                   </button>

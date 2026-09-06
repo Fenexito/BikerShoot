@@ -52,10 +52,27 @@ function MobileFeaturedTile({
   )
 }
 
-export function FeaturedPhotosSection({ eventId, photographerId }: { eventId: string; photographerId: string }) {
+export function FeaturedPhotosSection({
+  eventId,
+  photographerId,
+  registerRef,
+  onExpandedChange,
+}: {
+  eventId: string
+  photographerId: string
+  registerRef?: (el: HTMLDivElement | null) => void
+  onExpandedChange?: (expanded: boolean) => void
+}) {
   const { existing, queue, usedSlots, remaining, enqueue, retry, removeExisting } = useFeaturedPhotosManager(eventId, photographerId)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [expanded, setExpanded] = useState(false)
+
+  function toggleExpanded() {
+    setExpanded((e) => {
+      onExpandedChange?.(!e)
+      return !e
+    })
+  }
 
   const items = [
     ...existing.map((photo: FeaturedPhoto) => ({
@@ -100,8 +117,8 @@ export function FeaturedPhotosSection({ eventId, photographerId }: { eventId: st
   ]
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
-      <button onClick={() => setExpanded((e) => !e)} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
+    <div ref={registerRef} className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
+      <button onClick={toggleExpanded} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">★</span>
         <div className="min-w-0 flex-1">
           <h2 className="font-studio text-lg font-bold tracking-tight2">Destacadas</h2>

@@ -12,6 +12,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { cn } from '../../lib/cn'
+import { IconUser, IconSettings, IconBell, IconUsers } from '../../ui/shared/icons'
 import type { NotificationType } from '../notifications/useNotifications'
 
 const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description: string }[] = [
@@ -21,10 +22,10 @@ const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description
 ]
 
 const TABS = [
-  { id: 'perfil', label: 'Perfil' },
-  { id: 'cuenta', label: 'Cuenta' },
-  { id: 'notificaciones', label: 'Notificaciones' },
-  { id: 'equipo', label: 'Equipo' },
+  { id: 'perfil', label: 'Perfil', icon: IconUser },
+  { id: 'cuenta', label: 'Cuenta', icon: IconSettings },
+  { id: 'notificaciones', label: 'Notificaciones', icon: IconBell },
+  { id: 'equipo', label: 'Equipo', icon: IconUsers },
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
@@ -83,7 +84,7 @@ function EditableRow({
     <div className="border-b border-border py-4 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold">{label}</p>
-        <button onClick={() => setEditing((e) => !e)} className="shrink-0 text-xs font-semibold text-accent hover:underline">
+        <button onClick={() => setEditing((e) => !e)} className="shrink-0 text-xs font-semibold text-foreground hover:underline">
           {editing ? 'Cancelar' : 'Editar'}
         </button>
       </div>
@@ -469,7 +470,7 @@ export function StudioSettings() {
       title: 'Última confirmación',
       description: 'Los bikers que ya compraron fotos tuyas conservan su entrega descargada, pero perderán acceso a re-descargarla.',
       matchText: user?.email ?? '',
-      matchLabel: `Escribe tu correo (${user?.email}) para confirmar`,
+      matchLabel: 'Escribe tu correo para confirmar',
       confirmLabel: 'Eliminar mi cuenta',
     })
     if (!confirmed) return
@@ -512,12 +513,13 @@ export function StudioSettings() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'shrink-0 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
                 tab === t.id
                   ? 'border-foreground font-bold text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
+              <t.icon className="h-4 w-4 shrink-0" />
               {t.label}
             </button>
           ))}
@@ -539,7 +541,7 @@ export function StudioSettings() {
                     <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
                     <div>
                       <p className="text-sm font-semibold">Foto de perfil</p>
-                      <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} className="text-xs font-semibold text-accent hover:underline">
+                      <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} className="text-xs font-semibold text-foreground hover:underline">
                         {uploadingAvatar ? 'Subiendo…' : 'Cambiar'}
                       </button>
                     </div>
@@ -557,7 +559,7 @@ export function StudioSettings() {
                     <div>
                       <p className="text-sm font-semibold">Foto de portada</p>
                       <div className="flex gap-2">
-                        <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="text-xs font-semibold text-accent hover:underline">
+                        <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="text-xs font-semibold text-foreground hover:underline">
                           {uploadingCover ? 'Subiendo…' : 'Cambiar'}
                         </button>
                         {details?.profile_cover_path && (
@@ -581,7 +583,7 @@ export function StudioSettings() {
                     <div>
                       <p className="text-sm font-semibold">Logo (opcional)</p>
                       <div className="flex gap-2">
-                        <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="text-xs font-semibold text-accent hover:underline">
+                        <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="text-xs font-semibold text-foreground hover:underline">
                           {uploadingLogo ? 'Subiendo…' : 'Cambiar'}
                         </button>
                         {details?.logo_path && (
@@ -611,7 +613,7 @@ export function StudioSettings() {
                 <div className="border-b border-border py-4 last:border-b-0">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold">Contraseña</p>
-                    <button onClick={() => setEditingPassword((e) => !e)} className="shrink-0 text-xs font-semibold text-accent hover:underline">
+                    <button onClick={() => setEditingPassword((e) => !e)} className="shrink-0 text-xs font-semibold text-foreground hover:underline">
                       {editingPassword ? 'Cancelar' : 'Cambiar'}
                     </button>
                   </div>

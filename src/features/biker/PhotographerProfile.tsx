@@ -58,6 +58,7 @@ export function PhotographerProfile() {
     <div className="font-flat">
       {coverUrl ? (
         <ScrollExpand
+          className="-mt-[4.75rem] md:mt-0"
           src={coverUrl}
           alt={photographer.display_name}
           title={photographer.logo_path ? undefined : photographer.display_name}
@@ -78,7 +79,7 @@ export function PhotographerProfile() {
           endRadius={1}
           mediaZoom={1.5}
           scrollDistance={1}
-          holdDistance={0.45}
+          holdDistance={0.08}
           smoothing={0.3}
           overlayScrim={0.5}
         />

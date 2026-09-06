@@ -75,6 +75,7 @@ export function StudioProfilePage() {
     <div>
       {coverUrl ? (
         <ScrollExpand
+          className="-mt-[4.75rem] md:mt-0"
           src={coverUrl}
           alt={profile.display_name}
           title={details?.logo_path ? undefined : profile.display_name}
@@ -95,7 +96,7 @@ export function StudioProfilePage() {
           endRadius={1}
           mediaZoom={1.5}
           scrollDistance={1}
-          holdDistance={0.45}
+          holdDistance={0.08}
           smoothing={0.3}
           overlayScrim={0.5}
         />
@@ -106,11 +107,11 @@ export function StudioProfilePage() {
       )}
 
       <div className={STUDIO_PAGE_WIDE}>
-        <div className="-mt-20 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+        <div className="-mt-[136px] flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           {avatarUrl ? (
-            <img src={avatarUrl} alt={profile.display_name} className="h-36 w-36 rounded-full border-4 border-background object-cover shadow-sm" />
+            <img src={avatarUrl} alt={profile.display_name} className="h-44 w-44 shrink-0 rounded-full border-4 border-background object-cover shadow-sm" />
           ) : (
-            <InitialsAvatar name={profile.display_name || 'S'} className="h-36 w-36 rounded-full border-4 border-background bg-foreground text-3xl text-background shadow-sm" />
+            <InitialsAvatar name={profile.display_name || 'S'} className="h-44 w-44 shrink-0 rounded-full border-4 border-background bg-foreground text-3xl text-background shadow-sm" />
           )}
 
           <div className="flex-1 text-center sm:text-left">
@@ -127,7 +128,7 @@ export function StudioProfilePage() {
             />
           </div>
 
-          <Link to="/studio/ajustes">
+          <Link to="/studio/ajustes" className="hidden sm:inline-flex">
             <Button variant="dark">Editar perfil</Button>
           </Link>
         </div>
@@ -139,15 +140,24 @@ export function StudioProfilePage() {
         )}
 
         <div className="mt-8 flex flex-wrap gap-4">
-          <div className="grid grid-cols-2 gap-4 rounded-3xl border border-border bg-card px-6 py-5 text-center sm:w-72">
-            <div>
-              <p className="text-2xl font-bold">{events.length}</p>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rodadas cubiertas</p>
+          {/* `sm:contents` deja que estos dos hijos se comporten como si
+              fueran hijos directos del `flex-wrap` de arriba en escritorio
+              (donde el botón de abajo va oculto) — en móvil sí forman su
+              propia fila, tarjeta + botón lado a lado. */}
+          <div className="flex w-full items-center gap-3 sm:contents">
+            <div className="grid flex-1 grid-cols-2 gap-4 rounded-3xl border border-border bg-card px-4 py-5 text-center sm:w-72 sm:px-6">
+              <div>
+                <p className="text-2xl font-bold">{events.length}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rodadas cubiertas</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{photoCount}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Fotos publicadas</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{photoCount}</p>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Fotos publicadas</p>
-            </div>
+            <Link to="/studio/ajustes" className="shrink-0 sm:hidden">
+              <Button variant="dark" size="sm">Editar</Button>
+            </Link>
           </div>
 
           {details?.storage_plan && (

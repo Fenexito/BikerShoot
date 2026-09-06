@@ -3,15 +3,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { useMyEvents } from './useMyEvents'
 import { usePhotographerOrders } from './useMyOrders'
+import { usePhotographerDetails } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
 import { r2Url } from '../../lib/r2'
 import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
-import { getOrderStatusStyle } from '../../lib/orderStatus'
 import { Card } from '../../ui/studio/Card'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_DASHBOARD } from '../../ui/studio/layout'
+import { OrderRow } from './StudioOrders'
 
 function usePhotoCount(photographerId: string | undefined) {
   return useQuery({
@@ -33,6 +34,8 @@ export function StudioHome() {
   const { data: events = [] } = useMyEvents(user?.id)
   const { data: orders = [] } = usePhotographerOrders(user?.id)
   const { data: photoCount = 0 } = usePhotoCount(user?.id)
+  const { data: details } = usePhotographerDetails(user?.id)
+  const orderCodeName = details?.order_nickname ?? profile?.display_name
 
   const totalSalesQ = orders.filter((o) => o.status !== 'pendiente_pago' && o.status !== 'cancelado').reduce((s, o) => s + o.total, 0)
   const pendingPayment = orders.filter((o) => o.status === 'pendiente_pago')
@@ -76,27 +79,16 @@ export function StudioHome() {
         {needsAttention.length === 0 ? (
           <p className="rounded-2xl border border-border px-4 py-6 text-center text-muted-foreground">Todo al día. No hay pedidos pendientes.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
+          <div className="flex flex-col gap-3">
             {needsAttention.map((order) => (
-              <Link
+              <OrderRow
                 key={order.orderId}
-                to={`/studio/pedidos/${order.orderId}`}
-                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{order.bikerName}</p>
-                  <p className="truncate text-sm text-muted-foreground">{order.eventTitle} · {order.items.length} fotos</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-4">
-                  <StatusPill
-                    dot={getOrderStatusStyle(order.status).dot}
-                    text={getOrderStatusStyle(order.status).text}
-                    label={getOrderStatusStyle(order.status).label}
-                    className="text-xs font-medium uppercase tracking-wide"
-                  />
-                  <span className="font-bold">Q{order.total}</span>
-                </div>
-              </Link>
+                order={order}
+                profileName={orderCodeName}
+                canSelect={false}
+                selected={false}
+                onToggleSelect={() => {}}
+              />
             ))}
           </div>
         )}

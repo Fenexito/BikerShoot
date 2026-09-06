@@ -40,7 +40,7 @@ function urgencyClass(order: PhotographerOrderGroup) {
   return null
 }
 
-function OrderRow({
+export function OrderRow({
   order,
   profileName,
   canSelect,

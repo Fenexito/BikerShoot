@@ -15,7 +15,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconTrash, IconEdit } from '../../ui/shared/icons'
+import { IconTrash, IconEdit, IconChevronLeft } from '../../ui/shared/icons'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
@@ -54,10 +54,11 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 /** El acordeón horizontal necesita ancho real para lucir bien (el efecto de
  * expandir un panel angosto no tiene sentido en una pantalla de celular) —
- * en móvil se reemplaza por una cuadrícula simple: sin selección múltiple
- * (queda como función de escritorio) y con el botón de eliminar siempre
- * visible en vez de solo al hover. */
-function MobileGridTile({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
+ * en móvil se reemplaza por una cuadrícula simple, solo para VER: ni
+ * selección múltiple, ni subir, ni eliminar — esas acciones administrativas
+ * quedan para escritorio. Lo único que el fotógrafo puede subir desde el
+ * móvil son fotos destacadas (ver `FeaturedPhotosSection`). */
+function MobileGridTile({ photo }: { photo: EventPhoto }) {
   return (
     <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted">
       <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
@@ -66,13 +67,6 @@ function MobileGridTile({ photo, onDelete }: { photo: EventPhoto; onDelete: (id:
           Vendida
         </span>
       )}
-      <button
-        onClick={() => onDelete(photo.id)}
-        aria-label="Eliminar foto"
-        className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white"
-      >
-        <IconTrash className="h-3.5 w-3.5" />
-      </button>
     </div>
   )
 }
@@ -174,7 +168,7 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGa
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground sm:hidden">Selección múltiple disponible en escritorio</p>
+        <p className="text-xs text-muted-foreground sm:hidden">Subir y eliminar fotos está disponible en escritorio</p>
         <div className="hidden gap-1 rounded-full bg-muted p-1 sm:flex">
           <button
             onClick={() => setView('grid')}
@@ -194,7 +188,7 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGa
       {/* Móvil: cuadrícula simple, sin selección múltiple ni vista de lista. */}
       <div className="grid grid-cols-3 gap-2 sm:hidden">
         {visible.map((photo) => (
-          <MobileGridTile key={photo.id} photo={photo} onDelete={onDelete} />
+          <MobileGridTile key={photo.id} photo={photo} />
         ))}
       </div>
 
@@ -305,7 +299,7 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
 
       {expanded && (
         <div className="border-t border-border p-5">
-          <div className="mb-4 flex justify-end">
+          <div className="mb-4 hidden justify-end sm:flex">
             <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
               {uploadOpen ? 'Cerrar' : '+ Subir fotos a este punto'}
             </Button>
@@ -345,7 +339,10 @@ export function StudioEventView() {
   const eventPointsRef = useRef<{ id: string; label: string }[]>([])
 
   useEffect(() => {
-    eventPointsRef.current = event?.event_points ?? []
+    // "Destacadas" se trata como un punto más para efectos del header
+    // pegajoso — si el fotógrafo está haciendo scroll dentro de esa sección
+    // también debe ver su nombre ahí, igual que con cualquier punto real.
+    eventPointsRef.current = [{ id: '__featured__', label: 'Destacadas' }, ...(event?.event_points ?? [])]
   }, [event])
 
   function handlePointExpandedChange(pointId: string, expanded: boolean) {
@@ -516,6 +513,7 @@ export function StudioEventView() {
     <>
       {coverUrl ? (
         <ScrollExpand
+          className="-mt-[4.75rem] md:mt-0"
           src={coverUrl}
           alt={event.title}
           title={event.title}
@@ -527,7 +525,7 @@ export function StudioEventView() {
           endRadius={1}
           mediaZoom={1.5}
           scrollDistance={1}
-          holdDistance={0.45}
+          holdDistance={0.08}
           smoothing={0.3}
           overlayScrim={0.5}
         />
@@ -539,9 +537,12 @@ export function StudioEventView() {
       )}
 
       <div className={STUDIO_PAGE_WIDE}>
+        {/* En móvil la flecha de volver ya vive dentro de la barra del
+            evento (más abajo) — este link aparte solo tiene sentido en
+            escritorio, donde esa barra no tiene flecha propia. */}
         <Link
           to="/studio/eventos"
-          className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          className="hidden w-fit items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:inline-flex"
         >
           <span aria-hidden>←</span> Volver a eventos
         </Link>
@@ -549,27 +550,30 @@ export function StudioEventView() {
         <div
           className={cn(
             'sticky z-20 mt-6 transition-[top] duration-300',
-            headerHidden ? 'top-3' : 'top-[4.75rem] md:top-[5.5rem]',
+            // El header de arriba solo se oculta en móvil (en escritorio
+            // nunca se mueve — eso se rediseñará aparte), así que este
+            // offset dinámico debe aplicar solo por debajo de sm.
+            headerHidden ? 'top-3' : 'top-[4.75rem]',
+            'md:top-[5.5rem]',
           )}
         >
-          {/* Móvil: flecha atrás + título + estado + menú de tres puntos —
-              la barra de stats y el thumbnail no caben cómodos aquí, y el
-              botón de pausar/publicar se mueve dentro del menú. */}
+          {/* Móvil: flecha atrás, nombre del evento, y estado + menú de tres
+              puntos alineados a la derecha — la barra de stats y el
+              thumbnail no caben cómodos aquí, y pausar/publicar se mueve
+              dentro del menú. */}
           <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:hidden">
             <Link
               to="/studio/eventos"
               aria-label="Volver a eventos"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg text-foreground transition-colors hover:bg-muted"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
             >
-              ←
+              <IconChevronLeft className="h-5 w-5" />
             </Link>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
-                <h1 className="truncate text-sm font-bold tracking-tight2">{event.title}</h1>
-              </div>
+              <h1 className="truncate text-sm font-bold tracking-tight2">{event.title}</h1>
               {scrolled && activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
             </div>
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
             <ActionMenu
               items={[
                 event.status === 'pausado'
@@ -655,7 +659,12 @@ export function StudioEventView() {
         {event.description && <p className="mt-6 max-w-2xl text-muted-foreground">{event.description}</p>}
 
         <div className="mt-10 flex flex-col gap-4 pb-24">
-          <FeaturedPhotosSection eventId={event.id} photographerId={event.photographer_id} />
+          <FeaturedPhotosSection
+            eventId={event.id}
+            photographerId={event.photographer_id}
+            registerRef={(el) => (pointRefs.current['__featured__'] = el)}
+            onExpandedChange={(exp) => handlePointExpandedChange('__featured__', exp)}
+          />
 
           {event.event_points.map((pt) => (
             <PointCard

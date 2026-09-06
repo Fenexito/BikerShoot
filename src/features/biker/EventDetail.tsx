@@ -146,6 +146,7 @@ export function EventDetail() {
     <div className="pb-24 font-flat">
       {coverUrl ? (
         <ScrollExpand
+          className="-mt-[4.75rem] md:mt-0"
           src={coverUrl}
           alt={event.title}
           title={event.title}
@@ -157,7 +158,7 @@ export function EventDetail() {
           endRadius={1}
           mediaZoom={1.5}
           scrollDistance={1}
-          holdDistance={0.45}
+          holdDistance={0.08}
           smoothing={0.3}
           overlayScrim={0.5}
         />

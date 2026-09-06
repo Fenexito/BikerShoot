@@ -33,6 +33,14 @@ export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconChevronLeft(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
+
 export function IconWhatsapp(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -289,6 +297,17 @@ export function IconTrash(props: SVGProps<SVGSVGElement>) {
       <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
       <line x1="10" y1="11" x2="10" y2="17" />
       <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  )
+}
+
+export function IconUsers(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6" />
+      <path d="M15.5 5.5a3 3 0 0 1 0 5.8" />
+      <path d="M17.5 14c2.5.4 4.5 2.4 4.5 6" />
     </svg>
   )
 }
