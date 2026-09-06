@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
 import { PhotoUploadQueue } from './components/PhotoUploadQueue'
+import { FeaturedPhotosSection } from './components/FeaturedPhotosSection'
 import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
 import { Button } from '../../ui/studio/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
@@ -48,6 +49,31 @@ function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
   return out
+}
+
+/** El acordeón horizontal necesita ancho real para lucir bien (el efecto de
+ * expandir un panel angosto no tiene sentido en una pantalla de celular) —
+ * en móvil se reemplaza por una cuadrícula simple: sin selección múltiple
+ * (queda como función de escritorio) y con el botón de eliminar siempre
+ * visible en vez de solo al hover. */
+function MobileGridTile({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
+  return (
+    <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted">
+      <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+      {photo.delivered_path && (
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
+          Vendida
+        </span>
+      )}
+      <button
+        onClick={() => onDelete(photo.id)}
+        aria-label="Eliminar foto"
+        className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white"
+      >
+        <IconTrash className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
 }
 
 /** Fila de la galería tipo "acordeón" (hover expande la foto activa) — el
@@ -146,8 +172,9 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGa
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-end">
-        <div className="flex gap-1 rounded-full bg-muted p-1">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground sm:hidden">Selección múltiple disponible en escritorio</p>
+        <div className="hidden gap-1 rounded-full bg-muted p-1 sm:flex">
           <button
             onClick={() => setView('grid')}
             className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
@@ -163,19 +190,28 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGa
         </div>
       </div>
 
-      {view === 'grid' ? (
-        <div className="flex flex-col gap-3">
-          {chunk(visible, PAGE_SIZE).map((rowPhotos, i) => (
-            <AccordionRow key={i} photos={rowPhotos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
-          {visible.map((photo) => (
-            <PhotoListRow key={photo.id} photo={photo} onDelete={onDelete} />
-          ))}
-        </div>
-      )}
+      {/* Móvil: cuadrícula simple, sin selección múltiple ni vista de lista. */}
+      <div className="grid grid-cols-3 gap-2 sm:hidden">
+        {visible.map((photo) => (
+          <MobileGridTile key={photo.id} photo={photo} onDelete={onDelete} />
+        ))}
+      </div>
+
+      <div className="hidden sm:block">
+        {view === 'grid' ? (
+          <div className="flex flex-col gap-3">
+            {chunk(visible, PAGE_SIZE).map((rowPhotos, i) => (
+              <AccordionRow key={i} photos={rowPhotos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
+            {visible.map((photo) => (
+              <PhotoListRow key={photo.id} photo={photo} onDelete={onDelete} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Zona ancla siempre presente (con o sin botón) — así el scroll a la
           última fila funciona incluso cuando "ver más" ya no tiene sentido
@@ -305,6 +341,9 @@ export function StudioEventView() {
   const photosByPoint = useMemo(() => {
     const map = new Map<string, EventPhoto[]>()
     for (const p of photos) {
+      // Las destacadas viven en su propia sección — nunca deben colarse en
+      // "sin punto asignado" solo porque comparten point_id null.
+      if (p.featured) continue
       const key = p.point_id ?? '__none__'
       const list = map.get(key) ?? []
       list.push(p)
@@ -539,6 +578,8 @@ export function StudioEventView() {
         {event.description && <p className="mt-6 max-w-2xl text-muted-foreground">{event.description}</p>}
 
         <div className="mt-10 flex flex-col gap-4 pb-24">
+          <FeaturedPhotosSection eventId={event.id} photographerId={event.photographer_id} />
+
           {event.event_points.map((pt) => (
             <PointCard
               key={pt.id}
