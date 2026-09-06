@@ -7,6 +7,8 @@ export interface PointStorage {
   totalPhotos: number
   soldPhotos: number
   bytes: number
+  soldBytes: number
+  unsoldBytes: number
 }
 
 export interface EventStorage {
@@ -16,6 +18,8 @@ export interface EventStorage {
   totalPhotos: number
   soldPhotos: number
   bytes: number
+  soldBytes: number
+  unsoldBytes: number
   points: PointStorage[]
 }
 
@@ -80,6 +84,10 @@ export function useStorageOverview(photographerId: string | undefined) {
         }
       }
 
+      function bytesFor(list: PhotoRow[], sold: boolean) {
+        return list.filter((p) => !!p.delivered_path === sold).reduce((sum, p) => sum + photoBytes(p), 0)
+      }
+
       return events.map((event): EventStorage => {
         const eventPhotos = photosByEvent.get(event.id) ?? []
         const eventPoints = pointsByEvent.get(event.id) ?? []
@@ -90,6 +98,8 @@ export function useStorageOverview(photographerId: string | undefined) {
           totalPhotos: eventPhotos.length,
           soldPhotos: eventPhotos.filter((p) => p.delivered_path).length,
           bytes: eventPhotos.reduce((sum, p) => sum + photoBytes(p), 0),
+          soldBytes: bytesFor(eventPhotos, true),
+          unsoldBytes: bytesFor(eventPhotos, false),
           points: eventPoints.map((pt): PointStorage => {
             const ptPhotos = photosByPoint.get(pt.id) ?? []
             return {
@@ -98,6 +108,8 @@ export function useStorageOverview(photographerId: string | undefined) {
               totalPhotos: ptPhotos.length,
               soldPhotos: ptPhotos.filter((p) => p.delivered_path).length,
               bytes: ptPhotos.reduce((sum, p) => sum + photoBytes(p), 0),
+              soldBytes: bytesFor(ptPhotos, true),
+              unsoldBytes: bytesFor(ptPhotos, false),
             }
           }),
         }
