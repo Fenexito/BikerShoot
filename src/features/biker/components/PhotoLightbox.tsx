@@ -17,7 +17,7 @@ import type { GridPhoto } from './PhotoGrid'
 // precio, destacada) sin tener que buscarlo por fuera.
 declare module 'yet-another-react-lightbox' {
   interface SlideImage {
-    photoData: GridPhoto
+    photoData?: GridPhoto
   }
 }
 
@@ -112,8 +112,8 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
       carousel={{ finite: false, padding: 0, imageFit: 'contain' }}
       animation={{ swipe: 250 }}
       render={{
-        slideHeader: ({ slide }) => <SlideHeader photo={slide.photoData} position={`${index + 1} / ${photos.length}`} />,
-        slideFooter: ({ slide }) => <SlideFooter photo={slide.photoData} />,
+        slideHeader: ({ slide }) => <SlideHeader photo={slide.photoData!} position={`${index + 1} / ${photos.length}`} />,
+        slideFooter: ({ slide }) => <SlideFooter photo={slide.photoData!} />,
       }}
       className="motoshots-lightbox"
     />

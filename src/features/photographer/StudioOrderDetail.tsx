@@ -18,6 +18,9 @@ import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
+import Lightbox from 'yet-another-react-lightbox'
+import Zoom from 'yet-another-react-lightbox/plugins/zoom'
+import 'yet-another-react-lightbox/styles.css'
 
 interface DeliverablePhoto {
   id: string
@@ -33,42 +36,15 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   const push = useToastStore((s) => s.push)
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [downloadingRaw, setDownloadingRaw] = useState(false)
   const [openingDelivered, setOpeningDelivered] = useState(false)
-  const [togglingFeatured, setTogglingFeatured] = useState(false)
-
-  async function toggleFeatured() {
-    setTogglingFeatured(true)
-    const { error } = await supabase.from('photos').update({ featured: !photo.featured }).eq('id', photo.id)
-    setTogglingFeatured(false)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
-      return
-    }
-    push({ type: 'success', title: photo.featured ? 'Quitada de destacadas' : '★ Agregada a tu muro de destacadas' })
-    queryClient.invalidateQueries({ queryKey: ['photographer-order-items'] })
-    queryClient.invalidateQueries({ queryKey: ['featured-photographer-photos'] })
-  }
-
-  async function downloadRaw() {
-    setDownloadingRaw(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('r2-raw-download-url', { body: { photoId: photo.id } })
-      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
-      window.open(data.downloadUrl, '_blank')
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
-    } finally {
-      setDownloadingRaw(false)
-    }
-  }
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   async function viewDelivered() {
     setOpeningDelivered(true)
     try {
       const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: photo.id } })
       if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
-      window.open(data.downloadUrl, '_blank')
+      setLightboxUrl(data.downloadUrl)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo abrir la entrega', description: (err as Error).message })
     } finally {
@@ -138,20 +114,6 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
             Abriendo…
           </div>
         )}
-        {delivered && (
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleFeatured() }}
-            disabled={togglingFeatured}
-            aria-label="Destacar en tu perfil público"
-            title="Destacar en tu perfil público"
-            className={cn(
-              'absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-base shadow-sm transition-colors',
-              photo.featured ? 'bg-accent text-white' : 'bg-white/90 text-foreground hover:bg-white',
-            )}
-          >
-            ★
-          </button>
-        )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute inset-x-2 bottom-2">
           {delivered ? (
@@ -176,22 +138,47 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
         <p className="truncate text-xs text-muted-foreground" title={photo.original_filename ?? undefined}>
           {photo.original_filename ?? 'Sin nombre registrado'}
         </p>
-        {photo.raw_path && (
-          <button
-            onClick={downloadRaw}
-            disabled={downloadingRaw}
-            className="mt-1 block text-xs font-semibold text-accent hover:underline disabled:opacity-50"
-          >
-            {downloadingRaw ? 'Generando…' : '⬇ Descargar original (respaldo)'}
-          </button>
-        )}
       </div>
+
+      {lightboxUrl && (
+        <Lightbox
+          open
+          close={() => setLightboxUrl(null)}
+          index={0}
+          slides={[{ src: lightboxUrl }]}
+          plugins={[Zoom]}
+          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
+          render={{
+            slideFooter: () => (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-5">
+                <a
+                  href={lightboxUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="pointer-events-auto rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+                >
+                  ⬇ Descargar
+                </a>
+              </div>
+            ),
+          }}
+        />
+      )}
     </div>
   )
 }
 
-const FLOW: OrderItemStatus[] = ['pendiente_pago', 'en_preparacion', 'entregado']
-const FLOW_LABELS = FLOW.map((s) => getOrderStatusStyle(s).label)
+// 4 pasos visibles (los status reales en la base de datos son solo 3) —
+// "Pedido creado" siempre existe y siempre está completo para cualquier
+// pedido no cancelado, así el fotógrafo ve el recorrido completo en vez
+// de empezar el stepper ya a mitad de camino.
+const TOP_STEP_LABELS = ['Pedido creado', 'Pago confirmado', 'En preparación', 'Entregado']
+const TOP_STEP_INDEX: Record<OrderItemStatus, number> = {
+  pendiente_pago: 1,
+  en_preparacion: 2,
+  entregado: 3,
+  cancelado: 0,
+}
 const NEXT_ACTION: Partial<Record<OrderItemStatus, { next: OrderItemStatus; label: string }>> = {
   pendiente_pago: { next: 'en_preparacion', label: 'Confirmar pago recibido' },
 }
@@ -200,6 +187,42 @@ const SECTION_COPY: Record<OrderItemStatus, string> = {
   en_preparacion: 'Edita cada foto por tu cuenta y sube aquí el archivo final — eso es lo que el biker va a descargar. En cuanto subas las que faltan, el pedido pasa a "Entregado" automáticamente.',
   entregado: 'Pedido completo — el biker ya tiene sus archivos finales. Puedes hacer clic en cualquier foto para ver exactamente lo que se le entregó.',
   cancelado: 'Este pedido fue cancelado — el biker ya no tiene acceso a estas fotos.',
+}
+
+/** Guía de 3 pasos para el fotógrafo — qué toca hacer ahora mismo, no solo
+ * en qué estado está el pedido. */
+const CHECKLIST = [
+  { status: 'pendiente_pago' as const, label: 'Confirma que recibiste el pago' },
+  { status: 'en_preparacion' as const, label: 'Edita las fotos por tu cuenta' },
+  { status: 'en_preparacion' as const, label: 'Súbelas aquí para entregarlas' },
+]
+
+function ActionChecklist({ status }: { status: OrderItemStatus }) {
+  if (status === 'cancelado') return null
+  const currentIdx = status === 'pendiente_pago' ? 0 : status === 'en_preparacion' ? 1 : 3
+  return (
+    <div className="mt-6 flex flex-col gap-2 rounded-2xl bg-muted/40 p-4 sm:flex-row sm:items-center sm:gap-4">
+      {CHECKLIST.map((step, i) => {
+        const done = i < currentIdx || status === 'entregado'
+        const active = !done && i === currentIdx
+        return (
+          <div key={step.label} className="flex items-center gap-2">
+            <span
+              className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                done ? 'bg-foreground text-background' : active ? 'border-2 border-foreground text-foreground' : 'border border-border text-muted-foreground',
+              )}
+            >
+              {done ? '✓' : i + 1}
+            </span>
+            <span className={cn('text-xs', done ? 'text-muted-foreground line-through' : active ? 'font-semibold' : 'text-muted-foreground')}>
+              {step.label}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function timeAgoFull(iso: string) {
@@ -260,6 +283,7 @@ export function StudioOrderDetail() {
   const push = useToastStore((s) => s.push)
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   useEffect(() => {
     setNote(order?.note ?? '')
@@ -276,7 +300,7 @@ export function StudioOrderDetail() {
   }
   if (!order) return <PlaceholderPage title="Pedido no encontrado" />
 
-  const stepIndex = FLOW.indexOf(order.status)
+  const stepIndex = TOP_STEP_INDEX[order.status]
   const action = NEXT_ACTION[order.status]
   const canCancel = order.status === 'pendiente_pago' || order.status === 'en_preparacion'
   const statusStyle = getOrderStatusStyle(order.status)
@@ -384,47 +408,9 @@ export function StudioOrderDetail() {
           </div>
         </div>
 
-        {order.status !== 'cancelado' && <OrderStepper steps={FLOW_LABELS} currentIndex={stepIndex} className="mt-8" />}
+        {order.status !== 'cancelado' && <OrderStepper steps={TOP_STEP_LABELS} currentIndex={stepIndex} className="mt-8" />}
 
-        <div className="mt-8 grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
-          <div>
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Desglose del cobro</h3>
-            {sameUnitPrice ? (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{order.items.length} × Q{unitPrice}</span>
-                <span className="font-semibold">Q{order.total}</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5 text-sm">
-                {order.items.map((item, i) => (
-                  <div key={item.id} className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Foto {i + 1}</span>
-                    <span>Q{item.price}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-base font-bold">
-              <span>Total</span>
-              <span>Q{order.total}</span>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Nota interna</h3>
-            <p className="mb-2 text-xs text-muted-foreground">Solo la ves tú — el biker nunca la ve.</p>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="Ej. Cliente pidió reenviar por WhatsApp…"
-              className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-sm outline-none focus:border-accent"
-            />
-            <Button variant="secondary" size="sm" className="mt-2" onClick={saveNote} loading={savingNote}>
-              Guardar nota
-            </Button>
-          </div>
-        </div>
+        {order.status !== 'cancelado' && <ActionChecklist status={order.status} />}
 
         {order.status === 'cancelado' && order.cancellationReason && (
           <div className="mt-6 rounded-2xl border border-border bg-muted/40 p-4">
@@ -433,13 +419,67 @@ export function StudioOrderDetail() {
           </div>
         )}
 
-        <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
+        <div className="mt-6 border-t border-border pt-4">
+          <button
+            onClick={() => setDetailsOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Desglose del cobro y nota interna
+            <span className={cn('text-xs transition-transform', detailsOpen && 'rotate-180')}>▾</span>
+          </button>
+
+          {detailsOpen && (
+            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              <div>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Desglose del cobro</h3>
+                {sameUnitPrice ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{order.items.length} × Q{unitPrice}</span>
+                    <span className="font-semibold">Q{order.total}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    {order.items.map((item, i) => (
+                      <div key={item.id} className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Foto {i + 1}</span>
+                        <span>Q{item.price}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-base font-bold">
+                  <span>Total</span>
+                  <span>Q{order.total}</span>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Nota interna</h3>
+                <p className="mb-2 text-xs text-muted-foreground">Solo la ves tú — el biker nunca la ve.</p>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  placeholder="Ej. Cliente pidió reenviar por WhatsApp…"
+                  className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-sm outline-none focus:border-accent"
+                />
+                <Button variant="secondary" size="sm" className="mt-2" onClick={saveNote} loading={savingNote}>
+                  Guardar nota
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
           {canCancel ? (
-            <Button variant="danger" onClick={cancelOrder}>Cancelar pedido</Button>
+            <button onClick={cancelOrder} className="text-xs font-medium text-muted-foreground transition-colors hover:text-red-500">
+              Cancelar pedido
+            </button>
           ) : (
             <span />
           )}
-          {action && <Button onClick={confirmAction}>{action.label}</Button>}
+          {action && <Button variant="dark" onClick={confirmAction}>{action.label}</Button>}
         </div>
       </div>
 

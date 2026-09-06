@@ -14,7 +14,7 @@ interface OrderStepperProps {
 
 export function OrderStepper({ steps, currentIndex, className }: OrderStepperProps) {
   return (
-    <div className={cn('flex w-full items-center overflow-x-auto', className)}>
+    <div className={cn('flex w-full items-center overflow-x-auto py-1.5', className)}>
       {steps.map((label, i) => {
         const isFinalStep = i === steps.length - 1
         const status = i < currentIndex || (i === currentIndex && isFinalStep) ? 'complete' : i === currentIndex ? 'active' : 'inactive'
