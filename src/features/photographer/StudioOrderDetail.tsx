@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useOrderGroup, type PhotographerOrderGroup } from './useMyOrders'
+import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
@@ -253,6 +254,8 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
 export function StudioOrderDetail() {
   const { id } = useParams()
   const { user, profile } = useAuth()
+  const { data: details } = usePhotographerDetails(user?.id)
+  const orderCodeName = details?.order_nickname ?? profile?.display_name
   const { data: order, isLoading } = useOrderGroup(user?.id, id)
   const push = useToastStore((s) => s.push)
   const [note, setNote] = useState('')
@@ -350,7 +353,7 @@ export function StudioOrderDetail() {
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
               <h1 className="text-2xl font-bold tracking-tight">{order.bikerName}</h1>
-              <p className="text-muted-foreground">{formatOrderCode(order.orderNumber, profile?.display_name)} · {order.eventTitle}</p>
+              <p className="text-muted-foreground">{formatOrderCode(order.orderNumber, orderCodeName)} · {order.eventTitle}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">

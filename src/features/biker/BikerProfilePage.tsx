@@ -14,6 +14,12 @@ import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { IconBookmark, IconCart, IconMap, IconUser, IconLogOut } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { Skeleton } from '../../ui/shared/Skeleton'
+import type { NotificationType } from '../notifications/useNotifications'
+
+const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description: string }[] = [
+  { type: 'pedido_entregado', label: 'Foto lista', description: 'Cuando el fotógrafo entrega tu foto comprada.' },
+  { type: 'pedido_cancelado', label: 'Pedido cancelado', description: 'Si un fotógrafo cancela un pedido tuyo.' },
+]
 
 const QUICK_LINKS = [
   { to: '/app/mapa', label: 'Mapa', icon: <IconMap className="h-5 w-5" /> },
@@ -46,6 +52,17 @@ export function BikerProfilePage() {
     } finally {
       setSigningOut(false)
     }
+  }
+
+  async function toggleNotification(type: NotificationType, enabled: boolean) {
+    if (!user || !profile) return
+    const next = { ...profile.notification_prefs, [type]: enabled }
+    const { error } = await supabase.from('profiles').update({ notification_prefs: next }).eq('id', user.id)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo guardar', description: error.message })
+      return
+    }
+    await refreshProfile()
   }
 
   const {
@@ -153,6 +170,31 @@ export function BikerProfilePage() {
             </Button>
           </div>
         </form>
+      </Card>
+
+      <Card tint="blue" className="mt-6 cursor-default hover:scale-100">
+        <h2 className="text-lg font-bold tracking-tight">Notificaciones</h2>
+        <div className="mt-4 flex flex-col gap-4">
+          {NOTIFICATION_TOGGLES.map((n) => {
+            const enabled = profile?.notification_prefs?.[n.type] !== false
+            return (
+              <div key={n.type} className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{n.label}</p>
+                  <p className="text-xs text-muted-foreground">{n.description}</p>
+                </div>
+                <button
+                  onClick={() => toggleNotification(n.type, !enabled)}
+                  role="switch"
+                  aria-checked={enabled}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? 'bg-primary' : 'bg-muted'}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
       </Card>
 
       <button

@@ -70,8 +70,12 @@ function NotificationRow({ notification, userId, onNavigate }: { notification: A
  * fotógrafo distinga pedidos nuevos de cancelaciones de un vistazo sin
  * perder de vista el resto. */
 export function NotificationsMenu() {
-  const { user } = useAuth()
-  const { data: notifications = [] } = useNotifications(user?.id)
+  const { user, profile } = useAuth()
+  const { data: rawNotifications = [] } = useNotifications(user?.id)
+  // Un tipo desactivado en Configuración > Notificaciones se sigue guardando
+  // en el servidor (nunca se fabrica del lado del cliente), solo se oculta
+  // aquí — así el usuario deja de verlo sin tocar el trigger que lo escribe.
+  const notifications = rawNotifications.filter((n) => profile?.notification_prefs?.[n.type] !== false)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const unread = notifications.filter((n) => !n.read_at)

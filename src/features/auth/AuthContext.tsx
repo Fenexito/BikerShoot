@@ -10,6 +10,7 @@ export interface Profile {
   display_name: string
   avatar_url: string | null
   phone: string | null
+  notification_prefs: Record<string, boolean>
 }
 
 interface AuthState {
@@ -27,6 +28,7 @@ interface AuthState {
   signIn: (email: string, password: string, portal: 'biker' | 'studio') => Promise<{ error: string | null }>
   signInWithGoogle: (portal: 'biker' | 'studio') => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  signOutEverywhere: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
   refreshProfile: () => Promise<void>
@@ -142,6 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  async function signOutEverywhere() {
+    await supabase.auth.signOut({ scope: 'global' })
+  }
+
   async function requestPasswordReset(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
@@ -170,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signInWithGoogle,
         signOut,
+        signOutEverywhere,
         requestPasswordReset,
         updatePassword,
         refreshProfile,

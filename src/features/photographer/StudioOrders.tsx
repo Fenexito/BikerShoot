@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerOrders, type PhotographerOrderGroup } from './useMyOrders'
+import { usePhotographerDetails } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { useToastStore } from '../../ui/overlays/toastStore'
@@ -96,6 +97,8 @@ function OrderRow({
 
 export function StudioOrders() {
   const { user, profile } = useAuth()
+  const { data: details } = usePhotographerDetails(user?.id)
+  const orderCodeName = details?.order_nickname ?? profile?.display_name
   const { data: orders = [], isLoading } = usePhotographerOrders(user?.id)
   const push = useToastStore((s) => s.push)
   const [tab, setTab] = useState<OrderItemStatus | 'todos'>('todos')
@@ -208,7 +211,7 @@ export function StudioOrders() {
               <OrderRow
                 key={order.orderId}
                 order={order}
-                profileName={profile?.display_name}
+                profileName={orderCodeName}
                 canSelect={order.status === 'pendiente_pago'}
                 selected={selectedIds.has(order.orderId)}
                 onToggleSelect={() => toggleSelect(order.orderId)}
@@ -233,7 +236,7 @@ export function StudioOrders() {
           <OrderRow
             key={order.orderId}
             order={order}
-            profileName={profile?.display_name}
+            profileName={orderCodeName}
             canSelect={order.status === 'pendiente_pago'}
             selected={selectedIds.has(order.orderId)}
             onToggleSelect={() => toggleSelect(order.orderId)}
