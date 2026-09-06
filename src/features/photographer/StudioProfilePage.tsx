@@ -1,49 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
 import { usePublicPhotographer, useFeaturedPhotographerPhotos, usePhotographerPhotoCount } from '../biker/usePublicData'
 import { useMyEvents } from './useMyEvents'
 import { StudioEventCard } from './components/StudioEventCard'
-import { supabase } from '../../lib/supabase'
-import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
 import { Button } from '../../ui/studio/Button'
-import { Input } from '../../ui/studio/Input'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
 import { IconVerified, IconCreditCard, IconSettings, IconLogOut } from '../../ui/shared/icons'
 import { ThemeToggle } from '../../ui/studio/ThemeToggle'
 import { Skeleton } from '../../ui/shared/Skeleton'
-import { useToastStore } from '../../ui/overlays/toastStore'
 import DriftWall from '../../ui/reactbits/DriftWall'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import { cn } from '../../lib/cn'
-
-const schema = z.object({
-  displayName: z.string().min(2, 'Ingresa el nombre de tu estudio'),
-  city: z.string().optional(),
-  whatsapp: z.string().optional(),
-  bio: z.string().optional(),
-  instagramUrl: z.string().optional(),
-  facebookUrl: z.string().optional(),
-  tiktokUrl: z.string().optional(),
-})
-type FormValues = z.infer<typeof schema>
 
 function formatBytes(n: number) {
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(0)} MB`
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
+/** Puramente visual — igual a como lo ve un biker en PhotographerProfile.tsx,
+ * con la única diferencia de que aquí también se ve el conteo de fotos y el
+ * uso de almacenamiento/plan. Toda edición (foto, portada, logo, bio, redes,
+ * cuenta) vive en /studio/ajustes — "Editar perfil" solo lleva ahí. */
 export function StudioProfilePage() {
-  const { user, profile, refreshProfile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
+  const [tab, setTab] = useState<'destacadas' | 'eventos'>('destacadas')
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -54,179 +41,13 @@ export function StudioProfilePage() {
       setSigningOut(false)
     }
   }
+
   const { data: details } = usePhotographerDetails(user?.id)
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: photographer, isLoading } = usePublicPhotographer(user?.id)
   const { data: events = [] } = useMyEvents(user?.id)
   const { data: featuredPhotos = [] } = useFeaturedPhotographerPhotos(user?.id)
   const { data: photoCount = 0 } = usePhotographerPhotoCount(user?.id)
-  const push = useToastStore((s) => s.push)
-  const avatarInputRef = useRef<HTMLInputElement>(null)
-  const coverInputRef = useRef<HTMLInputElement>(null)
-  const logoInputRef = useRef<HTMLInputElement>(null)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [uploadingCover, setUploadingCover] = useState(false)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [tab, setTab] = useState<'destacadas' | 'eventos'>('destacadas')
-
-  async function handleCoverFile(file: File | undefined) {
-    if (!file || !user) return
-    if (!file.type.startsWith('image/')) {
-      push({ type: 'error', title: 'La portada debe ser una imagen' })
-      return
-    }
-    setUploadingCover(true)
-    try {
-      const { data: signed, error: signError } = await supabase.functions.invoke('r2-profile-cover-upload-url', {
-        body: { fileName: file.name, contentType: file.type },
-      })
-      if (signError || !signed?.uploadUrl) throw new Error(signError?.message ?? 'No se pudo obtener la URL de subida')
-
-      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
-
-      const { error: updateError } = await supabase
-        .from('photographer_details')
-        .update({ profile_cover_path: signed.coverPath })
-        .eq('profile_id', user.id)
-      if (updateError) throw updateError
-
-      queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
-      push({ type: 'success', title: 'Portada actualizada' })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo actualizar la portada', description: (err as Error).message })
-    } finally {
-      setUploadingCover(false)
-    }
-  }
-
-  async function handleLogoFile(file: File | undefined) {
-    if (!file || !user) return
-    if (!file.type.startsWith('image/')) {
-      push({ type: 'error', title: 'El logo debe ser una imagen' })
-      return
-    }
-    setUploadingLogo(true)
-    try {
-      const { data: signed, error: signError } = await supabase.functions.invoke('r2-profile-logo-upload-url', {
-        body: { fileName: file.name, contentType: file.type },
-      })
-      if (signError || !signed?.uploadUrl) throw new Error(signError?.message ?? 'No se pudo obtener la URL de subida')
-
-      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
-
-      const { error: updateError } = await supabase
-        .from('photographer_details')
-        .update({ logo_path: signed.logoPath })
-        .eq('profile_id', user.id)
-      if (updateError) throw updateError
-
-      queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
-      push({ type: 'success', title: 'Logo actualizado' })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo actualizar el logo', description: (err as Error).message })
-    } finally {
-      setUploadingLogo(false)
-    }
-  }
-
-  async function removeLogo() {
-    if (!user) return
-    const { error } = await supabase.from('photographer_details').update({ logo_path: null }).eq('profile_id', user.id)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo quitar el logo', description: error.message })
-      return
-    }
-    queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-    queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
-    push({ type: 'success', title: 'Logo removido' })
-  }
-
-  async function handleAvatarFile(file: File | undefined) {
-    if (!file || !user) return
-    if (!file.type.startsWith('image/')) {
-      push({ type: 'error', title: 'La foto de perfil debe ser una imagen' })
-      return
-    }
-    setUploadingAvatar(true)
-    try {
-      const { data: signed, error: signError } = await supabase.functions.invoke('r2-avatar-upload-url', {
-        body: { fileName: file.name, contentType: file.type },
-      })
-      if (signError || !signed?.uploadUrl) throw new Error(signError?.message ?? 'No se pudo obtener la URL de subida')
-
-      const putRes = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
-
-      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: signed.avatarPath }).eq('id', user.id)
-      if (updateError) throw updateError
-
-      await refreshProfile()
-      queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
-      push({ type: 'success', title: 'Foto de perfil actualizada' })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo actualizar la foto', description: (err as Error).message })
-    } finally {
-      setUploadingAvatar(false)
-    }
-  }
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) })
-
-  useEffect(() => {
-    if (profile) {
-      reset({
-        displayName: profile.display_name,
-        city: details?.city ?? '',
-        whatsapp: details?.whatsapp ?? '',
-        bio: details?.bio ?? '',
-        instagramUrl: details?.instagram_url ?? '',
-        facebookUrl: details?.facebook_url ?? '',
-        tiktokUrl: details?.tiktok_url ?? '',
-      })
-    }
-  }, [profile, details, reset])
-
-  const onSubmit = async (values: FormValues) => {
-    if (!user) return
-
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ display_name: values.displayName })
-      .eq('id', user.id)
-
-    const { error: detailsError } = await supabase
-      .from('photographer_details')
-      .update({
-        city: values.city || null,
-        whatsapp: values.whatsapp || null,
-        bio: values.bio || null,
-        instagram_url: values.instagramUrl || null,
-        facebook_url: values.facebookUrl || null,
-        tiktok_url: values.tiktokUrl || null,
-      })
-      .eq('profile_id', user.id)
-
-    if (profileError || detailsError) {
-      push({ type: 'error', title: 'No se pudo guardar', description: profileError?.message ?? detailsError?.message })
-      return
-    }
-
-    await refreshProfile()
-    queryClient.invalidateQueries({ queryKey: ['photographer_details', user.id] })
-    queryClient.invalidateQueries({ queryKey: ['public-photographer', user.id] })
-    push({ type: 'success', title: 'Perfil actualizado' })
-    setEditing(false)
-  }
 
   if (isLoading || !profile || !photographer) {
     return (
@@ -246,61 +67,51 @@ export function StudioProfilePage() {
   }
 
   const avatarUrl = profile.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
+  const coverUrl = details?.profile_cover_path ? r2Url(details.profile_cover_path) : null
   const limitBytes = details?.storage_plan ? details.storage_plan.gb_limit * 1024 * 1024 * 1024 : 0
   const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
 
   return (
     <div>
-      {/* Banner — misma animación de portada que ve el biker en su perfil público
-          (PhotographerProfile.tsx), con el único añadido de poder cambiarla aquí. */}
-      <div className="relative">
-        {details?.profile_cover_path ? (
-          <ScrollExpand
-            src={r2Url(details.profile_cover_path)}
-            alt={profile.display_name}
-            title={details?.logo_path ? undefined : profile.display_name}
-            titleNode={
-              details?.logo_path ? (
-                <img
-                  src={r2Url(details.logo_path)}
-                  alt={profile.display_name}
-                  className="max-h-[60%] max-w-[80%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
-                />
-              ) : undefined
-            }
-            scrollHint="Desliza para ver tu perfil"
-            useWindowScroll
-            startWidth={60}
-            startHeight={60}
-            startRadius={36}
-            endRadius={1}
-            mediaZoom={1.5}
-            scrollDistance={1}
-            holdDistance={0.45}
-            smoothing={0.3}
-            overlayScrim={0.5}
-          />
-        ) : (
-          <div className="flex h-48 items-center justify-center bg-muted md:h-64">
-            <span className="text-6xl opacity-20">🏍️</span>
-          </div>
-        )}
-      </div>
-      <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
+      {coverUrl ? (
+        <ScrollExpand
+          src={coverUrl}
+          alt={profile.display_name}
+          title={details?.logo_path ? undefined : profile.display_name}
+          titleNode={
+            details?.logo_path ? (
+              <img
+                src={r2Url(details.logo_path)}
+                alt={profile.display_name}
+                className="max-h-[60%] max-w-[80%] object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
+              />
+            ) : undefined
+          }
+          scrollHint="Desliza para ver tu perfil"
+          useWindowScroll
+          startWidth={60}
+          startHeight={60}
+          startRadius={36}
+          endRadius={1}
+          mediaZoom={1.5}
+          scrollDistance={1}
+          holdDistance={0.45}
+          smoothing={0.3}
+          overlayScrim={0.5}
+        />
+      ) : (
+        <div className="flex h-48 items-center justify-center bg-muted md:h-64">
+          <span className="text-6xl opacity-20">🏍️</span>
+        </div>
+      )}
 
       <div className={STUDIO_PAGE_WIDE}>
         <div className="-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
-          <button onClick={() => avatarInputRef.current?.click()} className="group relative h-36 w-36 shrink-0 rounded-full" disabled={uploadingAvatar}>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt={profile.display_name} className="h-36 w-36 rounded-full border-4 border-background object-cover shadow-sm" />
-            ) : (
-              <InitialsAvatar name={profile.display_name || 'S'} className="h-36 w-36 rounded-full border-4 border-background bg-foreground text-3xl text-background shadow-sm" />
-            )}
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100">
-              {uploadingAvatar ? '…' : 'Cambiar'}
-            </span>
-          </button>
-          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={profile.display_name} className="h-36 w-36 rounded-full border-4 border-background object-cover shadow-sm" />
+          ) : (
+            <InitialsAvatar name={profile.display_name || 'S'} className="h-36 w-36 rounded-full border-4 border-background bg-foreground text-3xl text-background shadow-sm" />
+          )}
 
           <div className="flex-1 text-center sm:text-left">
             <div className="flex items-center justify-center gap-2 sm:justify-start">
@@ -316,39 +127,9 @@ export function StudioProfilePage() {
             />
           </div>
 
-          <div className="flex shrink-0 gap-2">
-            <Button variant="secondary" onClick={() => coverInputRef.current?.click()} loading={uploadingCover}>
-              Cambiar portada
-            </Button>
-            <Button variant={editing ? 'secondary' : 'dark'} onClick={() => setEditing((e) => !e)}>
-              {editing ? 'Cancelar' : 'Editar perfil'}
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-muted/30 px-4 py-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
-            {details?.logo_path ? (
-              <img src={r2Url(details.logo_path)} alt="Logo" className="h-full w-full object-contain" />
-            ) : (
-              <span className="text-lg opacity-30">🖼️</span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Logo PNG (opcional)</p>
-            <p className="text-xs text-muted-foreground">Aparece en vez de tu nombre sobre la animación de portada de tu perfil.</p>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="secondary" size="sm" onClick={() => logoInputRef.current?.click()} loading={uploadingLogo}>
-              {details?.logo_path ? 'Cambiar' : 'Subir logo'}
-            </Button>
-            {details?.logo_path && (
-              <Button variant="ghost" size="sm" onClick={removeLogo}>
-                Quitar
-              </Button>
-            )}
-          </div>
-          <input ref={logoInputRef} type="file" accept="image/png,image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0])} />
+          <Link to="/studio/ajustes">
+            <Button variant="dark">Editar perfil</Button>
+          </Link>
         </div>
 
         {!details?.approved && (
@@ -390,37 +171,7 @@ export function StudioProfilePage() {
           )}
         </div>
 
-        {editing ? (
-          <form className="mt-8 flex flex-col gap-5 rounded-3xl border border-border bg-card p-6 sm:p-8" onSubmit={handleSubmit(onSubmit)}>
-            <p className="text-sm text-muted-foreground">Esto es lo que ve un biker en tu perfil público.</p>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Input label="Nombre del estudio" error={errors.displayName?.message} {...register('displayName')} />
-              <Input label="Ciudad" {...register('city')} />
-              <Input label="WhatsApp de contacto" {...register('whatsapp')} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sobre ti</label>
-              <textarea
-                rows={4}
-                className="rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
-                {...register('bio')}
-              />
-            </div>
-            <div>
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Redes sociales (opcional)</p>
-              <div className="grid gap-5 sm:grid-cols-3">
-                <Input label="Instagram" placeholder="https://instagram.com/tu_estudio" {...register('instagramUrl')} />
-                <Input label="Facebook" placeholder="https://facebook.com/tu_estudio" {...register('facebookUrl')} />
-                <Input label="TikTok" placeholder="https://tiktok.com/@tu_estudio" {...register('tiktokUrl')} />
-              </div>
-            </div>
-            <Button type="submit" variant="dark" size="lg" loading={isSubmitting} className="mt-2 w-fit">
-              Guardar cambios
-            </Button>
-          </form>
-        ) : (
-          photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>
-        )}
+        {photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>}
 
         <div className="mt-8 flex flex-wrap gap-2">
           <button
@@ -445,41 +196,34 @@ export function StudioProfilePage() {
 
         <div className="py-8">
           {tab === 'destacadas' ? (
-            <>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Sube tus fotos destacadas desde el editor de cada evento (junto a la portada y la marca de agua) —
-                estas mismas aparecen aquí, en la página del evento y en tu perfil público. No están a la venta ni
-                disponibles para descarga.
-              </p>
-              {featuredPhotos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>
-              ) : (
-                <div
-                  className="w-screen"
-                  style={{ height: '75vh', minHeight: 480, marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}
-                >
-                  <DriftWall
-                    items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
-                    columns={Math.max(3, Math.min(8, Math.floor(featuredPhotos.length / 4)))}
-                    tileWidth={220}
-                    tileHeight={220}
-                    gap={6}
-                    radius={0}
-                    tilt={16}
-                    turn={-14}
-                    perspective={950}
-                    depth={100}
-                    speed={22}
-                    variance={0.5}
-                    parallax={0.5}
-                    lift={48}
-                    fade={0.15}
-                    dim={0.92}
-                    overlayColor="transparent"
-                  />
-                </div>
-              )}
-            </>
+            featuredPhotos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>
+            ) : (
+              <div
+                className="w-screen"
+                style={{ height: '75vh', minHeight: 480, marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}
+              >
+                <DriftWall
+                  items={featuredPhotos.map((p) => ({ image: previewUrl(p) }))}
+                  columns={Math.max(3, Math.min(8, Math.floor(featuredPhotos.length / 4)))}
+                  tileWidth={220}
+                  tileHeight={220}
+                  gap={6}
+                  radius={0}
+                  tilt={16}
+                  turn={-14}
+                  perspective={950}
+                  depth={100}
+                  speed={22}
+                  variance={0.5}
+                  parallax={0.5}
+                  lift={48}
+                  fade={0.15}
+                  dim={0.92}
+                  overlayColor="transparent"
+                />
+              </div>
+            )
           ) : (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (
