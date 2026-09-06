@@ -1,6 +1,7 @@
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { cn } from '../../../lib/cn'
 
 const ACCENT_ICON = L.divIcon({
   className: '',
@@ -23,11 +24,12 @@ interface MapPointPickerProps {
   lng: number
   onPick?: (lat: number, lng: number) => void
   readOnly?: boolean
+  heightClassName?: string
 }
 
-export function MapPointPicker({ lat, lng, onPick, readOnly }: MapPointPickerProps) {
+export function MapPointPicker({ lat, lng, onPick, readOnly, heightClassName = 'h-64' }: MapPointPickerProps) {
   return (
-    <div className="h-64 w-full overflow-hidden rounded-2xl border border-border">
+    <div className={cn('w-full overflow-hidden rounded-2xl border border-border', heightClassName)}>
       <MapContainer
         center={[lat, lng]}
         zoom={12}

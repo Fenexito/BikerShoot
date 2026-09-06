@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useEvent } from './useMyEvents'
@@ -13,9 +13,11 @@ import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { IconInfo, IconMap, IconImages } from '../../ui/shared/icons'
+import { useBackButton } from '../../ui/shared/useBackButton'
+import { cn } from '../../lib/cn'
 import type { EventStatus } from '../../types/db'
 import { Skeleton } from '../../ui/shared/Skeleton'
-import { useBackButton } from '../../ui/shared/useBackButton'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos'] as const
 const AUTODROMOS = ['Autodromo Pedro Cofiño', 'Autodromo GT', 'Guatemala Raceway (1/4 de Milla)']
@@ -25,6 +27,19 @@ const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: 'cerrado', label: 'Cerrado' },
 ]
 const RODADA_CITY = 'Guatemala'
+
+const TAB_IDS = ['info', 'cobertura', 'imagenes'] as const
+type TabId = (typeof TAB_IDS)[number]
+
+function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return (
+    <section className="rounded-3xl border border-border bg-card p-6 sm:p-8">
+      <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      <div className="mt-5">{children}</div>
+    </section>
+  )
+}
 
 interface LocalPoint {
   id: string
@@ -47,6 +62,7 @@ export function StudioEventEditor() {
   const { data: existing, isLoading } = useEvent(id)
   const { data: routes = [] } = useRoutes()
 
+  const [tab, setTab] = useState<TabId>('info')
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('Rodada')
   const [routeId, setRouteId] = useState('')
@@ -160,6 +176,7 @@ export function StudioEventEditor() {
     const isRodada = category === 'Rodada'
     if (!title.trim() || (!isRodada && !city.trim())) {
       push({ type: 'error', title: 'Título y ciudad son obligatorios' })
+      setTab('info')
       return
     }
 
@@ -322,205 +339,224 @@ export function StudioEventEditor() {
     )
   }
 
+  const isRodada = category === 'Rodada'
+  const TABS: { id: TabId; label: string; icon: typeof IconInfo }[] = [
+    { id: 'info', label: 'Información', icon: IconInfo },
+    { id: 'cobertura', label: isRodada ? 'Ruta' : 'Punto', icon: IconMap },
+    { id: 'imagenes', label: 'Imágenes', icon: IconImages },
+  ]
+
   return (
     <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">
         {isNew ? 'Crear evento' : 'Editar evento'}
       </h1>
-      <p className="mt-2 text-muted-foreground">La info básica y los puntos de cobertura con su horario.</p>
+      <p className="mt-2 text-muted-foreground">La info básica, la ruta o punto de cobertura, y las imágenes del evento.</p>
 
-      <div className="mt-10 grid gap-5 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Input label="Título del evento" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Rodada Nocturna Antigua" />
-        </div>
-        <FancySelect
-          label="Categoría"
-          value={category}
-          onChange={(v) => setCategory(v as typeof category)}
-          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
-          clearable={false}
-        />
-        {category === 'Rodada' && (
-          <FancySelect
-            label="Ruta"
-            value={routeId}
-            onChange={setRouteId}
-            options={routes.map((r) => ({ value: r.id, label: r.name }))}
-            placeholder="Selecciona una ruta"
-          />
-        )}
-        <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
-        {category !== 'Rodada' && <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />}
-        {category === 'Pista' && (
-          <FancySelect
-            label="Autódromo"
-            value={venue}
-            onChange={setVenue}
-            options={AUTODROMOS.map((a) => ({ value: a, label: a }))}
-            placeholder="Selecciona un autódromo"
-          />
-        )}
-        {category === 'Sesión de Fotos' && (
-          <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
-        )}
-        <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
-        <FancySelect
-          label="Estado"
-          value={status}
-          onChange={(v) => setStatus(v as EventStatus)}
-          options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
-          clearable={false}
-        />
-        <div className="sm:col-span-2">
-          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Descripción</label>
-          <textarea
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
-          />
+      <div className="mt-8 grid gap-8 lg:grid-cols-[180px_1fr]">
+        {/* Mismo patrón que Configuración: pestañas subrayadas horizontales
+            en móvil, lista vertical a la izquierda en escritorio. */}
+        <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                tab === t.id
+                  ? 'border-foreground font-bold text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <t.icon className="h-4 w-4 shrink-0" />
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex flex-col gap-6 pb-24">
+          {tab === 'info' && (
+            <Section title="Información del evento">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Input label="Título del evento" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Rodada Nocturna Antigua" />
+                </div>
+                <FancySelect
+                  label="Categoría"
+                  value={category}
+                  onChange={(v) => setCategory(v as typeof category)}
+                  options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                  clearable={false}
+                />
+                <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+                {category !== 'Rodada' && <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />}
+                {category === 'Pista' && (
+                  <FancySelect
+                    label="Autódromo"
+                    value={venue}
+                    onChange={setVenue}
+                    options={AUTODROMOS.map((a) => ({ value: a, label: a }))}
+                    placeholder="Selecciona un autódromo"
+                  />
+                )}
+                {category === 'Sesión de Fotos' && (
+                  <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
+                )}
+                <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+                <FancySelect
+                  label="Estado"
+                  value={status}
+                  onChange={(v) => setStatus(v as EventStatus)}
+                  options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
+                  clearable={false}
+                />
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Descripción</label>
+                  <textarea
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-base text-foreground outline-none transition-colors duration-150 focus:border-accent"
+                  />
+                </div>
+              </div>
+            </Section>
+          )}
+
+          {tab === 'cobertura' && (
+            <Section
+              title={isRodada ? 'Ruta y puntos' : 'Punto de cobertura'}
+              description={
+                isRodada
+                  ? 'Cada punto es un lugar donde te paraste a cierta hora. Los bikers los usan para encontrarte por su ruta.'
+                  : 'Marca en el mapa dónde vas a estar y a qué hora — los bikers lo usan para encontrar sus fotos.'
+              }
+            >
+              {isRodada && (
+                <div className="mb-6">
+                  <FancySelect
+                    label="Ruta"
+                    value={routeId}
+                    onChange={setRouteId}
+                    options={routes.map((r) => ({ value: r.id, label: r.name }))}
+                    placeholder="Selecciona una ruta"
+                  />
+                </div>
+              )}
+
+              {points.length > 0 && (
+                <div className="mb-6 flex flex-col divide-y divide-border rounded-2xl border border-border">
+                  {points.map((pt) => (
+                    <div key={pt.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                      <p className="font-semibold">{pt.label}</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time"
+                          value={pt.timeStart}
+                          onChange={(e) => updatePointTime(pt.id, 'timeStart', e.target.value)}
+                          className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
+                        />
+                        <span className="text-xs text-muted-foreground">–</span>
+                        <input
+                          type="time"
+                          value={pt.timeEnd}
+                          onChange={(e) => updatePointTime(pt.id, 'timeEnd', e.target.value)}
+                          className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
+                        />
+                        <button onClick={() => removePoint(pt.id)} className="ml-2 text-sm text-muted-foreground hover:text-foreground">
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} useRoute={isRodada} routeId={routeId} />
+            </Section>
+          )}
+
+          {tab === 'imagenes' && (
+            <>
+              <Section title="Portada y marca de agua">
+                <div className="flex flex-wrap gap-8">
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => coverInputRef.current?.click()} className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted">
+                      {(coverLocalPreview || coverPath) ? (
+                        <img src={coverLocalPreview ?? r2Url(coverPath!)} alt="Portada" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-lg opacity-30">📷</span>
+                      )}
+                    </button>
+                    <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
+                    <div>
+                      <p className="text-sm font-semibold">Foto de portada</p>
+                      <p className="mb-1 text-xs text-muted-foreground">Banner ancho en la vista del evento. Opcional.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => coverInputRef.current?.click()} className="text-xs font-semibold text-foreground hover:underline">
+                          {coverPath || coverLocalPreview ? 'Cambiar' : 'Subir'}
+                        </button>
+                        {(coverPath || coverLocalPreview) && (
+                          <button onClick={clearCover} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => watermarkInputRef.current?.click()}
+                      className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-border bg-muted [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
+                    >
+                      {(watermarkLocalPreview || watermarkPath) ? (
+                        <img src={watermarkLocalPreview ?? r2Url(watermarkPath!)} alt="Marca de agua" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="text-lg opacity-30">🖼️</span>
+                      )}
+                    </button>
+                    <input ref={watermarkInputRef} type="file" accept="image/png" className="hidden" onChange={(e) => handleWatermarkFile(e.target.files?.[0])} />
+                    <div>
+                      <p className="text-sm font-semibold">Marca de agua (PNG)</p>
+                      <p className="mb-1 text-xs text-muted-foreground">Se estampa sobre las fotos. Opcional.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => watermarkInputRef.current?.click()} className="text-xs font-semibold text-foreground hover:underline">
+                          {watermarkPath || watermarkLocalPreview ? 'Cambiar' : 'Subir'}
+                        </button>
+                        {(watermarkPath || watermarkLocalPreview) && (
+                          <button onClick={clearWatermark} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+
+              {!isNew && id && user && (
+                <Section
+                  title="Fotos destacadas"
+                  description={`Tu portafolio de este evento — hasta ${MAX_FEATURED} fotos en alta calidad, sin marca de agua. No están a la venta.`}
+                >
+                  <FeaturedPhotosUploader eventId={id} photographerId={user.id} />
+                </Section>
+              )}
+
+              {isNew && (
+                <p className="text-sm text-muted-foreground">
+                  Las fotos destacadas y las fotos por punto se suben desde la vista del evento, una vez creado.
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      {/* Portada + Marca de agua */}
-      <section className="mt-14 border-t border-border pt-10">
-        <div className="grid grid-cols-1 gap-10 divide-y divide-border sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-y-0">
-          <div className="flex flex-col gap-4 sm:pr-10">
-            <div>
-              <h2 className="font-studio text-xl font-bold tracking-tight2">Foto de portada</h2>
-              <p className="mt-1 min-h-[2.75rem] text-justify text-sm text-muted-foreground [text-align-last:left]">
-                Se muestra como banner ancho en la vista del evento y en tu lista de eventos. Opcional.
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              {(coverLocalPreview || coverPath) ? (
-                <img
-                  src={coverLocalPreview ?? r2Url(coverPath!)}
-                  alt="Portada"
-                  className="h-20 w-32 shrink-0 rounded-2xl border border-border object-cover"
-                />
-              ) : (
-                <div className="flex h-20 w-32 shrink-0 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
-                  Sin portada
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <Button variant="ghost" size="sm" onClick={() => coverInputRef.current?.click()}>
-                  {coverPath || coverLocalPreview ? 'Cambiar' : 'Subir portada'}
-                </Button>
-                {(coverPath || coverLocalPreview) && (
-                  <Button variant="ghost" size="sm" onClick={clearCover}>Quitar</Button>
-                )}
-              </div>
-            </div>
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleCoverFile(e.target.files?.[0])}
-            />
-          </div>
-
-          <div className="flex flex-col gap-4 pt-10 sm:pl-10 sm:pt-0">
-            <div>
-              <h2 className="font-studio text-xl font-bold tracking-tight2">Marca de agua</h2>
-              <p className="mt-1 min-h-[2.75rem] text-justify text-sm text-muted-foreground [text-align-last:left]">
-                Un PNG que se estampa sobre las fotos de este evento. Opcional — sin uno, las fotos se suben reducidas pero sin marca.
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              {(watermarkLocalPreview || watermarkPath) ? (
-                <img
-                  src={watermarkLocalPreview ?? r2Url(watermarkPath!)}
-                  alt="Marca de agua"
-                  className="h-20 w-20 shrink-0 rounded-2xl border border-border object-contain [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
-                />
-              ) : (
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center border border-dashed border-border text-xs text-muted-foreground">
-                  Sin PNG
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <Button variant="ghost" size="sm" onClick={() => watermarkInputRef.current?.click()}>
-                  {watermarkPath || watermarkLocalPreview ? 'Cambiar PNG' : 'Subir PNG'}
-                </Button>
-                {(watermarkPath || watermarkLocalPreview) && (
-                  <Button variant="ghost" size="sm" onClick={clearWatermark}>Quitar</Button>
-                )}
-              </div>
-            </div>
-            <input
-              ref={watermarkInputRef}
-              type="file"
-              accept="image/png"
-              className="hidden"
-              onChange={(e) => handleWatermarkFile(e.target.files?.[0])}
-            />
-          </div>
-        </div>
-      </section>
-
-      {!isNew && id && user && (
-        <section className="mt-14 border-t border-border pt-10">
-          <h2 className="font-studio text-xl font-bold tracking-tight2">Fotos destacadas</h2>
-          <p className="mt-1 mb-6 text-sm text-muted-foreground">
-            Tu portafolio de este evento — hasta {MAX_FEATURED} fotos en alta calidad, sin marca de agua. No están a la venta;
-            aparecen en esta página del evento, en tu perfil público y pueden usarse en el muro de bienvenida.
-          </p>
-          <FeaturedPhotosUploader eventId={id} photographerId={user.id} />
-        </section>
-      )}
-
-      {/* Puntos de cobertura */}
-      <section className="mt-14 border-t border-border pt-10">
-        <h2 className="font-studio text-xl font-bold tracking-tight2">Puntos de cobertura</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Cada punto es un lugar donde te paraste a cierta hora. Los bikers los usan para encontrarte por su ruta.
-        </p>
-
-        {points.length > 0 && (
-          <div className="mt-6 flex flex-col divide-y divide-border rounded-2xl border border-border">
-            {points.map((pt) => (
-              <div key={pt.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <p className="font-semibold">{pt.label}</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={pt.timeStart}
-                    onChange={(e) => updatePointTime(pt.id, 'timeStart', e.target.value)}
-                    className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
-                  />
-                  <span className="text-xs text-muted-foreground">–</span>
-                  <input
-                    type="time"
-                    value={pt.timeEnd}
-                    onChange={(e) => updatePointTime(pt.id, 'timeEnd', e.target.value)}
-                    className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
-                  />
-                  <button onClick={() => removePoint(pt.id)} className="ml-2 text-sm text-muted-foreground hover:text-accent">
-                    Quitar
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-6">
-          <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} useRoute={category === 'Rodada'} routeId={routeId} />
-        </div>
-      </section>
-
-      {!isNew && (
-        <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
-          Para subir fotos, guarda tus cambios y hazlo desde la vista del evento.
-        </p>
-      )}
-
       <div className="sticky bottom-0 z-20 mt-10 flex justify-end gap-3 border-t border-border bg-background px-6 py-4 -mx-6 md:-mx-16 md:px-16">
         <Button variant="secondary" onClick={() => navigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
-        <Button onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
+        <Button variant="dark" onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
       </div>
     </div>
   )

@@ -5,9 +5,9 @@ import { Input } from '../../../ui/studio/Input'
 import { FancySelect } from '../../../ui/shared/FancySelect'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
+import { cn } from '../../../lib/cn'
 
 const GUATEMALA_CENTER = { lat: 14.6349, lng: -90.5069 }
-const NEW_POINT = '__new__'
 
 export interface AddedPoint {
   routePointId: string | null
@@ -40,6 +40,9 @@ interface RoutePointPickerProps {
   routeId?: string
 }
 
+/** Dos modos EXPLÍCITOS en vez de un selector con una opción "+ Nuevo punto"
+ * mezclada entre los reales — esa mezcla es justo lo que resultaba confuso.
+ * "Punto existente" solo aparece si la ruta ya tiene puntos guardados. */
 export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPickerProps>(function RoutePointPicker(
   { onAdd, useRoute = false, routeId = '' },
   ref,
@@ -47,7 +50,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   const push = useToastStore((s) => s.push)
   const { data: routePoints = [] } = useRoutePoints(routeId || undefined)
 
-  const [pointFormOpen, setPointFormOpen] = useState(true)
+  const [mode, setMode] = useState<'existing' | 'new'>('new')
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint | null>(null)
   const [newLabel, setNewLabel] = useState('')
   const [newLat, setNewLat] = useState(GUATEMALA_CENTER.lat)
@@ -57,6 +60,8 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   const [timeStart, setTimeStart] = useState('05:00')
   const [timeEnd, setTimeEnd] = useState('05:30')
 
+  const usingRoute = useRoute && !!routeId
+
   function resetPointForm() {
     setSelectedPoint(null)
     setNewLabel('')
@@ -65,24 +70,18 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   }
 
   // Si el fotógrafo cambia la ruta arriba, el punto que tenía a medio elegir
-  // ya no tiene sentido (pertenecía a la ruta anterior).
+  // ya no tiene sentido (pertenecía a la ruta anterior). Arranca en "nuevo"
+  // si la ruta todavía no tiene puntos guardados, o en "existente" si ya
+  // hay de dónde elegir (menos fricción que forzar a crear uno más).
   useEffect(() => {
     resetPointForm()
-    setPointFormOpen(!routeId)
+    setMode(routePoints.length > 0 ? 'existing' : 'new')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeId])
 
-  function handlePointChange(value: string) {
-    if (value === NEW_POINT) {
-      setPointFormOpen(true)
-      setSelectedPoint(null)
-    } else {
-      const found = routePoints.find((p) => p.id === value)
-      if (found) {
-        setSelectedPoint({ routePointId: found.id, label: found.label, lat: found.lat, lng: found.lng })
-        setPointFormOpen(false)
-      }
-    }
+  function handleSelectExisting(value: string) {
+    const found = routePoints.find((p) => p.id === value)
+    if (found) setSelectedPoint({ routePointId: found.id, label: found.label, lat: found.lat, lng: found.lng })
   }
 
   async function handleCreatePoint() {
@@ -93,8 +92,9 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     setSavingPoint(true)
     try {
       const point = await createRoutePoint(routeId, newLabel.trim(), newLat, newLng)
+      push({ type: 'success', title: 'Punto guardado en la ruta' })
       setSelectedPoint({ routePointId: point.id, label: point.label, lat: point.lat, lng: point.lng })
-      setPointFormOpen(false)
+      setMode('existing')
       setNewLabel('')
     } catch (err) {
       push({ type: 'error', title: 'No se pudo crear el punto', description: (err as Error).message })
@@ -103,15 +103,15 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     }
   }
 
-  const usingRoute = useRoute && !!routeId
-  const readyToTime = usingRoute ? !!selectedPoint : !!newLabel.trim()
+  const readyToTime = usingRoute ? (mode === 'existing' ? !!selectedPoint : !!newLabel.trim()) : !!newLabel.trim()
 
   function resolvePendingPoint(): AddedPoint | null {
-    const point: SelectedPoint | null = usingRoute
-      ? selectedPoint
-      : newLabel.trim()
-        ? { routePointId: null, label: newLabel.trim(), lat: newLat, lng: newLng }
-        : null
+    const point: SelectedPoint | null =
+      usingRoute && mode === 'existing'
+        ? selectedPoint
+        : newLabel.trim()
+          ? { routePointId: null, label: newLabel.trim(), lat: newLat, lng: newLng }
+          : null
     if (!point) return null
     return { ...point, timeStart, timeEnd }
   }
@@ -124,7 +124,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     }
     onAdd(point)
     resetPointForm()
-    setPointFormOpen(!usingRoute)
+    setMode(usingRoute && routePoints.length > 0 ? 'existing' : 'new')
   }
 
   useImperativeHandle(ref, () => ({
@@ -132,74 +132,99 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
       const point = resolvePendingPoint()
       if (!point) return null
       resetPointForm()
-      setPointFormOpen(!usingRoute)
+      setMode(usingRoute && routePoints.length > 0 ? 'existing' : 'new')
       return point
     },
   }))
 
   if (useRoute && !routeId) {
     return (
-      <div className="border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         Elige una ruta arriba para poder agregar puntos.
       </div>
     )
   }
 
-  return (
-    <div className="rounded-2xl border border-border p-5">
-      {usingRoute && (
-        <FancySelect
-          label="Punto en esta ruta"
-          value={selectedPoint?.routePointId ?? (pointFormOpen ? NEW_POINT : '')}
-          onChange={handlePointChange}
-          options={[...routePoints.map((p) => ({ value: p.id, label: p.label })), { value: NEW_POINT, label: '+ Nuevo punto en esta ruta' }]}
-          placeholder="Selecciona un punto"
-        />
-      )}
+  const mapLat = mode === 'existing' && selectedPoint ? selectedPoint.lat : newLat
+  const mapLng = mode === 'existing' && selectedPoint ? selectedPoint.lng : newLng
+  const mapReadOnly = mode === 'existing'
 
-      {pointFormOpen && (
-        <div className="mt-4">
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Haz clic en el mapa para marcar el punto
-          </p>
-          <MapPointPicker lat={newLat} lng={newLng} onPick={(lat, lng) => { setNewLat(lat); setNewLng(lng) }} />
-          <div className="mt-4 flex items-end gap-3">
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* El mapa ocupa la mayoría del ancho — es lo que el fotógrafo mira
+          más tiempo al ubicar un punto nuevo. */}
+      <div className="lg:col-span-2">
+        <MapPointPicker
+          lat={mapLat}
+          lng={mapLng}
+          readOnly={mapReadOnly}
+          onPick={mode === 'new' ? (lat, lng) => { setNewLat(lat); setNewLng(lng) } : undefined}
+          heightClassName="h-72 lg:h-[420px]"
+        />
+        {mode === 'new' && (
+          <p className="mt-2 text-xs text-muted-foreground">Haz clic en el mapa para marcar dónde está este punto.</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4 lg:col-span-1">
+        {usingRoute && routePoints.length > 0 && (
+          <div className="flex gap-1 rounded-full bg-muted p-1">
+            <button
+              onClick={() => setMode('existing')}
+              className={cn(
+                'flex-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors',
+                mode === 'existing' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Punto existente
+            </button>
+            <button
+              onClick={() => { setMode('new'); setSelectedPoint(null) }}
+              className={cn(
+                'flex-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors',
+                mode === 'new' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Punto nuevo
+            </button>
+          </div>
+        )}
+
+        {usingRoute && mode === 'existing' ? (
+          <FancySelect
+            label="Punto en esta ruta"
+            value={selectedPoint?.routePointId ?? ''}
+            onChange={handleSelectExisting}
+            options={routePoints.map((p) => ({ value: p.id, label: p.label }))}
+            placeholder="Selecciona un punto"
+          />
+        ) : (
+          <div className="flex items-end gap-3">
             <div className="flex-1">
               <Input label="Nombre del punto" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. VP Racing" />
             </div>
             {usingRoute && (
-              <Button variant="ghost" loading={savingPoint} onClick={handleCreatePoint}>Crear punto</Button>
+              <Button variant="secondary" size="sm" loading={savingPoint} onClick={handleCreatePoint}>
+                Guardar en la ruta
+              </Button>
             )}
           </div>
-        </div>
-      )}
-
-      {selectedPoint && !pointFormOpen && (
-        <div className="mt-4">
-          <p className="mb-3 text-sm text-muted-foreground">
-            Punto: <span className="font-semibold text-foreground">{selectedPoint.label}</span>{' '}
-            <button onClick={() => { setPointFormOpen(true); setSelectedPoint(null) }} className="text-accent underline">Cambiar</button>
+        )}
+        {usingRoute && mode === 'new' && (
+          <p className="-mt-2 text-xs text-muted-foreground">
+            "Guardar en la ruta" lo deja disponible para elegir en futuros eventos de esta misma ruta.
           </p>
-          <MapPointPicker lat={selectedPoint.lat} lng={selectedPoint.lng} readOnly />
-        </div>
-      )}
+        )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Input label="Hora inicio" type="time" value={timeStart} onChange={(e) => setTimeStart(e.target.value)} />
-        <Input label="Hora fin" type="time" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Hora inicio" type="time" value={timeStart} onChange={(e) => setTimeStart(e.target.value)} />
+          <Input label="Hora fin" type="time" value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} />
+        </div>
+
+        <Button variant="dark" className="w-full justify-center py-4 text-sm" onClick={handleAdd} disabled={!readyToTime}>
+          ✓ Agregar este punto a la lista
+        </Button>
       </div>
-      <Button
-        className="mt-4 w-full justify-center py-4 text-sm"
-        onClick={handleAdd}
-        disabled={!readyToTime}
-      >
-        ✓ Agregar este punto a la lista
-      </Button>
-      {readyToTime && (
-        <p className="mt-2 text-center text-xs text-accent">
-          No olvides hacer clic arriba — si guardas el evento sin agregarlo, lo agregamos automáticamente por ti.
-        </p>
-      )}
     </div>
   )
 })
