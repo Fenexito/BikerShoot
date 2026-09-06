@@ -28,6 +28,26 @@ const FAQ_ITEMS = [
     question: '¿Puedo cancelar en cualquier momento?',
     answer: 'Sí, puedes bajar al plan Gratis cuando quieras — el cambio entra en tu próxima renovación, igual que cualquier otra reducción de plan.',
   },
+  {
+    question: '¿Las fotos que ya vendí siguen ocupando espacio de mi plan?',
+    answer: 'Sí, hasta que las liberes desde Almacenamiento. Ahí puedes borrar el preview y el respaldo crudo de una foto ya vendida sin afectar al comprador — la entrega final que recibió nunca se toca ni desaparece, la conserva para siempre.',
+  },
+  {
+    question: '¿Qué son las fotos destacadas y ocupan espacio de mi plan?',
+    answer: 'Sí cuentan dentro de tu espacio. Se suben desde el editor de cada evento, en alta calidad y sin marca de agua, para mostrar tu mejor trabajo en tu perfil y el del evento — nunca están a la venta ni disponibles para descarga por un biker.',
+  },
+  {
+    question: '¿Qué pasa si cancelo un pedido después de confirmarlo?',
+    answer: 'El biker recibe una notificación con el motivo que escribas y pierde acceso a esas fotos específicas. Es una acción que no se puede deshacer, por eso te pedimos escribir el número de pedido para confirmar.',
+  },
+  {
+    question: '¿Por qué mis pedidos tienen un número con letras al final?',
+    answer: 'Es el código corto del pedido (ej. #000938-Mendz) — el sufijo sale del nombre de tu estudio, para que tú y el biker puedan referenciar el pedido por WhatsApp sin confundirlo con el de otro fotógrafo en compras con varios estudios.',
+  },
+  {
+    question: '¿Puedo tener colaboradores subiendo fotos a mi cuenta?',
+    answer: 'Todavía no, pero está en el roadmap — la idea es que un estudio con varios fotógrafos cubriendo distintos puntos pueda dar acceso a cuentas secundarias sin compartir su contraseña principal.',
+  },
 ]
 
 function formatBytes(n: number) {
@@ -292,7 +312,7 @@ export function StudioPlans() {
       <div className="mx-auto mt-20 max-w-2xl">
         <h2 className="text-center font-studio text-3xl font-bold tracking-tight2">Preguntas frecuentes</h2>
         <div className="mt-8">
-          <Accordion items={FAQ_ITEMS} />
+          <Accordion items={FAQ_ITEMS} defaultOpen={null} />
         </div>
       </div>
     </div>
