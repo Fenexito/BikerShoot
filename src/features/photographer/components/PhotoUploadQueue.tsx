@@ -44,9 +44,14 @@ interface PhotoUploadQueueProps {
   price: number
   watermarkPath: string | null
   onItemUploaded?: () => void
+  /** Si se da (ISO), se usa como `captured_at` de TODAS las fotos de esta
+   * cola en vez de leer el EXIF — para cuando el fotógrafo sube directo a
+   * un horario ya declarado a mano (fotos sin metadata, o quiere forzar el
+   * horario sin importar lo que diga el EXIF). */
+  forcedCapturedAt?: string
 }
 
-export function PhotoUploadQueue({ eventId, pointId, photographerId, price, watermarkPath, onItemUploaded }: PhotoUploadQueueProps) {
+export function PhotoUploadQueue({ eventId, pointId, photographerId, price, watermarkPath, onItemUploaded, forcedCapturedAt }: PhotoUploadQueueProps) {
   const push = useToastStore((s) => s.push)
   const itemsRef = useRef<QueueItem[]>([])
   const activeCountRef = useRef(0)
@@ -140,10 +145,11 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       })
       if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
-      const [previewBlob, capturedAt] = await Promise.all([
+      const [previewBlob, exifCapturedAt] = await Promise.all([
         createWatermarkedPreview(item.file, watermarkImageRef.current),
-        extractCapturedAt(item.file),
+        forcedCapturedAt ? Promise.resolve(null) : extractCapturedAt(item.file),
       ])
+      const capturedAt = forcedCapturedAt ?? exifCapturedAt
 
       let previewPct = 0
       let rawPct = item.backupRaw ? 0 : 100

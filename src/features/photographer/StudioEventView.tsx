@@ -7,6 +7,9 @@ import { queryClient } from '../../lib/queryClient'
 import { r2Url, previewUrl } from '../../lib/r2'
 import { PhotoUploadQueue } from './components/PhotoUploadQueue'
 import { FeaturedPhotosSection } from './components/FeaturedPhotosSection'
+import { computeSegments } from './photoSegments'
+import { groupByDeclaredSegments } from './photoGrouping'
+import { sortPhotosByFilename } from './sortPhotos'
 import { EVENT_STATUS_STYLE } from '../../lib/eventStatus'
 import { Button } from '../../ui/studio/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
@@ -93,6 +96,7 @@ function AccordionRow({
         image: previewUrl(photo),
         overlay: (
           <>
+            {selectedIds.has(photo.id) && <span className="absolute inset-0 z-[2] rounded-2xl ring-2 ring-inset ring-red-500" />}
             {photo.delivered_path && (
               <span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                 Vendida
@@ -106,7 +110,7 @@ function AccordionRow({
               aria-label="Seleccionar foto"
               className={cn(
                 'absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold opacity-100 transition-colors sm:opacity-0 sm:group-hover:opacity-100',
-                selectedIds.has(photo.id) ? 'border-white bg-white text-black' : 'border-white/80 bg-black/30 text-transparent hover:bg-black/50',
+                selectedIds.has(photo.id) ? 'border-red-500 bg-red-500 text-white' : 'border-white/80 bg-black/30 text-transparent hover:bg-black/50',
               )}
             >
               ✓
@@ -250,25 +254,52 @@ function PointStack({ photos }: { photos: EventPhoto[] }) {
   )
 }
 
+/** Botón de selección — alterna entre "Seleccionar todas" y "Deseleccionar"
+ * según si TODAS las fotos del grupo ya están seleccionadas o no. */
+function SelectToggle({ ids, selectedIds, onSelectMany, onDeselectMany }: {
+  ids: string[]
+  selectedIds: Set<string>
+  onSelectMany: (ids: string[]) => void
+  onDeselectMany: (ids: string[]) => void
+}) {
+  if (ids.length === 0) return null
+  const allSelected = ids.every((id) => selectedIds.has(id))
+  return (
+    <button
+      onClick={() => (allSelected ? onDeselectMany(ids) : onSelectMany(ids))}
+      className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {allSelected ? 'Deseleccionar' : 'Seleccionar todas'}
+    </button>
+  )
+}
+
 interface PointCardProps {
-  point: { id: string; label: string; time_start: string; time_end: string }
+  point: { id: string; label: string; time_start: string; time_end: string; manual_segments?: { start: string; end: string }[] | null }
   photos: EventPhoto[]
   eventId: string
   photographerId: string
   price: number
   watermarkPath: string | null
+  eventDate: string
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
+  onSelectMany: (ids: string[]) => void
+  onDeselectMany: (ids: string[]) => void
   onDelete: (id: string) => void
   onUploaded: () => void
   registerRef?: (el: HTMLDivElement | null) => void
   onExpandedChange?: (expanded: boolean) => void
 }
 
-function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, selectedIds, onToggleSelect, onDelete, onUploaded, registerRef, onExpandedChange }: PointCardProps) {
+function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, eventDate, selectedIds, onToggleSelect, onSelectMany, onDeselectMany, onDelete, onUploaded, registerRef, onExpandedChange }: PointCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [segmentUploadOpen, setSegmentUploadOpen] = useState<string | null>(null)
   const sold = photos.filter((p) => p.delivered_path).length
+  const hasDeclared = (point.manual_segments?.length ?? 0) > 0
+  const declared = useMemo(() => (hasDeclared ? groupByDeclaredSegments(photos, point.manual_segments!) : null), [hasDeclared, photos, point.manual_segments])
+  const autoSegments = useMemo(() => (hasDeclared ? null : computeSegments(photos)), [hasDeclared, photos])
 
   function toggleExpanded() {
     setExpanded((e) => {
@@ -300,7 +331,8 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
 
       {expanded && (
         <div className="border-t border-border p-5">
-          <div className="mb-4 hidden justify-end sm:flex">
+          <div className="mb-4 hidden items-center justify-between sm:flex">
+            <SelectToggle ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
             <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
               {uploadOpen ? 'Cerrar' : '+ Subir fotos a este punto'}
             </Button>
@@ -315,9 +347,68 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
                 watermarkPath={watermarkPath}
                 onItemUploaded={onUploaded}
               />
+              <p className="mt-2 hidden text-xs text-muted-foreground sm:block">Se clasifican solas por hora si la foto trae EXIF.</p>
             </div>
           )}
-          <PhotoGallery photos={photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+
+          {declared ? (
+            <div className="flex flex-col gap-3">
+              {declared.buckets.map((bucket) => (
+                <div key={bucket.start} className="rounded-2xl border border-border">
+                  <div className="hidden flex-wrap items-center justify-between gap-2 p-3 sm:flex">
+                    <p className="text-sm font-semibold">{bucket.start}–{bucket.end} <span className="font-normal text-muted-foreground">· {bucket.photos.length} fotos</span></p>
+                    <div className="flex items-center gap-2">
+                      <SelectToggle ids={bucket.photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
+                      <button
+                        onClick={() => setSegmentUploadOpen((k) => (k === bucket.start ? null : bucket.start))}
+                        className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                      >
+                        {segmentUploadOpen === bucket.start ? 'Cerrar' : 'Cargar fotos'}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="p-3 text-sm font-semibold sm:hidden">{bucket.start}–{bucket.end} <span className="font-normal text-muted-foreground">· {bucket.photos.length} fotos</span></p>
+                  {segmentUploadOpen === bucket.start && (
+                    <div className="border-t border-border p-3">
+                      <PhotoUploadQueue
+                        eventId={eventId}
+                        pointId={point.id}
+                        photographerId={photographerId}
+                        price={price}
+                        watermarkPath={watermarkPath}
+                        onItemUploaded={onUploaded}
+                        forcedCapturedAt={new Date(`${eventDate}T${bucket.start}:00`).toISOString()}
+                      />
+                    </div>
+                  )}
+                  <div className="border-t border-border p-3">
+                    <PhotoGallery photos={bucket.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+                  </div>
+                </div>
+              ))}
+              {declared.leftover.length > 0 && (
+                <div className="rounded-2xl border border-dashed border-border p-3">
+                  <p className="mb-2 text-sm font-semibold">Otras fotos <span className="font-normal text-muted-foreground">· {declared.leftover.length} fotos</span></p>
+                  <PhotoGallery photos={declared.leftover} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+                </div>
+              )}
+            </div>
+          ) : autoSegments ? (
+            <div className="flex flex-col gap-3">
+              {autoSegments.map((seg) => (
+                <div key={seg.key} className="rounded-2xl border border-border p-3">
+                  <div className="mb-2 hidden items-center justify-between gap-2 sm:flex">
+                    <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
+                    <SelectToggle ids={seg.photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
+                  </div>
+                  <p className="mb-2 text-sm font-semibold sm:hidden">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
+                  <PhotoGallery photos={seg.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <PhotoGallery photos={photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+          )}
         </div>
       )}
     </div>
@@ -381,7 +472,9 @@ export function StudioEventView() {
 
   const photosByPoint = useMemo(() => {
     const map = new Map<string, EventPhoto[]>()
-    for (const p of photos) {
+    // Siempre por nombre de archivo — el correlativo real de la cámara, no
+    // el orden en que se subieron/arrastraron los archivos.
+    for (const p of sortPhotosByFilename(photos)) {
       // Las destacadas viven en su propia sección — nunca deben colarse en
       // "sin punto asignado" solo porque comparten point_id null.
       if (p.featured) continue
@@ -398,6 +491,18 @@ export function StudioEventView() {
       const next = new Set(prev)
       if (next.has(photoId)) next.delete(photoId)
       else next.add(photoId)
+      return next
+    })
+  }
+
+  function selectMany(ids: string[]) {
+    setSelectedIds((prev) => new Set([...prev, ...ids]))
+  }
+
+  function deselectMany(ids: string[]) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) next.delete(id)
       return next
     })
   }
@@ -660,8 +765,11 @@ export function StudioEventView() {
               photographerId={event.photographer_id}
               price={event.price_per_photo}
               watermarkPath={event.watermark_path}
+              eventDate={event.event_date}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
+              onSelectMany={selectMany}
+              onDeselectMany={deselectMany}
               onDelete={deletePhoto}
               onUploaded={invalidatePhotos}
               registerRef={(el) => (pointRefs.current[pt.id] = el)}
@@ -671,7 +779,10 @@ export function StudioEventView() {
 
           {unassigned.length > 0 && (
             <div className="overflow-hidden rounded-3xl border border-border bg-card p-5">
-              <h2 className="mb-4 font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
+                <SelectToggle ids={unassigned.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={selectMany} onDeselectMany={deselectMany} />
+              </div>
               <PhotoGallery photos={unassigned} selectedIds={selectedIds} onToggleSelect={toggleSelect} onDelete={deletePhoto} />
             </div>
           )}

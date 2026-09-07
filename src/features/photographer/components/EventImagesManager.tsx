@@ -4,6 +4,8 @@ import { supabase } from '../../../lib/supabase'
 import { queryClient } from '../../../lib/queryClient'
 import { useEventPhotosDetailed, type EventPhoto } from '../useMyEvents'
 import { computeSegments } from '../photoSegments'
+import { sortPhotosByFilename } from '../sortPhotos'
+import { groupByDeclaredSegments } from '../photoGrouping'
 import { PhotoUploadQueue } from './PhotoUploadQueue'
 import { Button } from '../../../ui/studio/Button'
 import { TimePicker } from '../../../ui/shared/TimePicker'
@@ -15,6 +17,7 @@ import AccordionGallery from '../../../ui/reactbits/AccordionGallery'
 import { cn } from '../../../lib/cn'
 
 const ROW_SIZE = 8
+const MOBILE_PAGE_SIZE = 12
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = []
@@ -47,11 +50,14 @@ interface EventImagesManagerProps {
 /** Cuadrícula móvil de solo-vista — subir/organizar fotos de un punto es
  * exclusivo de escritorio (el mapa y el acordeón horizontal no funcionan
  * bien en una pantalla angosta); en móvil el fotógrafo solo puede revisar
- * lo que ya subió, igual que en el visor del evento. Cada punto se expande
- * de forma independiente (sin parejas de fila — en una sola columna no
- * aplica el emparejado que sí tiene sentido en la grilla de escritorio). */
+ * lo que ya subió, igual que en el visor del evento (máximo 12 a la vez,
+ * con "ver más"). Cada punto se expande de forma independiente (sin
+ * parejas de fila — en una sola columna no aplica el emparejado). */
 function MobilePointRow({ point, photos }: { point: EventPointInfo; photos: EventPhoto[] }) {
   const [expanded, setExpanded] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE)
+  const visible = photos.slice(0, visibleCount)
+
   return (
     <div className="overflow-hidden rounded-3xl border border-border bg-card">
       <button onClick={() => setExpanded((e) => !e)} className="flex w-full flex-wrap items-center gap-3 p-4 text-left">
@@ -71,18 +77,28 @@ function MobilePointRow({ point, photos }: { point: EventPointInfo; photos: Even
           {photos.length === 0 ? (
             <p className="text-sm text-muted-foreground">Todavía no hay fotos en este punto.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {photos.map((photo) => (
-                <div key={photo.id} className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted">
-                  <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
-                  {photo.delivered_path && (
-                    <span className="absolute left-1.5 top-1.5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
-                      Vendida
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                {visible.map((photo) => (
+                  <div key={photo.id} className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted">
+                    <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+                    {photo.delivered_path && (
+                      <span className="absolute left-1.5 top-1.5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
+                        Vendida
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {visibleCount < photos.length && (
+                <button
+                  onClick={() => setVisibleCount((c) => c + MOBILE_PAGE_SIZE)}
+                  className="mt-3 w-full rounded-2xl border border-border py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Ver más fotos ({photos.length - visibleCount} más)
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -120,7 +136,8 @@ function GalleryRows({
             image: previewUrl(photo),
             overlay: (
               <>
-                {selectedIds.has(photo.id) && <span className="absolute inset-0 z-[2] rounded-2xl ring-4 ring-inset ring-red-500" />}
+                {/* Anillo delgado — solo una confirmación visual, no un marco pesado. */}
+                {selectedIds.has(photo.id) && <span className="absolute inset-0 z-[2] rounded-2xl ring-2 ring-inset ring-red-500" />}
                 {photo.delivered_path && (
                   <span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                     Vendida
@@ -166,6 +183,24 @@ function GalleryRows({
   )
 }
 
+/** Botón de selección — alterna entre "Seleccionar todas" y "Deseleccionar"
+ * según si TODAS las fotos del grupo ya están seleccionadas o no. */
+function SelectToggle({ ids, selectedIds, onSelectMany, onDeselectMany, label = 'Seleccionar todas' }: {
+  ids: string[]
+  selectedIds: Set<string>
+  onSelectMany: (ids: string[]) => void
+  onDeselectMany: (ids: string[]) => void
+  label?: string
+}) {
+  if (ids.length === 0) return null
+  const allSelected = ids.every((id) => selectedIds.has(id))
+  return (
+    <Button variant="ghost" size="sm" onClick={() => (allSelected ? onDeselectMany(ids) : onSelectMany(ids))}>
+      {allSelected ? 'Deseleccionar' : label}
+    </Button>
+  )
+}
+
 function DesktopPointCard({
   point,
   photos,
@@ -173,9 +208,11 @@ function DesktopPointCard({
   photographerId,
   price,
   watermarkPath,
+  eventDate,
   selectedIds,
   onToggleSelect,
   onSelectMany,
+  onDeselectMany,
   onUploaded,
   expanded,
   onToggleExpanded,
@@ -188,9 +225,11 @@ function DesktopPointCard({
   photographerId: string
   price: number
   watermarkPath: string | null
+  eventDate: string
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onSelectMany: (ids: string[]) => void
+  onDeselectMany: (ids: string[]) => void
   onUploaded: () => void
   expanded: boolean
   onToggleExpanded: () => void
@@ -199,7 +238,10 @@ function DesktopPointCard({
 }) {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [openSegments, setOpenSegments] = useState<Set<string>>(new Set())
-  const segments = useMemo(() => computeSegments(photos), [photos])
+  const [segmentUploadOpen, setSegmentUploadOpen] = useState<string | null>(null)
+  const autoSegments = useMemo(() => computeSegments(photos), [photos])
+  const hasDeclared = point.manual_segments.length > 0
+  const declared = useMemo(() => (hasDeclared ? groupByDeclaredSegments(photos, point.manual_segments) : null), [hasDeclared, photos, point.manual_segments])
 
   function toggleSegment(key: string) {
     setOpenSegments((prev) => {
@@ -226,12 +268,8 @@ function DesktopPointCard({
 
       {expanded && (
         <div className="border-t border-border p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-            {photos.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => onSelectMany(photos.map((p) => p.id))}>
-                Seleccionar todas
-              </Button>
-            )}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <SelectToggle ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
             <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
               {uploadOpen ? 'Cerrar' : '+ Subir fotos'}
             </Button>
@@ -239,22 +277,80 @@ function DesktopPointCard({
           {uploadOpen && (
             <div className="mb-6">
               <PhotoUploadQueue eventId={eventId} pointId={point.id} photographerId={photographerId} price={price} watermarkPath={watermarkPath} onItemUploaded={onUploaded} />
+              <p className="mt-2 text-xs text-muted-foreground">Se clasifican solas por hora si la foto trae EXIF.</p>
             </div>
           )}
 
-          {photos.length === 0 ? (
+          {photos.length === 0 && !hasDeclared ? (
             <p className="text-sm text-muted-foreground">Todavía no hay fotos en este punto.</p>
-          ) : segments ? (
+          ) : declared ? (
             <div className="flex flex-col gap-3">
-              {segments.map((seg) => (
+              {declared.buckets.map((bucket) => (
+                <div key={bucket.start} className="rounded-2xl border border-border">
+                  <div className="flex w-full flex-wrap items-center justify-between gap-2 p-3">
+                    <button onClick={() => toggleSegment(bucket.start)} className="flex flex-1 items-center justify-between gap-3 text-left">
+                      <p className="text-sm font-semibold">{bucket.start}–{bucket.end} <span className="font-normal text-muted-foreground">· {bucket.photos.length} fotos</span></p>
+                      <span className={cn('text-xs transition-transform', openSegments.has(bucket.start) && 'rotate-180')}>▾</span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {bucket.photos.length > 0 && (
+                        <button onClick={() => (bucket.photos.every((p) => selectedIds.has(p.id)) ? onDeselectMany(bucket.photos.map((p) => p.id)) : onSelectMany(bucket.photos.map((p) => p.id)))} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+                          {bucket.photos.every((p) => selectedIds.has(p.id)) ? 'Deseleccionar' : 'Seleccionar'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setSegmentUploadOpen((k) => (k === bucket.start ? null : bucket.start))}
+                        className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                      >
+                        {segmentUploadOpen === bucket.start ? 'Cerrar' : 'Cargar fotos'}
+                      </button>
+                    </div>
+                  </div>
+                  {segmentUploadOpen === bucket.start && (
+                    <div className="border-t border-border p-3">
+                      <PhotoUploadQueue
+                        eventId={eventId}
+                        pointId={point.id}
+                        photographerId={photographerId}
+                        price={price}
+                        watermarkPath={watermarkPath}
+                        onItemUploaded={onUploaded}
+                        forcedCapturedAt={new Date(`${eventDate}T${bucket.start}:00`).toISOString()}
+                      />
+                    </div>
+                  )}
+                  {openSegments.has(bucket.start) && bucket.photos.length > 0 && (
+                    <div className="border-t border-border p-3">
+                      <GalleryRows photos={bucket.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} visibleRows={visibleRows} onShowMore={onShowMore} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {declared.leftover.length > 0 && (
+                <div className="rounded-2xl border border-dashed border-border">
+                  <button onClick={() => toggleSegment('__otras__')} className="flex w-full items-center justify-between gap-3 p-3 text-left">
+                    <p className="text-sm font-semibold">Otras fotos <span className="font-normal text-muted-foreground">· {declared.leftover.length} fotos</span></p>
+                    <span className={cn('text-xs transition-transform', openSegments.has('__otras__') && 'rotate-180')}>▾</span>
+                  </button>
+                  {openSegments.has('__otras__') && (
+                    <div className="border-t border-border p-3">
+                      <GalleryRows photos={declared.leftover} selectedIds={selectedIds} onToggleSelect={onToggleSelect} visibleRows={visibleRows} onShowMore={onShowMore} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : autoSegments ? (
+            <div className="flex flex-col gap-3">
+              {autoSegments.map((seg) => (
                 <div key={seg.key} className="rounded-2xl border border-border">
                   <div className="flex w-full items-center justify-between gap-3 p-3">
                     <button onClick={() => toggleSegment(seg.key)} className="flex flex-1 items-center justify-between gap-3 text-left">
                       <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
                       <span className={cn('text-xs transition-transform', openSegments.has(seg.key) && 'rotate-180')}>▾</span>
                     </button>
-                    <button onClick={() => onSelectMany(seg.photos.map((p) => p.id))} className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground">
-                      Seleccionar
+                    <button onClick={() => (seg.photos.every((p) => selectedIds.has(p.id)) ? onDeselectMany(seg.photos.map((p) => p.id)) : onSelectMany(seg.photos.map((p) => p.id)))} className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground">
+                      {seg.photos.every((p) => selectedIds.has(p.id)) ? 'Deseleccionar' : 'Seleccionar'}
                     </button>
                   </div>
                   {openSegments.has(seg.key) && (
@@ -281,13 +377,17 @@ function DesktopPointCard({
  * misma fila adicional en ambos. Móvil: lista simple, cada punto
  * independiente, sin subir/seleccionar (solo revisar). */
 export function EventImagesManager({ eventId, photographerId, price, watermarkPath, eventDate, points }: EventImagesManagerProps) {
-  const { data: photos = [] } = useEventPhotosDetailed(eventId)
+  const { data: rawPhotos = [] } = useEventPhotosDetailed(eventId)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openRows, setOpenRows] = useState<Set<number>>(new Set())
   const [visibleRowsByRow, setVisibleRowsByRow] = useState<Record<number, number>>({})
   const [assignHourOpen, setAssignHourOpen] = useState(false)
   const [assignHourValue, setAssignHourValue] = useState('06:00')
   const push = useToastStore((s) => s.push)
+
+  // Siempre por nombre de archivo — es el correlativo real de la cámara, no
+  // depende del orden en que se arrastraron los archivos al subirlos.
+  const photos = useMemo(() => sortPhotosByFilename(rawPhotos), [rawPhotos])
 
   const photosByPoint = useMemo(() => {
     const map = new Map<string, EventPhoto[]>()
@@ -311,6 +411,14 @@ export function EventImagesManager({ eventId, photographerId, price, watermarkPa
 
   function selectMany(ids: string[]) {
     setSelectedIds((prev) => new Set([...prev, ...ids]))
+  }
+
+  function deselectMany(ids: string[]) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) next.delete(id)
+      return next
+    })
   }
 
   function toggleRow(rowIndex: number) {
@@ -412,9 +520,11 @@ export function EventImagesManager({ eventId, photographerId, price, watermarkPa
               photographerId={photographerId}
               price={price}
               watermarkPath={watermarkPath}
+              eventDate={eventDate}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onSelectMany={selectMany}
+              onDeselectMany={deselectMany}
               onUploaded={invalidatePhotos}
               expanded={openRows.has(rowIndex)}
               onToggleExpanded={() => toggleRow(rowIndex)}

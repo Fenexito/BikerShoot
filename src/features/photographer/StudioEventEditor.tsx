@@ -101,13 +101,19 @@ function PointSegmentRow({
   const [expanded, setExpanded] = useState(false)
   const [step, setStep] = useState<15 | 30>(15)
   const [selected, setSelected] = useState<ManualSegment[]>(point.manualSegments)
-  const candidates = generateChipCandidates(point.timeStart, point.timeEnd, step)
+  // Los candidatos siempre continúan justo donde terminó el último horario
+  // ya agregado (sin importar con qué tamaño de chip se agregó) — así el
+  // fotógrafo arma una lista mixta de 15 y 30 min sin huecos ni traslapes,
+  // en vez de que cambiar de filtro vuelva a ofrecer tiempo ya cubierto.
+  const coverageEnd = selected.reduce((max, s) => (s.end > max ? s.end : max), point.timeStart)
+  const candidates = generateChipCandidates(coverageEnd, point.timeEnd, step)
 
-  function toggleChip(chip: ManualSegment) {
-    setSelected((prev) => {
-      const exists = prev.some((s) => s.start === chip.start && s.end === chip.end)
-      return exists ? prev.filter((s) => !(s.start === chip.start && s.end === chip.end)) : [...prev, chip].sort((a, b) => a.start.localeCompare(b.start))
-    })
+  function addChip(chip: ManualSegment) {
+    setSelected((prev) => [...prev, chip].sort((a, b) => a.start.localeCompare(b.start)))
+  }
+
+  function removeChip(chip: ManualSegment) {
+    setSelected((prev) => prev.filter((s) => !(s.start === chip.start && s.end === chip.end)))
   }
 
   return (
@@ -134,10 +140,30 @@ function PointSegmentRow({
 
       {expanded && (
         <div className="border-t border-border p-4">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Horarios para asignar fotos sin hora (EXIF) más tarde
+          </p>
+
+          {selected.length > 0 && (
+            <div className="mb-4">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ya agregados</p>
+              <div className="flex flex-wrap gap-2">
+                {selected.map((chip) => (
+                  <button
+                    key={chip.start}
+                    onClick={() => removeChip(chip)}
+                    className="flex items-center gap-1.5 rounded-full border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+                  >
+                    {chip.start}–{chip.end}
+                    <span aria-hidden>✕</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Horarios disponibles para asignar fotos sin hora (EXIF) más tarde
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Agregar más</p>
             <div className="flex gap-1 rounded-full bg-muted p-1">
               <button
                 onClick={() => setStep(15)}
@@ -153,23 +179,21 @@ function PointSegmentRow({
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {candidates.map((chip) => {
-              const isSelected = selected.some((s) => s.start === chip.start && s.end === chip.end)
-              return (
+          {candidates.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Ya cubriste todo el horario de este punto.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {candidates.map((chip) => (
                 <button
                   key={chip.start}
-                  onClick={() => toggleChip(chip)}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                    isSelected ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:text-foreground',
-                  )}
+                  onClick={() => addChip(chip)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
                 >
-                  {chip.start}–{chip.end}
+                  + {chip.start}–{chip.end}
                 </button>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
           <Button variant="dark" size="sm" className="mt-4" onClick={() => onSaveSegments(point.id, selected)}>
             Guardar horarios
           </Button>
