@@ -33,6 +33,10 @@ import { Skeleton } from '../../ui/shared/Skeleton'
 
 const PAGE_SIZE = 12
 const HEADER_SCROLL_THRESHOLD = 200
+// Borde inferior aproximado del header flotante en escritorio (top-4 = 16px
+// + h-16 = 64px) — cuando el centinela de la portada cruza esta línea, el
+// header ya puede transformarse.
+const HEADER_BOTTOM_OFFSET = 84
 
 function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
   return (
@@ -469,10 +473,12 @@ export function StudioEventView() {
   const [assignHourOpen, setAssignHourOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
+  const [coverPassed, setCoverPassed] = useState(false)
   const headerHidden = useAutoHideHeader()
   const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const expandedPointsRef = useRef<Set<string>>(new Set())
   const eventPointsRef = useRef<{ id: string; label: string }[]>([])
+  const coverSentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     // "Destacadas" se trata como un punto más para efectos del header
@@ -495,6 +501,12 @@ export function StudioEventView() {
     const STICKY_BAR_BOTTOM = 168
     function onScroll() {
       setScrolled(window.scrollY > HEADER_SCROLL_THRESHOLD)
+      // El header se transforma cuando la portada (imagen o el bloque
+      // genérico sin portada) ya terminó de pasar bajo el header flotante —
+      // no un umbral fijo arbitrario, sino la posición real de este
+      // centinela colocado justo después de la portada.
+      const sentinelTop = coverSentinelRef.current?.getBoundingClientRect().top
+      if (sentinelTop != null) setCoverPassed(sentinelTop <= HEADER_BOTTOM_OFFSET)
       let current: string | null = null
       for (const pt of eventPointsRef.current) {
         if (!expandedPointsRef.current.has(pt.id)) continue
@@ -702,36 +714,60 @@ export function StudioEventView() {
     navigate('/studio/eventos')
   }
 
-  // El header (HeaderStudio) se transforma al pasar el umbral de scroll:
-  // muestra el título del evento + el punto activo (ya se calculaba para la
-  // barra pegajosa de la página) + un salto rápido a cualquier punto, en vez
-  // del nav normal. Se registra antes de los `return` tempranos de abajo —
+  // El header (HeaderStudio) se transforma cuando la portada ya terminó de
+  // pasar bajo el header (ver `coverPassed`, no un scroll fijo) — muestra
+  // esta misma info que hoy vive en la barra pegajoja compacta de la página
+  // (estado, nombre, pausar/publicar, acciones) más el salto rápido a
+  // cualquier punto. Se registra antes de los `return` tempranos de abajo —
   // los hooks no pueden depender de si `event` ya cargó.
   useHeaderTransform(
     event ? (
       <div className="flex w-full items-center gap-3">
+        <StatusPill
+          dot={EVENT_STATUS_STYLE[event.status].dot}
+          text={EVENT_STATUS_STYLE[event.status].text}
+          label={EVENT_STATUS_STYLE[event.status].label}
+          className="hidden shrink-0 text-[10px] uppercase tracking-wide lg:flex"
+        />
         <p className="min-w-0 flex-1 truncate text-sm font-semibold">
           {event.title}
           {activePointLabel && <span className="ml-2 font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
         </p>
         {event.event_points.length > 0 && (
-          <select
-            value=""
-            onChange={(e) => {
-              const el = pointRefs.current[e.target.value]
-              el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }}
-            className="shrink-0 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
-          >
-            <option value="" disabled>Saltar a…</option>
-            <option value="__featured__">Destacadas</option>
-            {event.event_points.map((pt) => (
-              <option key={pt.id} value={pt.id}>{pt.label}</option>
-            ))}
-          </select>
+          <Dropdown
+            label="Saltar a…"
+            direction="down"
+            onSelect={(value) => pointRefs.current[value]?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            options={[
+              { value: '__featured__', label: 'Destacadas' },
+              ...event.event_points.map((pt) => ({ value: pt.id, label: pt.label })),
+            ]}
+          />
         )}
+        {event.status === 'pausado' ? (
+          <button
+            onClick={() => toggleStatus('activo')}
+            className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+          >
+            Publicar
+          </button>
+        ) : (
+          <button
+            onClick={() => toggleStatus('pausado')}
+            className="shrink-0 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-500"
+          >
+            Pausar
+          </button>
+        )}
+        <ActionMenu
+          items={[
+            { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
+            { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
+          ]}
+        />
       </div>
     ) : null,
+    coverPassed,
   )
 
   if (isLoading) {
@@ -781,6 +817,7 @@ export function StudioEventView() {
           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 to-transparent" />
         </div>
       )}
+      <div ref={coverSentinelRef} />
 
       <div className={STUDIO_PAGE_WIDE}>
         <div

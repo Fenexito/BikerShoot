@@ -129,6 +129,7 @@ export function Search() {
         )}
       </button>
     </div>,
+    scrolled,
   )
 
   return (

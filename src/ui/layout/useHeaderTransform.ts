@@ -2,16 +2,18 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useHeaderTransformStore } from './headerTransformStore'
 
-/** Registra el contenido que el header (Studio o Biker) debe mostrar en su
- * franja central una vez que el usuario hace scroll pasado el umbral — en
- * vez de los links de navegación normales. Solo aplica en escritorio (el
- * header lo renderiza dentro de un `hidden md:flex`); en móvil este
- * contenido simplemente nunca se ve.
+/** Registra el contenido que el header (Studio o Biker) debe mostrar, y
+ * CUÁNDO mostrarlo (`active`) — en vez de los links de navegación normales.
+ * `active` lo calcula la propia página (ej. "ya se scrolleó pasado un
+ * umbral genérico", o algo más específico como "la portada ya terminó de
+ * reducirse"), no un umbral fijo dentro del header. Solo aplica en
+ * escritorio: el header ignora `active` en móvil (gatea ese contenido con
+ * clases `hidden md:flex`, nunca lo muestra ahí sin importar el estado).
  *
- * Uso: `useHeaderTransform(<MiToolbarDePagina />)` dentro del componente de
- * la página — se limpia solo al desmontar (navegar a otra página). Pasa
- * `null` (o no llames el hook) en páginas que no participan de esta
- * mecánica; el header vuelve a su nav por defecto automáticamente.
+ * Uso: `useHeaderTransform(<MiToolbarDePagina />, huboScrollSuficiente)`
+ * dentro del componente de la página — se limpia solo al desmontar
+ * (navegar a otra página). Pasa `null` como contenido (o no llames el hook)
+ * en páginas que no participan de esta mecánica.
  *
  * A propósito no memoiza `content` como dependencia — el JSX es una
  * referencia nueva en cada render, así que en vez de perseguir esa
@@ -19,15 +21,15 @@ import { useHeaderTransformStore } from './headerTransformStore'
  * actualiza un valor en un store, no dispara ningún efecto secundario caro)
  * y así los manejadores de eventos que capture (onClick, onChange...) nunca
  * quedan obsoletos. Un efecto aparte, solo con `[]`, limpia al desmontar. */
-export function useHeaderTransform(content: ReactNode | null) {
-  const setContent = useHeaderTransformStore((s) => s.setContent)
+export function useHeaderTransform(content: ReactNode | null, active: boolean) {
+  const setTransform = useHeaderTransformStore((s) => s.setTransform)
 
   useEffect(() => {
-    setContent(content)
+    setTransform(content, active)
   })
 
   useEffect(() => {
-    return () => setContent(null)
+    return () => setTransform(null, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 }

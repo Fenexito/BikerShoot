@@ -10,12 +10,9 @@ import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
-import { useScrolledPast } from '../shared/useScrolledPast'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { cn } from '../../lib/cn'
-
-const HEADER_TRANSFORM_THRESHOLD = 200
 
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
@@ -51,12 +48,14 @@ export function HeaderUser() {
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
   const hidden = useAutoHideHeader()
 
-  // Igual que en HeaderStudio: si la página actual registró contenido (ver
-  // useHeaderTransform) y ya se scrolleó lo suficiente, el nav + buscador
-  // genérico ceden su lugar a las herramientas propias de esa página.
+  // Igual que en HeaderStudio: si la página actual registró contenido y
+  // señaló que ya toca mostrarlo (ver useHeaderTransform), el nav +
+  // buscador genérico ceden su lugar a las herramientas propias de esa
+  // página. (El lado biker todavía no tiene ninguna página conectada a esto
+  // — placeholder listo para cuando se diseñe esa parte.)
   const transformContent = useHeaderTransformStore((s) => s.content)
-  const scrolledPastThreshold = useScrolledPast(HEADER_TRANSFORM_THRESHOLD)
-  const transformed = scrolledPastThreshold && transformContent != null
+  const transformActive = useHeaderTransformStore((s) => s.active)
+  const transformed = transformActive && transformContent != null
 
   return (
     <>

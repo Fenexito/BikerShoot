@@ -17,6 +17,7 @@ import { IconSearch } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
+import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 
 const TABS: { value: OrderItemStatus | 'todos'; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -201,6 +202,7 @@ export function StudioOrders() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const scrolledPastThreshold = useScrolledPast(200)
 
   const filtered = useMemo(() => {
     let list = tab === 'todos' ? orders : orders.filter((o) => o.status === tab)
@@ -275,6 +277,7 @@ export function StudioOrders() {
         ))}
       </div>
     </div>,
+    scrolledPastThreshold,
   )
 
   return (

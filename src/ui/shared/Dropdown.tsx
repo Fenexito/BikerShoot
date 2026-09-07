@@ -11,12 +11,16 @@ interface DropdownProps {
   options: DropdownOption[]
   onSelect: (value: string) => void
   className?: string
+  /** Hacia dónde abre el panel — 'up' (por defecto) para barras de acciones
+   * ancladas abajo de la pantalla; 'down' para usos cerca del tope (ej. el
+   * header transformado), donde abrir hacia arriba se saldría de la vista. */
+  direction?: 'up' | 'down'
 }
 
 /** Menú desplegable oscuro y flotante, mismo lenguaje visual que ProfileMenu/
  * NotificationsMenu — reemplaza un <select> nativo cuando queremos que la
  * lista luzca como el resto de la app en vez del control gris del navegador. */
-export function Dropdown({ label, options, onSelect, className }: DropdownProps) {
+export function Dropdown({ label, options, onSelect, className, direction = 'up' }: DropdownProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -40,7 +44,12 @@ export function Dropdown({ label, options, onSelect, className }: DropdownProps)
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-52 origin-bottom animate-menu-in overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl">
+        <div
+          className={cn(
+            'absolute left-0 z-50 w-52 animate-menu-in overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl',
+            direction === 'down' ? 'top-full mt-2 origin-top' : 'bottom-full mb-2 origin-bottom',
+          )}
+        >
           {options.map((opt) => (
             <button
               key={opt.value}
