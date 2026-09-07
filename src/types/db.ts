@@ -13,6 +13,7 @@ export interface DbEventPoint {
   time_start: string
   time_end: string
   route_point_id: string | null
+  manual_segments: { start: string; end: string }[] | null
 }
 
 export interface DbRoute {

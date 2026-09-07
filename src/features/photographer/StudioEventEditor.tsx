@@ -12,6 +12,7 @@ import { EventImagesManager } from './components/EventImagesManager'
 import { Input } from '../../ui/studio/Input'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { DatePicker } from '../../ui/shared/DatePicker'
+import { TimePicker } from '../../ui/shared/TimePicker'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
@@ -44,6 +45,11 @@ function Section({ title, description, children }: { title: string; description?
   )
 }
 
+interface ManualSegment {
+  start: string
+  end: string
+}
+
 interface LocalPoint {
   id: string
   routePointId: string | null
@@ -52,6 +58,125 @@ interface LocalPoint {
   lng: number
   timeStart: string
   timeEnd: string
+  manualSegments: ManualSegment[]
+}
+
+function formatBytes(n: number) {
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
+function addMinutesHHMM(hhmm: string, minutes: number) {
+  const [h, m] = hhmm.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+/** Chips de 15 o 30 min entre timeStart y timeEnd — para que declarar los
+ * fragmentos de horario de un punto sea un par de clics en vez de escribir
+ * cada rango a mano. */
+function generateChipCandidates(timeStart: string, timeEnd: string, stepMinutes: 15 | 30): ManualSegment[] {
+  const chips: ManualSegment[] = []
+  let cursor = timeStart
+  while (cursor < timeEnd) {
+    const end = addMinutesHHMM(cursor, stepMinutes)
+    if (end > timeEnd) break
+    chips.push({ start: cursor, end })
+    cursor = end
+  }
+  return chips
+}
+
+function PointSegmentRow({
+  point,
+  onUpdateTime,
+  onRemove,
+  onSaveSegments,
+}: {
+  point: LocalPoint
+  onUpdateTime: (pointId: string, field: 'timeStart' | 'timeEnd', value: string) => void
+  onRemove: (pointId: string) => void
+  onSaveSegments: (pointId: string, segments: ManualSegment[]) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [step, setStep] = useState<15 | 30>(15)
+  const [selected, setSelected] = useState<ManualSegment[]>(point.manualSegments)
+  const candidates = generateChipCandidates(point.timeStart, point.timeEnd, step)
+
+  function toggleChip(chip: ManualSegment) {
+    setSelected((prev) => {
+      const exists = prev.some((s) => s.start === chip.start && s.end === chip.end)
+      return exists ? prev.filter((s) => !(s.start === chip.start && s.end === chip.end)) : [...prev, chip].sort((a, b) => a.start.localeCompare(b.start))
+    })
+  }
+
+  return (
+    <div className="rounded-2xl border border-border">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <button onClick={() => setExpanded((e) => !e)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className={cn('shrink-0 text-xs transition-transform', expanded && 'rotate-180')}>▾</span>
+          <span className="min-w-0">
+            <p className="truncate font-semibold">{point.label}</p>
+            {point.manualSegments.length > 0 && (
+              <p className="text-xs text-muted-foreground">{point.manualSegments.length} horario(s) configurado(s)</p>
+            )}
+          </span>
+        </button>
+        <div className="flex items-center gap-2">
+          <TimePicker value={point.timeStart} onChange={(v) => onUpdateTime(point.id, 'timeStart', v)} className="w-28" />
+          <span className="text-xs text-muted-foreground">–</span>
+          <TimePicker value={point.timeEnd} onChange={(v) => onUpdateTime(point.id, 'timeEnd', v)} after={point.timeStart} className="w-28" />
+          <button onClick={() => onRemove(point.id)} className="ml-2 text-sm text-muted-foreground hover:text-foreground">
+            Quitar
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-border p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Horarios disponibles para asignar fotos sin hora (EXIF) más tarde
+            </p>
+            <div className="flex gap-1 rounded-full bg-muted p-1">
+              <button
+                onClick={() => setStep(15)}
+                className={cn('rounded-full px-3 py-1 text-xs font-semibold transition-colors', step === 15 ? 'bg-foreground text-background' : 'text-muted-foreground')}
+              >
+                15 min
+              </button>
+              <button
+                onClick={() => setStep(30)}
+                className={cn('rounded-full px-3 py-1 text-xs font-semibold transition-colors', step === 30 ? 'bg-foreground text-background' : 'text-muted-foreground')}
+              >
+                30 min
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {candidates.map((chip) => {
+              const isSelected = selected.some((s) => s.start === chip.start && s.end === chip.end)
+              return (
+                <button
+                  key={chip.start}
+                  onClick={() => toggleChip(chip)}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                    isSelected ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {chip.start}–{chip.end}
+                </button>
+              )
+            })}
+          </div>
+          <Button variant="dark" size="sm" className="mt-4" onClick={() => onSaveSegments(point.id, selected)}>
+            Guardar horarios
+          </Button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function StudioEventEditor() {
@@ -227,6 +352,7 @@ export function StudioEventEditor() {
           lng: pt.lng,
           timeStart: pt.time_start.slice(0, 5),
           timeEnd: pt.time_end.slice(0, 5),
+          manualSegments: pt.manual_segments ?? [],
         })),
       )
       // Los puntos guardan a qué route_point pertenecen, pero no a qué ruta —
@@ -256,45 +382,115 @@ export function StudioEventEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing, isNew])
 
-  // Si el evento YA existe, un punto agregado se guarda en la base al
-  // instante (no solo en el estado local hasta "Guardar cambios") — así la
-  // pestaña Imágenes puede ofrecer subir fotos ahí de inmediato, sin que el
-  // fotógrafo tenga que guardar el evento y volver a entrar.
-  async function addPoint(pt: AddedPoint) {
-    if (!isNew && existing) {
-      const { data, error } = await supabase
-        .from('event_points')
-        .insert({ event_id: existing.id, route_point_id: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, time_start: pt.timeStart, time_end: pt.timeEnd })
-        .select('id')
-        .single()
-      if (error || !data) {
-        push({ type: 'error', title: 'No se pudo agregar el punto', description: error?.message })
-        return
-      }
-      setPoints((p) => [...p, { id: data.id, routePointId: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, timeStart: pt.timeStart, timeEnd: pt.timeEnd }])
-      queryClient.invalidateQueries({ queryKey: ['event', existing.id] })
-      return
+  // Crea el evento en silencio en cuanto hace falta un id real (ej. al
+  // agregar el primer punto) en vez de obligar a pasar por "Crear evento"
+  // primero — así agregar un punto queda disponible para subir fotos de
+  // inmediato incluso en un evento que técnicamente aún no se había
+  // guardado nunca. Devuelve null (y avisa qué falta) si Información no
+  // tiene lo mínimo para poder crear la fila.
+  async function ensureEventExists(): Promise<string | null> {
+    if (existing?.id) return existing.id
+    if (!user) return null
+    const errors = computeErrors()
+    if (Object.keys(errors).length > 0) {
+      setAttemptedSubmit(true)
+      setTab('info')
+      push({ type: 'error', title: 'Completa la información básica primero (título, fecha, precio)' })
+      return null
     }
-    setPoints((p) => [
-      ...p,
-      { id: `local-${Date.now()}`, routePointId: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, timeStart: pt.timeStart, timeEnd: pt.timeEnd },
-    ])
+    const isRodadaNow = category === 'Rodada'
+    const payload = {
+      photographer_id: user.id,
+      title,
+      category,
+      city: isRodadaNow ? RODADA_CITY : city,
+      venue: isRodadaNow ? null : venue || null,
+      event_date: eventDate,
+      price_per_photo: price,
+      description: description || null,
+      status,
+    }
+    const { data, error } = await supabase.from('events').insert(payload).select('id').single()
+    if (error || !data) {
+      push({ type: 'error', title: 'No se pudo crear el evento', description: error?.message })
+      return null
+    }
+    queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
+    navigate(`/studio/eventos/${data.id}/editar`, { replace: true })
+    return data.id
   }
 
+  // Un punto agregado se guarda en la base al instante (no solo en el
+  // estado local hasta "Guardar cambios") — así la pestaña Imágenes puede
+  // ofrecer subir fotos ahí de inmediato, sin que el fotógrafo tenga que
+  // guardar el evento y volver a entrar.
+  async function addPoint(pt: AddedPoint) {
+    const eventId = await ensureEventExists()
+    if (!eventId) return
+    const { data, error } = await supabase
+      .from('event_points')
+      .insert({ event_id: eventId, route_point_id: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, time_start: pt.timeStart, time_end: pt.timeEnd })
+      .select('id')
+      .single()
+    if (error || !data) {
+      push({ type: 'error', title: 'No se pudo agregar el punto', description: error?.message })
+      return
+    }
+    setPoints((p) => [...p, { id: data.id, routePointId: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, timeStart: pt.timeStart, timeEnd: pt.timeEnd, manualSegments: [] }])
+    queryClient.invalidateQueries({ queryKey: ['event', eventId] })
+  }
+
+  // Un punto con fotos no puede simplemente desaparecer de la lista — o se
+  // cancela, o el fotógrafo confirma explícitamente borrar el punto Y sus
+  // fotos (viendo antes cuántas son y cuánto pesan). Las que ya se
+  // vendieron nunca se pueden borrar (mismo comportamiento que en el
+  // visor del evento) — si hay alguna, ni las fotos ni el punto se tocan.
   async function removePoint(pointId: string) {
-    if (!isNew && !pointId.startsWith('local-')) {
+    const { data: photoRows, error: countError } = await supabase.from('photos').select('id, size_bytes').eq('point_id', pointId)
+    if (countError) {
+      push({ type: 'error', title: 'No se pudo revisar las fotos del punto', description: countError.message })
+      return
+    }
+    const photoCount = photoRows?.length ?? 0
+    if (photoCount > 0) {
+      const totalBytes = (photoRows ?? []).reduce((s, p) => s + (p.size_bytes ?? 0), 0)
+      const ok = await confirmDialog.ask({
+        title: `Este punto tiene ${photoCount} foto${photoCount > 1 ? 's' : ''} (${formatBytes(totalBytes)})`,
+        description: 'Eliminar el punto también elimina estas fotos. Si alguna ya se vendió, no se puede borrar — en ese caso no podrás eliminar el punto todavía.',
+        confirmLabel: `Eliminar punto y ${photoCount} foto${photoCount > 1 ? 's' : ''}`,
+        tone: 'danger',
+      })
+      if (!ok) return
+      const { error: delPhotosError } = await supabase.from('photos').delete().in('id', (photoRows ?? []).map((p) => p.id))
+      if (delPhotosError) {
+        push({ type: 'error', title: 'No se pudo eliminar el punto', description: 'Seguramente hay fotos ya vendidas ahí — esas no se pueden borrar.' })
+        return
+      }
+    }
+    if (!pointId.startsWith('local-')) {
       const { error } = await supabase.from('event_points').delete().eq('id', pointId)
       if (error) {
         push({ type: 'error', title: 'No se pudo quitar el punto', description: error.message })
         return
       }
       queryClient.invalidateQueries({ queryKey: ['event', id] })
+      queryClient.invalidateQueries({ queryKey: ['event-photos-detailed', id] })
     }
     setPoints((p) => p.filter((pt) => pt.id !== pointId))
   }
 
   function updatePointTime(pointId: string, field: 'timeStart' | 'timeEnd', value: string) {
     setPoints((p) => p.map((pt) => (pt.id === pointId ? { ...pt, [field]: value } : pt)))
+  }
+
+  async function saveManualSegments(pointId: string, segments: ManualSegment[]) {
+    const { error } = await supabase.from('event_points').update({ manual_segments: segments }).eq('id', pointId)
+    if (error) {
+      push({ type: 'error', title: 'No se pudieron guardar los horarios', description: error.message })
+      return
+    }
+    setPoints((p) => p.map((pt) => (pt.id === pointId ? { ...pt, manualSegments: segments } : pt)))
+    push({ type: 'success', title: 'Horarios guardados' })
   }
 
   function handleWatermarkFile(file: File | undefined) {
@@ -357,7 +553,7 @@ export function StudioEventEditor() {
     const finalPoints = pending
       ? [
           ...points,
-          { id: `local-${Date.now()}`, routePointId: pending.routePointId, label: pending.label, lat: pending.lat, lng: pending.lng, timeStart: pending.timeStart, timeEnd: pending.timeEnd },
+          { id: `local-${Date.now()}`, routePointId: pending.routePointId, label: pending.label, lat: pending.lat, lng: pending.lng, timeStart: pending.timeStart, timeEnd: pending.timeEnd, manualSegments: [] },
         ]
       : points
     if (pending) setPoints(finalPoints)
@@ -639,29 +835,9 @@ export function StudioEventEditor() {
               )}
 
               {points.length > 0 && (
-                <div className="mb-6 flex flex-col divide-y divide-border rounded-2xl border border-border">
+                <div className="mb-6 flex flex-col gap-3">
                   {points.map((pt) => (
-                    <div key={pt.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                      <p className="font-semibold">{pt.label}</p>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="time"
-                          value={pt.timeStart}
-                          onChange={(e) => updatePointTime(pt.id, 'timeStart', e.target.value)}
-                          className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
-                        />
-                        <span className="text-xs text-muted-foreground">–</span>
-                        <input
-                          type="time"
-                          value={pt.timeEnd}
-                          onChange={(e) => updatePointTime(pt.id, 'timeEnd', e.target.value)}
-                          className="rounded-2xl border border-border bg-input px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
-                        />
-                        <button onClick={() => removePoint(pt.id)} className="ml-2 text-sm text-muted-foreground hover:text-foreground">
-                          Quitar
-                        </button>
-                      </div>
-                    </div>
+                    <PointSegmentRow key={pt.id} point={pt} onUpdateTime={updatePointTime} onRemove={removePoint} onSaveSegments={saveManualSegments} />
                   ))}
                 </div>
               )}
@@ -748,7 +924,9 @@ export function StudioEventEditor() {
                     price={price}
                     watermarkPath={watermarkPath}
                     eventDate={eventDate}
-                    points={points.filter((p) => !p.id.startsWith('local-')).map((p) => ({ id: p.id, label: p.label, time_start: p.timeStart, time_end: p.timeEnd }))}
+                    points={points
+                      .filter((p) => !p.id.startsWith('local-'))
+                      .map((p) => ({ id: p.id, label: p.label, time_start: p.timeStart, time_end: p.timeEnd, manual_segments: p.manualSegments }))}
                   />
                 </Section>
               )}

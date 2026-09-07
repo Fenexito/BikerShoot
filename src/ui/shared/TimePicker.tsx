@@ -13,16 +13,25 @@ interface TimePickerProps {
   value: string // 'HH:MM'
   onChange: (value: string) => void
   className?: string
+  /** Excluye horas <= esta (ej. "hora fin" no puede ser antes ni igual a
+   * "hora inicio" — no tiene sentido ofrecerlas siquiera). */
+  after?: string
+  /** Acota la lista a un rango inclusive (ej. dentro de la ventana de
+   * tiempo de un punto) — para cuando asignar una hora fuera de ese rango
+   * no tendría sentido. */
+  min?: string
+  max?: string
 }
 
 /** Reemplazo del <input type="time"> nativo — los fotógrafos solo necesitan
  * intervalos de 15 minutos (así clasifican sus fotos en la práctica), así
  * que en vez de un selector con segundos/minutos arbitrarios del sistema
  * operativo, esto es una lista corta y directa. */
-export function TimePicker({ label, value, onChange, className }: TimePickerProps) {
+export function TimePicker({ label, value, onChange, className, after, min, max }: TimePickerProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const options = TIMES.filter((t) => (!after || t > after) && (!min || t >= min) && (!max || t <= max))
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +75,7 @@ export function TimePicker({ label, value, onChange, className }: TimePickerProp
           ref={listRef}
           className="absolute left-0 top-full z-50 mt-2 max-h-60 w-32 origin-top animate-menu-in overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl"
         >
-          {TIMES.map((t) => (
+          {options.map((t) => (
             <button
               type="button"
               key={t}

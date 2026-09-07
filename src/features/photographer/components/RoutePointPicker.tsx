@@ -82,6 +82,18 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   const [timeStart, setTimeStart] = useState('05:00')
   const [timeEnd, setTimeEnd] = useState('05:30')
 
+  // Si la hora inicio avanza más allá de la hora fin ya elegida, esta deja
+  // de tener sentido — se empuja 15 min después de la nueva hora inicio en
+  // vez de dejar una combinación inválida (fin <= inicio) seleccionada.
+  useEffect(() => {
+    if (timeEnd <= timeStart) {
+      const [h, m] = timeStart.split(':').map(Number)
+      const total = (h * 60 + m + 15) % (24 * 60)
+      setTimeEnd(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeStart])
+
   const usingRoute = useRoute && !!routeId
   // Aunque el estado interno recuerde "existente", si la ruta todavía no
   // tiene ningún punto guardado no hay nada que elegir — se comporta como
@@ -256,7 +268,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
 
         <div className="grid grid-cols-2 gap-3">
           <TimePicker label="Hora inicio" value={timeStart} onChange={setTimeStart} />
-          <TimePicker label="Hora fin" value={timeEnd} onChange={setTimeEnd} />
+          <TimePicker label="Hora fin" value={timeEnd} onChange={setTimeEnd} after={timeStart} />
         </div>
 
         <Button variant="dark" className="w-full justify-center py-4 text-sm" onClick={handleAdd} disabled={!readyToTime}>
