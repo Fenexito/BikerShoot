@@ -9,6 +9,7 @@ import { Footer } from '../ui/layout/Footer'
 import { Toaster } from '../ui/overlays/Toaster'
 import { ConfirmDialog } from '../ui/overlays/ConfirmDialog'
 import { TypedConfirmDialog } from '../ui/overlays/TypedConfirmDialog'
+import { SegmentPickerDialog } from '../ui/overlays/SegmentPickerDialog'
 import { ScrollRestoration } from './ScrollRestoration'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
@@ -67,6 +68,7 @@ export function PortalLayout() {
       <Toaster />
       <ConfirmDialog />
       <TypedConfirmDialog />
+      <SegmentPickerDialog />
       {!isAdminPortal && <BugReportWidget />}
     </div>
   )

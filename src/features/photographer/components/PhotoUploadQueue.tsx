@@ -7,6 +7,7 @@ import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, hashF
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
+import { segmentPickerDialog, type SegmentOption } from '../../../ui/overlays/segmentPickerStore'
 import { cn } from '../../../lib/cn'
 
 const CONCURRENCY = 4
@@ -29,6 +30,7 @@ interface QueueItem {
   previewPath?: string
   backupRaw: boolean
   hash: string
+  forcedCapturedAt?: string
 }
 
 function formatBytes(n: number) {
@@ -47,11 +49,20 @@ interface PhotoUploadQueueProps {
   /** Si se da (ISO), se usa como `captured_at` de TODAS las fotos de esta
    * cola en vez de leer el EXIF — para cuando el fotógrafo sube directo a
    * un horario ya declarado a mano (fotos sin metadata, o quiere forzar el
-   * horario sin importar lo que diga el EXIF). */
+   * horario sin importar lo que diga el EXIF). Lo usan las colas ya
+   * ancladas a un horario específico ("Cargar fotos" por segmento). */
   forcedCapturedAt?: string
+  /** Horarios declarados del punto — si se dan (y no hay `forcedCapturedAt`
+   * fijo), justo después de elegir/soltar archivos se pregunta a cuál
+   * horario pertenecen (modal), antes de preguntar por el respaldo. Lo usa
+   * el botón genérico "+ Subir fotos" de un punto con horarios. */
+  manualSegments?: SegmentOption[]
+  /** Fecha del evento (YYYY-MM-DD) — necesaria para construir el
+   * `captured_at` a partir del horario elegido en `manualSegments`. */
+  eventDate?: string
 }
 
-export function PhotoUploadQueue({ eventId, pointId, photographerId, price, watermarkPath, onItemUploaded, forcedCapturedAt }: PhotoUploadQueueProps) {
+export function PhotoUploadQueue({ eventId, pointId, photographerId, price, watermarkPath, onItemUploaded, forcedCapturedAt, manualSegments, eventDate }: PhotoUploadQueueProps) {
   const push = useToastStore((s) => s.push)
   const itemsRef = useRef<QueueItem[]>([])
   const activeCountRef = useRef(0)
@@ -147,9 +158,9 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
 
       const [previewBlob, exifCapturedAt] = await Promise.all([
         createWatermarkedPreview(item.file, watermarkImageRef.current),
-        forcedCapturedAt ? Promise.resolve(null) : extractCapturedAt(item.file),
+        item.forcedCapturedAt ? Promise.resolve(null) : extractCapturedAt(item.file),
       ])
-      const capturedAt = forcedCapturedAt ?? exifCapturedAt
+      const capturedAt = item.forcedCapturedAt ?? exifCapturedAt
 
       let previewPct = 0
       let rawPct = item.backupRaw ? 0 : 100
@@ -216,6 +227,24 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     }
     if (unique.length === 0) return
 
+    // Primero el horario (si el punto tiene alguno declarado y esta cola no
+    // viene ya anclada a uno fijo), luego el respaldo — en ese orden, cada
+    // uno su propio modal. Cancelar el horario cancela toda la subida del
+    // lote; sin horarios declarados, se salta directo al respaldo y las
+    // fotos se clasifican solas por EXIF como siempre.
+    let batchForcedCapturedAt = forcedCapturedAt
+    if (!batchForcedCapturedAt && manualSegments && manualSegments.length > 0 && eventDate) {
+      const chosen: SegmentOption | null = await segmentPickerDialog.ask({ segments: manualSegments })
+      if (!chosen) {
+        // Cancelar aquí no debe dejar estas fotos marcadas como "ya
+        // subidas" — si no, un reintento con los mismos archivos las
+        // rechazaría como falsos duplicados sin haberse subido nunca.
+        for (const item of unique) knownHashesRef.current.delete(item.hash)
+        return
+      }
+      batchForcedCapturedAt = new Date(`${eventDate}T${chosen.start}:00`).toISOString()
+    }
+
     const backupRaw = await confirmDialog.ask({
       title: `¿Respaldar el original de ${unique.length === 1 ? 'esta foto' : `estas ${unique.length} fotos`}?`,
       description: 'Guarda una copia sin editar (sin marca de agua) además de la vista previa. Ocupa más espacio de tu plan.',
@@ -233,6 +262,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       progress: 0,
       backupRaw,
       hash,
+      forcedCapturedAt: batchForcedCapturedAt,
     }))
     itemsRef.current = [...itemsRef.current, ...newItems]
     rerender()

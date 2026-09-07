@@ -312,7 +312,6 @@ interface PointCardProps {
 function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, eventDate, selectedIds, onToggleSelect, onSelectMany, onDeselectMany, onDelete, onUploaded, registerRef, onExpandedChange }: PointCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [uploadPickerOpen, setUploadPickerOpen] = useState(false)
   const [segmentUploadOpen, setSegmentUploadOpen] = useState<string | null>(null)
   const [visibleCountByRow, setVisibleCountByRow] = useState<Record<number, number>>({})
   const sold = photos.filter((p) => p.delivered_path).length
@@ -342,11 +341,6 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
 
   function showMoreRow(rowIndex: number) {
     setVisibleCountByRow((prev) => ({ ...prev, [rowIndex]: (prev[rowIndex] ?? PAGE_SIZE) + PAGE_SIZE }))
-  }
-
-  function chooseUploadSegment(segKey: string) {
-    setSegmentUploadOpen(segKey)
-    setUploadPickerOpen(false)
   }
 
   function toggleExpanded() {
@@ -381,33 +375,12 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
         <div className="border-t border-border p-5">
           <div className="mb-4 hidden items-center justify-between sm:flex">
             <SelectMenu ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => (hasDeclared ? setUploadPickerOpen((o) => !o) : setUploadOpen((o) => !o))}
-            >
-              {(hasDeclared ? uploadPickerOpen : uploadOpen) ? 'Cerrar' : '+ Subir fotos a este punto'}
+            <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
+              {uploadOpen ? 'Cerrar' : '+ Subir fotos a este punto'}
             </Button>
           </div>
 
-          {uploadPickerOpen && hasDeclared && (
-            <div className="mb-6 rounded-2xl border border-border p-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">¿Para qué horario son estas fotos?</p>
-              <div className="grid grid-cols-3 gap-2">
-                {point.manual_segments!.map((seg) => (
-                  <button
-                    key={seg.start}
-                    onClick={() => chooseUploadSegment(seg.start)}
-                    className="rounded-full border border-border px-2 py-1.5 text-center text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
-                  >
-                    {seg.start}–{seg.end}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {uploadOpen && !hasDeclared && (
+          {uploadOpen && (
             <div className="mb-6">
               <PhotoUploadQueue
                 eventId={eventId}
@@ -416,8 +389,12 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
                 price={price}
                 watermarkPath={watermarkPath}
                 onItemUploaded={onUploaded}
+                manualSegments={hasDeclared ? point.manual_segments! : undefined}
+                eventDate={eventDate}
               />
-              <p className="mt-2 hidden text-xs text-muted-foreground sm:block">Se clasifican solas por hora si la foto trae EXIF.</p>
+              <p className="mt-2 hidden text-xs text-muted-foreground sm:block">
+                {hasDeclared ? 'Se te preguntará a qué horario pertenecen antes de subirlas.' : 'Se clasifican solas por hora si la foto trae EXIF.'}
+              </p>
             </div>
           )}
 
