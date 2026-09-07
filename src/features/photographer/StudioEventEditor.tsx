@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
-import { FeaturedPhotosUploader, MAX_FEATURED } from './components/FeaturedPhotosUploader'
+import { FeaturedPhotosSection } from './components/FeaturedPhotosSection'
 import { EventImagesManager } from './components/EventImagesManager'
 import { Input } from '../../ui/studio/Input'
 import { FancySelect } from '../../ui/shared/FancySelect'
@@ -256,14 +256,40 @@ export function StudioEventEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing, isNew])
 
-  function addPoint(pt: AddedPoint) {
+  // Si el evento YA existe, un punto agregado se guarda en la base al
+  // instante (no solo en el estado local hasta "Guardar cambios") — así la
+  // pestaña Imágenes puede ofrecer subir fotos ahí de inmediato, sin que el
+  // fotógrafo tenga que guardar el evento y volver a entrar.
+  async function addPoint(pt: AddedPoint) {
+    if (!isNew && existing) {
+      const { data, error } = await supabase
+        .from('event_points')
+        .insert({ event_id: existing.id, route_point_id: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, time_start: pt.timeStart, time_end: pt.timeEnd })
+        .select('id')
+        .single()
+      if (error || !data) {
+        push({ type: 'error', title: 'No se pudo agregar el punto', description: error?.message })
+        return
+      }
+      setPoints((p) => [...p, { id: data.id, routePointId: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, timeStart: pt.timeStart, timeEnd: pt.timeEnd }])
+      queryClient.invalidateQueries({ queryKey: ['event', existing.id] })
+      return
+    }
     setPoints((p) => [
       ...p,
       { id: `local-${Date.now()}`, routePointId: pt.routePointId, label: pt.label, lat: pt.lat, lng: pt.lng, timeStart: pt.timeStart, timeEnd: pt.timeEnd },
     ])
   }
 
-  function removePoint(pointId: string) {
+  async function removePoint(pointId: string) {
+    if (!isNew && !pointId.startsWith('local-')) {
+      const { error } = await supabase.from('event_points').delete().eq('id', pointId)
+      if (error) {
+        push({ type: 'error', title: 'No se pudo quitar el punto', description: error.message })
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['event', id] })
+    }
     setPoints((p) => p.filter((pt) => pt.id !== pointId))
   }
 
@@ -501,15 +527,16 @@ export function StudioEventEditor() {
       <p className="mt-2 text-muted-foreground">La info básica, la ruta o punto de cobertura, y las imágenes del evento.</p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[180px_1fr]">
-        {/* Mismo patrón que Configuración: pestañas subrayadas horizontales
-            en móvil, lista vertical a la izquierda en escritorio. */}
-        <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
+        {/* Solo 3 pestañas fijas (a diferencia de Configuración, que puede
+            crecer) — en móvil se justifican a todo el ancho en 3 columnas
+            iguales y centradas, en vez de una fila con scroll horizontal. */}
+        <nav className="-mb-px grid grid-cols-3 gap-1 border-b border-border lg:mb-0 lg:flex lg:flex-col lg:gap-1 lg:border-b-0">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                'flex items-center justify-center gap-1.5 whitespace-nowrap border-b-2 pb-3 text-xs font-medium transition-colors sm:text-sm lg:justify-start lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
                 tab === t.id
                   ? 'border-foreground font-bold text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -639,7 +666,13 @@ export function StudioEventEditor() {
                 </div>
               )}
 
-              <RoutePointPicker ref={routePointPickerRef} onAdd={addPoint} useRoute={isRodada} routeId={routeId} />
+              <RoutePointPicker
+                ref={routePointPickerRef}
+                onAdd={addPoint}
+                useRoute={isRodada}
+                routeId={routeId}
+                addedPoints={points.map((p) => ({ routePointId: p.routePointId, lat: p.lat, lng: p.lng, label: p.label }))}
+              />
             </Section>
           )}
 
@@ -702,14 +735,7 @@ export function StudioEventEditor() {
                 </div>
               </Section>
 
-              {!isNew && id && user && (
-                <Section
-                  title="Fotos destacadas"
-                  description={`Tu portafolio de este evento — hasta ${MAX_FEATURED} fotos en alta calidad, sin marca de agua. No están a la venta.`}
-                >
-                  <FeaturedPhotosUploader eventId={id} photographerId={user.id} />
-                </Section>
-              )}
+              {!isNew && id && user && <FeaturedPhotosSection eventId={id} photographerId={user.id} />}
 
               {!isNew && id && user && (
                 <Section
@@ -721,6 +747,7 @@ export function StudioEventEditor() {
                     photographerId={user.id}
                     price={price}
                     watermarkPath={watermarkPath}
+                    eventDate={eventDate}
                     points={points.filter((p) => !p.id.startsWith('local-')).map((p) => ({ id: p.id, label: p.label, time_start: p.timeStart, time_end: p.timeEnd }))}
                   />
                 </Section>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -36,9 +36,11 @@ function ClickCatcher({ onPick }: { onPick: (lat: number, lng: number) => void }
   return null
 }
 
-/** Recentra el mapa cuando cambian lat/lng/zoom desde fuera (ej. al elegir
- * otro punto existente) — MapContainer solo usa center/zoom como valor
- * INICIAL, no los vuelve a aplicar solo. */
+/** Recentra el mapa cuando cambian lat/lng/zoom — pero solo se monta cuando
+ * el llamador realmente quiere ese comportamiento (elegir un punto ya
+ * existente). Si siempre estuviera montado, cada clic para marcar un punto
+ * NUEVO recentraría el mapa justo debajo del cursor, sin dejar al
+ * fotógrafo alejarse/paneear libremente para ubicar el punto con calma. */
 function Recenter({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) {
   const map = useMap()
   useEffect(() => {
@@ -59,7 +61,10 @@ interface MapPointPickerProps {
   lat: number
   lng: number
   onPick?: (lat: number, lng: number) => void
-  readOnly?: boolean
+  /** Recentra el mapa cada vez que lat/lng cambian (ej. al elegir otro punto
+   * existente en el selector) — para "punto nuevo" debe ir en false, así el
+   * fotógrafo puede paneear/zoom libremente sin que el clic lo recentre. */
+  autoRecenter?: boolean
   heightClassName?: string
   zoom?: number
   /** Otros puntos ya guardados de la ruta — se muestran como marcadores
@@ -68,12 +73,17 @@ interface MapPointPickerProps {
   onMarkerClick?: (id: string) => void
 }
 
-export function MapPointPicker({ lat, lng, onPick, readOnly, heightClassName = 'h-64', zoom = 12, markers = [], onMarkerClick }: MapPointPickerProps) {
+export function MapPointPicker({ lat, lng, onPick, autoRecenter = false, heightClassName = 'h-64', zoom = 12, markers = [], onMarkerClick }: MapPointPickerProps) {
   const [satellite, setSatellite] = useState(false)
+  const initialCenter = useRef<[number, number]>([lat, lng])
   const tile = satellite ? SATELLITE_TILE : STREET_TILE
 
   return (
-    <div className={cn('relative w-full overflow-hidden rounded-2xl border border-border', heightClassName)}>
+    // `isolate`: los panes internos de Leaflet usan z-index altos (hasta
+    // ~700) que, sin una capa de aislamiento propia, competían con el
+    // footer sticky, el modal de "salir sin guardar", etc. — quedando el
+    // mapa arriba de todo eso por error.
+    <div className={cn('relative isolate w-full overflow-hidden rounded-2xl border border-border', heightClassName)}>
       <button
         type="button"
         onClick={() => setSatellite((s) => !s)}
@@ -82,17 +92,17 @@ export function MapPointPicker({ lat, lng, onPick, readOnly, heightClassName = '
         {satellite ? 'Ver mapa' : 'Ver satélite'}
       </button>
       <MapContainer
-        center={[lat, lng]}
+        center={initialCenter.current}
         zoom={zoom}
-        scrollWheelZoom={!readOnly}
-        dragging={!readOnly}
-        zoomControl={!readOnly}
-        doubleClickZoom={!readOnly}
+        scrollWheelZoom
+        dragging
+        zoomControl
+        doubleClickZoom
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer attribution={tile.attribution} url={tile.url} />
-        <Recenter lat={lat} lng={lng} zoom={zoom} />
-        {!readOnly && onPick && <ClickCatcher onPick={onPick} />}
+        {autoRecenter && <Recenter lat={lat} lng={lng} zoom={zoom} />}
+        {onPick && <ClickCatcher onPick={onPick} />}
         {markers.map((m) => (
           <Marker
             key={m.id}

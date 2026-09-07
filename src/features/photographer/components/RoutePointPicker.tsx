@@ -5,6 +5,7 @@ import { TimePicker } from '../../../ui/shared/TimePicker'
 import { FancySelect } from '../../../ui/shared/FancySelect'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
+import { haversineMeters, DUPLICATE_POINT_THRESHOLD_M } from '../../../lib/geo'
 import { cn } from '../../../lib/cn'
 
 const GUATEMALA_CENTER = { lat: 14.6349, lng: -90.5069 }
@@ -41,6 +42,11 @@ interface RoutePointPickerProps {
    * vez por evento, no por punto); pista/sesión de fotos siempre son puntos sueltos. */
   useRoute?: boolean
   routeId?: string
+  /** Puntos que el fotógrafo ya agregó a ESTE evento — se usan para (a) no
+   * ofrecer un punto que ya está en la lista como "existente" otra vez, y
+   * (b) bloquear un punto nuevo cuyas coordenadas caen encima de uno que ya
+   * agregó (con nombre distinto o no). */
+  addedPoints?: { routePointId: string | null; lat: number; lng: number; label: string }[]
 }
 
 const smallInputClass =
@@ -51,11 +57,19 @@ const smallInputClass =
  * "Punto existente" solo aparece si la ruta ya tiene puntos guardados, y es
  * el modo por defecto (es el caso más común: reutilizar un punto ya usado). */
 export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPickerProps>(function RoutePointPicker(
-  { onAdd, useRoute = false, routeId = '' },
+  { onAdd, useRoute = false, routeId = '', addedPoints = [] },
   ref,
 ) {
   const push = useToastStore((s) => s.push)
-  const { data: routePoints = [] } = useRoutePoints(routeId || undefined)
+  const { data: allRoutePoints = [] } = useRoutePoints(routeId || undefined)
+  // Ya agregado a este evento → no debe ofrecerse de nuevo como "existente".
+  // Por coordenadas, no solo por id: un punto agregado sin pasar por
+  // "Guardar en la ruta" (routePointId null) puede coincidir físicamente con
+  // una entrada del catálogo de la ruta creada por otro fotógrafo con otro
+  // nombre — el id no lo detecta, la distancia sí.
+  const routePoints = allRoutePoints.filter(
+    (p) => !addedPoints.some((added) => haversineMeters(p.lat, p.lng, added.lat, added.lng) <= DUPLICATE_POINT_THRESHOLD_M),
+  )
 
   const [mode, setMode] = useState<'existing' | 'new'>('existing')
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint | null>(null)
@@ -97,9 +111,27 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
     if (found) setSelectedPoint({ routePointId: found.id, label: found.label, lat: found.lat, lng: found.lng })
   }
 
+  /** Busca un punto (de la ruta completa o ya agregado a este evento) que
+   * físicamente sea el mismo lugar — aunque el nombre no coincida. */
+  function findDuplicate(lat: number, lng: number): string | null {
+    const candidates = [
+      ...allRoutePoints.map((p) => ({ label: p.label, lat: p.lat, lng: p.lng })),
+      ...addedPoints,
+    ]
+    for (const c of candidates) {
+      if (haversineMeters(lat, lng, c.lat, c.lng) <= DUPLICATE_POINT_THRESHOLD_M) return c.label
+    }
+    return null
+  }
+
   async function handleCreatePoint() {
     if (!newLabel.trim()) {
       push({ type: 'error', title: 'Ponle un nombre al punto' })
+      return
+    }
+    const dup = findDuplicate(newLat, newLng)
+    if (dup) {
+      push({ type: 'error', title: 'Ya existe un punto ahí', description: `"${dup}" está a menos de ${DUPLICATE_POINT_THRESHOLD_M}m — es el mismo lugar.` })
       return
     }
     setSavingPoint(true)
@@ -135,6 +167,13 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
       push({ type: 'error', title: 'Elige o crea un punto primero' })
       return
     }
+    if (effectiveMode === 'new') {
+      const dup = findDuplicate(point.lat, point.lng)
+      if (dup) {
+        push({ type: 'error', title: 'Ya existe un punto ahí', description: `"${dup}" está a menos de ${DUPLICATE_POINT_THRESHOLD_M}m — es el mismo lugar.` })
+        return
+      }
+    }
     onAdd(point)
     resetPointForm()
     setMode('existing')
@@ -160,7 +199,6 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
 
   const mapLat = effectiveMode === 'existing' && selectedPoint ? selectedPoint.lat : newLat
   const mapLng = effectiveMode === 'existing' && selectedPoint ? selectedPoint.lng : newLng
-  const mapReadOnly = effectiveMode === 'existing'
   const mapZoom = effectiveMode === 'existing' ? EXISTING_ZOOM : NEW_ZOOM
 
   return (
@@ -227,13 +265,15 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
       </div>
 
       {/* El mapa va a la derecha una vez hay ruta elegida — es lo que el
-          fotógrafo mira más tiempo al ubicar o confirmar un punto. */}
+          fotógrafo mira más tiempo al ubicar o confirmar un punto. Siempre
+          se puede paneear/zoom con el cursor; solo se recentra solo al
+          elegir un punto existente, nunca al marcar uno nuevo. */}
       <div className="lg:order-2 lg:col-span-2">
         <MapPointPicker
           lat={mapLat}
           lng={mapLng}
           zoom={mapZoom}
-          readOnly={mapReadOnly}
+          autoRecenter={effectiveMode === 'existing'}
           onPick={effectiveMode === 'new' ? (lat, lng) => { setNewLat(lat); setNewLng(lng) } : undefined}
           heightClassName="h-72 lg:h-[420px]"
           markers={usingRoute ? routePoints.map((p) => ({ id: p.id, label: p.label, lat: p.lat, lng: p.lng })) : []}
