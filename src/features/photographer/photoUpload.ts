@@ -1,6 +1,7 @@
 // Lógica compartida de subida de fotos — usada por la carga por punto
 // dentro del visor y del editor de un evento. Un solo lugar para el
 // pipeline de reescalado + marca de agua y la subida con progreso a R2.
+import { parse as parseExif } from 'exifr'
 
 export const PREVIEW_MAX_SIDE = 1600
 export const PREVIEW_QUALITY = 0.5
@@ -32,6 +33,22 @@ export async function hashFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
   const digest = await crypto.subtle.digest('SHA-256', buffer)
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Hora real de la toma, leída del EXIF (DateTimeOriginal) — es la base de
+ * la clasificación automática por segmentos de tiempo (ver photoSegments.ts).
+ * Null si el archivo no trae EXIF (capturas de pantalla, reenvíos de
+ * WhatsApp, algunas apps de cámara Android lo eliminan) — nunca bloquea la
+ * subida, esas fotos simplemente caen en el grupo "sin hora registrada". */
+export async function extractCapturedAt(file: File): Promise<string | null> {
+  try {
+    const exif = await parseExif(file, ['DateTimeOriginal', 'CreateDate'])
+    const date: Date | undefined = exif?.DateTimeOriginal ?? exif?.CreateDate
+    if (!date || Number.isNaN(date.getTime())) return null
+    return date.toISOString()
+  } catch {
+    return null
+  }
 }
 
 export async function loadWatermarkImage(url: string): Promise<ImageBitmap> {

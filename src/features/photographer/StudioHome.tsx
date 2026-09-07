@@ -98,7 +98,7 @@ export function StudioHome() {
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-studio text-xl font-bold tracking-tight2">Tus eventos</h2>
           <Link to="/studio/eventos/new">
-            <Button variant="ghost">+ Crear evento</Button>
+            <Button variant="dark">+ Crear evento</Button>
           </Link>
         </div>
         {events.length === 0 ? (

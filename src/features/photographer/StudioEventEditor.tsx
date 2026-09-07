@@ -8,11 +8,14 @@ import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
 import { FeaturedPhotosUploader, MAX_FEATURED } from './components/FeaturedPhotosUploader'
+import { EventImagesManager } from './components/EventImagesManager'
 import { Input } from '../../ui/studio/Input'
 import { FancySelect } from '../../ui/shared/FancySelect'
+import { DatePicker } from '../../ui/shared/DatePicker'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { IconInfo, IconMap, IconImages } from '../../ui/shared/icons'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { cn } from '../../lib/cn'
@@ -84,6 +87,125 @@ export function StudioEventEditor() {
   const coverInputRef = useRef<HTMLInputElement>(null)
   const routePointPickerRef = useRef<RoutePointPickerHandle>(null)
 
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const dirtyRef = useRef(false)
+  const skipNextDirtyRef = useRef(true)
+  // Se pone en true recién cuando TODA la hidratación inicial terminó —
+  // incluyendo el fetch async de routeId (que resuelve después de que
+  // `isLoading` ya pasó a false), no solo cuando useEvent() terminó. Sin
+  // esto, ese segundo cambio de estado llegaba tarde y se marcaba como si
+  // el fotógrafo hubiera tocado algo, disparando la confirmación de salida
+  // en una página recién abierta y sin editar.
+  const hydrationDoneRef = useRef(false)
+  const [leaveHref, setLeaveHref] = useState<string | null>(null)
+  const draftKey = user ? `motoshots-event-draft-${user.id}-${id ?? 'new'}` : null
+
+  useEffect(() => {
+    dirtyRef.current = dirty
+  }, [dirty])
+
+  // Autosave a un borrador local + marcar "sucio" — se salta la primera
+  // pasada (el mount con los valores por defecto, o la carga inicial de un
+  // evento existente) para no marcar sucio algo que el fotógrafo no tocó.
+  useEffect(() => {
+    if (!hydrationDoneRef.current) return
+    if (skipNextDirtyRef.current) {
+      skipNextDirtyRef.current = false
+      return
+    }
+    setDirty(true)
+    if (!draftKey) return
+    const draft = { title, category, routeId, city, venue, eventDate, price, description, status, points, savedAt: Date.now() }
+    localStorage.setItem(draftKey, JSON.stringify(draft))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, category, routeId, city, venue, eventDate, price, description, status, points, isLoading, isNew])
+
+  // Ofrece continuar un borrador guardado — solo una vez, y solo después de
+  // que (si es edición) los datos reales del evento ya se hayan cargado, así
+  // el borrador siempre pisa al final y no al revés.
+  const draftCheckedRef = useRef(false)
+  useEffect(() => {
+    if (!draftKey || draftCheckedRef.current) return
+    if (!isNew && isLoading) return
+    draftCheckedRef.current = true
+    const raw = localStorage.getItem(draftKey)
+    if (!raw) return
+    let draft: any
+    try {
+      draft = JSON.parse(raw)
+    } catch {
+      localStorage.removeItem(draftKey)
+      return
+    }
+    confirmDialog
+      .ask({
+        title: 'Tienes un borrador sin terminar de este evento',
+        description: `Guardado ${new Date(draft.savedAt).toLocaleString('es-GT')} — ¿quieres continuarlo?`,
+        confirmLabel: 'Continuar borrador',
+        cancelLabel: 'Descartar',
+      })
+      .then((ok) => {
+        if (!ok) {
+          localStorage.removeItem(draftKey)
+          return
+        }
+        setTitle(draft.title ?? '')
+        setCategory(draft.category ?? 'Rodada')
+        setRouteId(draft.routeId ?? '')
+        setCity(draft.city ?? '')
+        setVenue(draft.venue ?? '')
+        setEventDate(draft.eventDate ?? new Date().toISOString().slice(0, 10))
+        setPrice(draft.price ?? 25)
+        setDescription(draft.description ?? '')
+        setStatus(draft.status ?? 'pausado')
+        setPoints(draft.points ?? [])
+        push({ type: 'success', title: 'Borrador restaurado' })
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, isNew, isLoading])
+
+  function attemptNavigate(href: string) {
+    if (dirtyRef.current) {
+      setLeaveHref(href)
+    } else {
+      navigate(href)
+    }
+  }
+
+  // Cualquier <a>/<Link> de la app (header, nav inferior, menú de perfil…)
+  // queda interceptado mientras haya cambios sin guardar — no solo el botón
+  // Cancelar de esta página.
+  useEffect(() => {
+    function onClickCapture(e: MouseEvent) {
+      if (!dirtyRef.current) return
+      const a = (e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (!a) return
+      let url: URL
+      try {
+        url = new URL(a.href, window.location.origin)
+      } catch {
+        return
+      }
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return
+      e.preventDefault()
+      e.stopPropagation()
+      setLeaveHref(url.pathname + url.search)
+    }
+    document.addEventListener('click', onClickCapture, true)
+    return () => document.removeEventListener('click', onClickCapture, true)
+  }, [])
+
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (!dirtyRef.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
+
   useEffect(() => {
     if (existing) {
       setTitle(existing.title)
@@ -119,10 +241,20 @@ export function StudioEventEditor() {
           .single()
           .then(({ data }) => {
             if (data) setRouteId(data.route_id)
+            hydrationDoneRef.current = true
           })
+      } else {
+        hydrationDoneRef.current = true
       }
+    } else if (isNew) {
+      // Para un evento nuevo no hay ningún cambio de estado posterior que
+      // le dé al efecto de "sucio" la oportunidad de correr de nuevo y
+      // consumir el salto — se consume aquí mismo, directo.
+      hydrationDoneRef.current = true
+      skipNextDirtyRef.current = false
     }
-  }, [existing])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing, isNew])
 
   function addPoint(pt: AddedPoint) {
     setPoints((p) => [
@@ -171,16 +303,29 @@ export function StudioEventEditor() {
     setCoverPath(null)
   }
 
+  function computeErrors() {
+    const isRodada = category === 'Rodada'
+    const errors: { title?: boolean; city?: boolean; eventDate?: boolean; price?: boolean } = {}
+    if (!title.trim()) errors.title = true
+    if (!isRodada && !city.trim()) errors.city = true
+    if (!eventDate) errors.eventDate = true
+    if (!price || price <= 0) errors.price = true
+    return errors
+  }
+  const fieldErrors = attemptedSubmit ? computeErrors() : {}
+
   async function save() {
     if (!user) return
-    const isRodada = category === 'Rodada'
-    if (!title.trim() || (!isRodada && !city.trim())) {
-      push({ type: 'error', title: 'Título y ciudad son obligatorios' })
+    const errors = computeErrors()
+    if (Object.keys(errors).length > 0) {
+      setAttemptedSubmit(true)
       setTab('info')
+      push({ type: 'error', title: 'Completa los campos obligatorios' })
       return
     }
 
     setSaving(true)
+    const isRodada = category === 'Rodada'
 
     const pending = routePointPickerRef.current?.commitPending()
     const finalPoints = pending
@@ -320,6 +465,8 @@ export function StudioEventEditor() {
     queryClient.invalidateQueries({ queryKey: ['event', eventId] })
     push({ type: 'success', title: isNew ? 'Evento creado — pausado hasta que lo publiques' : 'Evento actualizado' })
     setSaving(false)
+    setDirty(false)
+    if (draftKey) localStorage.removeItem(draftKey)
 
     // Tanto al crear como al editar, el destino es la vista del evento — ahí
     // vive el uploader por punto.
@@ -379,7 +526,13 @@ export function StudioEventEditor() {
             <Section title="Información del evento">
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <Input label="Título del evento" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej. Rodada Nocturna Antigua" />
+                  <Input
+                    label="Título del evento"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Ej. Rodada Nocturna Antigua"
+                    error={fieldErrors.title ? 'Obligatorio' : undefined}
+                  />
                 </div>
                 <FancySelect
                   label="Categoría"
@@ -388,8 +541,22 @@ export function StudioEventEditor() {
                   options={CATEGORIES.map((c) => ({ value: c, label: c }))}
                   clearable={false}
                 />
-                <Input label="Precio por foto (Q)" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
-                {category !== 'Rodada' && <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Antigua" />}
+                <Input
+                  label="Precio por foto (Q)"
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                  error={fieldErrors.price ? 'Obligatorio' : undefined}
+                />
+                {category !== 'Rodada' && (
+                  <Input
+                    label="Ciudad"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Ej. Antigua"
+                    error={fieldErrors.city ? 'Obligatorio' : undefined}
+                  />
+                )}
                 {category === 'Pista' && (
                   <FancySelect
                     label="Autódromo"
@@ -402,7 +569,7 @@ export function StudioEventEditor() {
                 {category === 'Sesión de Fotos' && (
                   <Input label="Lugar / punto de referencia" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Ej. Calzada Roosevelt" />
                 )}
-                <Input label="Fecha del evento" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+                <DatePicker label="Fecha del evento" value={eventDate} onChange={setEventDate} error={fieldErrors.eventDate} />
                 <FancySelect
                   label="Estado"
                   value={status}
@@ -544,9 +711,24 @@ export function StudioEventEditor() {
                 </Section>
               )}
 
+              {!isNew && id && user && (
+                <Section
+                  title="Fotos por punto"
+                  description="Sube y organiza las fotos de cada punto desde aquí mismo — también puedes hacerlo después desde la vista del evento."
+                >
+                  <EventImagesManager
+                    eventId={id}
+                    photographerId={user.id}
+                    price={price}
+                    watermarkPath={watermarkPath}
+                    points={points.filter((p) => !p.id.startsWith('local-')).map((p) => ({ id: p.id, label: p.label, time_start: p.timeStart, time_end: p.timeEnd }))}
+                  />
+                </Section>
+              )}
+
               {isNew && (
                 <p className="text-sm text-muted-foreground">
-                  Las fotos destacadas y las fotos por punto se suben desde la vista del evento, una vez creado.
+                  Las fotos destacadas y las fotos por punto se suben desde aquí mismo una vez creado el evento.
                 </p>
               )}
             </>
@@ -555,9 +737,51 @@ export function StudioEventEditor() {
       </div>
 
       <div className="sticky bottom-0 z-20 mt-10 flex justify-end gap-3 border-t border-border bg-background px-6 py-4 -mx-6 md:-mx-16 md:px-16">
-        <Button variant="secondary" onClick={() => navigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
+        <Button variant="secondary" onClick={() => attemptNavigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
         <Button variant="dark" onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
       </div>
+
+      {leaveHref && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60" onClick={() => setLeaveHref(null)} />
+          <div className="relative z-10 w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <h2 className="text-lg font-bold">Tienes cambios sin guardar</h2>
+            <p className="mt-2 text-sm text-muted-foreground">¿Qué quieres hacer antes de salir?</p>
+            <div className="mt-6 flex flex-col gap-2">
+              <Button
+                variant="dark"
+                onClick={() => {
+                  setLeaveHref(null)
+                  save()
+                }}
+              >
+                Guardar evento
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const href = leaveHref
+                  setLeaveHref(null)
+                  navigate(href)
+                }}
+              >
+                Guardar como borrador y salir
+              </Button>
+              <button
+                onClick={() => {
+                  if (draftKey) localStorage.removeItem(draftKey)
+                  const href = leaveHref
+                  setLeaveHref(null)
+                  navigate(href)
+                }}
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Salir sin guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

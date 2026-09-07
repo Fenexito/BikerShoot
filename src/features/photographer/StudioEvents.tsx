@@ -18,7 +18,7 @@ export function StudioEvents() {
           <p className="mt-2 text-muted-foreground">{events?.length ?? 0} eventos publicados</p>
         </div>
         <Link to="/studio/eventos/new">
-          <Button variant="secondary">+ Crear evento</Button>
+          <Button variant="dark">+ Crear evento</Button>
         </Link>
       </div>
 

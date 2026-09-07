@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '../../../lib/queryClient'
 import { supabase } from '../../../lib/supabase'
 import { r2Url, previewUrl } from '../../../lib/r2'
-import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, hashFile } from '../photoUpload'
+import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, hashFile, extractCapturedAt } from '../photoUpload'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
@@ -140,7 +140,10 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       })
       if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
-      const previewBlob = await createWatermarkedPreview(item.file, watermarkImageRef.current)
+      const [previewBlob, capturedAt] = await Promise.all([
+        createWatermarkedPreview(item.file, watermarkImageRef.current),
+        extractCapturedAt(item.file),
+      ])
 
       let previewPct = 0
       let rawPct = item.backupRaw ? 0 : 100
@@ -164,6 +167,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         raw_size_bytes: item.backupRaw ? item.file.size : 0,
         original_filename: item.file.name,
         content_hash: item.hash,
+        captured_at: capturedAt,
       })
       if (insertError) throw insertError
 
