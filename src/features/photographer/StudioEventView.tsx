@@ -352,7 +352,7 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
           )}
 
           {declared ? (
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {declared.buckets.map((bucket) => (
                 <div key={bucket.start} className="rounded-2xl border border-border">
                   <div className="hidden flex-wrap items-center justify-between gap-2 p-3 sm:flex">
@@ -394,7 +394,7 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
               )}
             </div>
           ) : autoSegments ? (
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {autoSegments.map((seg) => (
                 <div key={seg.key} className="rounded-2xl border border-border p-3">
                   <div className="mb-2 hidden items-center justify-between gap-2 sm:flex">
@@ -424,6 +424,7 @@ export function StudioEventView() {
   const { data: event, isLoading } = useEvent(id)
   const { data: photos = [] } = useEventPhotosDetailed(id)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [assignHourOpen, setAssignHourOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
   const headerHidden = useAutoHideHeader()
@@ -561,6 +562,35 @@ export function StudioEventView() {
     } else {
       push({ type: 'success', title: 'Fotos eliminadas' })
     }
+    setSelectedIds(new Set())
+    invalidatePhotos()
+  }
+
+  // A qué punto pertenecen las fotos seleccionadas — si son todas del mismo
+  // punto con horarios declarados, el modal ofrece esos horarios como chips.
+  const assignHourPoint = useMemo(() => {
+    const pointIds = new Set(Array.from(selectedIds).map((pid) => photos.find((p) => p.id === pid)?.point_id).filter(Boolean))
+    if (pointIds.size !== 1) return null
+    const [onlyId] = pointIds
+    return event?.event_points.find((p) => p.id === onlyId) ?? null
+  }, [selectedIds, photos, event])
+
+  // Reasignación manual de horario — para fotos sin EXIF (capturas de
+  // pantalla, reenvíos de WhatsApp, exportaciones que perdieron los
+  // metadatos). Escribe un `captured_at` sintético a partir de la fecha del
+  // evento + el horario declarado elegido, así el mismo agrupador por
+  // segmentos las clasifica solas de ahí en adelante.
+  async function assignHour(time: string) {
+    if (!event) return
+    const ids = Array.from(selectedIds)
+    const capturedAt = new Date(`${event.event_date}T${time}:00`).toISOString()
+    const { error } = await supabase.from('photos').update({ captured_at: capturedAt }).in('id', ids)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo asignar la hora', description: error.message })
+      return
+    }
+    push({ type: 'success', title: `Hora asignada a ${ids.length} foto${ids.length > 1 ? 's' : ''}` })
+    setAssignHourOpen(false)
     setSelectedIds(new Set())
     invalidatePhotos()
   }
@@ -811,6 +841,12 @@ export function StudioEventView() {
               ]}
             />
             <button
+              onClick={() => setAssignHourOpen(true)}
+              className="rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-muted"
+            >
+              Asignar hora
+            </button>
+            <button
               onClick={bulkDelete}
               className="flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"
             >
@@ -820,6 +856,45 @@ export function StudioEventView() {
             <button onClick={() => setSelectedIds(new Set())} aria-label="Cancelar selección" className="ml-1 text-muted-foreground hover:text-foreground">
               ✕
             </button>
+          </div>
+        </div>
+      )}
+
+      {assignHourOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60" onClick={() => setAssignHourOpen(false)} />
+          <div className="relative z-10 w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <h2 className="text-base font-bold">Asignar hora manualmente</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Para fotos sin hora de captura registrada (sin EXIF) — elige el horario declarado al que pertenecen.
+            </p>
+
+            {assignHourPoint && (assignHourPoint.manual_segments?.length ?? 0) > 0 ? (
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Horarios de {assignHourPoint.label}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {assignHourPoint.manual_segments!.map((seg) => (
+                    <button
+                      key={seg.start}
+                      onClick={() => assignHour(seg.start)}
+                      className="rounded-full border border-border px-2 py-1.5 text-center text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                    >
+                      {seg.start}–{seg.end}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-muted-foreground">
+                {assignHourPoint
+                  ? `${assignHourPoint.label} todavía no tiene horarios declarados — agrégalos en la pestaña "Ruta"/"Punto" del editor.`
+                  : 'Selecciona fotos de un solo punto con horarios declarados para poder asignarles hora.'}
+              </p>
+            )}
+
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setAssignHourOpen(false)}>Cancelar</Button>
+            </div>
           </div>
         </div>
       )}
