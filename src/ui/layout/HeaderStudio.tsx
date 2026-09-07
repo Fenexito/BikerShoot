@@ -11,8 +11,12 @@ import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { SocialLinks } from '../shared/SocialLinks'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
+import { useScrolledPast } from '../shared/useScrolledPast'
+import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { cn } from '../../lib/cn'
+
+const HEADER_TRANSFORM_THRESHOLD = 200
 
 const NAV_ITEMS = [
   { to: '/studio/eventos', label: 'Eventos' },
@@ -41,6 +45,15 @@ export function HeaderStudio() {
   const profileIncomplete = !!details && (!details.bio || !details.city || !details.whatsapp)
   const hidden = useAutoHideHeader()
 
+  // El header se "transforma": si la página actual registró contenido (ver
+  // useHeaderTransform) y el usuario ya scrolleó lo suficiente, el nav
+  // normal cede su lugar a esas herramientas propias de la página (búsqueda,
+  // filtros, etc.) con un crossfade — el header nunca cambia de tamaño ni
+  // posición, solo lo que hay adentro de esta franja.
+  const transformContent = useHeaderTransformStore((s) => s.content)
+  const scrolledPastThreshold = useScrolledPast(HEADER_TRANSFORM_THRESHOLD)
+  const transformed = scrolledPastThreshold && transformContent != null
+
   return (
     <>
       <div
@@ -54,22 +67,37 @@ export function HeaderStudio() {
           <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">
             MotoShots Studio
           </Link>
-          <nav className="ml-2 hidden flex-1 items-center gap-1 text-sm font-medium md:flex">
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    'rounded-full px-3.5 py-2 transition-colors duration-150',
-                    isActive ? 'bg-foreground/10 font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
-                  )
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+          <div className="relative ml-2 hidden h-10 flex-1 items-center md:flex">
+            <nav
+              className={cn(
+                'absolute inset-0 flex items-center gap-1 text-sm font-medium transition-all duration-300',
+                transformed ? 'pointer-events-none translate-y-1 opacity-0' : 'translate-y-0 opacity-100',
+              )}
+            >
+              {NAV_ITEMS.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    cn(
+                      'rounded-full px-3.5 py-2 transition-colors duration-150',
+                      isActive ? 'bg-foreground/10 font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+            <div
+              className={cn(
+                'absolute inset-0 flex items-center transition-all duration-300',
+                transformed ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0',
+              )}
+            >
+              {transformContent}
+            </div>
+          </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <NotificationsMenu />
             <div className="hidden md:block">

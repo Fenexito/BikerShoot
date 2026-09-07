@@ -16,6 +16,7 @@ import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { IconSearch } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
+import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 
 const TABS: { value: OrderItemStatus | 'todos'; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -244,6 +245,37 @@ export function StudioOrders() {
     setSelectedIds(new Set())
     queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
   }
+
+  // El header (HeaderStudio) se transforma al pasar el umbral de scroll:
+  // muestra este buscador + pestañas de estado en vez del nav normal — para
+  // no tener que scrollear de vuelta arriba a cambiar de filtro.
+  useHeaderTransform(
+    <div className="flex w-full items-center gap-2 overflow-x-auto">
+      <div className="flex shrink-0 items-center gap-2 rounded-full bg-muted px-3">
+        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Biker o evento…"
+          className="h-9 w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground md:w-44"
+        />
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            onClick={() => setTab(t.value)}
+            className={cn(
+              'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+              tab === t.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>,
+  )
 
   return (
     <div className={STUDIO_PAGE_WIDE}>

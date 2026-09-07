@@ -10,8 +10,12 @@ import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
+import { useScrolledPast } from '../shared/useScrolledPast'
+import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { cn } from '../../lib/cn'
+
+const HEADER_TRANSFORM_THRESHOLD = 200
 
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
@@ -47,6 +51,13 @@ export function HeaderUser() {
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
   const hidden = useAutoHideHeader()
 
+  // Igual que en HeaderStudio: si la página actual registró contenido (ver
+  // useHeaderTransform) y ya se scrolleó lo suficiente, el nav + buscador
+  // genérico ceden su lugar a las herramientas propias de esa página.
+  const transformContent = useHeaderTransformStore((s) => s.content)
+  const scrolledPastThreshold = useScrolledPast(HEADER_TRANSFORM_THRESHOLD)
+  const transformed = scrolledPastThreshold && transformContent != null
+
   return (
     <>
       <div
@@ -61,33 +72,50 @@ export function HeaderUser() {
             MotoShots
           </Link>
 
-          <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
-            {NAV_ITEMS.slice(0, 4).map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/app'}
-                className={({ isActive }) =>
-                  cn(
-                    'rounded-full px-3.5 py-2 transition-colors',
-                    isActive ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground hover:text-foreground',
-                  )
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+          <div className="relative hidden h-11 flex-1 items-center md:flex">
+            <div
+              className={cn(
+                'flex w-full items-center transition-all duration-300',
+                transformed ? 'pointer-events-none translate-y-1 opacity-0' : 'translate-y-0 opacity-100',
+              )}
+            >
+              <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
+                {NAV_ITEMS.slice(0, 4).map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/app'}
+                    className={({ isActive }) =>
+                      cn(
+                        'rounded-full px-3.5 py-2 transition-colors',
+                        isActive ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground hover:text-foreground',
+                      )
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </nav>
 
-          <form onSubmit={submitSearch} className="ml-auto hidden max-w-md flex-1 items-center gap-2 rounded-full bg-muted px-4 md:flex">
-            <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar evento, fotógrafo, ciudad…"
-              className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </form>
+              <form onSubmit={submitSearch} className="ml-auto flex max-w-md flex-1 items-center gap-2 rounded-full bg-muted px-4">
+                <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar evento, fotógrafo, ciudad…"
+                  className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </form>
+            </div>
+            <div
+              className={cn(
+                'absolute inset-0 flex items-center transition-all duration-300',
+                transformed ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0',
+              )}
+            >
+              {transformContent}
+            </div>
+          </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:gap-2">
             <Link

@@ -23,6 +23,7 @@ import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
 import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
+import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
@@ -700,6 +701,38 @@ export function StudioEventView() {
     queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
     navigate('/studio/eventos')
   }
+
+  // El header (HeaderStudio) se transforma al pasar el umbral de scroll:
+  // muestra el título del evento + el punto activo (ya se calculaba para la
+  // barra pegajosa de la página) + un salto rápido a cualquier punto, en vez
+  // del nav normal. Se registra antes de los `return` tempranos de abajo —
+  // los hooks no pueden depender de si `event` ya cargó.
+  useHeaderTransform(
+    event ? (
+      <div className="flex w-full items-center gap-3">
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {event.title}
+          {activePointLabel && <span className="ml-2 font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
+        </p>
+        {event.event_points.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => {
+              const el = pointRefs.current[e.target.value]
+              el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+            className="shrink-0 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
+          >
+            <option value="" disabled>Saltar a…</option>
+            <option value="__featured__">Destacadas</option>
+            {event.event_points.map((pt) => (
+              <option key={pt.id} value={pt.id}>{pt.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    ) : null,
+  )
 
   if (isLoading) {
     return (
