@@ -149,8 +149,16 @@ interface PhotoGalleryProps {
   onDelete: (id: string) => void
 }
 
-function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGalleryProps) {
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+function PhotoGallery({
+  photos,
+  selectedIds,
+  onToggleSelect,
+  onDelete,
+  visibleCount: visibleCountProp,
+  onShowMore: onShowMoreProp,
+}: PhotoGalleryProps & { visibleCount?: number; onShowMore?: () => void }) {
+  const [visibleCountState, setVisibleCountState] = useState(PAGE_SIZE)
+  const visibleCount = visibleCountProp ?? visibleCountState
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const loadMoreZoneRef = useRef<HTMLDivElement>(null)
   const visible = photos.slice(0, visibleCount)
@@ -161,7 +169,8 @@ function PhotoGallery({ photos, selectedIds, onToggleSelect, onDelete }: PhotoGa
 
   function handleLoadMore() {
     const prevTop = loadMoreZoneRef.current?.getBoundingClientRect().top ?? 0
-    setVisibleCount((c) => c + PAGE_SIZE)
+    if (onShowMoreProp) onShowMoreProp()
+    else setVisibleCountState((c) => c + PAGE_SIZE)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const newTop = loadMoreZoneRef.current?.getBoundingClientRect().top
@@ -254,24 +263,32 @@ function PointStack({ photos }: { photos: EventPhoto[] }) {
   )
 }
 
-/** Botón de selección — alterna entre "Seleccionar todas" y "Deseleccionar"
- * según si TODAS las fotos del grupo ya están seleccionadas o no. */
-function SelectToggle({ ids, selectedIds, onSelectMany, onDeselectMany }: {
+/** Menú "···" con la opción de seleccionar/deseleccionar todo el grupo —
+ * no es algo que se use seguido, así que vive detrás de un botón discreto
+ * en vez de competir visualmente con "Cargar fotos"/"Subir fotos". */
+function SelectMenu({ ids, selectedIds, onSelectMany, onDeselectMany, triggerClassName }: {
   ids: string[]
   selectedIds: Set<string>
   onSelectMany: (ids: string[]) => void
   onDeselectMany: (ids: string[]) => void
+  triggerClassName?: string
 }) {
   if (ids.length === 0) return null
   const allSelected = ids.every((id) => selectedIds.has(id))
   return (
-    <button
-      onClick={() => (allSelected ? onDeselectMany(ids) : onSelectMany(ids))}
-      className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-    >
-      {allSelected ? 'Deseleccionar' : 'Seleccionar todas'}
-    </button>
+    <ActionMenu
+      triggerClassName={triggerClassName}
+      items={[{ label: allSelected ? 'Deseleccionar' : 'Seleccionar todas', onClick: () => (allSelected ? onDeselectMany(ids) : onSelectMany(ids)) }]}
+    />
   )
+}
+
+interface SegmentLike {
+  key: string
+  label: string
+  photos: EventPhoto[]
+  forcedCapturedAt?: string
+  dashed?: boolean
 }
 
 interface PointCardProps {
@@ -295,11 +312,42 @@ interface PointCardProps {
 function PointCard({ point, photos, eventId, photographerId, price, watermarkPath, eventDate, selectedIds, onToggleSelect, onSelectMany, onDeselectMany, onDelete, onUploaded, registerRef, onExpandedChange }: PointCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadPickerOpen, setUploadPickerOpen] = useState(false)
   const [segmentUploadOpen, setSegmentUploadOpen] = useState<string | null>(null)
+  const [visibleCountByRow, setVisibleCountByRow] = useState<Record<number, number>>({})
   const sold = photos.filter((p) => p.delivered_path).length
   const hasDeclared = (point.manual_segments?.length ?? 0) > 0
   const declared = useMemo(() => (hasDeclared ? groupByDeclaredSegments(photos, point.manual_segments!) : null), [hasDeclared, photos, point.manual_segments])
   const autoSegments = useMemo(() => (hasDeclared ? null : computeSegments(photos)), [hasDeclared, photos])
+
+  // Horarios y "otras fotos" unificados — permite emparejar de a dos por
+  // fila (mismos "gemelos" del editor) sin importar si vienen de horarios
+  // declarados o de la detección automática por EXIF.
+  const segments: SegmentLike[] = useMemo(() => {
+    if (declared) {
+      const bucketSegs = declared.buckets.map((b) => ({
+        key: b.start,
+        label: `${b.start}–${b.end}`,
+        photos: b.photos,
+        forcedCapturedAt: new Date(`${eventDate}T${b.start}:00`).toISOString(),
+      }))
+      const leftoverSeg = declared.leftover.length > 0 ? [{ key: '__otras__', label: 'Otras fotos', photos: declared.leftover, dashed: true }] : []
+      return [...bucketSegs, ...leftoverSeg]
+    }
+    if (autoSegments) return autoSegments.map((s) => ({ key: s.key, label: s.label, photos: s.photos }))
+    return []
+  }, [declared, autoSegments, eventDate])
+
+  const segmentRows = useMemo(() => chunk(segments, 2), [segments])
+
+  function showMoreRow(rowIndex: number) {
+    setVisibleCountByRow((prev) => ({ ...prev, [rowIndex]: (prev[rowIndex] ?? PAGE_SIZE) + PAGE_SIZE }))
+  }
+
+  function chooseUploadSegment(segKey: string) {
+    setSegmentUploadOpen(segKey)
+    setUploadPickerOpen(false)
+  }
 
   function toggleExpanded() {
     setExpanded((e) => {
@@ -332,12 +380,34 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
       {expanded && (
         <div className="border-t border-border p-5">
           <div className="mb-4 hidden items-center justify-between sm:flex">
-            <SelectToggle ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
-            <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
-              {uploadOpen ? 'Cerrar' : '+ Subir fotos a este punto'}
+            <SelectMenu ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => (hasDeclared ? setUploadPickerOpen((o) => !o) : setUploadOpen((o) => !o))}
+            >
+              {(hasDeclared ? uploadPickerOpen : uploadOpen) ? 'Cerrar' : '+ Subir fotos a este punto'}
             </Button>
           </div>
-          {uploadOpen && (
+
+          {uploadPickerOpen && hasDeclared && (
+            <div className="mb-6 rounded-2xl border border-border p-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">¿Para qué horario son estas fotos?</p>
+              <div className="grid grid-cols-3 gap-2">
+                {point.manual_segments!.map((seg) => (
+                  <button
+                    key={seg.start}
+                    onClick={() => chooseUploadSegment(seg.start)}
+                    className="rounded-full border border-border px-2 py-1.5 text-center text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                  >
+                    {seg.start}–{seg.end}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uploadOpen && !hasDeclared && (
             <div className="mb-6">
               <PhotoUploadQueue
                 eventId={eventId}
@@ -351,58 +421,52 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
             </div>
           )}
 
-          {declared ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {declared.buckets.map((bucket) => (
-                <div key={bucket.start} className="rounded-2xl border border-border">
-                  <div className="hidden flex-wrap items-center justify-between gap-2 p-3 sm:flex">
-                    <p className="text-sm font-semibold">{bucket.start}–{bucket.end} <span className="font-normal text-muted-foreground">· {bucket.photos.length} fotos</span></p>
-                    <div className="flex items-center gap-2">
-                      <SelectToggle ids={bucket.photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
-                      <button
-                        onClick={() => setSegmentUploadOpen((k) => (k === bucket.start ? null : bucket.start))}
-                        className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
-                      >
-                        {segmentUploadOpen === bucket.start ? 'Cerrar' : 'Cargar fotos'}
-                      </button>
+          {segments.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {segmentRows.map((row, rowIndex) => (
+                <div key={rowIndex} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {row.map((seg) => (
+                    <div key={seg.key} className={cn('rounded-2xl border border-border', seg.dashed && 'border-dashed')}>
+                      <div className="hidden flex-wrap items-center justify-between gap-2 p-3 sm:flex">
+                        <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
+                        <div className="flex items-center gap-2">
+                          <SelectMenu ids={seg.photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
+                          {seg.forcedCapturedAt && (
+                            <button
+                              onClick={() => setSegmentUploadOpen((k) => (k === seg.key ? null : seg.key))}
+                              className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                            >
+                              {segmentUploadOpen === seg.key ? 'Cerrar' : 'Cargar fotos'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="p-3 text-sm font-semibold sm:hidden">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
+                      {segmentUploadOpen === seg.key && seg.forcedCapturedAt && (
+                        <div className="border-t border-border p-3">
+                          <PhotoUploadQueue
+                            eventId={eventId}
+                            pointId={point.id}
+                            photographerId={photographerId}
+                            price={price}
+                            watermarkPath={watermarkPath}
+                            onItemUploaded={onUploaded}
+                            forcedCapturedAt={seg.forcedCapturedAt}
+                          />
+                        </div>
+                      )}
+                      <div className="border-t border-border p-3">
+                        <PhotoGallery
+                          photos={seg.photos}
+                          selectedIds={selectedIds}
+                          onToggleSelect={onToggleSelect}
+                          onDelete={onDelete}
+                          visibleCount={visibleCountByRow[rowIndex] ?? PAGE_SIZE}
+                          onShowMore={() => showMoreRow(rowIndex)}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <p className="p-3 text-sm font-semibold sm:hidden">{bucket.start}–{bucket.end} <span className="font-normal text-muted-foreground">· {bucket.photos.length} fotos</span></p>
-                  {segmentUploadOpen === bucket.start && (
-                    <div className="border-t border-border p-3">
-                      <PhotoUploadQueue
-                        eventId={eventId}
-                        pointId={point.id}
-                        photographerId={photographerId}
-                        price={price}
-                        watermarkPath={watermarkPath}
-                        onItemUploaded={onUploaded}
-                        forcedCapturedAt={new Date(`${eventDate}T${bucket.start}:00`).toISOString()}
-                      />
-                    </div>
-                  )}
-                  <div className="border-t border-border p-3">
-                    <PhotoGallery photos={bucket.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
-                  </div>
-                </div>
-              ))}
-              {declared.leftover.length > 0 && (
-                <div className="rounded-2xl border border-dashed border-border p-3">
-                  <p className="mb-2 text-sm font-semibold">Otras fotos <span className="font-normal text-muted-foreground">· {declared.leftover.length} fotos</span></p>
-                  <PhotoGallery photos={declared.leftover} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
-                </div>
-              )}
-            </div>
-          ) : autoSegments ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {autoSegments.map((seg) => (
-                <div key={seg.key} className="rounded-2xl border border-border p-3">
-                  <div className="mb-2 hidden items-center justify-between gap-2 sm:flex">
-                    <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
-                    <SelectToggle ids={seg.photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
-                  </div>
-                  <p className="mb-2 text-sm font-semibold sm:hidden">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
-                  <PhotoGallery photos={seg.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onDelete={onDelete} />
+                  ))}
                 </div>
               ))}
             </div>
@@ -487,17 +551,49 @@ export function StudioEventView() {
     return map
   }, [photos])
 
+  // Nunca mezclar en la misma selección fotos de puntos distintos (incluye
+  // "sin punto asignado", con clave '__none__') — moverlas o asignarles hora
+  // a la vez no tendría un único destino sensato. Deseleccionar siempre está
+  // permitido; agregar una foto de otro punto mientras ya hay selección de
+  // uno distinto se bloquea con un aviso.
+  function pointKeyOf(photoId: string): string {
+    return photos.find((p) => p.id === photoId)?.point_id ?? '__none__'
+  }
+
+  function currentSelectionPointKey(prev: Set<string>): string | undefined {
+    if (prev.size === 0) return undefined
+    const [first] = prev
+    return pointKeyOf(first)
+  }
+
   function toggleSelect(photoId: string) {
     setSelectedIds((prev) => {
+      if (prev.has(photoId)) {
+        const next = new Set(prev)
+        next.delete(photoId)
+        return next
+      }
+      const currentKey = currentSelectionPointKey(prev)
+      if (currentKey !== undefined && currentKey !== pointKeyOf(photoId)) {
+        push({ type: 'error', title: 'No puedes mezclar puntos', description: 'Deselecciona las fotos del otro punto antes de elegir esta.' })
+        return prev
+      }
       const next = new Set(prev)
-      if (next.has(photoId)) next.delete(photoId)
-      else next.add(photoId)
+      next.add(photoId)
       return next
     })
   }
 
   function selectMany(ids: string[]) {
-    setSelectedIds((prev) => new Set([...prev, ...ids]))
+    if (ids.length === 0) return
+    setSelectedIds((prev) => {
+      const currentKey = currentSelectionPointKey(prev)
+      if (currentKey !== undefined && currentKey !== pointKeyOf(ids[0])) {
+        push({ type: 'error', title: 'No puedes mezclar puntos', description: 'Deselecciona las fotos del otro punto antes de seleccionar este grupo.' })
+        return prev
+      }
+      return new Set([...prev, ...ids])
+    })
   }
 
   function deselectMany(ids: string[]) {
@@ -566,14 +662,17 @@ export function StudioEventView() {
     invalidatePhotos()
   }
 
-  // A qué punto pertenecen las fotos seleccionadas — si son todas del mismo
-  // punto con horarios declarados, el modal ofrece esos horarios como chips.
-  const assignHourPoint = useMemo(() => {
-    const pointIds = new Set(Array.from(selectedIds).map((pid) => photos.find((p) => p.id === pid)?.point_id).filter(Boolean))
-    if (pointIds.size !== 1) return null
-    const [onlyId] = pointIds
-    return event?.event_points.find((p) => p.id === onlyId) ?? null
-  }, [selectedIds, photos, event])
+  // A qué punto pertenecen las fotos seleccionadas — nunca hay mezcla (ver
+  // toggleSelect/selectMany), así que basta con mirar la primera. Se usa
+  // para acotar los horarios del modal de "asignar hora" y para no ofrecer
+  // el punto actual como destino en "Mover a…" (ya están ahí).
+  const selectedPointKey = useMemo(() => {
+    if (selectedIds.size === 0) return null
+    const [first] = selectedIds
+    return photos.find((p) => p.id === first)?.point_id ?? '__none__'
+  }, [selectedIds, photos])
+
+  const assignHourPoint = useMemo(() => event?.event_points.find((p) => p.id === selectedPointKey) ?? null, [selectedPointKey, event])
 
   // Reasignación manual de horario — para fotos sin EXIF (capturas de
   // pantalla, reenvíos de WhatsApp, exportaciones que perdieron los
@@ -811,7 +910,7 @@ export function StudioEventView() {
             <div className="overflow-hidden rounded-3xl border border-border bg-card p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="font-studio text-lg font-bold tracking-tight2">Sin punto asignado</h2>
-                <SelectToggle ids={unassigned.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={selectMany} onDeselectMany={deselectMany} />
+                <SelectMenu ids={unassigned.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={selectMany} onDeselectMany={deselectMany} />
               </div>
               <PhotoGallery photos={unassigned} selectedIds={selectedIds} onToggleSelect={toggleSelect} onDelete={deletePhoto} />
             </div>
@@ -838,7 +937,7 @@ export function StudioEventView() {
               options={[
                 ...event.event_points.map((pt) => ({ value: pt.id, label: pt.label })),
                 { value: '__none__', label: 'Sin punto asignado' },
-              ]}
+              ].filter((opt) => opt.value !== selectedPointKey)}
             />
             <button
               onClick={() => setAssignHourOpen(true)}

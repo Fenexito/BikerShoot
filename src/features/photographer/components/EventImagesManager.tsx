@@ -12,6 +12,7 @@ import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
 import { IconTrash } from '../../../ui/shared/icons'
 import { Dropdown } from '../../../ui/shared/Dropdown'
+import { ActionMenu } from '../../../ui/shared/ActionMenu'
 import AccordionGallery from '../../../ui/reactbits/AccordionGallery'
 import { cn } from '../../../lib/cn'
 
@@ -35,6 +36,14 @@ interface EventPointInfo {
   time_start: string
   time_end: string
   manual_segments: ManualSegment[]
+}
+
+interface SegmentLike {
+  key: string
+  label: string
+  photos: EventPhoto[]
+  forcedCapturedAt?: string
+  dashed?: boolean
 }
 
 interface EventImagesManagerProps {
@@ -106,19 +115,26 @@ function MobilePointRow({ point, photos }: { point: EventPointInfo; photos: Even
 }
 
 /** Filas adicionales de acordeón (8 fotos cada una) — "ver más" agrega otra
- * fila abajo. Cada instancia (un punto, o un segmento dentro de un punto)
- * maneja su propia paginación por separado — sin sincronizar con ninguna
- * otra galería. */
+ * fila abajo. Por defecto cada instancia maneja su propia paginación; si el
+ * padre pasa `visibleRows`/`onShowMore` (dos horarios "gemelos" en la misma
+ * fila), la paginación queda controlada desde afuera y ambos avanzan juntos
+ * al presionar "ver más" en cualquiera de los dos. */
 function GalleryRows({
   photos,
   selectedIds,
   onToggleSelect,
+  visibleRows: visibleRowsProp,
+  onShowMore: onShowMoreProp,
 }: {
   photos: EventPhoto[]
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
+  visibleRows?: number
+  onShowMore?: () => void
 }) {
-  const [visibleRows, setVisibleRows] = useState(1)
+  const [visibleRowsState, setVisibleRowsState] = useState(1)
+  const visibleRows = visibleRowsProp ?? visibleRowsState
+  const onShowMore = onShowMoreProp ?? (() => setVisibleRowsState((r) => r + 1))
   const rows = useMemo(() => chunk(photos, ROW_SIZE), [photos])
   const shown = rows.slice(0, visibleRows)
   const remaining = photos.length - shown.reduce((s, r) => s + r.length, 0)
@@ -169,7 +185,7 @@ function GalleryRows({
       ))}
       {remaining > 0 && (
         <button
-          onClick={() => setVisibleRows((r) => r + 1)}
+          onClick={onShowMore}
           className="w-full rounded-2xl border border-border py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
         >
           Ver más fotos ({remaining} más)
@@ -179,21 +195,23 @@ function GalleryRows({
   )
 }
 
-/** Botón de selección — alterna entre "Seleccionar todas" y "Deseleccionar"
- * según si TODAS las fotos del grupo ya están seleccionadas o no. */
-function SelectToggle({ ids, selectedIds, onSelectMany, onDeselectMany, label = 'Seleccionar todas' }: {
+/** Menú "···" con la opción de seleccionar/deseleccionar todo el grupo —
+ * no es algo que se use seguido, así que vive detrás de un botón discreto
+ * en vez de competir visualmente con "Cargar fotos"/"Subir fotos". */
+function SelectMenu({ ids, selectedIds, onSelectMany, onDeselectMany, triggerClassName }: {
   ids: string[]
   selectedIds: Set<string>
   onSelectMany: (ids: string[]) => void
   onDeselectMany: (ids: string[]) => void
-  label?: string
+  triggerClassName?: string
 }) {
   if (ids.length === 0) return null
   const allSelected = ids.every((id) => selectedIds.has(id))
   return (
-    <Button variant="ghost" size="sm" onClick={() => (allSelected ? onDeselectMany(ids) : onSelectMany(ids))}>
-      {allSelected ? 'Deseleccionar' : label}
-    </Button>
+    <ActionMenu
+      triggerClassName={triggerClassName}
+      items={[{ label: allSelected ? 'Deseleccionar' : 'Seleccionar todas', onClick: () => (allSelected ? onDeselectMany(ids) : onSelectMany(ids)) }]}
+    />
   )
 }
 
@@ -226,19 +244,52 @@ function DesktopPointCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [openSegments, setOpenSegments] = useState<Set<string>>(new Set())
+  const [uploadPickerOpen, setUploadPickerOpen] = useState(false)
+  const [openRows, setOpenRows] = useState<Set<number>>(new Set())
+  const [visibleRowsByRow, setVisibleRowsByRow] = useState<Record<number, number>>({})
   const [segmentUploadOpen, setSegmentUploadOpen] = useState<string | null>(null)
   const autoSegments = useMemo(() => computeSegments(photos), [photos])
   const hasDeclared = point.manual_segments.length > 0
   const declared = useMemo(() => (hasDeclared ? groupByDeclaredSegments(photos, point.manual_segments) : null), [hasDeclared, photos, point.manual_segments])
 
-  function toggleSegment(key: string) {
-    setOpenSegments((prev) => {
+  // Horarios y "otras fotos" unificados en una sola lista — así se pueden
+  // emparejar de a dos por fila (misma lógica sin importar si vienen de
+  // horarios declarados o de la detección automática por EXIF).
+  const segments: SegmentLike[] = useMemo(() => {
+    if (declared) {
+      const bucketSegs = declared.buckets.map((b) => ({
+        key: b.start,
+        label: `${b.start}–${b.end}`,
+        photos: b.photos,
+        forcedCapturedAt: new Date(`${eventDate}T${b.start}:00`).toISOString(),
+      }))
+      const leftoverSeg = declared.leftover.length > 0 ? [{ key: '__otras__', label: 'Otras fotos', photos: declared.leftover, dashed: true }] : []
+      return [...bucketSegs, ...leftoverSeg]
+    }
+    if (autoSegments) return autoSegments.map((s) => ({ key: s.key, label: s.label, photos: s.photos }))
+    return []
+  }, [declared, autoSegments, eventDate])
+
+  const segmentRows = useMemo(() => chunk(segments, 2), [segments])
+
+  function toggleRow(rowIndex: number) {
+    setOpenRows((prev) => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      if (next.has(rowIndex)) next.delete(rowIndex)
+      else next.add(rowIndex)
       return next
     })
+  }
+
+  function showMoreRow(rowIndex: number) {
+    setVisibleRowsByRow((prev) => ({ ...prev, [rowIndex]: (prev[rowIndex] ?? 1) + 1 }))
+  }
+
+  function chooseUploadSegment(segKey: string) {
+    setSegmentUploadOpen(segKey)
+    setUploadPickerOpen(false)
+    const idx = segments.findIndex((s) => s.key === segKey)
+    if (idx >= 0) setOpenRows((prev) => new Set(prev).add(Math.floor(idx / 2)))
   }
 
   return (
@@ -258,95 +309,91 @@ function DesktopPointCard({
       {expanded && (
         <div className="border-t border-border p-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <SelectToggle ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
-            <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
-              {uploadOpen ? 'Cerrar' : '+ Subir fotos'}
+            <SelectMenu ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => (hasDeclared ? setUploadPickerOpen((o) => !o) : setUploadOpen((o) => !o))}
+            >
+              {(hasDeclared ? uploadPickerOpen : uploadOpen) ? 'Cerrar' : '+ Subir fotos'}
             </Button>
           </div>
-          {uploadOpen && (
+
+          {uploadPickerOpen && hasDeclared && (
+            <div className="mb-6 rounded-2xl border border-border p-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">¿Para qué horario son estas fotos?</p>
+              <div className="grid grid-cols-3 gap-2">
+                {point.manual_segments.map((seg) => (
+                  <button
+                    key={seg.start}
+                    onClick={() => chooseUploadSegment(seg.start)}
+                    className="rounded-full border border-border px-2 py-1.5 text-center text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                  >
+                    {seg.start}–{seg.end}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uploadOpen && !hasDeclared && (
             <div className="mb-6">
               <PhotoUploadQueue eventId={eventId} pointId={point.id} photographerId={photographerId} price={price} watermarkPath={watermarkPath} onItemUploaded={onUploaded} />
               <p className="mt-2 text-xs text-muted-foreground">Se clasifican solas por hora si la foto trae EXIF.</p>
             </div>
           )}
 
-          {photos.length === 0 && !hasDeclared ? (
+          {photos.length === 0 && segments.length === 0 ? (
             <p className="text-sm text-muted-foreground">Todavía no hay fotos en este punto.</p>
-          ) : declared ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {declared.buckets.map((bucket) => (
-                <div key={bucket.start} className="rounded-2xl border border-border">
-                  <div className="flex w-full flex-wrap items-center justify-between gap-2 p-3">
-                    <button onClick={() => toggleSegment(bucket.start)} className="flex flex-1 items-center justify-between gap-3 text-left">
-                      <p className="text-sm font-semibold">{bucket.start}–{bucket.end} <span className="font-normal text-muted-foreground">· {bucket.photos.length} fotos</span></p>
-                      <span className={cn('text-xs transition-transform', openSegments.has(bucket.start) && 'rotate-180')}>▾</span>
-                    </button>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {bucket.photos.length > 0 && (
-                        <button onClick={() => (bucket.photos.every((p) => selectedIds.has(p.id)) ? onDeselectMany(bucket.photos.map((p) => p.id)) : onSelectMany(bucket.photos.map((p) => p.id)))} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
-                          {bucket.photos.every((p) => selectedIds.has(p.id)) ? 'Deseleccionar' : 'Seleccionar'}
+          ) : segments.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {segmentRows.map((row, rowIndex) => (
+                <div key={rowIndex} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {row.map((seg) => (
+                    <div key={seg.key} className={cn('rounded-2xl border border-border', seg.dashed && 'border-dashed')}>
+                      <div className="flex w-full flex-wrap items-center justify-between gap-2 p-3">
+                        <button onClick={() => toggleRow(rowIndex)} className="flex flex-1 items-center justify-between gap-3 text-left">
+                          <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
+                          <span className={cn('text-xs transition-transform', openRows.has(rowIndex) && 'rotate-180')}>▾</span>
                         </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <SelectMenu ids={seg.photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
+                          {seg.forcedCapturedAt && (
+                            <button
+                              onClick={() => setSegmentUploadOpen((k) => (k === seg.key ? null : seg.key))}
+                              className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
+                            >
+                              {segmentUploadOpen === seg.key ? 'Cerrar' : 'Cargar fotos'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {segmentUploadOpen === seg.key && seg.forcedCapturedAt && (
+                        <div className="border-t border-border p-3">
+                          <PhotoUploadQueue
+                            eventId={eventId}
+                            pointId={point.id}
+                            photographerId={photographerId}
+                            price={price}
+                            watermarkPath={watermarkPath}
+                            onItemUploaded={onUploaded}
+                            forcedCapturedAt={seg.forcedCapturedAt}
+                          />
+                        </div>
                       )}
-                      <button
-                        onClick={() => setSegmentUploadOpen((k) => (k === bucket.start ? null : bucket.start))}
-                        className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition-colors hover:border-foreground hover:text-foreground"
-                      >
-                        {segmentUploadOpen === bucket.start ? 'Cerrar' : 'Cargar fotos'}
-                      </button>
+                      {openRows.has(rowIndex) && seg.photos.length > 0 && (
+                        <div className="border-t border-border p-3">
+                          <GalleryRows
+                            photos={seg.photos}
+                            selectedIds={selectedIds}
+                            onToggleSelect={onToggleSelect}
+                            visibleRows={visibleRowsByRow[rowIndex] ?? 1}
+                            onShowMore={() => showMoreRow(rowIndex)}
+                          />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  {segmentUploadOpen === bucket.start && (
-                    <div className="border-t border-border p-3">
-                      <PhotoUploadQueue
-                        eventId={eventId}
-                        pointId={point.id}
-                        photographerId={photographerId}
-                        price={price}
-                        watermarkPath={watermarkPath}
-                        onItemUploaded={onUploaded}
-                        forcedCapturedAt={new Date(`${eventDate}T${bucket.start}:00`).toISOString()}
-                      />
-                    </div>
-                  )}
-                  {openSegments.has(bucket.start) && bucket.photos.length > 0 && (
-                    <div className="border-t border-border p-3">
-                      <GalleryRows photos={bucket.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} />
-                    </div>
-                  )}
-                </div>
-              ))}
-              {declared.leftover.length > 0 && (
-                <div className="rounded-2xl border border-dashed border-border">
-                  <button onClick={() => toggleSegment('__otras__')} className="flex w-full items-center justify-between gap-3 p-3 text-left">
-                    <p className="text-sm font-semibold">Otras fotos <span className="font-normal text-muted-foreground">· {declared.leftover.length} fotos</span></p>
-                    <span className={cn('text-xs transition-transform', openSegments.has('__otras__') && 'rotate-180')}>▾</span>
-                  </button>
-                  {openSegments.has('__otras__') && (
-                    <div className="border-t border-border p-3">
-                      <GalleryRows photos={declared.leftover} selectedIds={selectedIds} onToggleSelect={onToggleSelect} />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : autoSegments ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {autoSegments.map((seg) => (
-                <div key={seg.key} className="rounded-2xl border border-border">
-                  <div className="flex w-full items-center justify-between gap-3 p-3">
-                    <button onClick={() => toggleSegment(seg.key)} className="flex flex-1 items-center justify-between gap-3 text-left">
-                      <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
-                      <span className={cn('text-xs transition-transform', openSegments.has(seg.key) && 'rotate-180')}>▾</span>
-                    </button>
-                    <button onClick={() => (seg.photos.every((p) => selectedIds.has(p.id)) ? onDeselectMany(seg.photos.map((p) => p.id)) : onSelectMany(seg.photos.map((p) => p.id)))} className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground">
-                      {seg.photos.every((p) => selectedIds.has(p.id)) ? 'Deseleccionar' : 'Seleccionar'}
-                    </button>
-                  </div>
-                  {openSegments.has(seg.key) && (
-                    <div className="border-t border-border p-3">
-                      <GalleryRows photos={seg.photos} selectedIds={selectedIds} onToggleSelect={onToggleSelect} />
-                    </div>
-                  )}
+                  ))}
                 </div>
               ))}
             </div>
@@ -387,17 +434,48 @@ export function EventImagesManager({ eventId, photographerId, price, watermarkPa
     return map
   }, [photos])
 
+  // Nunca mezclar en la misma selección fotos de puntos distintos — moverlas
+  // o asignarles hora a la vez no tendría un único destino/punto de
+  // referencia sensato. Deseleccionar siempre está permitido; agregar una
+  // foto de otro punto mientras ya hay selección de uno distinto se bloquea.
+  function pointOf(photoId: string): string | null {
+    return photos.find((p) => p.id === photoId)?.point_id ?? null
+  }
+
+  function currentSelectionPoint(prev: Set<string>): string | null | undefined {
+    if (prev.size === 0) return undefined
+    const first = [...prev][0]
+    return pointOf(first)
+  }
+
   function toggleSelect(photoId: string) {
     setSelectedIds((prev) => {
+      if (prev.has(photoId)) {
+        const next = new Set(prev)
+        next.delete(photoId)
+        return next
+      }
+      const currentPoint = currentSelectionPoint(prev)
+      if (currentPoint !== undefined && currentPoint !== pointOf(photoId)) {
+        push({ type: 'error', title: 'No puedes mezclar puntos', description: 'Deselecciona las fotos del otro punto antes de elegir esta.' })
+        return prev
+      }
       const next = new Set(prev)
-      if (next.has(photoId)) next.delete(photoId)
-      else next.add(photoId)
+      next.add(photoId)
       return next
     })
   }
 
   function selectMany(ids: string[]) {
-    setSelectedIds((prev) => new Set([...prev, ...ids]))
+    if (ids.length === 0) return
+    setSelectedIds((prev) => {
+      const currentPoint = currentSelectionPoint(prev)
+      if (currentPoint !== undefined && currentPoint !== pointOf(ids[0])) {
+        push({ type: 'error', title: 'No puedes mezclar puntos', description: 'Deselecciona las fotos del otro punto antes de seleccionar este grupo.' })
+        return prev
+      }
+      return new Set([...prev, ...ids])
+    })
   }
 
   function deselectMany(ids: string[]) {
@@ -445,16 +523,17 @@ export function EventImagesManager({ eventId, photographerId, price, watermarkPa
     invalidatePhotos()
   }
 
-  // A qué punto pertenecen las fotos seleccionadas — si son todas del mismo
-  // punto, la hora manual se acota a la ventana de ese punto (no tendría
-  // sentido ofrecer horas fuera de cuándo el fotógrafo estuvo ahí). Si hay
-  // fotos de puntos distintos seleccionadas a la vez, no se acota.
-  const assignHourPoint = useMemo(() => {
-    const pointIds = new Set(Array.from(selectedIds).map((id) => photos.find((p) => p.id === id)?.point_id).filter(Boolean))
-    if (pointIds.size !== 1) return null
-    const [onlyId] = pointIds
-    return points.find((p) => p.id === onlyId) ?? null
-  }, [selectedIds, photos, points])
+  // A qué punto pertenecen las fotos seleccionadas — nunca hay mezcla (ver
+  // toggleSelect/selectMany), así que basta con mirar la primera. Se usa
+  // para acotar los horarios del modal de "asignar hora" y para no ofrecer
+  // el punto actual como destino en "Mover a…" (ya están ahí).
+  const selectedPointId = useMemo(() => {
+    if (selectedIds.size === 0) return null
+    const [first] = selectedIds
+    return photos.find((p) => p.id === first)?.point_id ?? null
+  }, [selectedIds, photos])
+
+  const assignHourPoint = useMemo(() => points.find((p) => p.id === selectedPointId) ?? null, [selectedPointId, points])
 
   // Reasignación manual de horario — para fotos sin EXIF (capturas de
   // pantalla, reenvíos de WhatsApp, exportaciones que perdieron los
@@ -513,7 +592,11 @@ export function EventImagesManager({ eventId, photographerId, price, watermarkPa
         <div className="fixed inset-x-0 bottom-20 z-30 hidden justify-center px-4 md:bottom-6 lg:flex">
           <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-border bg-background px-5 py-3 shadow-lg">
             <span className="text-sm font-semibold">{selectedIds.size} seleccionada{selectedIds.size > 1 ? 's' : ''}</span>
-            <Dropdown label="Mover a…" onSelect={bulkMoveTo} options={points.map((pt) => ({ value: pt.id, label: pt.label }))} />
+            <Dropdown
+              label="Mover a…"
+              onSelect={bulkMoveTo}
+              options={points.filter((pt) => pt.id !== selectedPointId).map((pt) => ({ value: pt.id, label: pt.label }))}
+            />
             <button onClick={() => setAssignHourOpen(true)} className="rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-muted">
               Asignar hora
             </button>
