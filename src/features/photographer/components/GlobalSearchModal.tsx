@@ -33,6 +33,33 @@ const CATEGORY_LABELS: Record<SearchCategory, string> = {
   paginas: 'Páginas y funciones',
 }
 
+const RECENTS_KEY = 'motoshots_studio_recent_searches'
+const MAX_RECENTS = 8
+
+function loadRecents(): SearchResult[] {
+  try {
+    const raw = localStorage.getItem(RECENTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+// Nota: el ícono JSX de una página estática no sobrevive JSON.stringify, así
+// que los "recientes" de páginas se guardan sin `icon` — la fila los pinta
+// igual con el marcador de puntito genérico, no rompe nada.
+function saveRecent(result: SearchResult) {
+  try {
+    const { icon: _icon, ...serializable } = result
+    const current = loadRecents().filter((r) => !(r.id === result.id && r.category === result.category))
+    const next = [serializable as SearchResult, ...current].slice(0, MAX_RECENTS)
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(next))
+  } catch {
+    // localStorage puede fallar (modo privado, cuota llena) — los
+    // recientes son una conveniencia, nunca deben tumbar la búsqueda.
+  }
+}
+
 const STATIC_PAGES: { id: string; title: string; subtitle: string; to: string; icon: React.ReactNode }[] = [
   { id: 'p-eventos', title: 'Eventos', subtitle: 'Ver todos tus eventos', to: '/studio/eventos', icon: <IconImages className="h-4 w-4" /> },
   { id: 'p-crear-evento', title: 'Crear evento', subtitle: 'Publicar un nuevo evento', to: '/studio/eventos/new', icon: <IconPlus className="h-4 w-4" /> },
@@ -43,18 +70,29 @@ const STATIC_PAGES: { id: string; title: string; subtitle: string; to: string; i
   { id: 'p-ajustes', title: 'Configuración', subtitle: 'Ajustes de tu cuenta', to: '/studio/ajustes', icon: <IconSettings className="h-4 w-4" /> },
 ]
 
+function ResultThumb({ r, className }: { r: SearchResult; className: string }) {
+  if (r.thumbnail) return <img src={r.thumbnail} alt="" className={cn(className, 'object-cover')} />
+  if (r.category === 'bikers') return <InitialsAvatar name={r.title} className={cn(className, 'bg-white/10 text-white')} />
+  if (r.icon) return <span className={cn(className, 'flex items-center justify-center bg-white/10')}>{r.icon}</span>
+  return <span className={cn(className, 'flex items-center justify-center bg-white/10 text-xs')}>•</span>
+}
+
 /** Búsqueda global del portal del fotógrafo — bikers, eventos, pedidos,
- * fotos (por nombre de archivo) y páginas/funciones, todo desde un mismo
- * cuadro. Bikers/eventos/pedidos/páginas se filtran en el cliente sobre
- * datos ya cargados por otros hooks (sin pegarle a la base de datos otra
- * vez); fotos es la única categoría con su propia consulta (debounced),
- * porque buscar por nombre de archivo entre miles de fotos no tiene sentido
+ * fotos (por nombre de archivo) y páginas/funciones. Categorías como
+ * pestañas verticales a la izquierda (mismo patrón que el editor de evento/
+ * configuración), resultados a la derecha, y un panel de vista previa que
+ * se llena al pasar el cursor sobre un resultado. Bikers/eventos/pedidos/
+ * páginas se filtran en el cliente sobre datos ya cargados por otros hooks;
+ * fotos es la única categoría con su propia consulta (debounced), porque
+ * buscar por nombre de archivo entre miles de fotos no tiene sentido
  * traerlo completo al cliente de antemano. */
 export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<'todos' | SearchCategory>('todos')
+  const [hovered, setHovered] = useState<SearchResult | null>(null)
+  const [recents, setRecents] = useState<SearchResult[]>([])
   const { data: events = [] } = useMyEvents(user?.id)
   const { data: orders = [] } = usePhotographerOrders(user?.id)
   const [photoResults, setPhotoResults] = useState<SearchResult[]>([])
@@ -75,10 +113,13 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   }, [open, onClose])
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setRecents(loadRecents())
+    } else {
       setQuery('')
       setActiveCategory('todos')
       setPhotoResults([])
+      setHovered(null)
     }
   }, [open])
 
@@ -130,7 +171,7 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
     return [...map.values()]
   }, [orders])
 
-  const groups = useMemo(() => {
+  const resultsByCategory = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = (s: string) => !q || s.toLowerCase().includes(q)
 
@@ -155,31 +196,17 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
 
     const rPaginas: SearchResult[] = STATIC_PAGES.filter((p) => matches(p.title) || matches(p.subtitle)).map((p) => ({ ...p, category: 'paginas' as const }))
 
-    const all: Record<SearchCategory, SearchResult[]> = {
-      bikers: rBikers,
-      eventos: rEventos,
-      pedidos: rPedidos,
-      fotos: photoResults,
-      paginas: rPaginas,
-    }
-    if (activeCategory !== 'todos') {
-      return { [activeCategory]: all[activeCategory] } as Partial<Record<SearchCategory, SearchResult[]>>
-    }
-    return all
-  }, [query, events, orders, bikers, photoResults, activeCategory])
+    return { bikers: rBikers, eventos: rEventos, pedidos: rPedidos, fotos: photoResults, paginas: rPaginas } as Record<SearchCategory, SearchResult[]>
+  }, [query, events, orders, bikers, photoResults])
 
-  const totalCount = Object.values(groups).reduce((s, list) => s + (list?.length ?? 0), 0)
-  const categoryCounts: Record<SearchCategory, number> = {
-    bikers: bikers.filter((b) => !query.trim() || b.name.toLowerCase().includes(query.trim().toLowerCase())).length,
-    eventos: events.filter((e) => !query.trim() || e.title.toLowerCase().includes(query.trim().toLowerCase()) || e.city.toLowerCase().includes(query.trim().toLowerCase())).length,
-    pedidos: orders.filter((o) => !query.trim() || o.bikerName.toLowerCase().includes(query.trim().toLowerCase()) || o.eventTitle.toLowerCase().includes(query.trim().toLowerCase())).length,
-    fotos: photoResults.length,
-    paginas: STATIC_PAGES.filter((p) => !query.trim() || p.title.toLowerCase().includes(query.trim().toLowerCase())).length,
-  }
+  const categoryOrder: SearchCategory[] = ['bikers', 'eventos', 'pedidos', 'fotos', 'paginas']
+  const totalCount = categoryOrder.reduce((s, c) => s + resultsByCategory[c].length, 0)
+  const visibleCategories = activeCategory === 'todos' ? categoryOrder : [activeCategory]
 
-  function go(to: string) {
+  function selectResult(r: SearchResult) {
+    saveRecent(r)
     onClose()
-    navigate(to)
+    navigate(r.to)
   }
 
   if (!open) return null
@@ -187,7 +214,7 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16 sm:pt-24">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 text-white shadow-2xl animate-menu-in">
+      <div className="relative z-10 flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 text-white shadow-2xl animate-menu-in">
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
           <IconSearch className="h-5 w-5 shrink-0 text-white/50" />
           <input
@@ -202,63 +229,96 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
           </button>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 px-5 py-3">
-          <button
-            onClick={() => setActiveCategory('todos')}
-            className={cn('shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', activeCategory === 'todos' ? 'bg-white text-black' : 'bg-white/10 text-white/70 hover:bg-white/20')}
-          >
-            Todos
-          </button>
-          {(Object.keys(CATEGORY_LABELS) as SearchCategory[]).map((cat) => (
+        {!query.trim() && recents.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-5 py-3">
+            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-white/40">Recientes</span>
+            {recents.map((r) => (
+              <button
+                key={`${r.category}-${r.id}`}
+                onClick={() => selectResult(r)}
+                className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/20"
+              >
+                {r.title}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex max-h-[60vh] flex-1 overflow-hidden">
+          {/* Categorías — mismo patrón de pestaña vertical que el editor de
+              evento y configuración (borde izquierdo activo). */}
+          <nav className="flex w-36 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/10 p-3 sm:w-44">
             <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => setActiveCategory('todos')}
               className={cn(
-                'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
-                activeCategory === cat ? 'bg-white text-black' : 'bg-white/10 text-white/70 hover:bg-white/20',
+                'rounded-xl border-l-2 px-3 py-2 text-left text-sm font-medium transition-colors',
+                activeCategory === 'todos' ? 'border-white bg-white/10 font-bold text-white' : 'border-transparent text-white/60 hover:text-white',
               )}
             >
-              {CATEGORY_LABELS[cat]} ({categoryCounts[cat]})
+              Todos <span className="text-white/40">({totalCount})</span>
             </button>
-          ))}
-        </div>
+            {categoryOrder.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  'rounded-xl border-l-2 px-3 py-2 text-left text-sm font-medium transition-colors',
+                  activeCategory === cat ? 'border-white bg-white/10 font-bold text-white' : 'border-transparent text-white/60 hover:text-white',
+                )}
+              >
+                {CATEGORY_LABELS[cat]} <span className="text-white/40">({resultsByCategory[cat].length})</span>
+              </button>
+            ))}
+          </nav>
 
-        <div className="max-h-[60vh] overflow-y-auto px-2 py-2">
-          {searchingPhotos && query.trim().length >= 2 && (
-            <p className="px-3 py-1 text-xs text-white/40">Buscando fotos…</p>
-          )}
-          {totalCount === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-white/50">
-              {query.trim() ? 'Sin resultados para esa búsqueda.' : 'Escribe para buscar en todo el sitio.'}
-            </p>
-          ) : (
-            (Object.keys(groups) as SearchCategory[]).map((cat) => {
-              const list = groups[cat]
-              if (!list || list.length === 0) return null
-              return (
-                <div key={cat} className="mb-2">
-                  <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">{CATEGORY_LABELS[cat]}</p>
-                  {list.map((r) => (
-                    <button key={r.id} onClick={() => go(r.to)} className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-white/10">
-                      {r.thumbnail ? (
-                        <img src={r.thumbnail} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
-                      ) : r.icon ? (
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">{r.icon}</span>
-                      ) : r.category === 'bikers' ? (
-                        <InitialsAvatar name={r.title} className="h-9 w-9 shrink-0 bg-white/10 text-xs text-white" />
-                      ) : (
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xs">•</span>
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-white">{r.title}</span>
-                        {r.subtitle && <span className="block truncate text-xs text-white/50">{r.subtitle}</span>}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )
-            })
-          )}
+          {/* Resultados */}
+          <div className="flex-1 overflow-y-auto px-2 py-2">
+            {searchingPhotos && query.trim().length >= 2 && <p className="px-3 py-1 text-xs text-white/40">Buscando fotos…</p>}
+            {totalCount === 0 ? (
+              <p className="px-3 py-8 text-center text-sm text-white/50">
+                {query.trim() ? 'Sin resultados para esa búsqueda.' : 'Escribe para buscar en todo el sitio.'}
+              </p>
+            ) : (
+              visibleCategories.map((cat) => {
+                const list = resultsByCategory[cat]
+                if (list.length === 0) return null
+                return (
+                  <div key={cat} className="mb-2">
+                    {activeCategory === 'todos' && <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">{CATEGORY_LABELS[cat]}</p>}
+                    {list.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => selectResult(r)}
+                        onMouseEnter={() => setHovered(r)}
+                        className={cn('flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-white/10', hovered?.id === r.id && hovered.category === r.category && 'bg-white/10')}
+                      >
+                        <ResultThumb r={r} className="h-9 w-9 shrink-0 rounded-xl" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">{r.title}</span>
+                          {r.subtitle && <span className="block truncate text-xs text-white/50">{r.subtitle}</span>}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* Vista previa al hover — Mobbin-style: se llena con lo que el
+              mouse esté sobre en este momento. */}
+          <div className="hidden w-56 shrink-0 flex-col border-l border-white/10 p-4 sm:flex">
+            {hovered ? (
+              <>
+                <ResultThumb r={hovered} className="aspect-square w-full rounded-2xl text-3xl" />
+                <p className="mt-3 truncate text-sm font-semibold text-white">{hovered.title}</p>
+                {hovered.subtitle && <p className="truncate text-xs text-white/50">{hovered.subtitle}</p>}
+                <p className="mt-auto pt-3 text-[11px] font-semibold uppercase tracking-wide text-white/30">{CATEGORY_LABELS[hovered.category]}</p>
+              </>
+            ) : (
+              <p className="text-xs text-white/40">Pasa el cursor sobre un resultado para verlo aquí.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>,

@@ -6,6 +6,33 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Barra de scroll consistente con el tema — por defecto el navegador pinta
+   su barra nativa siempre clara, sin importar el tema de la app, y se ve
+   fuera de lugar sobre fondos oscuros. Usa las mismas variables de color
+   del tema (ya cambian solas entre claro/oscuro), así la barra sigue al
+   tema activo automáticamente sin lógica aparte. `scrollbar-color` cubre
+   Firefox; los `::-webkit-scrollbar-*` cubren Chrome/Edge/Safari. */
+html {
+  scrollbar-color: rgb(var(--color-muted-foreground) / 0.35) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--color-muted-foreground) / 0.35);
+  border-radius: 9999px;
+  border: 2px solid rgb(var(--color-background));
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--color-muted-foreground) / 0.55);
+}
+
 @layer base {
   body {
     @apply bg-background text-foreground antialiased;
@@ -55,8 +82,23 @@ html {
 
 /* Transición suave al cambiar de tema claro/oscuro — se aplica solo a
    color/fondo/borde, nunca a transform/opacity, para no pisar las
-   animaciones de entrada de tarjetas y menús. */
-#portal-theme-root, #portal-theme-root * {
+   animaciones de entrada de tarjetas y menús.
+   El `:where(...)` es a propósito: Tailwind v3 NO emite `@layer` nativo de
+   CSS en el output (lo consume en tiempo de build vía PostCSS y solo
+   reordena las reglas físicamente) — envolver esto en `@layer base` no
+   hace nada real aquí, el navegador nunca ve una capa. Lo que sí decide
+   quién gana es la ESPECIFICIDAD, y un selector de ID como
+   `#portal-theme-root *` (especificidad 1-0-0) le gana a CUALQUIER clase
+   de utilidad de Tailwind (0-1-0) sin importar el orden — eso pisaba en
+   silencio cualquier transition-property que un componente declarara (el
+   header interactivo, por ejemplo, nunca animaba: esta regla forzaba
+   transition-property a solo background-color/color/border-color en toda
+   la app). `:where()` singularmente hace que TODO lo que envuelve cuente
+   como especificidad CERO, así que cualquier utilidad de Tailwind
+   (transition-all, transition-opacity, etc.) gana automáticamente en
+   cuanto un componente la declara, sin tocar la especificidad de nada
+   más. */
+:where(#portal-theme-root, #portal-theme-root *) {
   transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
 }
 

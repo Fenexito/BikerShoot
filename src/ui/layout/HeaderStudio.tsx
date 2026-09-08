@@ -96,6 +96,14 @@ export function HeaderStudio() {
                 ))}
               </nav>
               <div className="ml-auto flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  aria-label="Buscar en todo el sitio"
+                  title="Buscar"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+                >
+                  <IconSearch className="h-5 w-5" />
+                </button>
                 <NotificationsMenu />
                 <div className="hidden md:block">
                   <ProfileMenu
@@ -136,28 +144,27 @@ export function HeaderStudio() {
             </div>
 
             {/* Capa transformada: solo existe en el DOM a partir de md — en
-                móvil `hidden` la saca del todo, sin importar `transformed`. */}
+                móvil `hidden` la saca del todo, sin importar `transformed`.
+                La búsqueda global se queda disponible aquí también (a la
+                derecha, con forma de cuadro de búsqueda en vez de solo el
+                ícono) — así nunca desaparece, sin importar qué página esté
+                mostrando el header en ese momento. */}
             <div
               className={cn(
-                'absolute inset-0 hidden items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
+                'absolute inset-0 hidden items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
                 transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0',
               )}
             >
-              {transformContent}
+              <div className="min-w-0 flex-1">{transformContent}</div>
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
+              >
+                <IconSearch className="h-5 w-5" />
+                <span className="hidden lg:inline">Buscar…</span>
+              </button>
             </div>
           </div>
-
-          {/* Búsqueda global — a propósito vive AFUERA de la franja que se
-              transforma: debe seguir alcanzable sin importar qué página
-              esté mostrando el header en ese momento. */}
-          <button
-            onClick={() => setSearchOpen(true)}
-            aria-label="Buscar en todo el sitio"
-            title="Buscar"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-          >
-            <IconSearch className="h-4 w-4" />
-          </button>
         </header>
       </div>
 

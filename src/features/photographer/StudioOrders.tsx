@@ -42,6 +42,18 @@ function byOrderNumber(a: PhotographerOrderGroup, b: PhotographerOrderGroup) {
   return (a.orderNumber ?? 0) - (b.orderNumber ?? 0)
 }
 
+/** Coincide por biker, evento, o número de pedido — con o sin "#" y sin
+ * importar los ceros a la izquierda (el fotógrafo puede escribir "123",
+ * "000123" o "#000123" y debe encontrarlo igual). */
+function orderMatchesQuery(o: PhotographerOrderGroup, q: string) {
+  if (!q) return true
+  if (o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q)) return true
+  if (o.orderNumber == null) return false
+  const qDigits = q.replace(/^#/, '').replace(/^0+(?=\d)/, '')
+  const orderDigits = String(o.orderNumber)
+  return qDigits.length > 0 && orderDigits.includes(qDigits)
+}
+
 export function OrderRow({
   order,
   profileName,
@@ -267,7 +279,7 @@ export function StudioOrders() {
   // paginación). La búsqueda sigue aplicando dentro de cada categoría.
   const categories = useMemo((): OrderCategory[] => {
     const q = query.trim().toLowerCase()
-    const matches = (o: PhotographerOrderGroup) => !q || o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q)
+    const matches = (o: PhotographerOrderGroup) => orderMatchesQuery(o, q)
     const byStatus = (status: OrderItemStatus) => orders.filter((o) => o.status === status && matches(o)).sort(byOrderNumber)
     return [
       { key: 'urgente', label: '🔥 Urgentes', orders: orders.filter((o) => urgencyClass(o) !== null && matches(o)).sort(byOrderNumber), defaultOpen: true, tone: 'danger' },
@@ -281,7 +293,7 @@ export function StudioOrders() {
   const matchingCount = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return orders.length
-    return orders.filter((o) => o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q)).length
+    return orders.filter((o) => orderMatchesQuery(o, q)).length
   }, [orders, query])
 
   const summary = useMemo(() => {
