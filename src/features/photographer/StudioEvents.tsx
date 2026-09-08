@@ -8,10 +8,16 @@ import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
 
-const STATUS_TABS: { value: 'todos' | 'activo' | 'pausado' | 'cerrado'; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
+type EventStatusFilter = 'todos' | 'activo' | 'pausado' | 'cerrado'
+
+// Los dos estados más comunes van en el switch de 2 vías (izquierda); los
+// que quedan (ver todo, o ver lo cerrado) van en las pestañas de al lado.
+const STATUS_SEGMENTS: { value: EventStatusFilter; label: string }[] = [
   { value: 'activo', label: 'Activos' },
   { value: 'pausado', label: 'Pausados' },
+]
+const STATUS_TABS: { value: EventStatusFilter; label: string }[] = [
+  { value: 'todos', label: 'Todos' },
   { value: 'cerrado', label: 'Cerrados' },
 ]
 
@@ -19,7 +25,7 @@ export function StudioEvents() {
   const { user } = useAuth()
   const { data: events, isLoading, error } = useMyEvents(user?.id)
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<(typeof STATUS_TABS)[number]['value']>('todos')
+  const [status, setStatus] = useState<EventStatusFilter>('todos')
 
   const filtered = useMemo(() => {
     let list = events ?? []
@@ -53,13 +59,16 @@ export function StudioEvents() {
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Buscar evento o ciudad…"
+          segments={STATUS_SEGMENTS.map((s) => ({ ...s, count: events.filter((e) => e.status === s.value).length }))}
+          segmentValue={status}
+          onSegmentChange={(v) => setStatus(v as EventStatusFilter)}
           tabs={STATUS_TABS.map((t) => ({
             value: t.value,
             label: t.label,
             count: t.value === 'todos' ? events.length : events.filter((e) => e.status === t.value).length,
           }))}
           tabValue={status}
-          onTabChange={(v) => setStatus(v as (typeof STATUS_TABS)[number]['value'])}
+          onTabChange={(v) => setStatus(v as EventStatusFilter)}
         />
       )}
 

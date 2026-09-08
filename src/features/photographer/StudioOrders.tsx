@@ -15,11 +15,8 @@ import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { IconSearch } from '../../ui/shared/icons'
-import { Dropdown } from '../../ui/shared/Dropdown'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
-import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
-import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 
 const PAGE_SIZE_FIRST = 10
 const PAGE_SIZE_MORE = 15
@@ -150,15 +147,16 @@ function CategorySection({ category, profileName, selectedIds, onToggleSelect }:
       </button>
       {open && (
         <div className="flex flex-col gap-3">
-          {visible.map((order) => (
-            <OrderRow
-              key={order.orderId}
-              order={order}
-              profileName={profileName}
-              canSelect={order.status === 'pendiente_pago'}
-              selected={selectedIds.has(order.orderId)}
-              onToggleSelect={() => onToggleSelect(order.orderId)}
-            />
+          {visible.map((order, i) => (
+            <div key={order.orderId} className="animate-row-in" style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}>
+              <OrderRow
+                order={order}
+                profileName={profileName}
+                canSelect={order.status === 'pendiente_pago'}
+                selected={selectedIds.has(order.orderId)}
+                onToggleSelect={() => onToggleSelect(order.orderId)}
+              />
+            </div>
           ))}
           {remaining > 0 && (
             <button
@@ -273,7 +271,6 @@ export function StudioOrders() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const scrolledPastThreshold = useScrolledPast(200)
 
   // Ya no se filtra por un solo estado a la vez — todos los pedidos se ven
   // siempre, agrupados por categoría (colapsables, con su propia
@@ -317,6 +314,16 @@ export function StudioOrders() {
     document.getElementById(`pedidos-cat-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  // "En proceso" del switch representa DOS categorías reales a la vez
+  // (pendiente de pago + en preparación) — salta a la que sí tenga
+  // pedidos, priorizando pendientes de pago (suele ser lo más urgente de
+  // revisar primero).
+  function jumpToEnProceso() {
+    const pendientes = categories.find((c) => c.key === 'pendiente_pago')
+    const target = pendientes && pendientes.orders.length > 0 ? 'pendiente_pago' : 'en_preparacion'
+    jumpToCategory(target)
+  }
+
   async function bulkConfirmPayment() {
     if (!user) return
     setConfirming(true)
@@ -335,31 +342,6 @@ export function StudioOrders() {
     setSelectedIds(new Set())
     queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
   }
-
-  // El header (HeaderStudio) se transforma al pasar el umbral de scroll:
-  // buscador + un botón "Filtros" que en realidad es un acceso rápido —
-  // salta a la categoría elegida en vez de ocultar el resto, así el
-  // fotógrafo no tiene que colapsar todo y volver a bajar para verla.
-  useHeaderTransform(
-    <div className="flex w-full items-center gap-2">
-      <div className="flex max-w-xs flex-1 items-center gap-2 rounded-full bg-muted px-3">
-        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Biker o evento…"
-          className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-      </div>
-      <Dropdown
-        label="Filtros"
-        direction="down"
-        onSelect={jumpToCategory}
-        options={categories.filter((c) => c.orders.length > 0).map((c) => ({ value: c.key, label: `${c.label} (${c.orders.length})` }))}
-      />
-    </div>,
-    scrolledPastThreshold,
-  )
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
@@ -398,7 +380,28 @@ export function StudioOrders() {
       </div>
 
       <div className="mt-8 hidden sm:block">
-        <StudioFilterBar searchValue={query} onSearchChange={setQuery} searchPlaceholder="Buscar por biker, evento o # de pedido…" />
+        {/* El switch y las pestañas aquí NO filtran (todo sigue visible
+            siempre, agrupado abajo) — son accesos rápidos que saltan a esa
+            categoría, iguales a lo que antes vivía en el header. */}
+        <StudioFilterBar
+          searchValue={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Buscar por biker, evento o # de pedido…"
+          segments={[
+            { value: 'entregado', label: 'Entregados', count: categories.find((c) => c.key === 'entregado')?.orders.length ?? 0 },
+            {
+              value: 'en_proceso',
+              label: 'En proceso',
+              count: (categories.find((c) => c.key === 'pendiente_pago')?.orders.length ?? 0) + (categories.find((c) => c.key === 'en_preparacion')?.orders.length ?? 0),
+            },
+          ]}
+          onSegmentChange={(v) => (v === 'en_proceso' ? jumpToEnProceso() : jumpToCategory(v))}
+          tabs={[
+            { value: 'urgente', label: 'Urgentes', count: categories.find((c) => c.key === 'urgente')?.orders.length ?? 0 },
+            { value: 'cancelado', label: 'Cancelados', count: categories.find((c) => c.key === 'cancelado')?.orders.length ?? 0 },
+          ]}
+          onTabChange={jumpToCategory}
+        />
       </div>
 
       <OrdersFilterModal

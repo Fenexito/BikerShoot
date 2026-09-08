@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../lib/cn'
 import { HeaderPublic } from '../ui/layout/HeaderPublic'
@@ -44,6 +44,21 @@ export function PortalLayout() {
   const themeClass = isStudioPortal
     ? cn('theme-studio', STUDIO_ALWAYS_DARK_PATHS.includes(pathname) ? 'dark' : studioTheme)
     : 'theme-flat'
+  const isDark = themeClass.includes('dark')
+
+  // Los colores del tema (incluido --color-background/--color-muted-foreground,
+  // que usa la barra de scroll nativa) viven escondidos en `.theme-studio.dark`
+  // sobre #portal-theme-root — <html> nunca los ve, así que cualquier estilo
+  // puesto directo en `html`/`:root` (como la barra de scroll del documento)
+  // siempre resolvía a los valores claros por defecto sin importar el tema
+  // activo. Reflejar la misma clase en <html> (y `color-scheme` para que los
+  // controles nativos del navegador — scrollbar incluida, en cualquier
+  // elemento que llegue a necesitarla — sigan el tema solos) arregla esto de
+  // raíz en vez de parchar cada barra de scroll una por una.
+  useEffect(() => {
+    document.documentElement.className = themeClass
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+  }, [themeClass, isDark])
 
   return (
     <div

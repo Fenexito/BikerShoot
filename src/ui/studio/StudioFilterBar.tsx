@@ -1,19 +1,29 @@
 import { IconSearch, IconFilter } from '../shared/icons'
 import { cn } from '../../lib/cn'
 
-export interface StudioFilterTab {
+export interface StudioFilterOption {
   value: string
   label: string
   count?: number
 }
 
 interface StudioFilterBarProps {
+  /** Switch de 2 estados a la izquierda (estilo iOS/Web de la referencia) —
+   * un vistazo rápido entre los dos estados más comunes. No es un filtro
+   * "excluyente" en el sentido de ocultar todo lo demás para siempre: cada
+   * página decide qué significa seleccionarlo (filtrar, o solo saltar a esa
+   * sección). Si no se da, no se muestra ni el switch ni su separador. */
+  segments?: StudioFilterOption[]
+  segmentValue?: string | null
+  onSegmentChange?: (value: string) => void
+  /** Pestañas de texto subrayado (estilo Mobbin) — para el resto de
+   * opciones que no caben en el switch de 2 estados. */
+  tabs?: StudioFilterOption[]
+  tabValue?: string | null
+  onTabChange?: (value: string) => void
   searchValue: string
   onSearchChange: (value: string) => void
   searchPlaceholder?: string
-  tabs?: StudioFilterTab[]
-  tabValue?: string
-  onTabChange?: (value: string) => void
   onFilterClick?: () => void
   filterCount?: number
   className?: string
@@ -21,33 +31,45 @@ interface StudioFilterBarProps {
 
 /** Barra de búsqueda + filtros reutilizable — una sola línea, justo debajo
  * del título de la página y antes de cualquier tarjeta/lista. Mismo
- * componente en Eventos, Pedidos, Fotógrafos, etc. para que filtrar se
- * sienta idéntico en toda la app en vez de que cada página invente su
- * propia fila. Los tabs usan subrayado en vez de pills (inspirado en las
- * pestañas de texto de Mobbin) — el buscador y "Filtros" sí conservan el
- * lenguaje redondeado del resto de Studio. */
+ * componente en Eventos, Pedidos, Fotógrafos, etc. Orden de izquierda a
+ * derecha (inspirado en la referencia de Mobbin): switch de 2 estados →
+ * separador → pestañas de texto subrayado → buscador pegado al borde
+ * derecho. */
 export function StudioFilterBar({
-  searchValue,
-  onSearchChange,
-  searchPlaceholder = 'Buscar…',
+  segments,
+  segmentValue,
+  onSegmentChange,
   tabs,
   tabValue,
   onTabChange,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = 'Buscar…',
   onFilterClick,
   filterCount = 0,
   className,
 }: StudioFilterBarProps) {
   return (
-    <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border pb-4', className)}>
-      <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:max-w-xs">
-        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-      </div>
+    <div className={cn('flex flex-wrap items-center gap-4 border-b border-border pb-4', className)}>
+      {segments && segments.length > 0 && (
+        <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted p-1">
+          {segments.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => onSegmentChange?.(s.value)}
+              className={cn(
+                'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
+                segmentValue === s.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {s.label}
+              {s.count != null && <span className="ml-1 opacity-60">({s.count})</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {segments && segments.length > 0 && tabs && tabs.length > 0 && <div className="h-6 w-px shrink-0 bg-border" />}
 
       {tabs && tabs.length > 0 && (
         <nav className="flex flex-1 flex-wrap items-center gap-5 overflow-x-auto">
@@ -70,7 +92,7 @@ export function StudioFilterBar({
       {onFilterClick && (
         <button
           onClick={onFilterClick}
-          className="ml-auto flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-muted-foreground"
+          className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-muted-foreground"
         >
           <IconFilter className="h-4 w-4" />
           Filtros
@@ -79,6 +101,18 @@ export function StudioFilterBar({
           )}
         </button>
       )}
+
+      {/* Buscador — siempre al borde derecho por completo, nunca empujado
+          por los tabs (que ya reclaman el espacio flexible disponible). */}
+      <div className="ml-auto flex w-full shrink-0 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:w-auto sm:min-w-[220px]">
+        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={searchPlaceholder}
+          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+      </div>
     </div>
   )
 }

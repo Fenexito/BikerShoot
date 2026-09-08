@@ -784,7 +784,13 @@ export function StudioEventView() {
     <>
       {coverUrl ? (
         <ScrollExpand
-          className="-mt-[4.75rem] md:mt-0"
+          // El header sí ocupa espacio real en el flujo en escritorio
+          // (a diferencia de móvil, donde es `fixed` y flota encima) —
+          // sin este margen negativo (mismo espíritu que el de móvil,
+          // ajustado a la altura real del header en escritorio: 16px de
+          // separación + 64px de alto = 80px) la portada quedaba empujada
+          // hacia abajo en vez de llegar al borde superior de la página.
+          className="-mt-[4.75rem] md:-mt-20"
           src={coverUrl}
           alt={event.title}
           title={event.title}

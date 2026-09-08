@@ -50,19 +50,19 @@ export function StudioHome() {
       <p className="mt-2 text-muted-foreground">Así va tu negocio esta semana.</p>
 
       <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card bordered className="text-center">
+        <Card bordered className="animate-stat-in text-center" style={{ animationDelay: '0ms' }}>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ventas (activas)</p>
           <p className="mt-2 font-studio text-3xl font-bold">Q{totalSalesQ}</p>
         </Card>
-        <Card bordered className="text-center">
+        <Card bordered className="animate-stat-in text-center" style={{ animationDelay: '60ms' }}>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pend. de pago</p>
           <p className="mt-2 font-studio text-3xl font-bold text-accent">{pendingPayment.length}</p>
         </Card>
-        <Card bordered className="text-center">
+        <Card bordered className="animate-stat-in text-center" style={{ animationDelay: '120ms' }}>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">En preparación</p>
           <p className="mt-2 font-studio text-3xl font-bold">{inPreparation.length}</p>
         </Card>
-        <Card bordered className="text-center">
+        <Card bordered className="animate-stat-in text-center" style={{ animationDelay: '180ms' }}>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fotos subidas</p>
           <p className="mt-2 font-studio text-3xl font-bold">{photoCount}</p>
         </Card>
@@ -80,15 +80,16 @@ export function StudioHome() {
           <p className="rounded-2xl border border-border px-4 py-6 text-center text-muted-foreground">Todo al día. No hay pedidos pendientes.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {needsAttention.map((order) => (
-              <OrderRow
-                key={order.orderId}
-                order={order}
-                profileName={orderCodeName}
-                canSelect={false}
-                selected={false}
-                onToggleSelect={() => {}}
-              />
+            {needsAttention.map((order, i) => (
+              <div key={order.orderId} className="animate-row-in" style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}>
+                <OrderRow
+                  order={order}
+                  profileName={orderCodeName}
+                  canSelect={false}
+                  selected={false}
+                  onToggleSelect={() => {}}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -107,11 +108,12 @@ export function StudioHome() {
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
-            {events.slice(0, 6).map((event) => (
+            {events.slice(0, 6).map((event, i) => (
               <Link
                 key={event.id}
                 to={`/studio/eventos/${event.id}`}
-                className="group overflow-hidden rounded-3xl border border-border transition-all duration-300 hover:-translate-y-1 hover:border-border-hover hover:shadow-xl"
+                className="group animate-card-in overflow-hidden rounded-3xl border border-border transition-all duration-300 hover:-translate-y-1 hover:border-border-hover hover:shadow-xl"
+                style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
               >
                 <div className="relative flex h-56 items-center justify-center overflow-hidden bg-muted">
                   {event.cover_path ? (
