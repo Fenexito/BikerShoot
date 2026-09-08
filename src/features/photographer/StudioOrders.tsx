@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getPortalRoot } from '../../ui/shared/portalRoot'
-import { IconClose, IconFilter } from '../../ui/shared/icons'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerOrders, type PhotographerOrderGroup } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
@@ -14,7 +11,6 @@ import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
-import { IconSearch } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
 
@@ -172,112 +168,6 @@ function CategorySection({ category, profileName, selectedIds, onToggleSelect }:
   )
 }
 
-/** Modal de filtros para móvil — mismo panel oscuro flotante que
- * `SearchFilterModal.tsx` del lado biker (buscador), para no inventar un
- * segundo lenguaje visual de filtros dentro de la misma app. En escritorio
- * no se usa: ahí el buscador y el filtro de estado ya viven en la barra. */
-function OrdersFilterModal({
-  open,
-  onClose,
-  query,
-  onQuery,
-  categories,
-  activeFilter,
-  onSelectFilter,
-}: {
-  open: boolean
-  onClose: () => void
-  query: string
-  onQuery: (v: string) => void
-  categories: OrderCategory[]
-  activeFilter: string
-  onSelectFilter: (key: string) => void
-}) {
-  useEffect(() => {
-    if (!open) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = prevOverflow
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto p-4 pt-16 sm:pt-24">
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg animate-menu-in rounded-3xl border border-white/10 bg-neutral-900 p-6 text-white shadow-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Buscar y saltar a categoría</h2>
-          <button onClick={onClose} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
-            <IconClose className="h-4 w-4" />
-          </button>
-        </div>
-
-        <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Buscar</span>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-3">
-            <IconSearch className="h-4 w-4 shrink-0 text-white/50" />
-            <input
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              placeholder="Biker o evento…"
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/40"
-            />
-          </div>
-        </label>
-
-        <div className="mt-5 flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Filtrar por categoría</span>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                onSelectFilter('todos')
-                onClose()
-              }}
-              className={cn(
-                'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                activeFilter === 'todos' ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/20',
-              )}
-            >
-              Todos
-            </button>
-            {categories.filter((c) => c.orders.length > 0).map((c) => (
-              <button
-                key={c.key}
-                onClick={() => {
-                  onSelectFilter(c.key)
-                  onClose()
-                }}
-                className={cn(
-                  'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                  activeFilter === c.key ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/20',
-                )}
-              >
-                {c.label} ({c.orders.length})
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="mt-8 flex w-full items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>,
-    getPortalRoot(),
-  )
-}
-
 export function StudioOrders() {
   const { user, profile } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
@@ -287,7 +177,6 @@ export function StudioOrders() {
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'todos' | 'entregado' | 'en_proceso' | 'urgente' | 'pendiente_pago' | 'en_preparacion' | 'cancelado'>('todos')
 
   // Ya no se filtra por un solo estado a la vez — todos los pedidos se ven
@@ -377,23 +266,10 @@ export function StudioOrders() {
         </div>
       </div>
 
-      {/* Móvil: un solo botón que abre el modal de búsqueda + salto a
-          categoría. Escritorio: el buscador ya cabe cómodo en una fila (el
-          salto a categoría vive en el header al hacer scroll). */}
-      <div className="mt-8 sm:hidden">
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className="flex w-full items-center justify-between gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-medium"
-        >
-          <span className="flex items-center gap-2 text-muted-foreground">
-            <IconFilter className="h-4 w-4" />
-            {query ? `"${query}"` : 'Buscar / filtrar'}
-          </span>
-          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">{matchingCount}</span>
-        </button>
-      </div>
-
-      <div className="mt-8 hidden sm:block">
+      {/* Mismo StudioFilterBar en todas las resoluciones (igual que
+          Eventos) — antes móvil tenía un botón+modal aparte, que se veía y
+          se sentía distinto a la barra de escritorio. */}
+      <div className="mt-8">
         <StudioFilterBar
           searchValue={query}
           onSearchChange={setQuery}
@@ -412,16 +288,6 @@ export function StudioOrders() {
           onTabChange={(v) => setStatusFilter(v as typeof statusFilter)}
         />
       </div>
-
-      <OrdersFilterModal
-        open={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
-        query={query}
-        onQuery={setQuery}
-        categories={categories}
-        activeFilter={statusFilter}
-        onSelectFilter={(key) => setStatusFilter(key as typeof statusFilter)}
-      />
 
       {isLoading && <SkeletonRows count={5} className="mt-6" />}
 

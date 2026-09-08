@@ -10,8 +10,21 @@ html {
      unos px más ancho que el área realmente visible y genera scroll
      horizontal fantasma. Como estos elementos ya se ven bien recortados
      visualmente (máscaras, overflow:hidden propio), cortar el overflow acá
-     es seguro: nada en la app depende de poder hacer scroll horizontal. */
-  overflow-x: hidden;
+     es seguro: nada en la app depende de poder hacer scroll horizontal.
+     OJO: es `clip`, NO `hidden`. `overflow-x: hidden` (un valor
+     "scrolleable") fuerza a `overflow-y` a computarse como `auto` cuando
+     antes era `visible` (regla de pareja del spec) — eso convirtió a
+     <body> en su PROPIO contenedor de scroll independiente del viewport,
+     así que `window` dejaba de disparar su evento `scroll` real mientras
+     el contenido sí se movía (vía el scroll interno de body). Eso fue lo
+     que desfasó por completo a ScrollExpand (que escucha `scroll` en
+     `window` y mide con `getBoundingClientRect()`): la animación se quedó
+     congelada en el progreso inicial porque su listener nunca disparaba.
+     `clip` corta el overflow igual mismo pero NO es "scrolleable" —
+     está exento de esa regla de pareja, así que `overflow-y` se queda tal
+     cual estaba (visible, `html`/`window` sigue siendo el único que
+     scrollea) y no crea un contenedor de scroll anidado en `body`. */
+  overflow-x: clip;
 }
 
 /* Barra de scroll consistente con el tema — por defecto el navegador pinta
@@ -44,12 +57,15 @@ html {
 @layer base {
   body {
     @apply bg-background text-foreground antialiased;
-    /* `overflow-x:hidden` en <html> por sí solo no basta — el navegador
+    /* `overflow-x:clip` en <html> por sí solo no basta — el navegador
        puede seguir dejando a <body> como el elemento con scroll real (viejo
        comportamiento de "scrolling element" heredado), así que el mismo
        corte debe repetirse aquí para que de verdad no exista scroll
-       horizontal en ningún nivel. */
-    overflow-x: hidden;
+       horizontal en ningún nivel. Es `clip`, no `hidden` — ver el comentario
+       largo en la regla de `html` arriba: `hidden` vuelve a `body` un
+       contenedor de scroll aparte y desfasa cualquier componente que mida
+       el scroll de `window` (ScrollExpand, por ejemplo). */
+    overflow-x: clip;
   }
 }
 

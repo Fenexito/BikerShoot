@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
@@ -191,12 +191,13 @@ function EventDetailPanel({ event }: { event: EventStorage }) {
   )
 }
 
-function EventCard({ event, open, onToggle }: { event: EventStorage; open: boolean; onToggle: () => void }) {
+function EventCard({ event, open, onToggle, style }: { event: EventStorage; open: boolean; onToggle: () => void; style?: CSSProperties }) {
   return (
     <button
       onClick={onToggle}
+      style={style}
       className={cn(
-        'flex flex-col gap-3 rounded-3xl border p-5 text-left transition-all hover:shadow-sm',
+        'animate-card-in flex flex-col gap-3 rounded-3xl border p-5 text-left transition-all hover:shadow-sm',
         open ? 'border-accent/50 bg-accent/5' : 'border-border bg-card hover:border-accent/40',
       )}
     >
@@ -286,9 +287,12 @@ export function StudioStorage() {
           const open = openEventId === event.id
           return (
             <Fragment key={event.id}>
-              <div className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
-                <EventCard event={event} open={open} onToggle={() => setOpenEventId(open ? null : event.id)} />
-              </div>
+              <EventCard
+                event={event}
+                open={open}
+                onToggle={() => setOpenEventId(open ? null : event.id)}
+                style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
+              />
               {open && <EventDetailPanel event={event} />}
             </Fragment>
           )
