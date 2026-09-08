@@ -44,13 +44,13 @@ export function StudioFilterBar({
 }: StudioFilterBarProps) {
   return (
     <div className={cn('flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center', className)}>
-      <nav className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto">
+      <nav className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto sm:gap-5">
         {tabs.map((t) => (
           <button
             key={t.value}
             onClick={() => onTabChange(t.value)}
             className={cn(
-              'shrink-0 whitespace-nowrap border-b-2 pb-0.5 text-sm font-medium transition-colors',
+              'shrink-0 whitespace-nowrap border-b-2 pb-0.5 text-xs font-medium transition-colors sm:text-sm',
               tabValue === t.value ? 'border-foreground font-bold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
