@@ -5,9 +5,8 @@ import { useMyEvents } from './useMyEvents'
 import { StudioEventCard } from './components/StudioEventCard'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
+import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
-import { IconSearch } from '../../ui/shared/icons'
-import { cn } from '../../lib/cn'
 
 const STATUS_TABS: { value: 'todos' | 'activo' | 'pausado' | 'cerrado'; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -30,9 +29,15 @@ export function StudioEvents() {
     return list
   }, [events, status, query])
 
+  // Cambia junto con cualquier filtro — al usarlo como `key` del grid,
+  // React desmonta y vuelve a montar las tarjetas visibles en vez de solo
+  // reordenar el DOM existente, así la animación de entrada (escalonada)
+  // se vuelve a disparar cada vez que el resultado del filtro cambia.
+  const filterSignature = `${status}:${query.trim().toLowerCase()}`
+
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Tus eventos</h1>
           <p className="mt-2 text-muted-foreground">{events?.length ?? 0} eventos publicados</p>
@@ -43,34 +48,19 @@ export function StudioEvents() {
       </div>
 
       {events && events.length > 0 && (
-        <div className="mb-8 flex flex-wrap items-center gap-3">
-          <div className="flex flex-1 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:max-w-xs">
-            <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar evento o ciudad…"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {STATUS_TABS.map((t) => {
-              const count = t.value === 'todos' ? events.length : events.filter((e) => e.status === t.value).length
-              return (
-                <button
-                  key={t.value}
-                  onClick={() => setStatus(t.value)}
-                  className={cn(
-                    'whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                    status === t.value ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
-                  )}
-                >
-                  {t.label} <span className="opacity-70">({count})</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        <StudioFilterBar
+          className="mb-8"
+          searchValue={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Buscar evento o ciudad…"
+          tabs={STATUS_TABS.map((t) => ({
+            value: t.value,
+            label: t.label,
+            count: t.value === 'todos' ? events.length : events.filter((e) => e.status === t.value).length,
+          }))}
+          tabValue={status}
+          onTabChange={(v) => setStatus(v as (typeof STATUS_TABS)[number]['value'])}
+        />
       )}
 
       {isLoading && <SkeletonGrid count={6} className="md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
@@ -93,9 +83,11 @@ export function StudioEvents() {
         </div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filtered.map((event) => (
-          <StudioEventCard key={event.id} event={event} photographerId={user?.id} />
+      <div key={filterSignature} className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {filtered.map((event, i) => (
+          <div key={event.id} className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
+            <StudioEventCard event={event} photographerId={user?.id} />
+          </div>
         ))}
       </div>
     </div>

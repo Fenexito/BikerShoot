@@ -73,7 +73,13 @@ export function HeaderStudio() {
             <div
               className={cn(
                 'absolute inset-0 flex items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-                transformed ? 'pointer-events-none -translate-y-full opacity-0' : 'translate-y-0 opacity-100',
+                // Desplazamiento corto a propósito (no translate-y-full): el
+                // header solo tiene ~12px de aire arriba/abajo de esta franja
+                // antes de toparse con su propio borde redondeado — un
+                // desplazamiento del 100% se salía de esa forma y se veía
+                // como desbordamiento. La opacidad hace la mayor parte del
+                // trabajo de "ocultar", el desplazamiento es solo un toque.
+                transformed ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'translate-y-0 opacity-100',
               )}
             >
               <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">
@@ -152,16 +158,20 @@ export function HeaderStudio() {
             <div
               className={cn(
                 'absolute inset-0 hidden items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
-                transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0',
+                transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-2.5 opacity-0',
               )}
             >
               <div className="min-w-0 flex-1">{transformContent}</div>
+              {/* Ancho fijo a propósito — igual al espacio que ocupan
+                  buscar+notificaciones+perfil juntos en el estado normal
+                  (40px+8px+40px+8px+40px = 176px), así el cambio se siente
+                  contenido en vez de brusco. */}
               <button
                 onClick={() => setSearchOpen(true)}
-                className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
+                className="flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
               >
-                <IconSearch className="h-5 w-5" />
-                <span className="hidden lg:inline">Buscar…</span>
+                <IconSearch className="h-5 w-5 shrink-0" />
+                <span className="truncate">Buscar…</span>
               </button>
             </div>
           </div>

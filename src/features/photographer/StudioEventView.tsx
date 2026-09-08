@@ -717,33 +717,22 @@ export function StudioEventView() {
   // El header (HeaderStudio) se transforma cuando la portada ya terminó de
   // pasar bajo el header (ver `coverPassed`, no un scroll fijo) — muestra
   // esta misma info que hoy vive en la barra pegajoja compacta de la página
-  // (estado, nombre, pausar/publicar, acciones) más el salto rápido a
-  // cualquier punto. Se registra antes de los `return` tempranos de abajo —
-  // los hooks no pueden depender de si `event` ya cargó.
+  // (estado, nombre, pausar/publicar, acciones). Se registra antes de los
+  // `return` tempranos de abajo — los hooks no pueden depender de si
+  // `event` ya cargó.
   useHeaderTransform(
     event ? (
-      <div className="flex w-full items-center gap-3">
+      <div className="flex w-full min-w-0 items-center gap-3">
         <StatusPill
           dot={EVENT_STATUS_STYLE[event.status].dot}
           text={EVENT_STATUS_STYLE[event.status].text}
           label={EVENT_STATUS_STYLE[event.status].label}
-          className="hidden shrink-0 text-[10px] uppercase tracking-wide lg:flex"
+          className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex"
         />
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+        <p className="min-w-0 flex-1 truncate text-base font-bold">
           {event.title}
-          {activePointLabel && <span className="ml-2 font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
+          {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
         </p>
-        {event.event_points.length > 0 && (
-          <Dropdown
-            label="Saltar a…"
-            direction="down"
-            onSelect={(value) => pointRefs.current[value]?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            options={[
-              { value: '__featured__', label: 'Destacadas' },
-              ...event.event_points.map((pt) => ({ value: pt.id, label: pt.label })),
-            ]}
-          />
-        )}
         {event.status === 'pausado' ? (
           <button
             onClick={() => toggleStatus('activo')}
@@ -817,7 +806,6 @@ export function StudioEventView() {
           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 to-transparent" />
         </div>
       )}
-      <div ref={coverSentinelRef} />
 
       <div className={STUDIO_PAGE_WIDE}>
         <div
@@ -851,7 +839,13 @@ export function StudioEventView() {
             />
           </div>
 
+          {/* Este es el bloque cuya posición dispara la transformación del
+              header (ver `coverSentinelRef` / `coverPassed`) — el header se
+              transforma justo cuando ESTE bloque (el que antes quedaba
+              pegajoso) llega a la altura del header real, para que nunca se
+              vean dos barras iguales a la vez. */}
           <div
+            ref={coverSentinelRef}
             className={cn(
               'hidden rounded-3xl border border-border bg-background/95 shadow-sm backdrop-blur-md transition-all duration-300 sm:block',
               scrolled ? 'px-4 py-2.5' : 'px-5 py-5 sm:px-6',

@@ -12,6 +12,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
+import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { IconSearch } from '../../ui/shared/icons'
 import { Dropdown } from '../../ui/shared/Dropdown'
@@ -396,16 +397,8 @@ export function StudioOrders() {
         </button>
       </div>
 
-      <div className="mt-8 hidden items-center gap-3 sm:flex">
-        <div className="flex flex-1 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:max-w-xs">
-          <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por biker o evento…"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+      <div className="mt-8 hidden sm:block">
+        <StudioFilterBar searchValue={query} onSearchChange={setQuery} searchPlaceholder="Buscar por biker, evento o # de pedido…" />
       </div>
 
       <OrdersFilterModal

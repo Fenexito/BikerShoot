@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
@@ -68,6 +68,9 @@ const STATIC_PAGES: { id: string; title: string; subtitle: string; to: string; i
   { id: 'p-planes', title: 'Planes', subtitle: 'Planes y facturación', to: '/studio/planes', icon: <IconCreditCard className="h-4 w-4" /> },
   { id: 'p-perfil', title: 'Mi perfil', subtitle: 'Editar tu perfil público', to: '/studio/perfil', icon: <IconUser className="h-4 w-4" /> },
   { id: 'p-ajustes', title: 'Configuración', subtitle: 'Ajustes de tu cuenta', to: '/studio/ajustes', icon: <IconSettings className="h-4 w-4" /> },
+  { id: 'p-editar-avatar', title: 'Editar foto de perfil', subtitle: 'Configuración → Perfil', to: '/studio/ajustes', icon: <IconUser className="h-4 w-4" /> },
+  { id: 'p-editar-portada', title: 'Editar portada', subtitle: 'Configuración → Perfil', to: '/studio/ajustes', icon: <IconImages className="h-4 w-4" /> },
+  { id: 'p-editar-logo', title: 'Editar logo del estudio', subtitle: 'Configuración → Perfil', to: '/studio/ajustes', icon: <IconImages className="h-4 w-4" /> },
 ]
 
 function ResultThumb({ r, className }: { r: SearchResult; className: string }) {
@@ -93,6 +96,8 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   const [activeCategory, setActiveCategory] = useState<'todos' | SearchCategory>('todos')
   const [hovered, setHovered] = useState<SearchResult | null>(null)
   const [recents, setRecents] = useState<SearchResult[]>([])
+  const [visibleRecents, setVisibleRecents] = useState<SearchResult[]>([])
+  const recentsRowRef = useRef<HTMLDivElement>(null)
   const { data: events = [] } = useMyEvents(user?.id)
   const { data: orders = [] } = usePhotographerOrders(user?.id)
   const [photoResults, setPhotoResults] = useState<SearchResult[]>([])
@@ -122,6 +127,23 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
       setHovered(null)
     }
   }, [open])
+
+  // Los recientes nunca deben pasar a una segunda línea — si el nombre de
+  // alguna búsqueda es largo y no cabe, se descartan las más ANTIGUAS (el
+  // final del array; las más nuevas siempre van primero) hasta que la fila
+  // completa quepa en una sola línea. Se re-mide en cada recorte porque
+  // quitar un chip puede o no ser suficiente.
+  useEffect(() => {
+    setVisibleRecents(recents)
+  }, [recents])
+
+  useLayoutEffect(() => {
+    const el = recentsRowRef.current
+    if (!el || visibleRecents.length === 0) return
+    if (el.scrollWidth > el.clientWidth) {
+      setVisibleRecents((prev) => prev.slice(0, -1))
+    }
+  }, [visibleRecents])
 
   // Fotos: la única categoría que consulta la base de datos directamente
   // (por nombre de archivo), con un pequeño debounce — el resto ya vive en
@@ -212,9 +234,13 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16 sm:pt-24">
+    <div className="fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16 sm:pt-24 animate-backdrop-in">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 text-white shadow-2xl animate-menu-in">
+      {/* Fila de dos tarjetas independientes — el modal principal y, aparte,
+          el visor de vista previa al costado (no anidado adentro): así se
+          lee como un panel separado, no como una columna más del modal. */}
+      <div className="relative z-10 flex w-full max-w-4xl items-start gap-4">
+        <div className="flex w-full flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 text-white shadow-2xl animate-search-modal-in">
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
           <IconSearch className="h-5 w-5 shrink-0 text-white/50" />
           <input
@@ -229,14 +255,14 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
           </button>
         </div>
 
-        {!query.trim() && recents.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-5 py-3">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-white/40">Recientes</span>
-            {recents.map((r) => (
+        {!query.trim() && visibleRecents.length > 0 && (
+          <div ref={recentsRowRef} className="flex flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap border-b border-white/10 px-5 py-3">
+            <span className="mr-1 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-white/40">Recientes</span>
+            {visibleRecents.map((r) => (
               <button
                 key={`${r.category}-${r.id}`}
                 onClick={() => selectResult(r)}
-                className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/20"
+                className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/20"
               >
                 {r.title}
               </button>
@@ -247,7 +273,7 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
         <div className="flex max-h-[60vh] flex-1 overflow-hidden">
           {/* Categorías — mismo patrón de pestaña vertical que el editor de
               evento y configuración (borde izquierdo activo). */}
-          <nav className="flex w-36 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/10 p-3 sm:w-44">
+          <nav className="flex w-32 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/10 p-3 sm:w-40">
             <button
               onClick={() => setActiveCategory('todos')}
               className={cn(
@@ -305,21 +331,25 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
             )}
           </div>
 
-          {/* Vista previa al hover — Mobbin-style: se llena con lo que el
-              mouse esté sobre en este momento. */}
-          <div className="hidden w-56 shrink-0 flex-col border-l border-white/10 p-4 sm:flex">
-            {hovered ? (
-              <>
-                <ResultThumb r={hovered} className="aspect-square w-full rounded-2xl text-3xl" />
-                <p className="mt-3 truncate text-sm font-semibold text-white">{hovered.title}</p>
-                {hovered.subtitle && <p className="truncate text-xs text-white/50">{hovered.subtitle}</p>}
-                <p className="mt-auto pt-3 text-[11px] font-semibold uppercase tracking-wide text-white/30">{CATEGORY_LABELS[hovered.category]}</p>
-              </>
-            ) : (
-              <p className="text-xs text-white/40">Pasa el cursor sobre un resultado para verlo aquí.</p>
-            )}
-          </div>
         </div>
+      </div>
+
+      {/* Visor de vista previa — EXTERNO al modal a propósito (una tarjeta
+          separada al costado, no una columna interna) para que se lea como
+          un panel aparte, igual que en la referencia. Solo en pantallas
+          anchas; en angostas no hay espacio para un panel al costado. */}
+      <div className="hidden w-64 shrink-0 flex-col rounded-3xl border border-white/10 bg-neutral-900 p-4 text-white shadow-2xl animate-search-modal-in sm:flex">
+        {hovered ? (
+          <>
+            <ResultThumb r={hovered} className="aspect-square w-full rounded-2xl text-3xl" />
+            <p className="mt-3 truncate text-sm font-semibold text-white">{hovered.title}</p>
+            {hovered.subtitle && <p className="truncate text-xs text-white/50">{hovered.subtitle}</p>}
+            <p className="mt-auto pt-3 text-[11px] font-semibold uppercase tracking-wide text-white/30">{CATEGORY_LABELS[hovered.category]}</p>
+          </>
+        ) : (
+          <p className="text-xs text-white/40">Pasa el cursor sobre un resultado para verlo aquí.</p>
+        )}
+      </div>
       </div>
     </div>,
     getPortalRoot(),

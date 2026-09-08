@@ -75,7 +75,7 @@ export function HeaderUser() {
             <div
               className={cn(
                 'flex w-full items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-                transformed ? 'pointer-events-none -translate-y-full opacity-0' : 'translate-y-0 opacity-100',
+                transformed ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'translate-y-0 opacity-100',
               )}
             >
               <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
@@ -109,7 +109,7 @@ export function HeaderUser() {
             <div
               className={cn(
                 'absolute inset-0 flex items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-                transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0',
+                transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-2.5 opacity-0',
               )}
             >
               {transformContent}
