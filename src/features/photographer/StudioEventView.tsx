@@ -18,7 +18,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconTrash, IconEdit } from '../../ui/shared/icons'
+import { IconTrash, IconEdit, IconPlay, IconPause } from '../../ui/shared/icons'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
@@ -837,8 +837,8 @@ export function StudioEventView() {
             <ActionMenu
               items={[
                 event.status === 'pausado'
-                  ? { onClick: () => toggleStatus('activo'), label: 'Publicar evento' }
-                  : { onClick: () => toggleStatus('pausado'), label: 'Pausar evento' },
+                  ? { onClick: () => toggleStatus('activo'), label: 'Publicar evento', icon: <IconPlay className="h-4 w-4" /> }
+                  : { onClick: () => toggleStatus('pausado'), label: 'Pausar evento', icon: <IconPause className="h-4 w-4" /> },
                 { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
                 { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
               ]}

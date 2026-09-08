@@ -59,6 +59,23 @@ export function IconEdit(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconPlay(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)} fill="currentColor" stroke="none">
+      <path d="M7 4.5v15l13-7.5Z" />
+    </svg>
+  )
+}
+
+export function IconPause(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+  )
+}
+
 export function IconMoreHorizontal(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)} fill="currentColor" stroke="none">

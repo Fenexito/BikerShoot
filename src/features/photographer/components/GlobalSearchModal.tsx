@@ -109,11 +109,18 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKeyDown)
-    const prevOverflow = document.body.style.overflow
+    // Bloquea el scroll en <html> (el `scrollingElement` real de la app,
+    // confirmado — ver [[motoshots_v2_layout_overflow_bugs]]) Y en <body>:
+    // bloquear solo body no bastaba, sobre todo en móvil, porque quien
+    // realmente scrollea es html/window, no body.
+    const prevHtmlOverflow = document.documentElement.style.overflow
+    const prevBodyOverflow = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = prevOverflow
+      document.documentElement.style.overflow = prevHtmlOverflow
+      document.body.style.overflow = prevBodyOverflow
     }
   }, [open, onClose])
 
@@ -222,6 +229,11 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   }, [query, events, orders, bikers, photoResults])
 
   const categoryOrder: SearchCategory[] = ['bikers', 'eventos', 'pedidos', 'fotos', 'paginas']
+  // En móvil las categorías se ven como pestañas horizontales arriba (no la
+  // barra vertical de escritorio) — "Páginas y funciones" se deja fuera ahí
+  // a propósito, es la categoría menos relevante para un dedo en pantalla
+  // chica y agregaba una pestaña más de las que ya no caben cómodas.
+  const mobileCategoryOrder: SearchCategory[] = ['bikers', 'eventos', 'pedidos', 'fotos']
   const totalCount = categoryOrder.reduce((s, c) => s + resultsByCategory[c].length, 0)
   const visibleCategories = activeCategory === 'todos' ? categoryOrder : [activeCategory]
 
@@ -270,10 +282,35 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
           </div>
         )}
 
+        {/* Móvil: pestañas horizontales arriba (sin "Páginas y funciones").
+            Escritorio: barra vertical a la izquierda con borde activo,
+            incluye todas las categorías. */}
+        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/10 p-3 sm:hidden">
+          <button
+            onClick={() => setActiveCategory('todos')}
+            className={cn(
+              'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
+              activeCategory === 'todos' ? 'bg-white text-black' : 'bg-white/10 text-white/70 hover:text-white',
+            )}
+          >
+            Todos ({totalCount})
+          </button>
+          {mobileCategoryOrder.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={cn(
+                'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
+                activeCategory === cat ? 'bg-white text-black' : 'bg-white/10 text-white/70 hover:text-white',
+              )}
+            >
+              {CATEGORY_LABELS[cat]} ({resultsByCategory[cat].length})
+            </button>
+          ))}
+        </nav>
+
         <div className="flex max-h-[60vh] flex-1 overflow-hidden">
-          {/* Categorías — mismo patrón de pestaña vertical que el editor de
-              evento y configuración (borde izquierdo activo). */}
-          <nav className="flex w-32 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/10 p-3 sm:w-40">
+          <nav className="hidden w-32 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/10 p-3 sm:flex sm:w-40">
             <button
               onClick={() => setActiveCategory('todos')}
               className={cn(
