@@ -63,7 +63,14 @@ export function PortalLayout() {
   return (
     <div
       id="portal-theme-root"
-      className={cn('flex min-h-screen flex-col bg-background text-foreground transition-colors duration-300', themeClass)}
+      // `min-h-dvh` (dynamic viewport height) en vez de `min-h-screen`
+      // (100vh estático) — en Chrome/Safari de iPhone, la barra del
+      // navegador se oculta/aparece al hacer scroll y cambia la altura real
+      // visible; con 100vh fijo eso hacía que el layout (y el menú inferior
+      // `fixed`) se reajustara de golpe cada vez, sintiéndose brusco. `dvh`
+      // sigue el alto visible real en cada momento, así el reacomodo es
+      // continuo en vez de un salto.
+      className={cn('flex min-h-dvh flex-col bg-background text-foreground transition-colors duration-300', themeClass)}
     >
       <ScrollRestoration />
       {!isAuthPage && (

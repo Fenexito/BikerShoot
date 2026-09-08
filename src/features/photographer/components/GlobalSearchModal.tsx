@@ -229,11 +229,12 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   }, [query, events, orders, bikers, photoResults])
 
   const categoryOrder: SearchCategory[] = ['bikers', 'eventos', 'pedidos', 'fotos', 'paginas']
-  // En móvil las categorías se ven como pestañas horizontales arriba (no la
-  // barra vertical de escritorio) — "Páginas y funciones" se deja fuera ahí
-  // a propósito, es la categoría menos relevante para un dedo en pantalla
-  // chica y agregaba una pestaña más de las que ya no caben cómodas.
-  const mobileCategoryOrder: SearchCategory[] = ['bikers', 'eventos', 'pedidos', 'fotos']
+  // En móvil las categorías son solo estas 4 pestañas (ni "Fotos" ni
+  // "Páginas y funciones" — decisión explícita: 4 pestañas fijas,
+  // justificadas al ancho del modal, no una fila que haya que scrollear).
+  // "Todos" en móvil sigue agrupando TODOS los resultados (fotos y páginas
+  // incluidas) — solo no existe una pestaña dedicada para filtrar por ellas.
+  const mobileCategoryOrder: SearchCategory[] = ['bikers', 'eventos', 'pedidos']
   const totalCount = categoryOrder.reduce((s, c) => s + resultsByCategory[c].length, 0)
   const visibleCategories = activeCategory === 'todos' ? categoryOrder : [activeCategory]
 
@@ -244,6 +245,13 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
   }
 
   if (!open) return null
+
+  // En móvil el teclado no debe abrirse solo — el usuario lo activa al
+  // tocar el campo. Se evalúa en cada apertura (el componente se desmonta
+  // por completo con `!open`, así que esto corre de nuevo cada vez), no
+  // reactivo a un resize mientras el modal ya está abierto — eso está bien,
+  // `autoFocus` solo importa en el instante del montaje.
+  const autoFocusInput = typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches
 
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16 sm:pt-24 animate-backdrop-in">
@@ -256,7 +264,7 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
           <IconSearch className="h-5 w-5 shrink-0 text-white/50" />
           <input
-            autoFocus
+            autoFocus={autoFocusInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Bikers, eventos, pedidos, fotos, páginas…"
@@ -282,26 +290,28 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
           </div>
         )}
 
-        {/* Móvil: pestañas horizontales arriba (sin "Páginas y funciones").
-            Escritorio: barra vertical a la izquierda con borde activo,
-            incluye todas las categorías. */}
-        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/10 p-3 sm:hidden">
+        {/* Móvil: pestañas subrayadas justificadas al ancho del modal — 4
+            fijas (Todo/Bikers/Eventos/Pedidos, sin scroll ni chips), mismo
+            lenguaje visual que las pestañas de Configuración/editor de
+            evento (borde inferior activo) en vez de píldoras. Escritorio:
+            barra vertical a la izquierda, incluye todas las categorías. */}
+        <nav className="grid grid-cols-4 border-b border-white/10 sm:hidden">
           <button
             onClick={() => setActiveCategory('todos')}
             className={cn(
-              'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
-              activeCategory === 'todos' ? 'bg-white text-black' : 'bg-white/10 text-white/70 hover:text-white',
+              'min-w-0 truncate border-b-2 px-2 py-3 text-sm font-medium transition-colors',
+              activeCategory === 'todos' ? 'border-white font-bold text-white' : 'border-transparent text-white/50 hover:text-white',
             )}
           >
-            Todos ({totalCount})
+            Todo ({totalCount})
           </button>
           {mobileCategoryOrder.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
               className={cn(
-                'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
-                activeCategory === cat ? 'bg-white text-black' : 'bg-white/10 text-white/70 hover:text-white',
+                'min-w-0 truncate border-b-2 px-2 py-3 text-sm font-medium transition-colors',
+                activeCategory === cat ? 'border-white font-bold text-white' : 'border-transparent text-white/50 hover:text-white',
               )}
             >
               {CATEGORY_LABELS[cat]} ({resultsByCategory[cat].length})
