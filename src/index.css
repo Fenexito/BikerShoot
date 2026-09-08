@@ -4,6 +4,14 @@
 
 html {
   scrollbar-gutter: stable;
+  /* `100vw` no descuenta el gutter reservado por `scrollbar-gutter: stable`
+     arriba — cualquier full-bleed que use el truco `width:100vw; margin:
+     calc(-50vw + 50%)` (ScrollExpand, DriftWall en el perfil, etc.) termina
+     unos px más ancho que el área realmente visible y genera scroll
+     horizontal fantasma. Como estos elementos ya se ven bien recortados
+     visualmente (máscaras, overflow:hidden propio), cortar el overflow acá
+     es seguro: nada en la app depende de poder hacer scroll horizontal. */
+  overflow-x: hidden;
 }
 
 /* Barra de scroll consistente con el tema — por defecto el navegador pinta
@@ -36,6 +44,12 @@ html {
 @layer base {
   body {
     @apply bg-background text-foreground antialiased;
+    /* `overflow-x:hidden` en <html> por sí solo no basta — el navegador
+       puede seguir dejando a <body> como el elemento con scroll real (viejo
+       comportamiento de "scrolling element" heredado), así que el mismo
+       corte debe repetirse aquí para que de verdad no exista scroll
+       horizontal en ningún nivel. */
+    overflow-x: hidden;
   }
 }
 
@@ -168,6 +182,46 @@ html {
 
 .animate-stat-in {
   animation: stat-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Transición de contenido al cambiar de pestaña (Configuración, editor de
+   evento) — un fundido + leve subida, aplicado al contenedor completo de la
+   pestaña activa vía `key={tab}` en el componente (el cambio de key fuerza
+   un remount, así el contenido nuevo siempre entra "fresco" en vez de
+   simplemente reemplazar texto de golpe). */
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-in {
+  animation: tab-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Entrada de un panel que se expande bajo una tarjeta (detalle de evento en
+   Almacenamiento) — nace desde arriba con una leve escala vertical, para
+   sentirse como que "se despliega" en vez de aparecer de golpe como las
+   tarjetas normales. */
+@keyframes accordion-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.96) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+.animate-accordion-in {
+  animation: accordion-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top;
 }
 
 /* Transición suave al cambiar de tema claro/oscuro — se aplica solo a

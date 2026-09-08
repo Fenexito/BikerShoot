@@ -1,10 +1,9 @@
-import { IconSearch, IconFilter } from '../shared/icons'
+import { IconSearch } from '../shared/icons'
 import { cn } from '../../lib/cn'
 
 export interface StudioFilterOption {
   value: string
   label: string
-  count?: number
 }
 
 interface StudioFilterBarProps {
@@ -24,8 +23,6 @@ interface StudioFilterBarProps {
   searchValue: string
   onSearchChange: (value: string) => void
   searchPlaceholder?: string
-  onFilterClick?: () => void
-  filterCount?: number
   className?: string
 }
 
@@ -44,9 +41,7 @@ export function StudioFilterBar({
   onTabChange,
   searchValue,
   onSearchChange,
-  searchPlaceholder = 'Buscar…',
-  onFilterClick,
-  filterCount = 0,
+  searchPlaceholder = 'Buscar',
   className,
 }: StudioFilterBarProps) {
   return (
@@ -63,7 +58,6 @@ export function StudioFilterBar({
               )}
             >
               {s.label}
-              {s.count != null && <span className="ml-1 opacity-60">({s.count})</span>}
             </button>
           ))}
         </div>
@@ -83,23 +77,9 @@ export function StudioFilterBar({
               )}
             >
               {t.label}
-              {t.count != null && <span className="ml-1 opacity-60">({t.count})</span>}
             </button>
           ))}
         </nav>
-      )}
-
-      {onFilterClick && (
-        <button
-          onClick={onFilterClick}
-          className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-muted-foreground"
-        >
-          <IconFilter className="h-4 w-4" />
-          Filtros
-          {filterCount > 0 && (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">{filterCount}</span>
-          )}
-        </button>
       )}
 
       {/* Buscador — siempre al borde derecho por completo, nunca empujado

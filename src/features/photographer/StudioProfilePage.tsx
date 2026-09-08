@@ -75,7 +75,7 @@ export function StudioProfilePage() {
     <div>
       {coverUrl ? (
         <ScrollExpand
-          className="-mt-[4.75rem] md:mt-0"
+          className="-mt-[4.75rem] md:-mt-20"
           src={coverUrl}
           alt={profile.display_name}
           title={details?.logo_path ? undefined : profile.display_name}
@@ -149,7 +149,7 @@ export function StudioProfilePage() {
               (donde el botón de abajo va oculto) — en móvil sí forman su
               propia fila, tarjeta + botón lado a lado. */}
           <div className="flex w-full items-center gap-3 sm:contents">
-            <div className="grid flex-1 grid-cols-2 gap-4 rounded-3xl border border-border bg-card px-4 py-5 text-center sm:w-72 sm:px-6">
+            <div className="animate-stat-in grid flex-1 grid-cols-2 gap-4 rounded-3xl border border-border bg-card px-4 py-5 text-center sm:w-72 sm:px-6">
               <div>
                 <p className="text-2xl font-bold">{events.length}</p>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rodadas cubiertas</p>
@@ -165,7 +165,7 @@ export function StudioProfilePage() {
           </div>
 
           {details?.storage_plan && (
-            <div className="flex-1 rounded-3xl border border-border bg-card px-6 py-5" style={{ minWidth: 240 }}>
+            <div className="animate-stat-in flex-1 rounded-3xl border border-border bg-card px-6 py-5" style={{ minWidth: 240, animationDelay: '60ms' }}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Almacenamiento · Plan {details.storage_plan.name}
@@ -208,7 +208,7 @@ export function StudioProfilePage() {
           </button>
         </div>
 
-        <div className="py-8">
+        <div key={tab} className="animate-tab-in py-8">
           {tab === 'destacadas' ? (
             featuredPhotos.length === 0 ? (
               <p className="text-sm text-muted-foreground">Todavía no has destacado ninguna foto.</p>
@@ -240,8 +240,10 @@ export function StudioProfilePage() {
             )
           ) : (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => (
-                <StudioEventCard key={event.id} event={event} photographerId={user?.id} />
+              {events.map((event, i) => (
+                <div key={event.id} className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
+                  <StudioEventCard event={event} photographerId={user?.id} />
+                </div>
               ))}
               {events.length === 0 && <p className="text-sm text-muted-foreground">Todavía no tienes eventos.</p>}
             </div>

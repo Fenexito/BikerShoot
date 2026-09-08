@@ -85,7 +85,8 @@ const DriftWall = ({
   const pointerDampedRef = useRef({ x: 0, y: 0 })
   const lastTsRef = useRef<number | null>(null)
 
-  const [containerHeight, setContainerHeight] = useState(600)
+  const [containerSize, setContainerSize] = useState({ width: 1200, height: 600 })
+  const containerHeight = containerSize.height
   const [activeId, setActiveId] = useState<string | null>(null)
   const activeIdRef = useRef<string | null>(null)
   const [reduced, setReduced] = useState(false)
@@ -98,11 +99,21 @@ const DriftWall = ({
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  // La pared debe cubrir TODO el ancho del contenedor sin importar cuántas
+  // columnas pida quien la use — si hay pocas fotos, se repiten entre
+  // columnas de sobra (a propósito: se ve mejor una pared llena con algo de
+  // repetición que una pared angosta con espacio vacío a los lados).
+  const effectiveColumns = useMemo(() => {
+    const unit = tileWidth + gap
+    const needed = Math.ceil((containerSize.width * 1.35) / unit)
+    return Math.max(columns, needed)
+  }, [columns, tileWidth, gap, containerSize.width])
+
   const columnItems = useMemo(() => {
-    const cols: DriftWallItem[][] = Array.from({ length: columns }, () => [])
-    items.forEach((item, i) => cols[i % columns].push(item))
+    const cols: DriftWallItem[][] = Array.from({ length: effectiveColumns }, () => [])
+    items.forEach((item, i) => cols[i % effectiveColumns].push(item))
     return cols.map((col) => (col.length ? col : items.slice(0, 1)))
-  }, [items, columns])
+  }, [items, effectiveColumns])
 
   const columnMeta = useMemo(() => {
     const unit = tileHeight + gap
@@ -116,7 +127,7 @@ const DriftWall = ({
   useLayoutEffect(() => {
     if (!containerRef.current) return
     const ro = new ResizeObserver(([entry]) => {
-      setContainerHeight(entry.contentRect.height || 600)
+      setContainerSize({ width: entry.contentRect.width || 1200, height: entry.contentRect.height || 600 })
     })
     ro.observe(containerRef.current)
     return () => ro.disconnect()
@@ -257,7 +268,15 @@ const DriftWall = ({
   const renderTile = (item: DriftWallItem, id: string, colIndex: number, itemIndex: number) => {
     const inner = (
       <span className="drift-wall__inner">
-        <img src={item.image} alt={item.title ?? ''} loading="lazy" decoding="async" draggable={false} />
+        {/* Sin `loading="lazy"`: el layout real de cada tile vive apilado en
+            una columna muy alta (todas las copias verticales para el loop
+            infinito) y solo se reubica visualmente vía `transform`
+            (JS/rAF) — el lazy-loading nativo del navegador decide según la
+            posición de layout SIN transformar, así que casi ninguna imagen
+            "en pantalla" (por transform) se consideraba visible y nunca
+            cargaba. Con pocas decenas de fotos como mucho, cargarlas todas
+            de una vez es barato y evita esa falla. */}
+        <img src={item.image} alt={item.title ?? ''} decoding="async" draggable={false} />
         <span className="drift-wall__overlay" aria-hidden="true" />
       </span>
     )

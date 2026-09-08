@@ -175,21 +175,23 @@ function CategorySection({ category, profileName, selectedIds, onToggleSelect }:
 /** Modal de filtros para móvil — mismo panel oscuro flotante que
  * `SearchFilterModal.tsx` del lado biker (buscador), para no inventar un
  * segundo lenguaje visual de filtros dentro de la misma app. En escritorio
- * no se usa: ahí el buscador y el salto a categoría ya viven en el header. */
+ * no se usa: ahí el buscador y el filtro de estado ya viven en la barra. */
 function OrdersFilterModal({
   open,
   onClose,
   query,
   onQuery,
   categories,
-  onJump,
+  activeFilter,
+  onSelectFilter,
 }: {
   open: boolean
   onClose: () => void
   query: string
   onQuery: (v: string) => void
   categories: OrderCategory[]
-  onJump: (key: string) => void
+  activeFilter: string
+  onSelectFilter: (key: string) => void
 }) {
   useEffect(() => {
     if (!open) return
@@ -232,16 +234,31 @@ function OrdersFilterModal({
         </label>
 
         <div className="mt-5 flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Ir a categoría</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Filtrar por categoría</span>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                onSelectFilter('todos')
+                onClose()
+              }}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                activeFilter === 'todos' ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/20',
+              )}
+            >
+              Todos
+            </button>
             {categories.filter((c) => c.orders.length > 0).map((c) => (
               <button
                 key={c.key}
                 onClick={() => {
-                  onJump(c.key)
+                  onSelectFilter(c.key)
                   onClose()
                 }}
-                className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/20"
+                className={cn(
+                  'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                  activeFilter === c.key ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/20',
+                )}
               >
                 {c.label} ({c.orders.length})
               </button>
@@ -271,6 +288,7 @@ export function StudioOrders() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'entregado' | 'en_proceso' | 'urgente' | 'pendiente_pago' | 'en_preparacion' | 'cancelado'>('todos')
 
   // Ya no se filtra por un solo estado a la vez — todos los pedidos se ven
   // siempre, agrupados por categoría (colapsables, con su propia
@@ -294,6 +312,16 @@ export function StudioOrders() {
     return orders.filter((o) => orderMatchesQuery(o, q)).length
   }, [orders, query])
 
+  // El switch/pestañas de la barra de filtro sí filtran de verdad: reducen
+  // qué categorías se muestran abajo (no solo saltan a ellas con scroll).
+  const visibleCategories = useMemo(() => {
+    if (statusFilter === 'todos') return categories
+    if (statusFilter === 'en_proceso') return categories.filter((c) => c.key === 'pendiente_pago' || c.key === 'en_preparacion')
+    return categories.filter((c) => c.key === statusFilter)
+  }, [categories, statusFilter])
+
+  const visibleTotal = useMemo(() => visibleCategories.reduce((s, c) => s + c.orders.length, 0), [visibleCategories])
+
   const summary = useMemo(() => {
     const collected = orders.filter((o) => o.status === 'entregado' || o.status === 'en_preparacion').reduce((s, o) => s + o.total, 0)
     const pending = orders.filter((o) => o.status === 'pendiente_pago').reduce((s, o) => s + o.total, 0)
@@ -308,20 +336,6 @@ export function StudioOrders() {
       else next.add(orderId)
       return next
     })
-  }
-
-  function jumpToCategory(key: string) {
-    document.getElementById(`pedidos-cat-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  // "En proceso" del switch representa DOS categorías reales a la vez
-  // (pendiente de pago + en preparación) — salta a la que sí tenga
-  // pedidos, priorizando pendientes de pago (suele ser lo más urgente de
-  // revisar primero).
-  function jumpToEnProceso() {
-    const pendientes = categories.find((c) => c.key === 'pendiente_pago')
-    const target = pendientes && pendientes.orders.length > 0 ? 'pendiente_pago' : 'en_preparacion'
-    jumpToCategory(target)
   }
 
   async function bulkConfirmPayment() {
@@ -373,34 +387,29 @@ export function StudioOrders() {
         >
           <span className="flex items-center gap-2 text-muted-foreground">
             <IconFilter className="h-4 w-4" />
-            {query ? `"${query}"` : 'Buscar / saltar a categoría'}
+            {query ? `"${query}"` : 'Buscar / filtrar'}
           </span>
           <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">{matchingCount}</span>
         </button>
       </div>
 
       <div className="mt-8 hidden sm:block">
-        {/* El switch y las pestañas aquí NO filtran (todo sigue visible
-            siempre, agrupado abajo) — son accesos rápidos que saltan a esa
-            categoría, iguales a lo que antes vivía en el header. */}
         <StudioFilterBar
           searchValue={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Buscar por biker, evento o # de pedido…"
           segments={[
-            { value: 'entregado', label: 'Entregados', count: categories.find((c) => c.key === 'entregado')?.orders.length ?? 0 },
-            {
-              value: 'en_proceso',
-              label: 'En proceso',
-              count: (categories.find((c) => c.key === 'pendiente_pago')?.orders.length ?? 0) + (categories.find((c) => c.key === 'en_preparacion')?.orders.length ?? 0),
-            },
+            { value: 'entregado', label: 'Entregados' },
+            { value: 'en_proceso', label: 'En proceso' },
           ]}
-          onSegmentChange={(v) => (v === 'en_proceso' ? jumpToEnProceso() : jumpToCategory(v))}
+          segmentValue={statusFilter}
+          onSegmentChange={(v) => setStatusFilter(v as typeof statusFilter)}
           tabs={[
-            { value: 'urgente', label: 'Urgentes', count: categories.find((c) => c.key === 'urgente')?.orders.length ?? 0 },
-            { value: 'cancelado', label: 'Cancelados', count: categories.find((c) => c.key === 'cancelado')?.orders.length ?? 0 },
+            { value: 'todos', label: 'Todos' },
+            { value: 'urgente', label: 'Urgentes' },
+            { value: 'cancelado', label: 'Cancelados' },
           ]}
-          onTabChange={jumpToCategory}
+          tabValue={statusFilter}
+          onTabChange={(v) => setStatusFilter(v as typeof statusFilter)}
         />
       </div>
 
@@ -410,20 +419,23 @@ export function StudioOrders() {
         query={query}
         onQuery={setQuery}
         categories={categories}
-        onJump={jumpToCategory}
+        activeFilter={statusFilter}
+        onSelectFilter={(key) => setStatusFilter(key as typeof statusFilter)}
       />
 
       {isLoading && <SkeletonRows count={5} className="mt-6" />}
 
-      {!isLoading && matchingCount === 0 && (
+      {!isLoading && (matchingCount === 0 || visibleTotal === 0) && (
         <div className="mt-6 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
           <span className="text-4xl opacity-40">🧾</span>
-          <p className="font-semibold">{orders.length === 0 ? 'Todavía no tienes pedidos' : 'Ningún pedido coincide con esa búsqueda'}</p>
+          <p className="font-semibold">
+            {orders.length === 0 ? 'Todavía no tienes pedidos' : matchingCount === 0 ? 'Ningún pedido coincide con esa búsqueda' : 'Ningún pedido coincide con ese filtro'}
+          </p>
         </div>
       )}
 
       <div className="mt-6 flex flex-col gap-8 pb-20">
-        {categories.map((category) => (
+        {visibleCategories.map((category) => (
           <CategorySection key={category.key} category={category} profileName={orderCodeName} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
         ))}
       </div>

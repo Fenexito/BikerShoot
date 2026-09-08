@@ -58,15 +58,10 @@ export function StudioEvents() {
           className="mb-8"
           searchValue={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Buscar evento o ciudad…"
-          segments={STATUS_SEGMENTS.map((s) => ({ ...s, count: events.filter((e) => e.status === s.value).length }))}
+          segments={STATUS_SEGMENTS}
           segmentValue={status}
           onSegmentChange={(v) => setStatus(v as EventStatusFilter)}
-          tabs={STATUS_TABS.map((t) => ({
-            value: t.value,
-            label: t.label,
-            count: t.value === 'todos' ? events.length : events.filter((e) => e.status === t.value).length,
-          }))}
+          tabs={STATUS_TABS}
           tabValue={status}
           onTabChange={(v) => setStatus(v as EventStatusFilter)}
         />

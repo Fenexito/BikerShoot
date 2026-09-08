@@ -157,7 +157,7 @@ function PointPanel({ eventId, point }: { eventId: string; point: PointStorage }
 
 function EventDetailPanel({ event }: { event: EventStorage }) {
   return (
-    <div className="col-span-full rounded-3xl border border-border bg-card p-5">
+    <div className="animate-accordion-in col-span-full rounded-3xl border border-border bg-card p-5">
       <div className="mb-5 rounded-2xl border border-accent/30 bg-accent/5 p-4">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-accent">
           Acciones de todo el evento — afecta los {event.points.length || 0} puntos y lo que no tenga punto asignado
@@ -274,7 +274,7 @@ export function StudioStorage() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div key={sort} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading && <SkeletonRows count={3} />}
         {!isLoading && sorted.length === 0 && (
           <div className="col-span-full flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-16 text-center">
@@ -282,11 +282,13 @@ export function StudioStorage() {
             <p className="font-semibold">Todavía no tienes eventos</p>
           </div>
         )}
-        {sorted.map((event) => {
+        {sorted.map((event, i) => {
           const open = openEventId === event.id
           return (
             <Fragment key={event.id}>
-              <EventCard event={event} open={open} onToggle={() => setOpenEventId(open ? null : event.id)} />
+              <div className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
+                <EventCard event={event} open={open} onToggle={() => setOpenEventId(open ? null : event.id)} />
+              </div>
               {open && <EventDetailPanel event={event} />}
             </Fragment>
           )

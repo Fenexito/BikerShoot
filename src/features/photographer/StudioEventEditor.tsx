@@ -756,19 +756,19 @@ export function StudioEventEditor() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex items-center justify-center gap-1.5 whitespace-nowrap border-b-2 pb-3 text-xs font-medium transition-colors sm:text-sm lg:justify-start lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                'flex min-w-0 items-center justify-center gap-1.5 border-b-2 pb-3 text-xs font-medium transition-colors sm:text-sm lg:justify-start lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
                 tab === t.id
                   ? 'border-foreground font-bold text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               <t.icon className="h-4 w-4 shrink-0" />
-              {t.label}
+              <span className="truncate">{t.label}</span>
             </button>
           ))}
         </nav>
 
-        <div className="flex flex-col gap-6 pb-24">
+        <div key={tab} className="flex flex-col gap-6 pb-24 animate-tab-in">
           {tab === 'info' && (
             <Section title="Información del evento">
               <div className="grid gap-5 sm:grid-cols-2">

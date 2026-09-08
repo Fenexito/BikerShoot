@@ -527,7 +527,7 @@ export function StudioSettings() {
           ))}
         </nav>
 
-        <div className="flex flex-col gap-6">
+        <div key={tab} className="flex flex-col gap-6 animate-tab-in">
           {tab === 'perfil' && (
             <>
               <Section title="Foto de perfil, portada y logo">

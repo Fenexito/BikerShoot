@@ -284,16 +284,17 @@ export function StudioPlans() {
       )}
 
       <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {plans.map((plan) => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            isCurrent={plan.id === details.storage_plan_id}
-            isPending={plan.id === details.pending_plan_id}
-            isDowngrade={!!currentPlan && plan.gb_limit < currentPlan.gb_limit}
-            busy={busy}
-            onSelect={() => selectPlan(plan)}
-          />
+        {plans.map((plan, i) => (
+          <div key={plan.id} className="animate-card-in" style={{ animationDelay: `${i * 60}ms` }}>
+            <PlanCard
+              plan={plan}
+              isCurrent={plan.id === details.storage_plan_id}
+              isPending={plan.id === details.pending_plan_id}
+              isDowngrade={!!currentPlan && plan.gb_limit < currentPlan.gb_limit}
+              busy={busy}
+              onSelect={() => selectPlan(plan)}
+            />
+          </div>
         ))}
       </div>
 
