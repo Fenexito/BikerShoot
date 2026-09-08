@@ -10,14 +10,15 @@ import { SkeletonGrid } from '../../ui/shared/Skeleton'
 
 type EventStatusFilter = 'todos' | 'activo' | 'pausado' | 'cerrado'
 
-// Los dos estados más comunes van en el switch de 2 vías (izquierda); los
-// que quedan (ver todo, o ver lo cerrado) van en las pestañas de al lado.
-const STATUS_SEGMENTS: { value: EventStatusFilter; label: string }[] = [
-  { value: 'activo', label: 'Activos' },
-  { value: 'pausado', label: 'Pausados' },
-]
+// Todas las opciones en una sola fila de pestañas — antes "Activos" y
+// "Pausados" vivían en un switch aparte y el resto en pestañas, pero esa
+// distinción (dos categorías "principales" con su propio espacio) es un
+// patrón de Mobbin que no aplica aquí; una sola lista es más consistente
+// con Pedidos.
 const STATUS_TABS: { value: EventStatusFilter; label: string }[] = [
   { value: 'todos', label: 'Todos' },
+  { value: 'activo', label: 'Activos' },
+  { value: 'pausado', label: 'Pausados' },
   { value: 'cerrado', label: 'Cerrados' },
 ]
 
@@ -58,9 +59,6 @@ export function StudioEvents() {
           className="mb-8"
           searchValue={query}
           onSearchChange={setQuery}
-          segments={STATUS_SEGMENTS}
-          segmentValue={status}
-          onSegmentChange={(v) => setStatus(v as EventStatusFilter)}
           tabs={STATUS_TABS}
           tabValue={status}
           onTabChange={(v) => setStatus(v as EventStatusFilter)}

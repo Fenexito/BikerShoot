@@ -268,20 +268,17 @@ export function StudioOrders() {
 
       {/* Mismo StudioFilterBar en todas las resoluciones (igual que
           Eventos) — antes móvil tenía un botón+modal aparte, que se veía y
-          se sentía distinto a la barra de escritorio. */}
+          se sentía distinto a la barra de escritorio. Todas las opciones
+          en una sola fila de pestañas (ya no switch + tabs por separado). */}
       <div className="mt-8">
         <StudioFilterBar
           searchValue={query}
           onSearchChange={setQuery}
-          segments={[
-            { value: 'entregado', label: 'Entregados' },
-            { value: 'en_proceso', label: 'En proceso' },
-          ]}
-          segmentValue={statusFilter}
-          onSegmentChange={(v) => setStatusFilter(v as typeof statusFilter)}
           tabs={[
             { value: 'todos', label: 'Todos' },
             { value: 'urgente', label: 'Urgentes' },
+            { value: 'en_proceso', label: 'En proceso' },
+            { value: 'entregado', label: 'Entregados' },
             { value: 'cancelado', label: 'Cancelados' },
           ]}
           tabValue={statusFilter}
