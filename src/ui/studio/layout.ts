@@ -1,6 +1,6 @@
-// Anchos de página compartidos para Studio — antes cada pantalla tenía su
-// propio max-w-* (6xl/5xl/4xl/2xl) sin ningún criterio, dando una sensación
-// de inconsistencia. Home es la única excepción intencional (es un
-// dashboard, se queda contenido); todo lo demás usa el ancho amplio.
-export const STUDIO_PAGE_DASHBOARD = 'mx-auto max-w-6xl px-6 py-12 text-foreground md:px-16'
-export const STUDIO_PAGE_WIDE = 'mx-auto max-w-screen-2xl px-6 py-12 text-foreground md:px-16'
+// Ancho de página único para todo Studio — debe calzar EXACTO con el ancho
+// del header (`max-w-screen-xl` en HeaderStudio.tsx) para que el contenido
+// de cada pantalla quede alineado con los bordes del header flotante. Antes
+// había dos anchos (2xl para casi todo, 6xl solo para Home) y NINGUNO de
+// los dos coincidía con el del header — se unificaron los tres.
+export const STUDIO_PAGE_WIDE = 'mx-auto max-w-screen-xl px-6 py-12 text-foreground md:px-16'

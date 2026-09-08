@@ -4,7 +4,8 @@ import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
 import { useAuth } from '../../features/auth/AuthContext'
 import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
-import { IconUser, IconLogOut, IconArchive, IconCreditCard, IconSettings, IconSparkles, IconImages, IconCart, IconPlus } from '../shared/icons'
+import { IconUser, IconLogOut, IconArchive, IconCreditCard, IconSettings, IconSparkles, IconImages, IconCart, IconPlus, IconSearch } from '../shared/icons'
+import { GlobalSearchModal } from '../../features/photographer/components/GlobalSearchModal'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
@@ -27,6 +28,7 @@ export function HeaderStudio() {
   const { data: details } = usePhotographerDetails(user?.id)
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -70,8 +72,8 @@ export function HeaderStudio() {
                 ahí), y en escritorio se desvanece cuando `transformed`. */}
             <div
               className={cn(
-                'absolute inset-0 flex items-center gap-4 transition-all duration-200 ease-in',
-                transformed ? 'pointer-events-none -translate-y-2 scale-[0.97] opacity-0 blur-[2px]' : 'translate-y-0 scale-100 opacity-100 blur-0',
+                'absolute inset-0 flex items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                transformed ? 'pointer-events-none -translate-y-full opacity-0' : 'translate-y-0 opacity-100',
               )}
             >
               <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">
@@ -137,15 +139,29 @@ export function HeaderStudio() {
                 móvil `hidden` la saca del todo, sin importar `transformed`. */}
             <div
               className={cn(
-                'absolute inset-0 hidden items-center transition-all duration-300 ease-out md:flex',
-                transformed ? 'delay-100 translate-y-0 scale-100 opacity-100 blur-0' : 'pointer-events-none translate-y-2 scale-[0.97] opacity-0 blur-[2px]',
+                'absolute inset-0 hidden items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
+                transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0',
               )}
             >
               {transformContent}
             </div>
           </div>
+
+          {/* Búsqueda global — a propósito vive AFUERA de la franja que se
+              transforma: debe seguir alcanzable sin importar qué página
+              esté mostrando el header en ese momento. */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            aria-label="Buscar en todo el sitio"
+            title="Buscar"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+          >
+            <IconSearch className="h-4 w-4" />
+          </button>
         </header>
       </div>
+
+      <GlobalSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <MobileBottomNav
         items={[

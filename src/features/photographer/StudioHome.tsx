@@ -11,7 +11,7 @@ import { Card } from '../../ui/studio/Card'
 import { Badge } from '../../ui/studio/Badge'
 import { Button } from '../../ui/studio/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
-import { STUDIO_PAGE_DASHBOARD } from '../../ui/studio/layout'
+import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { OrderRow } from './StudioOrders'
 
 function usePhotoCount(photographerId: string | undefined) {
@@ -43,7 +43,7 @@ export function StudioHome() {
   const needsAttention = [...pendingPayment, ...inPreparation].slice(0, 6)
 
   return (
-    <div className={STUDIO_PAGE_DASHBOARD}>
+    <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">
         Hola, {profile?.display_name || 'estudio'}
       </h1>

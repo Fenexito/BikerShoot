@@ -6,8 +6,6 @@ import { StudioEventCard } from './components/StudioEventCard'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
-import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
-import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { IconSearch } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 
@@ -23,7 +21,6 @@ export function StudioEvents() {
   const { data: events, isLoading, error } = useMyEvents(user?.id)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<(typeof STATUS_TABS)[number]['value']>('todos')
-  const scrolledPastThreshold = useScrolledPast(200)
 
   const filtered = useMemo(() => {
     let list = events ?? []
@@ -32,39 +29,6 @@ export function StudioEvents() {
     if (q) list = list.filter((e) => e.title.toLowerCase().includes(q) || e.city.toLowerCase().includes(q))
     return list
   }, [events, status, query])
-
-  // El header (HeaderStudio) se transforma al pasar el umbral de scroll:
-  // buscador por nombre/ciudad + pestañas de estado — útil en cuanto el
-  // fotógrafo acumula muchos eventos y ya no quiere scrollear de vuelta
-  // arriba para cambiar de filtro.
-  useHeaderTransform(
-    <div className="flex w-full items-center gap-2 overflow-x-auto">
-      <div className="flex shrink-0 items-center gap-2 rounded-full bg-muted px-3">
-        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar evento o ciudad…"
-          className="h-9 w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground md:w-44"
-        />
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {STATUS_TABS.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setStatus(t.value)}
-            className={cn(
-              'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-              status === t.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-    </div>,
-    scrolledPastThreshold,
-  )
 
   return (
     <div className={STUDIO_PAGE_WIDE}>

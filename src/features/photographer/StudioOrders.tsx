@@ -14,18 +14,14 @@ import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { IconSearch } from '../../ui/shared/icons'
+import { Dropdown } from '../../ui/shared/Dropdown'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 
-const TABS: { value: OrderItemStatus | 'todos'; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'pendiente_pago', label: 'Pendientes de pago' },
-  { value: 'en_preparacion', label: 'En preparación' },
-  { value: 'entregado', label: 'Entregados' },
-  { value: 'cancelado', label: 'Cancelados' },
-]
+const PAGE_SIZE_FIRST = 10
+const PAGE_SIZE_MORE = 15
 
 function daysSince(iso: string) {
   return (Date.now() - new Date(iso).getTime()) / 86_400_000
@@ -40,6 +36,10 @@ function urgencyClass(order: PhotographerOrderGroup) {
   if (days > 3) return 'text-red-500 font-semibold'
   if (days > 1) return 'text-amber-500 font-medium'
   return null
+}
+
+function byOrderNumber(a: PhotographerOrderGroup, b: PhotographerOrderGroup) {
+  return (a.orderNumber ?? 0) - (b.orderNumber ?? 0)
 }
 
 export function OrderRow({
@@ -100,26 +100,85 @@ export function OrderRow({
   )
 }
 
+interface OrderCategory {
+  key: string
+  label: string
+  orders: PhotographerOrderGroup[]
+  defaultOpen: boolean
+  tone?: 'danger'
+}
+
+/** Una categoría de pedidos (urgentes, o un estado) — colapsable, ordenada
+ * por número de pedido, con paginación propia: primero 10, "ver más" trae
+ * 15 a la vez. Se oculta sola si no tiene ningún pedido (ej. sin
+ * cancelados, sin resultados de búsqueda en ese estado). */
+function CategorySection({ category, profileName, selectedIds, onToggleSelect }: {
+  category: OrderCategory
+  profileName?: string
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
+}) {
+  const [open, setOpen] = useState(category.defaultOpen)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE_FIRST)
+
+  if (category.orders.length === 0) return null
+
+  const visible = category.orders.slice(0, visibleCount)
+  const remaining = category.orders.length - visible.length
+
+  return (
+    <div id={`pedidos-cat-${category.key}`} className="scroll-mt-28">
+      <button onClick={() => setOpen((o) => !o)} className="mb-3 flex w-full items-center justify-between gap-2 text-left">
+        <h2 className={cn('flex items-center gap-2 text-sm font-bold uppercase tracking-wide', category.tone === 'danger' ? 'text-red-500' : 'text-muted-foreground')}>
+          {category.label}
+          <span className={cn('rounded-full px-2 py-0.5 text-xs', category.tone === 'danger' ? 'bg-red-500/10' : 'bg-muted')}>{category.orders.length}</span>
+        </h2>
+        <span className={cn('text-xs text-muted-foreground transition-transform', open && 'rotate-180')}>▾</span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3">
+          {visible.map((order) => (
+            <OrderRow
+              key={order.orderId}
+              order={order}
+              profileName={profileName}
+              canSelect={order.status === 'pendiente_pago'}
+              selected={selectedIds.has(order.orderId)}
+              onToggleSelect={() => onToggleSelect(order.orderId)}
+            />
+          ))}
+          {remaining > 0 && (
+            <button
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE_MORE)}
+              className="w-full rounded-2xl border border-border py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Ver más ({remaining} más)
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Modal de filtros para móvil — mismo panel oscuro flotante que
  * `SearchFilterModal.tsx` del lado biker (buscador), para no inventar un
  * segundo lenguaje visual de filtros dentro de la misma app. En escritorio
- * no se usa: ahí la búsqueda y las pestañas ya caben cómodas en una fila. */
+ * no se usa: ahí el buscador y el salto a categoría ya viven en el header. */
 function OrdersFilterModal({
   open,
   onClose,
   query,
   onQuery,
-  tab,
-  onTab,
-  resultCount,
+  categories,
+  onJump,
 }: {
   open: boolean
   onClose: () => void
   query: string
   onQuery: (v: string) => void
-  tab: OrderItemStatus | 'todos'
-  onTab: (v: OrderItemStatus | 'todos') => void
-  resultCount: number
+  categories: OrderCategory[]
+  onJump: (key: string) => void
 }) {
   useEffect(() => {
     if (!open) return
@@ -142,7 +201,7 @@ function OrdersFilterModal({
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg animate-menu-in rounded-3xl border border-white/10 bg-neutral-900 p-6 text-white shadow-2xl">
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Filtros</h2>
+          <h2 className="text-xl font-bold">Buscar y saltar a categoría</h2>
           <button onClick={onClose} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
             <IconClose className="h-4 w-4" />
           </button>
@@ -162,18 +221,18 @@ function OrdersFilterModal({
         </label>
 
         <div className="mt-5 flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Estado</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Ir a categoría</span>
           <div className="flex flex-wrap gap-2">
-            {TABS.map((t) => (
+            {categories.filter((c) => c.orders.length > 0).map((c) => (
               <button
-                key={t.value}
-                onClick={() => onTab(t.value)}
-                className={cn(
-                  'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                  tab === t.value ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/20',
-                )}
+                key={c.key}
+                onClick={() => {
+                  onJump(c.key)
+                  onClose()
+                }}
+                className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/20"
               >
-                {t.label}
+                {c.label} ({c.orders.length})
               </button>
             ))}
           </div>
@@ -183,7 +242,7 @@ function OrdersFilterModal({
           onClick={onClose}
           className="mt-8 flex w-full items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
         >
-          Ver {resultCount} pedido{resultCount === 1 ? '' : 's'}
+          Cerrar
         </button>
       </div>
     </div>,
@@ -197,21 +256,33 @@ export function StudioOrders() {
   const orderCodeName = details?.order_nickname ?? profile?.display_name
   const { data: orders = [], isLoading } = usePhotographerOrders(user?.id)
   const push = useToastStore((s) => s.push)
-  const [tab, setTab] = useState<OrderItemStatus | 'todos'>('todos')
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const scrolledPastThreshold = useScrolledPast(200)
 
-  const filtered = useMemo(() => {
-    let list = tab === 'todos' ? orders : orders.filter((o) => o.status === tab)
+  // Ya no se filtra por un solo estado a la vez — todos los pedidos se ven
+  // siempre, agrupados por categoría (colapsables, con su propia
+  // paginación). La búsqueda sigue aplicando dentro de cada categoría.
+  const categories = useMemo((): OrderCategory[] => {
     const q = query.trim().toLowerCase()
-    if (q) list = list.filter((o) => o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q))
-    return list
-  }, [orders, tab, query])
+    const matches = (o: PhotographerOrderGroup) => !q || o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q)
+    const byStatus = (status: OrderItemStatus) => orders.filter((o) => o.status === status && matches(o)).sort(byOrderNumber)
+    return [
+      { key: 'urgente', label: '🔥 Urgentes', orders: orders.filter((o) => urgencyClass(o) !== null && matches(o)).sort(byOrderNumber), defaultOpen: true, tone: 'danger' },
+      { key: 'pendiente_pago', label: 'Pendientes de pago', orders: byStatus('pendiente_pago'), defaultOpen: true },
+      { key: 'en_preparacion', label: 'En preparación', orders: byStatus('en_preparacion'), defaultOpen: true },
+      { key: 'entregado', label: 'Entregados', orders: byStatus('entregado'), defaultOpen: true },
+      { key: 'cancelado', label: 'Cancelados', orders: byStatus('cancelado'), defaultOpen: false },
+    ]
+  }, [orders, query])
 
-  const urgentOrders = useMemo(() => orders.filter((o) => urgencyClass(o) !== null), [orders])
+  const matchingCount = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return orders.length
+    return orders.filter((o) => o.bikerName.toLowerCase().includes(q) || o.eventTitle.toLowerCase().includes(q)).length
+  }, [orders, query])
 
   const summary = useMemo(() => {
     const collected = orders.filter((o) => o.status === 'entregado' || o.status === 'en_preparacion').reduce((s, o) => s + o.total, 0)
@@ -227,6 +298,10 @@ export function StudioOrders() {
       else next.add(orderId)
       return next
     })
+  }
+
+  function jumpToCategory(key: string) {
+    document.getElementById(`pedidos-cat-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   async function bulkConfirmPayment() {
@@ -249,33 +324,26 @@ export function StudioOrders() {
   }
 
   // El header (HeaderStudio) se transforma al pasar el umbral de scroll:
-  // muestra este buscador + pestañas de estado en vez del nav normal — para
-  // no tener que scrollear de vuelta arriba a cambiar de filtro.
+  // buscador + un botón "Filtros" que en realidad es un acceso rápido —
+  // salta a la categoría elegida en vez de ocultar el resto, así el
+  // fotógrafo no tiene que colapsar todo y volver a bajar para verla.
   useHeaderTransform(
-    <div className="flex w-full items-center gap-2 overflow-x-auto">
-      <div className="flex shrink-0 items-center gap-2 rounded-full bg-muted px-3">
+    <div className="flex w-full items-center gap-2">
+      <div className="flex max-w-xs flex-1 items-center gap-2 rounded-full bg-muted px-3">
         <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Biker o evento…"
-          className="h-9 w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground md:w-44"
+          className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setTab(t.value)}
-            className={cn(
-              'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-              tab === t.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Dropdown
+        label="Filtros"
+        direction="down"
+        onSelect={jumpToCategory}
+        options={categories.filter((c) => c.orders.length > 0).map((c) => ({ value: c.key, label: `${c.label} (${c.orders.length})` }))}
+      />
     </div>,
     scrolledPastThreshold,
   )
@@ -300,9 +368,9 @@ export function StudioOrders() {
         </div>
       </div>
 
-      {/* Móvil: un solo botón que abre el modal de filtros (buscador +
-          estado) — tres controles en fila no cabían cómodos en pantalla
-          angosta. Escritorio: todo inline, como antes. */}
+      {/* Móvil: un solo botón que abre el modal de búsqueda + salto a
+          categoría. Escritorio: el buscador ya cabe cómodo en una fila (el
+          salto a categoría vive en el header al hacer scroll). */}
       <div className="mt-8 sm:hidden">
         <button
           onClick={() => setFiltersOpen(true)}
@@ -310,13 +378,13 @@ export function StudioOrders() {
         >
           <span className="flex items-center gap-2 text-muted-foreground">
             <IconFilter className="h-4 w-4" />
-            {tab === 'todos' && !query ? 'Filtros' : `${TABS.find((t) => t.value === tab)?.label}${query ? ` · "${query}"` : ''}`}
+            {query ? `"${query}"` : 'Buscar / saltar a categoría'}
           </span>
-          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">{filtered.length}</span>
+          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">{matchingCount}</span>
         </button>
       </div>
 
-      <div className="mt-8 hidden flex-wrap items-center gap-3 sm:flex">
+      <div className="mt-8 hidden items-center gap-3 sm:flex">
         <div className="flex flex-1 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:max-w-xs">
           <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
@@ -326,23 +394,6 @@ export function StudioOrders() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((t) => {
-            const count = t.value === 'todos' ? orders.length : orders.filter((o) => o.status === t.value).length
-            return (
-              <button
-                key={t.value}
-                onClick={() => setTab(t.value)}
-                className={cn(
-                  'whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                  tab === t.value ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
-                )}
-              >
-                {t.label} <span className="opacity-70">({count})</span>
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <OrdersFilterModal
@@ -350,53 +401,22 @@ export function StudioOrders() {
         onClose={() => setFiltersOpen(false)}
         query={query}
         onQuery={setQuery}
-        tab={tab}
-        onTab={setTab}
-        resultCount={filtered.length}
+        categories={categories}
+        onJump={jumpToCategory}
       />
 
       {isLoading && <SkeletonRows count={5} className="mt-6" />}
 
-      {!isLoading && urgentOrders.length > 0 && (
-        <div className="mt-6">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-red-500">
-            🔥 Urgente <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs">{urgentOrders.length}</span>
-          </h2>
-          <div className="flex flex-col gap-3">
-            {urgentOrders.map((order) => (
-              <OrderRow
-                key={order.orderId}
-                order={order}
-                profileName={orderCodeName}
-                canSelect={order.status === 'pendiente_pago'}
-                selected={selectedIds.has(order.orderId)}
-                onToggleSelect={() => toggleSelect(order.orderId)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && matchingCount === 0 && (
         <div className="mt-6 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-20 text-center">
           <span className="text-4xl opacity-40">🧾</span>
-          <p className="font-semibold">No hay pedidos en esta categoría</p>
+          <p className="font-semibold">{orders.length === 0 ? 'Todavía no tienes pedidos' : 'Ningún pedido coincide con esa búsqueda'}</p>
         </div>
       )}
 
-      <div className="mt-6 flex flex-col gap-3 pb-20">
-        {urgentOrders.length > 0 && filtered.length > 0 && (
-          <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted-foreground">Todos los pedidos</h2>
-        )}
-        {filtered.map((order) => (
-          <OrderRow
-            key={order.orderId}
-            order={order}
-            profileName={orderCodeName}
-            canSelect={order.status === 'pendiente_pago'}
-            selected={selectedIds.has(order.orderId)}
-            onToggleSelect={() => toggleSelect(order.orderId)}
-          />
+      <div className="mt-6 flex flex-col gap-8 pb-20">
+        {categories.map((category) => (
+          <CategorySection key={category.key} category={category} profileName={orderCodeName} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
         ))}
       </div>
 

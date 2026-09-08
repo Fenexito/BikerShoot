@@ -822,12 +822,12 @@ export function StudioEventView() {
       <div className={STUDIO_PAGE_WIDE}>
         <div
           className={cn(
-            'sticky z-20 mt-6 transition-[top] duration-300',
-            // El header de arriba solo se oculta en móvil (en escritorio
-            // nunca se mueve — eso se rediseñará aparte), así que este
-            // offset dinámico debe aplicar solo por debajo de sm.
+            // Solo pegajosa en móvil — en escritorio ese rol ya lo cumple el
+            // header transformado (mismo estado/nombre/pausar/acciones), así
+            // que aquí basta con quedarse en el flujo normal (sin sticky, sin
+            // z-index elevado) para no tener dos barras encimadas.
+            'sticky z-20 mt-6 transition-[top] duration-300 sm:static sm:z-auto',
             headerHidden ? 'top-3' : 'top-[4.75rem]',
-            'md:top-[5.5rem]',
           )}
         >
           {/* Móvil: flecha atrás, nombre del evento, y estado + menú de tres
