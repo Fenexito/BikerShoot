@@ -225,8 +225,8 @@ html {
 }
 
 /* Transición suave al cambiar de tema claro/oscuro — se aplica solo a
-   color/fondo/borde, nunca a transform/opacity, para no pisar las
-   animaciones de entrada de tarjetas y menús.
+   fondo/borde, nunca a transform/opacity, para no pisar las animaciones de
+   entrada de tarjetas y menús.
    El `:where(...)` es a propósito: Tailwind v3 NO emite `@layer` nativo de
    CSS en el output (lo consume en tiempo de build vía PostCSS y solo
    reordena las reglas físicamente) — envolver esto en `@layer base` no
@@ -241,9 +241,21 @@ html {
    como especificidad CERO, así que cualquier utilidad de Tailwind
    (transition-all, transition-opacity, etc.) gana automáticamente en
    cuanto un componente la declara, sin tocar la especificidad de nada
-   más. */
+   más.
+   `color` se sacó a propósito de esta lista (antes sí transicionaba): con
+   tanto texto en negrita/grande en la app, animar `color` de blanco a
+   negro (o viceversa) producía un parpadeo visible al cambiar de tema —
+   un texto grande es un área de glifos compleja, y el navegador repinta
+   ese texto como textura en cada frame de la transición en vez de
+   interpolar el color píxel a píxel como sí hace con un fondo sólido; ese
+   repintado por frame es lo que se percibe como parpadeo, y es más notorio
+   mientras más grande/grueso es el texto (más píxeles de glifo por
+   repintar). El cambio de color de TEXTO ahora es instantáneo (sin
+   transición) — imperceptible como "salto" porque es un solo cambio muy
+   rápido, y evita el parpadeo por completo. Fondos y bordes (áreas sólidas,
+   sin glifos) sí se siguen animando sin este problema. */
 :where(#portal-theme-root, #portal-theme-root *) {
-  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  transition: background-color 200ms ease, border-color 200ms ease;
 }
 
 /* Leaflet trae sus propias esquinas cuadradas por defecto — se redondean

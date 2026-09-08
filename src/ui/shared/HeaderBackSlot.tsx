@@ -18,7 +18,7 @@ export function HeaderBackSlot() {
           aria-label="Volver"
           className="flex h-full w-full items-center justify-center text-foreground transition-colors hover:text-muted-foreground"
         >
-          <IconChevronLeft className="h-5 w-5" />
+          <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
         </button>
       ) : target ? (
         <Link
@@ -26,7 +26,7 @@ export function HeaderBackSlot() {
           aria-label="Volver"
           className="flex h-full w-full items-center justify-center text-foreground transition-colors hover:text-muted-foreground"
         >
-          <IconChevronLeft className="h-5 w-5" />
+          <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
         </Link>
       ) : null}
     </div>
