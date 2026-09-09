@@ -76,6 +76,25 @@ export function IconPause(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function IconGridSmall(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="6" height="6" rx="1" />
+      <rect x="15" y="3" width="6" height="6" rx="1" />
+      <rect x="3" y="15" width="6" height="6" rx="1" />
+      <rect x="15" y="15" width="6" height="6" rx="1" />
+    </svg>
+  )
+}
+
+export function IconGridLarge(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+    </svg>
+  )
+}
+
 export function IconMoreHorizontal(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)} fill="currentColor" stroke="none">

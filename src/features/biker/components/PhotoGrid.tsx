@@ -17,9 +17,17 @@ interface PhotoGridProps {
   onOpenPhoto: (photos: GridPhoto[], index: number) => void
   layout?: 'grid' | 'mosaic'
   isLoading?: boolean
+  /** Ancho mínimo (px) de cada foto en la vista `grid` — controla cuántas
+   * columnas caben por fila (`auto-fill` calcula el resto solo). El
+   * resizer de Search.tsx cambia este valor; el resto de usos de
+   * PhotoGrid (perfil del fotógrafo) se quedan con el tamaño fijo de
+   * siempre. Solo aplica a `layout='grid'` — `mosaic` usa columnas fijas
+   * por breakpoint (`columns-2 sm:columns-3 lg:columns-4`), no relacionado
+   * con este control. */
+  tileSize?: number
 }
 
-export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false }: PhotoGridProps) {
+export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false, tileSize = 150 }: PhotoGridProps) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -67,11 +75,8 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
   return (
     <div>
       <div
-        className={cn(
-          layout === 'mosaic'
-            ? 'columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4'
-            : 'grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 sm:gap-3',
-        )}
+        className={cn(layout === 'mosaic' ? 'columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4' : 'grid gap-2.5 sm:gap-3')}
+        style={layout === 'grid' ? { gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize}px, 1fr))` } : undefined}
       >
         {visible.map((photo, i) => (
           <div

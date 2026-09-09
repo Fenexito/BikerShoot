@@ -8,12 +8,36 @@ import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { SearchFilterModal } from './components/SearchFilterModal'
 import { Badge } from '../../ui/flat/Badge'
-import { IconFilter, IconSearch } from '../../ui/shared/icons'
+import { IconFilter, IconSearch, IconGridSmall, IconGridLarge } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { cn } from '../../lib/cn'
 
 const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
+
+// Rango del resizer de tamaño de foto — el tope (270px) está calculado
+// para que, incluso en el tamaño MÁS GRANDE posible, sigan cabiendo al
+// menos 6 fotos por fila en el ancho máximo del contenedor: 1800px menos
+// padding (md:px-8 = 32px por lado) = 1736px disponibles; con gap-3
+// (12px) entre columnas, 6 fotos de 270px + 5 gaps = 1680+60 = 1740px…
+// ligeramente ajustado a 270 (no 279, el límite matemático exacto) para
+// dejar margen a la barra de scroll del navegador, que resta ancho real
+// sin que el cálculo de CSS lo sepa. El piso (130px) da bastantes más
+// por fila para quien prefiera una vista densa tipo contact-sheet.
+const TILE_SIZE_MIN = 130
+const TILE_SIZE_MAX = 270
+const TILE_SIZE_DEFAULT = 220
+const TILE_SIZE_KEY = 'motoshots_biker_photo_tile_size'
+
+function loadTileSize() {
+  try {
+    const raw = localStorage.getItem(TILE_SIZE_KEY)
+    const n = raw ? Number(raw) : NaN
+    return Number.isFinite(n) && n >= TILE_SIZE_MIN && n <= TILE_SIZE_MAX ? n : TILE_SIZE_DEFAULT
+  } catch {
+    return TILE_SIZE_DEFAULT
+  }
+}
 
 export function Search() {
   const { user } = useAuth()
@@ -25,6 +49,21 @@ export function Search() {
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [tileSize, setTileSize] = useState(TILE_SIZE_DEFAULT)
+
+  useEffect(() => {
+    setTileSize(loadTileSize())
+  }, [])
+
+  function changeTileSize(next: number) {
+    setTileSize(next)
+    try {
+      localStorage.setItem(TILE_SIZE_KEY, String(next))
+    } catch {
+      // localStorage puede fallar (modo privado, cuota llena) — el tamaño
+      // elegido simplemente no se recuerda la próxima vez, no es grave.
+    }
+  }
 
   useEffect(() => {
     function onScroll() {
@@ -189,6 +228,29 @@ export function Search() {
           </button>
         </div>
 
+        {/* Contador + resizer de tamaño de foto — solo desde md:, en móvil
+            no hay espacio real para aprovechar el control de densidad y el
+            grid ya usa el mínimo de columnas cómodo por defecto. */}
+        <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
+          </p>
+          <div className="flex items-center gap-3">
+            <IconGridSmall className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              type="range"
+              min={TILE_SIZE_MIN}
+              max={TILE_SIZE_MAX}
+              step={10}
+              value={tileSize}
+              onChange={(e) => changeTileSize(Number(e.target.value))}
+              aria-label="Tamaño de las fotos"
+              className="h-1.5 w-32 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+            />
+            <IconGridLarge className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </div>
+        </div>
+
         {activeChips.length > 0 && (
           <div className="mb-5 flex flex-wrap gap-2">
             {activeChips.map((chip) => (
@@ -207,7 +269,7 @@ export function Search() {
           </div>
         )}
 
-        <PhotoGrid photos={results} isLoading={resultsLoading} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+        <PhotoGrid photos={results} isLoading={resultsLoading} tileSize={tileSize} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
       </div>
 
       <SearchFilterModal
