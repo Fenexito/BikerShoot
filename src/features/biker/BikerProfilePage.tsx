@@ -113,7 +113,7 @@ export function BikerProfilePage() {
 
   if (isLoading || !profile) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-16 font-flat">
+      <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
         <Skeleton className="h-8 w-40" />
         <div className="mt-8 flex items-center gap-4">
           <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
@@ -129,7 +129,7 @@ export function BikerProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-16 font-flat">
+    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
       <div className="mb-10 flex items-center gap-5">
         <InitialsAvatar name={profile.display_name || 'B'} className="h-20 w-20 rounded-full bg-primary text-2xl text-white" />
         <div>

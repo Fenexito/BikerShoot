@@ -3,15 +3,17 @@ import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useFeaturedEventPhotos } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
 import { EventCard } from './components/EventCard'
-import { FancySelect } from '../../ui/shared/FancySelect'
+import { EventsFilterModal } from './components/EventsFilterModal'
 import { FilterBar, type FilterOption } from '../../ui/shared/FilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
-import { IconSearch } from '../../ui/shared/icons'
+import { IconSearch, IconFilter } from '../../ui/shared/icons'
+import { cn } from '../../lib/cn'
 import type { DbPhoto } from '../../types/db'
+import type { PublicEvent } from './usePublicData'
 
-type EventGroup = 'rodada' | 'evento'
+type EventGroup = 'rodada' | 'evento' | ''
 
 // Las tabs de la fila cambian según qué pastilla (Rodada/Evento) está
 // activa — Rodada filtra por ruta específica, Evento por tipo (Autódromo/
@@ -23,10 +25,49 @@ const EVENT_TYPE_TABS: FilterOption[] = [
   { value: 'Pista', label: 'Autódromo' },
   { value: 'Sesión de Fotos', label: 'Sesión de fotos' },
 ]
-const SORTS: { value: string; label: string }[] = [
-  { value: 'recientes', label: 'Más recientes' },
-  { value: 'proximos', label: 'Próximamente' },
-]
+
+function monthKey(iso: string) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthLabel(iso: string) {
+  const label = new Date(iso).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+/** Un mes de eventos — colapsable, mismo espíritu que las categorías de
+ * estado en Pedidos de Studio (ahí por estado; aquí por mes, ya que un
+ * biker navegando eventos quiere ver los recientes/próximos de un
+ * vistazo y poder ocultar los ya pasados sin perder acceso a ellos). */
+function MonthSection({ label, events, photosByEvent, defaultOpen }: {
+  label: string
+  events: PublicEvent[]
+  photosByEvent: Map<string, DbPhoto[]>
+  defaultOpen: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div>
+      <button onClick={() => setOpen((o) => !o)} className="mb-4 flex w-full items-center justify-between gap-2 text-left">
+        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          {label}
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{events.length}</span>
+        </h2>
+        <span className={cn('text-xs text-muted-foreground transition-transform', open && 'rotate-180')}>▾</span>
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {events.map((event, i) => (
+            <div key={event.id} className="animate-[fade-in-up_.4s_ease-out_backwards]" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+              <EventCard event={event} photos={photosByEvent.get(event.id)} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Con 100+ eventos previstos, filtrar solo con selects sueltos no
  * alcanza — la barra de filtros vive en el header interactivo una vez que
@@ -39,7 +80,12 @@ export function Events() {
   const { data: featuredPhotos = [] } = useFeaturedEventPhotos()
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState('')
-  const group = (searchParams.get('tipo') as EventGroup | null) ?? 'rodada'
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  // Sin valor por defecto a propósito — la pastilla arranca sin selección
+  // (ver el estado del botón en FilterBar) y solo cambia entre Rodada/
+  // Evento desde que el usuario elige una vez; no hay forma de volver al
+  // estado "sin selección" salvo recargar la página.
+  const group = (searchParams.get('tipo') as EventGroup | null) ?? ''
   const city = searchParams.get('ciudad') ?? ''
   const category = searchParams.get('categoria') ?? ''
   const routeId = searchParams.get('ruta') ?? ''
@@ -55,8 +101,6 @@ export function Events() {
   }
 
   function setGroup(next: string) {
-    // Cambiar de pastilla resetea ruta/categoría — son sub-filtros del
-    // grupo anterior, no tendría sentido conservarlos.
     const params = new URLSearchParams(searchParams)
     params.set('tipo', next)
     params.delete('ruta')
@@ -83,7 +127,7 @@ export function Events() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return [...events]
-      .filter((e) => (group === 'rodada' ? e.category === 'Rodada' : e.category !== 'Rodada'))
+      .filter((e) => (group === 'rodada' ? e.category === 'Rodada' : group === 'evento' ? e.category !== 'Rodada' : true))
       .filter((e) => (city ? e.city === city : true))
       .filter((e) => (group === 'evento' && category ? e.category === category : true))
       .filter((e) => (photographerId ? e.photographer_id === photographerId : true))
@@ -93,6 +137,20 @@ export function Events() {
         sort === 'proximos' ? +new Date(a.event_date) - +new Date(b.event_date) : +new Date(b.event_date) - +new Date(a.event_date),
       )
   }, [events, group, city, category, routeId, photographerId, sort, query])
+
+  const months = useMemo(() => {
+    const map = new Map<string, PublicEvent[]>()
+    for (const e of filtered) {
+      const key = monthKey(e.event_date)
+      const list = map.get(key) ?? []
+      list.push(e)
+      map.set(key, list)
+    }
+    const now = monthKey(new Date().toISOString())
+    return [...map.entries()]
+      .sort((a, b) => (sort === 'proximos' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0])))
+      .map(([key, list]) => ({ key, label: monthLabel(list[0].event_date), events: list, isPast: key < now }))
+  }, [filtered, sort])
 
   const activeFilterCount = [city, photographerId].filter(Boolean).length
 
@@ -116,64 +174,47 @@ export function Events() {
         {filtered.length} eventos · descubre rodadas, pistas y sesiones cerca de ti
       </p>
 
-      <FilterBar
-        className="mb-6"
-        searchValue={query}
-        onSearchChange={setQuery}
-        searchPlaceholder="Buscar evento o ciudad…"
-        segments={[
-          { value: 'rodada', label: 'Rodada' },
-          { value: 'evento', label: 'Evento' },
-        ]}
-        segmentValue={group}
-        onSegmentChange={setGroup}
-        tabs={group === 'rodada' ? ROUTE_TABS : EVENT_TYPE_TABS}
-        tabValue={group === 'rodada' ? routeId : category}
-        onTabChange={(v) => setParam(group === 'rodada' ? 'ruta' : 'categoria', v || undefined)}
-      />
-
-      <div className="mb-8 flex flex-wrap items-center gap-3">
-        <div className="flex gap-5 border-b border-border">
-          {SORTS.map((s) => (
-            <button
-              key={s.value}
-              onClick={() => setParam('orden', s.value === 'recientes' ? undefined : s.value)}
-              className={`border-b-2 pb-3 text-sm font-semibold transition-colors ${sort === s.value ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <FancySelect
-          value={city}
-          onChange={(v) => setParam('ciudad', v || undefined)}
-          options={CITIES.map((c) => ({ value: c, label: c }))}
-          placeholder="Toda ciudad"
-          className="w-40"
+      <div className="mb-8 flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <FilterBar
+          className="!border-none flex-1 !pb-0"
+          searchValue={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Buscar evento o ciudad…"
+          segments={[
+            { value: 'rodada', label: 'Rodada' },
+            { value: 'evento', label: 'Evento' },
+          ]}
+          segmentValue={group}
+          onSegmentChange={setGroup}
+          tabs={group === 'rodada' ? ROUTE_TABS : group === 'evento' ? EVENT_TYPE_TABS : []}
+          tabValue={group === 'rodada' ? routeId : category}
+          onTabChange={(v) => setParam(group === 'rodada' ? 'ruta' : 'categoria', v || undefined)}
         />
-        {photographers.length > 0 && (
-          <FancySelect
-            value={photographerId}
-            onChange={(v) => setParam('fotografo', v || undefined)}
-            options={photographers.map((p) => ({ value: p.id, label: p.display_name }))}
-            placeholder="Todo fotógrafo"
-            className="w-48"
-          />
-        )}
-        {activeFilterCount > 0 && (
-          <button
-            onClick={() => {
-              const next = new URLSearchParams(searchParams)
-              next.delete('ciudad')
-              next.delete('fotografo')
-              setSearchParams(next, { replace: true })
-            }}
-            className="text-sm font-medium text-muted-foreground underline"
-          >
-            Limpiar filtros
-          </button>
-        )}
+        <button
+          onClick={() => setFiltersOpen(true)}
+          className="flex shrink-0 items-center gap-2 self-start rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted sm:self-auto"
+        >
+          <IconFilter className="h-4 w-4" />
+          Filtros
+          {activeFilterCount > 0 && (
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
+
+      <EventsFilterModal
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        cityOptions={CITIES.map((c) => ({ value: c, label: c }))}
+        photographerOptions={photographers.map((p) => ({ value: p.id, label: p.display_name }))}
+        city={city}
+        photographerId={photographerId}
+        sort={sort}
+        onChange={(key, value) => setParam(key, value)}
+        resultCount={filtered.length}
+      />
 
       {isLoading && <SkeletonGrid count={6} className="sm:grid-cols-2 lg:grid-cols-3" />}
 
@@ -186,11 +227,9 @@ export function Events() {
       )}
 
       {!isLoading && filtered.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((event, i) => (
-            <div key={event.id} className="animate-[fade-in-up_.4s_ease-out_backwards]" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-              <EventCard event={event} photos={photosByEvent.get(event.id)} />
-            </div>
+        <div className="flex flex-col gap-8">
+          {months.map((month) => (
+            <MonthSection key={month.key} label={month.label} events={month.events} photosByEvent={photosByEvent} defaultOpen={!month.isPast} />
           ))}
         </div>
       )}

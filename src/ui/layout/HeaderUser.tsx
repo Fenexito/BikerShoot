@@ -15,12 +15,16 @@ import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { BikerSearchModal } from '../../features/biker/components/BikerSearchModal'
 import { cn } from '../../lib/cn'
 
+// "Mis compras" ya NO vive aquí — vive únicamente en el menú de perfil
+// (ver `sections` de `ProfileMenu` más abajo). Con el buscador incrustado
+// y el botón de favoritos/carrito/notificaciones, el header ya tenía
+// demasiados accesos compitiendo por espacio — el usuario pidió dejar
+// solo estos 4 en la barra de navegación.
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
   { to: '/app/mapa', label: 'Mapa' },
   { to: '/app/eventos', label: 'Eventos' },
   { to: '/app/fotografos', label: 'Fotógrafos' },
-  { to: '/app/historial', label: 'Mis compras' },
 ]
 
 export function HeaderUser() {
