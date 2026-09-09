@@ -148,7 +148,7 @@ export function EventDetail() {
     <div className="pb-24 font-flat">
       {coverUrl ? (
         <ScrollExpand
-          className="-mt-[4.75rem] md:mt-0"
+          className="-mt-[4.75rem] md:-mt-20"
           src={coverUrl}
           alt={event.title}
           title={event.title}

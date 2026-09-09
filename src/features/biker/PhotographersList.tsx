@@ -4,10 +4,13 @@ import { useApprovedPhotographers, usePublicEvents, useFeaturedEventPhotos } fro
 import { PhotoCarousel } from './components/PhotoCarousel'
 import { previewUrl, r2Url } from '../../lib/r2'
 import { FancySelect } from '../../ui/shared/FancySelect'
+import { FilterBar } from '../../ui/shared/FilterBar'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
-import { IconVerified } from '../../ui/shared/icons'
+import { IconVerified, IconSearch } from '../../ui/shared/icons'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
+import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
+import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import type { DbPhoto, DbPhotographer } from '../../types/db'
 import { cn } from '../../lib/cn'
 
@@ -129,6 +132,8 @@ export function PhotographersList() {
   const { data: featuredPhotos = [] } = useFeaturedEventPhotos()
   const [city, setCity] = useState('')
   const [sort, setSort] = useState('popular')
+  const [query, setQuery] = useState('')
+  const scrolledPast = useScrolledPast(160)
 
   const CITIES = useMemo(() => Array.from(new Set(photographers.map((p) => p.city).filter(Boolean))) as string[], [photographers])
 
@@ -149,14 +154,30 @@ export function PhotographersList() {
   }, [featuredPhotos])
 
   const filtered = useMemo(() => {
-    let list = photographers.filter((p) => (city ? p.city === city : true))
+    const q = query.trim().toLowerCase()
+    let list = photographers
+      .filter((p) => (city ? p.city === city : true))
+      .filter((p) => (q ? p.display_name.toLowerCase().includes(q) : true))
     list = [...list].sort((a, b) =>
       sort === 'az'
         ? a.display_name.localeCompare(b.display_name)
         : (eventCounts.get(b.id) ?? 0) - (eventCounts.get(a.id) ?? 0),
     )
     return list
-  }, [photographers, city, sort, eventCounts])
+  }, [photographers, city, sort, query, eventCounts])
+
+  useHeaderTransform(
+    <div className="flex w-full min-w-0 items-center gap-2 rounded-full bg-muted px-4 py-2">
+      <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Buscar fotógrafo…"
+        className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+      />
+    </div>,
+    scrolledPast,
+  )
 
   const spotlight = useMemo(() => {
     const candidates = [...photographers]
@@ -185,25 +206,22 @@ export function PhotographersList() {
       )}
 
       {!isLoading && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-6 border-b border-border">
-            {SORTS.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => setSort(s.value)}
-                className={cn(
-                  'border-b-2 pb-3 text-sm font-semibold transition-colors',
-                  sort === s.value ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+        <>
+          <FilterBar
+            className="mb-4"
+            searchValue={query}
+            onSearchChange={setQuery}
+            searchPlaceholder="Buscar fotógrafo…"
+            tabs={SORTS}
+            tabValue={sort}
+            onTabChange={setSort}
+          />
           {CITIES.length > 0 && (
-            <FancySelect value={city} onChange={setCity} options={CITIES.map((c) => ({ value: c, label: c }))} placeholder="Toda ciudad" className="w-48" />
+            <div className="mb-6">
+              <FancySelect value={city} onChange={setCity} options={CITIES.map((c) => ({ value: c, label: c }))} placeholder="Toda ciudad" className="w-48" />
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {!isLoading && filtered.length === 0 && (

@@ -9,7 +9,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
-import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
+import { FilterBar } from '../../ui/shared/FilterBar'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
@@ -266,12 +266,12 @@ export function StudioOrders() {
         </div>
       </div>
 
-      {/* Mismo StudioFilterBar en todas las resoluciones (igual que
+      {/* Mismo FilterBar en todas las resoluciones (igual que
           Eventos) — antes móvil tenía un botón+modal aparte, que se veía y
           se sentía distinto a la barra de escritorio. Todas las opciones
           en una sola fila de pestañas (ya no switch + tabs por separado). */}
       <div className="mt-8">
-        <StudioFilterBar
+        <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
           tabs={[

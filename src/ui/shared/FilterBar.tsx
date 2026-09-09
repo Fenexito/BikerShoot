@@ -1,12 +1,12 @@
-import { IconSearch } from '../shared/icons'
+import { IconSearch } from './icons'
 import { cn } from '../../lib/cn'
 
-export interface StudioFilterOption {
+export interface FilterOption {
   value: string
   label: string
 }
 
-interface StudioFilterBarProps {
+interface FilterBarProps {
   /** Pestañas de texto subrayado (mismo lenguaje visual que Configuración
    * y el editor de evento) — TODAS las opciones de filtro viven aquí, en
    * una sola fila. Antes había un switch de 2 estados aparte para las 2
@@ -16,7 +16,7 @@ interface StudioFilterBarProps {
    * y Eventos se sentían inconsistentes entre sí. Ahora cada página pasa
    * UNA sola lista con todas sus opciones (ej. Todos/Activos/Pausados/
    * Cerrados), sin distinción de cuáles son "principales". */
-  tabs: StudioFilterOption[]
+  tabs: FilterOption[]
   tabValue?: string | null
   onTabChange: (value: string) => void
   searchValue: string
@@ -26,14 +26,18 @@ interface StudioFilterBarProps {
 }
 
 /** Barra de búsqueda + filtros reutilizable — justo debajo del título de la
- * página y antes de cualquier tarjeta/lista. Mismo componente en Eventos,
- * Pedidos, Fotógrafos, etc.
+ * página y antes de cualquier tarjeta/lista. Portal-agnóstica a propósito
+ * (vivía en `ui/studio/` como `StudioFilterBar`, movida a `ui/shared/`
+ * cuando el biker también la necesitó — Eventos/Pedidos en Studio,
+ * Eventos/Fotógrafos en biker): no usa ningún color de acento fijo, solo
+ * tokens semánticos (`border-foreground`, `bg-muted`, etc.) que ya cambian
+ * solos según el tema del portal activo.
  * En móvil, las pestañas viven en su PROPIA fila que scrollea
  * horizontalmente (igual que la pestaña de Configuración en angosto) en
  * vez de envolver línea por línea. El buscador baja a su propia fila
  * completa en móvil, y solo se junta a la derecha de esa fila desde `sm:`
  * en adelante donde ya cabe cómodo. */
-export function StudioFilterBar({
+export function FilterBar({
   tabs,
   tabValue,
   onTabChange,
@@ -41,7 +45,7 @@ export function StudioFilterBar({
   onSearchChange,
   searchPlaceholder = 'Buscar',
   className,
-}: StudioFilterBarProps) {
+}: FilterBarProps) {
   return (
     <div className={cn('flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center', className)}>
       <nav className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto sm:gap-5">

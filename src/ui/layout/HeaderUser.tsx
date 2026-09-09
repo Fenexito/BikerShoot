@@ -12,6 +12,7 @@ import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
+import { BikerSearchModal } from '../../features/biker/components/BikerSearchModal'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -29,6 +30,7 @@ export function HeaderUser() {
   const itemCount = useCartStore((s) => s.items.length)
   const [signingOut, setSigningOut] = useState(false)
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -51,8 +53,8 @@ export function HeaderUser() {
   // Igual que en HeaderStudio: si la página actual registró contenido y
   // señaló que ya toca mostrarlo (ver useHeaderTransform), el nav +
   // buscador genérico ceden su lugar a las herramientas propias de esa
-  // página. (El lado biker todavía no tiene ninguna página conectada a esto
-  // — placeholder listo para cuando se diseñe esa parte.)
+  // página — Search.tsx, Events.tsx, PhotographersList.tsx y RouteMap.tsx
+  // ya lo usan.
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
   const transformed = transformActive && transformContent != null
@@ -74,8 +76,15 @@ export function HeaderUser() {
           <div className="relative hidden h-11 flex-1 items-center md:flex">
             <div
               className={cn(
-                'flex w-full items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-                transformed ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'translate-y-0 opacity-100',
+                // Igual que en HeaderStudio: este bloque completo (nav +
+                // buscador) ya vive dentro de un contenedor `hidden md:flex`
+                // (línea de arriba), así que en la práctica este
+                // desvanecimiento solo puede aplicar desde md: — pero se
+                // deja el mismo prefijo `md:` explícito que en HeaderStudio
+                // por si el contenedor padre alguna vez deja de ocultarlo
+                // en móvil, para no reintroducir el bug del header vacío.
+                'flex w-full translate-y-0 items-center opacity-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                transformed && 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0',
               )}
             >
               <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
@@ -117,6 +126,14 @@ export function HeaderUser() {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:gap-2">
+            <button
+              onClick={() => setSearchOpen(true)}
+              aria-label="Buscar en tus pedidos, eventos, fotógrafos y rutas"
+              title="Buscar"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+            >
+              <IconSearch className="h-5 w-5" />
+            </button>
             <Link
               to="/app/favoritos"
               aria-label="Favoritos"
@@ -171,6 +188,8 @@ export function HeaderUser() {
           </div>
         </header>
       </div>
+
+      <BikerSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <MobileBottomNav
         items={[

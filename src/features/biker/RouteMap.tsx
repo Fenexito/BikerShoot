@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -7,6 +7,7 @@ import { useMapPoints, pointMatchesTime } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/flat/Button'
+import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import type { MapPoint } from './usePublicData'
 
 const GUATEMALA_CENTER: [number, number] = [14.6349, -90.5069]
@@ -48,9 +49,20 @@ function FlyToPoints({ points }: { points: MapPoint[] }) {
 export function RouteMap() {
   const { data: points = [] } = useMapPoints()
   const { data: routes = [] } = useRoutes()
-  const [routeId, setRouteId] = useState('')
+  const [searchParams] = useSearchParams()
+  const [routeId, setRouteId] = useState(searchParams.get('ruta') ?? '')
   const [city, setCity] = useState('')
   const [timePreset, setTimePreset] = useState(0)
+
+  // Llegar aquí desde un resultado de búsqueda (BikerSearchModal) trae la
+  // ruta ya elegida en la URL — sincroniza el select si cambia sin que el
+  // componente se remonte (ej. navegar de una ruta a otra desde el modal
+  // sin salir de /app/mapa).
+  useEffect(() => {
+    const fromUrl = searchParams.get('ruta')
+    if (fromUrl) setRouteId(fromUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('ruta')])
 
   const preset = TIME_PRESETS[timePreset]
   const routeFilteredPoints = routeId ? points.filter((p) => p.route_point?.route_id === routeId) : points
@@ -59,6 +71,21 @@ export function RouteMap() {
   const cityFilteredPoints = city ? routeFilteredPoints.filter((p) => p.event?.city === city) : routeFilteredPoints
   const activePoints = cityFilteredPoints.filter((p) => pointMatchesTime(p, preset.after, preset.before))
   const activeIds = new Set(activePoints.map((p) => p.id))
+  const routeName = routeId ? routes.find((r) => r.id === routeId)?.name : null
+
+  // El mapa no tiene scroll de página (es un lienzo de altura fija), así
+  // que el header se transforma SIEMPRE que se está en esta vista — no
+  // reemplaza el panel flotante (donde de verdad se editan los filtros),
+  // solo muestra un resumen compacto de qué se está viendo, consistente
+  // con el resto de páginas que sí usan el header interactivo.
+  useHeaderTransform(
+    <p className="min-w-0 truncate text-sm font-semibold text-foreground">
+      {routeName ?? 'Todas las rutas'}
+      {city ? ` · ${city}` : ''}
+      <span className="ml-2 font-normal text-muted-foreground">{activePoints.length} de {cityFilteredPoints.length} puntos</span>
+    </p>,
+    true,
+  )
 
   return (
     <div className="relative font-flat" style={{ height: 'calc(100dvh - 64px)' }}>

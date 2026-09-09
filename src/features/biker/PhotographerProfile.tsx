@@ -60,7 +60,7 @@ export function PhotographerProfile() {
     <div className="font-flat">
       {coverUrl ? (
         <ScrollExpand
-          className="-mt-[4.75rem] md:mt-0"
+          className="-mt-[4.75rem] md:-mt-20"
           src={coverUrl}
           alt={photographer.display_name}
           title={photographer.logo_path ? undefined : photographer.display_name}
@@ -126,7 +126,7 @@ export function PhotographerProfile() {
           )}
         </div>
 
-        <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-border bg-card px-6 py-3">
+        <div className="animate-stat-in mt-8 inline-flex items-center gap-3 rounded-full border border-border bg-card px-6 py-3">
           <p className="text-2xl font-bold">{events.length}</p>
           <p className="text-sm text-muted-foreground">evento{events.length === 1 ? '' : 's'} cubierto{events.length === 1 ? '' : 's'}</p>
         </div>
@@ -175,7 +175,7 @@ export function PhotographerProfile() {
           )}
         </div>
 
-        <div className="py-8">
+        <div key={tab} className="animate-tab-in py-8">
           {tab === 'fotos' ? (
             galleryLayout === 'muro' ? (
               featuredPhotos.length === 0 ? (
@@ -212,8 +212,10 @@ export function PhotographerProfile() {
             )
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => (
-                <EventCard key={event.id} event={event} />
+              {events.map((event, i) => (
+                <div key={event.id} className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
+                  <EventCard event={event} />
+                </div>
               ))}
             </div>
           )}

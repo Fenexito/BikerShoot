@@ -5,6 +5,7 @@ import { r2Url } from '../../../lib/r2'
 import { EVENT_STATUS_STYLE } from '../../../lib/eventStatus'
 import { Badge } from '../../../ui/studio/Badge'
 import { StatusPill } from '../../../ui/shared/StatusPill'
+import { EventCoverMedia } from '../../../ui/shared/EventCoverMedia'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import type { MyEvent } from '../useMyEvents'
 import type { EventStatus } from '../../../types/db'
@@ -34,29 +35,18 @@ export function StudioEventCard({ event, photographerId }: { event: MyEvent; pho
   return (
     <div className="group overflow-hidden rounded-3xl border border-border transition-all duration-300 hover:-translate-y-1 hover:border-border-hover hover:shadow-xl">
       <Link to={`/studio/eventos/${event.id}`} className="block">
-        <div className="relative flex h-56 items-center justify-center overflow-hidden bg-muted">
-          {event.cover_path ? (
-            <img
-              src={r2Url(event.cover_path)}
-              alt=""
-              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
-            />
-          ) : (
-            <span className="text-3xl opacity-30">📷</span>
-          )}
-          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <div className="absolute left-3 top-3">
-            <Badge className="border-white/20 bg-black/70 text-white">{event.category}</Badge>
-          </div>
-          <div className="absolute right-3 top-3">
+        <EventCoverMedia
+          coverUrl={event.cover_path ? r2Url(event.cover_path) : null}
+          categorySlot={<Badge className="border-white/20 bg-black/70 text-white">{event.category}</Badge>}
+          statusSlot={
             <StatusPill
               dot={statusStyle.dot}
               text={statusStyle.text}
               label={statusStyle.label}
               className="rounded-full bg-black/70 px-2.5 py-1 text-[10px] uppercase tracking-wide"
             />
-          </div>
-        </div>
+          }
+        />
         <div className="px-5 pt-5">
           <h3 className="font-studio text-lg font-bold">{event.title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">

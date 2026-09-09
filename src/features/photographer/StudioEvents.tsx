@@ -5,7 +5,7 @@ import { useMyEvents } from './useMyEvents'
 import { StudioEventCard } from './components/StudioEventCard'
 import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
-import { StudioFilterBar } from '../../ui/studio/StudioFilterBar'
+import { FilterBar } from '../../ui/shared/FilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
 
 type EventStatusFilter = 'todos' | 'activo' | 'pausado' | 'cerrado'
@@ -55,7 +55,7 @@ export function StudioEvents() {
       </div>
 
       {events && events.length > 0 && (
-        <StudioFilterBar
+        <FilterBar
           className="mb-8"
           searchValue={query}
           onSearchChange={setQuery}
