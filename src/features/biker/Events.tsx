@@ -8,7 +8,7 @@ import { FilterBar, type FilterOption } from '../../ui/shared/FilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
-import { IconSearch, IconFilter } from '../../ui/shared/icons'
+import { IconFilter } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 import type { DbPhoto } from '../../types/db'
 import type { PublicEvent } from './usePublicData'
@@ -154,32 +154,25 @@ export function Events() {
 
   const activeFilterCount = [city, photographerId].filter(Boolean).length
 
-  useHeaderTransform(
-    <div className="flex w-full min-w-0 items-center gap-2 rounded-full bg-muted px-4 py-2">
-      <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar evento o ciudad…"
-        className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-      />
-    </div>,
-    scrolledPast,
-  )
-
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
-      <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Eventos</h1>
-      <p className="mb-6 text-muted-foreground">
-        {filtered.length} eventos · descubre rodadas, pistas y sesiones cerca de ti
-      </p>
-
-      <div className="mb-8 flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+  // Mismo bloque (pastilla + tabs + botón Filtros) tanto en la página como
+  // en el header transformado — se registra tal cual una vez que se hizo
+  // scroll, igual que en Studio, para que el filtro principal siga
+  // alcanzable sin volver arriba. Solo uno de los dos está realmente
+  // visible en un momento dado (el de la página desaparece de la vista al
+  // scrollear lo suficiente para que el header se transforme). En el
+  // header se oculta el buscador propio del FilterBar (`hideSearch`) — el
+  // disparador de búsqueda global ya vive justo al lado ahí, no hace
+  // falta un segundo campo de texto compitiendo por el mismo espacio
+  // angosto.
+  function renderFilterRow(hideSearch: boolean) {
+    return (
+      <div className="flex w-full min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         <FilterBar
-          className="!border-none flex-1 !pb-0"
+          className="!border-none min-w-0 flex-1 !pb-0"
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Buscar evento o ciudad…"
+          hideSearch={hideSearch}
           segments={[
             { value: 'rodada', label: 'Rodada' },
             { value: 'evento', label: 'Evento' },
@@ -192,10 +185,10 @@ export function Events() {
         />
         <button
           onClick={() => setFiltersOpen(true)}
-          className="flex shrink-0 items-center gap-2 self-start rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted sm:self-auto"
+          className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
         >
           <IconFilter className="h-4 w-4" />
-          Filtros
+          <span className="hidden lg:inline">Filtros</span>
           {activeFilterCount > 0 && (
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
               {activeFilterCount}
@@ -203,6 +196,19 @@ export function Events() {
           )}
         </button>
       </div>
+    )
+  }
+
+  useHeaderTransform(renderFilterRow(true), scrolledPast)
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+      <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Eventos</h1>
+      <p className="mb-6 text-muted-foreground">
+        {filtered.length} eventos · descubre rodadas, pistas y sesiones cerca de ti
+      </p>
+
+      <div className="mb-8 border-b border-border pb-4">{renderFilterRow(false)}</div>
 
       <EventsFilterModal
         open={filtersOpen}

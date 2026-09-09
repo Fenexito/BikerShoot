@@ -28,6 +28,11 @@ interface FilterBarProps {
   searchValue: string
   onSearchChange: (value: string) => void
   searchPlaceholder?: string
+  /** Oculta el buscador propio de la barra — útil cuando este FilterBar se
+   * reutiliza junto a OTRO buscador ya visible al lado (ej. el disparador
+   * de búsqueda global del header transformado), para no duplicar el
+   * campo ni competir por el mismo espacio angosto. */
+  hideSearch?: boolean
   className?: string
 }
 
@@ -52,6 +57,7 @@ export function FilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Buscar',
+  hideSearch = false,
   className,
 }: FilterBarProps) {
   return (
@@ -96,15 +102,17 @@ export function FilterBar({
 
       {/* Buscador — propia fila completa en móvil, pegado al borde derecho
           desde `sm:` en adelante. */}
-      <div className="flex w-full shrink-0 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:w-auto sm:min-w-[220px]">
-        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-      </div>
+      {!hideSearch && (
+        <div className="flex w-full shrink-0 items-center gap-2 rounded-full bg-muted px-4 py-2 sm:w-auto sm:min-w-[220px]">
+          <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+      )}
     </div>
   )
 }

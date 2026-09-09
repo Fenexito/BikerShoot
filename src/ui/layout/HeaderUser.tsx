@@ -16,10 +16,7 @@ import { BikerSearchModal } from '../../features/biker/components/BikerSearchMod
 import { cn } from '../../lib/cn'
 
 // "Mis compras" ya NO vive aquí — vive únicamente en el menú de perfil
-// (ver `sections` de `ProfileMenu` más abajo). Con el buscador incrustado
-// y el botón de favoritos/carrito/notificaciones, el header ya tenía
-// demasiados accesos compitiendo por espacio — el usuario pidió dejar
-// solo estos 4 en la barra de navegación.
+// (ver `sections` de `ProfileMenu` más abajo).
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
   { to: '/app/mapa', label: 'Mapa' },
@@ -48,11 +45,14 @@ export function HeaderUser() {
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
   const hidden = useAutoHideHeader()
 
-  // Igual que en HeaderStudio: si la página actual registró contenido y
-  // señaló que ya toca mostrarlo (ver useHeaderTransform), el nav +
-  // buscador genérico ceden su lugar a las herramientas propias de esa
-  // página — Search.tsx, Events.tsx, PhotographersList.tsx y RouteMap.tsx
-  // ya lo usan.
+  // Mismo mecanismo que HeaderStudio: si la página actual registró
+  // contenido y señaló que ya toca mostrarlo (useHeaderTransform), TODO lo
+  // que hay a la derecha del botón atrás (logo, nav, buscar, favoritos,
+  // carrito, notificaciones, perfil) cede su lugar a las herramientas
+  // propias de esa página, con un crossfade — el header nunca cambia de
+  // tamaño ni posición, solo lo que hay adentro. Solo aplica en escritorio
+  // (capa transformada `hidden md:flex`) — en móvil este mecanismo no
+  // existe, la capa normal se queda siempre visible.
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
   const transformed = transformActive && transformContent != null
@@ -67,25 +67,21 @@ export function HeaderUser() {
       >
         <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background/90 px-3 shadow-sm backdrop-blur-md md:gap-5 md:px-4">
           <HeaderBackSlot />
-          <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
-            MotoShots
-          </Link>
-
-          <div className="relative hidden h-11 flex-1 items-center md:flex">
+          <div className="relative h-11 min-w-0 flex-1">
+            {/* Capa normal: logo + nav + buscar/favoritos/carrito/
+                notificaciones/perfil — sigue mostrándose completa en
+                móvil (la transformación nunca aplica ahí), y en
+                escritorio se desvanece cuando `transformed`. */}
             <div
               className={cn(
-                // Igual que en HeaderStudio: este bloque completo (nav +
-                // buscador) ya vive dentro de un contenedor `hidden md:flex`
-                // (línea de arriba), así que en la práctica este
-                // desvanecimiento solo puede aplicar desde md: — pero se
-                // deja el mismo prefijo `md:` explícito que en HeaderStudio
-                // por si el contenedor padre alguna vez deja de ocultarlo
-                // en móvil, para no reintroducir el bug del header vacío.
-                'flex w-full translate-y-0 items-center opacity-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                'absolute inset-0 flex translate-y-0 items-center gap-3 opacity-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-5',
                 transformed && 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0',
               )}
             >
-              <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
+              <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
+                MotoShots
+              </Link>
+              <nav className="hidden flex-1 items-center gap-1 text-sm font-medium lg:flex">
                 {NAV_ITEMS.map((item) => (
                   <NavLink
                     key={item.to}
@@ -102,76 +98,90 @@ export function HeaderUser() {
                   </NavLink>
                 ))}
               </nav>
+              <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  aria-label="Buscar en tus pedidos, eventos, fotógrafos y rutas"
+                  title="Buscar"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+                >
+                  <IconSearch className="h-5 w-5" />
+                </button>
+                <Link
+                  to="/app/favoritos"
+                  aria-label="Favoritos"
+                  title="Favoritos"
+                  className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
+                >
+                  <IconBookmark className="h-5 w-5" />
+                </Link>
+                <Link
+                  to="/app/checkout"
+                  aria-label="Carrito"
+                  title="Carrito"
+                  className="relative hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border md:flex"
+                >
+                  <IconCart className="h-5 w-5" />
+                  {itemCount > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                      {itemCount}
+                    </span>
+                  )}
+                </Link>
+                <NotificationsMenu />
+                <div className="hidden md:block">
+                  <ProfileMenu
+                    name={profile?.display_name ?? 'Biker'}
+                    email={user?.email}
+                    avatar={
+                      avatarUrl ? (
+                        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <InitialsAvatar name={profile?.display_name ?? 'B'} className="h-full w-full bg-primary text-sm text-white" />
+                      )
+                    }
+                    editProfile={
+                      bikerDetails && (!bikerDetails.city || !bikerDetails.moto_brand)
+                        ? { label: 'Completar perfil', to: '/app/perfil' }
+                        : undefined
+                    }
+                    sections={[
+                      [
+                        { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
+                        { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-4 w-4" /> },
+                        { to: '/app/favoritos', label: 'Favoritos', icon: <IconBookmark className="h-4 w-4" /> },
+                      ],
+                      [
+                        { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
+                        { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+                      ],
+                    ]}
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Capa transformada: solo existe en el DOM a partir de md —
+                en móvil `hidden` la saca del todo, sin importar
+                `transformed`. La búsqueda global se queda disponible
+                aquí también (a la derecha, con forma de cuadro de
+                búsqueda), en el mismo lugar donde vivían buscar/
+                favoritos/carrito/notificaciones/perfil — nunca en medio
+                del contenido de la página. */}
             <div
               className={cn(
-                'absolute inset-0 flex items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                'absolute inset-0 hidden items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
                 transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-2.5 opacity-0',
               )}
             >
-              {transformContent}
-            </div>
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:gap-2">
-            <button
-              onClick={() => setSearchOpen(true)}
-              aria-label="Buscar en tus pedidos, eventos, fotógrafos y rutas"
-              title="Buscar"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-            >
-              <IconSearch className="h-5 w-5" />
-            </button>
-            <Link
-              to="/app/favoritos"
-              aria-label="Favoritos"
-              title="Favoritos"
-              className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
-            >
-              <IconBookmark className="h-5 w-5" />
-            </Link>
-            <Link
-              to="/app/checkout"
-              aria-label="Carrito"
-              title="Carrito"
-              className="relative hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border md:flex"
-            >
-              <IconCart className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                  {itemCount}
-                </span>
-              )}
-            </Link>
-            <NotificationsMenu />
-            <div className="hidden md:block">
-              <ProfileMenu
-                name={profile?.display_name ?? 'Biker'}
-                email={user?.email}
-                avatar={
-                  avatarUrl ? (
-                    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <InitialsAvatar name={profile?.display_name ?? 'B'} className="h-full w-full bg-primary text-sm text-white" />
-                  )
-                }
-                editProfile={
-                  bikerDetails && (!bikerDetails.city || !bikerDetails.moto_brand)
-                    ? { label: 'Completar perfil', to: '/app/perfil' }
-                    : undefined
-                }
-                sections={[
-                  [
-                    { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
-                    { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-4 w-4" /> },
-                    { to: '/app/favoritos', label: 'Favoritos', icon: <IconBookmark className="h-4 w-4" /> },
-                  ],
-                  [
-                    { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
-                    { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
-                  ],
-                ]}
-              />
+              <div className="min-w-0 flex-1">{transformContent}</div>
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
+              >
+                <IconSearch className="h-5 w-5 shrink-0" />
+                <span className="truncate">Buscar…</span>
+              </button>
             </div>
           </div>
         </header>
