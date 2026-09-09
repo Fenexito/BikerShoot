@@ -4,13 +4,19 @@ import type { DbPhoto } from '../../../types/db'
 import { Badge } from '../../../ui/flat/Badge'
 import { r2Url } from '../../../lib/r2'
 import { EventCoverMedia } from '../../../ui/shared/EventCoverMedia'
+import { IconUser } from '../../../ui/shared/icons'
 import { PhotoCarousel } from './PhotoCarousel'
 
 /** Misma tarjeta de evento que `StudioEventCard` (portal del fotógrafo) —
  * comparten el bloque de portada (`EventCoverMedia`: zoom de hover,
  * degradado, posición de insignias). El contenido de abajo es distinto
  * porque aquí lo relevante para un biker es quién cubre el evento y
- * cuánto cuesta, no la cantidad de puntos/fotos. */
+ * cuánto cuesta, no la cantidad de puntos/fotos.
+ * El fotógrafo aparece TANTO en un chip sobre la portada como en el
+ * bloque de abajo — a propósito: con muchos fotógrafos nombrando sus
+ * rodadas solo con la fecha, es fácil que dos eventos de fotógrafos
+ * distintos se llamen casi igual, así que quién lo cubre debe notarse de
+ * un vistazo, no solo al leer hasta el final de la tarjeta. */
 export function EventCard({ event, photos = [] }: { event: PublicEvent; photos?: DbPhoto[] }) {
   const date = new Date(event.event_date)
 
@@ -22,6 +28,12 @@ export function EventCard({ event, photos = [] }: { event: PublicEvent; photos?:
           placeholderIcon="🏍️"
           media={photos.length > 0 ? <PhotoCarousel photos={photos} /> : undefined}
           categorySlot={<Badge tone="dark">{event.category}</Badge>}
+          statusSlot={
+            <span className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white">
+              <IconUser className="h-3 w-3 shrink-0" />
+              <span className="truncate">{event.photographer?.display_name ?? 'Fotógrafo'}</span>
+            </span>
+          }
         />
         <div className="px-5 pb-5 pt-5">
           <h3 className="truncate text-lg font-bold">{event.title}</h3>

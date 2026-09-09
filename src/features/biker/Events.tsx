@@ -4,18 +4,24 @@ import { usePublicEvents, useApprovedPhotographers, useFeaturedEventPhotos } fro
 import { useRoutes } from '../shared/useRoutes'
 import { EventCard } from './components/EventCard'
 import { FancySelect } from '../../ui/shared/FancySelect'
-import { FilterBar } from '../../ui/shared/FilterBar'
+import { FilterBar, type FilterOption } from '../../ui/shared/FilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { IconSearch } from '../../ui/shared/icons'
 import type { DbPhoto } from '../../types/db'
 
-const CATEGORY_TABS = [
-  { value: '', label: 'Todas' },
-  { value: 'Rodada', label: 'Rodada' },
-  { value: 'Pista', label: 'Pista' },
-  { value: 'Sesión de Fotos', label: 'Sesión de Fotos' },
+type EventGroup = 'rodada' | 'evento'
+
+// Las tabs de la fila cambian según qué pastilla (Rodada/Evento) está
+// activa — Rodada filtra por ruta específica, Evento por tipo (Autódromo/
+// Sesión de fotos). Mismo patrón de dos niveles que Mobbin usa para
+// categorías con sub-filtros propios (a diferencia de Pedidos/Eventos de
+// Studio, aquí SÍ hay dos categorías realmente distintas entre sí).
+const EVENT_TYPE_TABS: FilterOption[] = [
+  { value: '', label: 'Todos' },
+  { value: 'Pista', label: 'Autódromo' },
+  { value: 'Sesión de Fotos', label: 'Sesión de fotos' },
 ]
 const SORTS: { value: string; label: string }[] = [
   { value: 'recientes', label: 'Más recientes' },
@@ -23,10 +29,9 @@ const SORTS: { value: string; label: string }[] = [
 ]
 
 /** Con 100+ eventos previstos, filtrar solo con selects sueltos no
- * alcanza — la barra de filtros (categoría + búsqueda libre por título/
- * ciudad) vive en el header interactivo una vez que el usuario hace
- * scroll más allá de la intro, para que siga alcanzable sin tener que
- * volver arriba. */
+ * alcanza — la barra de filtros vive en el header interactivo una vez que
+ * el usuario hace scroll más allá de la intro, para que siga alcanzable
+ * sin tener que volver arriba. */
 export function Events() {
   const { data: events = [], isLoading } = usePublicEvents()
   const { data: photographers = [] } = useApprovedPhotographers()
@@ -34,6 +39,7 @@ export function Events() {
   const { data: featuredPhotos = [] } = useFeaturedEventPhotos()
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState('')
+  const group = (searchParams.get('tipo') as EventGroup | null) ?? 'rodada'
   const city = searchParams.get('ciudad') ?? ''
   const category = searchParams.get('categoria') ?? ''
   const routeId = searchParams.get('ruta') ?? ''
@@ -48,7 +54,21 @@ export function Events() {
     setSearchParams(next, { replace: true })
   }
 
+  function setGroup(next: string) {
+    // Cambiar de pastilla resetea ruta/categoría — son sub-filtros del
+    // grupo anterior, no tendría sentido conservarlos.
+    const params = new URLSearchParams(searchParams)
+    params.set('tipo', next)
+    params.delete('ruta')
+    params.delete('categoria')
+    setSearchParams(params, { replace: true })
+  }
+
   const CITIES = useMemo(() => Array.from(new Set(events.map((e) => e.city))), [events])
+  const ROUTE_TABS: FilterOption[] = useMemo(
+    () => [{ value: '', label: 'Todas las rutas' }, ...routes.map((r) => ({ value: r.id, label: r.name }))],
+    [routes],
+  )
 
   const photosByEvent = useMemo(() => {
     const map = new Map<string, DbPhoto[]>()
@@ -63,17 +83,18 @@ export function Events() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return [...events]
+      .filter((e) => (group === 'rodada' ? e.category === 'Rodada' : e.category !== 'Rodada'))
       .filter((e) => (city ? e.city === city : true))
-      .filter((e) => (category ? e.category === category : true))
+      .filter((e) => (group === 'evento' && category ? e.category === category : true))
       .filter((e) => (photographerId ? e.photographer_id === photographerId : true))
-      .filter((e) => (routeId ? e.event_points.some((pt) => pt.route_point?.route_id === routeId) : true))
+      .filter((e) => (group === 'rodada' && routeId ? e.event_points.some((pt) => pt.route_point?.route_id === routeId) : true))
       .filter((e) => (q ? e.title.toLowerCase().includes(q) || e.city.toLowerCase().includes(q) : true))
       .sort((a, b) =>
         sort === 'proximos' ? +new Date(a.event_date) - +new Date(b.event_date) : +new Date(b.event_date) - +new Date(a.event_date),
       )
-  }, [events, city, category, routeId, photographerId, sort, query])
+  }, [events, group, city, category, routeId, photographerId, sort, query])
 
-  const activeFilterCount = [city, routeId, photographerId].filter(Boolean).length
+  const activeFilterCount = [city, photographerId].filter(Boolean).length
 
   useHeaderTransform(
     <div className="flex w-full min-w-0 items-center gap-2 rounded-full bg-muted px-4 py-2">
@@ -100,9 +121,15 @@ export function Events() {
         searchValue={query}
         onSearchChange={setQuery}
         searchPlaceholder="Buscar evento o ciudad…"
-        tabs={CATEGORY_TABS}
-        tabValue={category}
-        onTabChange={(v) => setParam('categoria', v || undefined)}
+        segments={[
+          { value: 'rodada', label: 'Rodada' },
+          { value: 'evento', label: 'Evento' },
+        ]}
+        segmentValue={group}
+        onSegmentChange={setGroup}
+        tabs={group === 'rodada' ? ROUTE_TABS : EVENT_TYPE_TABS}
+        tabValue={group === 'rodada' ? routeId : category}
+        onTabChange={(v) => setParam(group === 'rodada' ? 'ruta' : 'categoria', v || undefined)}
       />
 
       <div className="mb-8 flex flex-wrap items-center gap-3">
@@ -124,15 +151,6 @@ export function Events() {
           placeholder="Toda ciudad"
           className="w-40"
         />
-        {routes.length > 0 && (
-          <FancySelect
-            value={routeId}
-            onChange={(v) => setParam('ruta', v || undefined)}
-            options={routes.map((r) => ({ value: r.id, label: r.name }))}
-            placeholder="Toda ruta"
-            className="w-44"
-          />
-        )}
         {photographers.length > 0 && (
           <FancySelect
             value={photographerId}
@@ -144,7 +162,12 @@ export function Events() {
         )}
         {activeFilterCount > 0 && (
           <button
-            onClick={() => setSearchParams({}, { replace: true })}
+            onClick={() => {
+              const next = new URLSearchParams(searchParams)
+              next.delete('ciudad')
+              next.delete('fotografo')
+              setSearchParams(next, { replace: true })
+            }}
             className="text-sm font-medium text-muted-foreground underline"
           >
             Limpiar filtros

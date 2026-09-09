@@ -29,7 +29,6 @@ export function HeaderUser() {
   const navigate = useNavigate()
   const itemCount = useCartStore((s) => s.items.length)
   const [signingOut, setSigningOut] = useState(false)
-  const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
 
   async function handleSignOut() {
@@ -40,11 +39,6 @@ export function HeaderUser() {
     } finally {
       setSigningOut(false)
     }
-  }
-
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault()
-    navigate(query.trim() ? `/app/buscar?q=${encodeURIComponent(query.trim())}` : '/app/buscar')
   }
 
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
@@ -88,7 +82,7 @@ export function HeaderUser() {
               )}
             >
               <nav className="hidden shrink-0 items-center gap-1 text-sm font-medium lg:flex">
-                {NAV_ITEMS.slice(0, 4).map((item) => (
+                {NAV_ITEMS.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -104,16 +98,6 @@ export function HeaderUser() {
                   </NavLink>
                 ))}
               </nav>
-
-              <form onSubmit={submitSearch} className="ml-auto flex max-w-md flex-1 items-center gap-2 rounded-full bg-muted px-4">
-                <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar evento, fotógrafo, ciudad…"
-                  className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                />
-              </form>
             </div>
             <div
               className={cn(
