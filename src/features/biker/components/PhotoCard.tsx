@@ -1,9 +1,11 @@
+import { useRef } from 'react'
 import type { DbPhoto } from '../../../types/db'
 import { previewUrl } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { timeAgo } from '../../../lib/timeAgo'
-import { IconBookmark } from '../../../ui/shared/icons'
+import { flyToCart } from '../../../lib/flyToCart'
+import { IconBookmark, IconCart } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 
 interface PhotoCardProps {
@@ -12,27 +14,67 @@ interface PhotoCardProps {
   photographerName: string
   onOpen: () => void
   layout?: 'grid' | 'mosaic'
+  /** Tamaño actual de la miniatura (px) — con marcos chicos (grilla densa)
+   * la etiqueta de frescura ("hace 2h") ocupa demasiado espacio relativo a
+   * la foto, así que se oculta por debajo de cierto tamaño. */
+  tileSize?: number
 }
+
+const FRESHNESS_MIN_TILE_SIZE = 170
 
 /** Foto limpia por defecto — toda la info (precio, favorito, carrito,
  * fotógrafo) solo aparece al pasar el cursor, como en la referencia. */
-export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout = 'grid' }: PhotoCardProps) {
+export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout = 'grid', tileSize = 220 }: PhotoCardProps) {
   const inCart = useCartStore((s) => s.has(photo.id))
   const add = useCartStore((s) => s.add)
   const remove = useCartStore((s) => s.remove)
   const isFavorite = useFavoritesStore((s) => s.has(photo.id))
   const toggleFavorite = useFavoritesStore((s) => s.toggle)
   const freshness = timeAgo(photo.created_at)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  function handleAddClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (inCart) {
+      remove(photo.id)
+      return
+    }
+    add({
+      photoId: photo.id,
+      eventId: photo.event_id,
+      eventTitle,
+      photographerId: photo.photographer_id,
+      photographerName,
+      price: photo.price,
+      storagePath: photo.storage_path,
+      previewPath: photo.preview_path,
+    })
+    // Puramente decorativo (prueba pedida explícitamente) — no afecta el
+    // carrito en sí, que ya se actualizó arriba.
+    if (imgRef.current) flyToCart(imgRef.current.getBoundingClientRect(), previewUrl(photo))
+  }
 
   return (
-    <div className={cn('group relative overflow-hidden rounded-2xl bg-muted', layout === 'mosaic' && 'mb-3 break-inside-avoid')}>
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-2xl bg-muted transition-shadow',
+        layout === 'mosaic' && 'mb-3 break-inside-avoid',
+        // Borde azul persistente en fotos ya agregadas al carrito — visible
+        // incluso sin pasar el cursor encima, para que al reiniciar o
+        // repetir una búsqueda el usuario sepa de un vistazo cuáles ya
+        // eligió sin tener que abrir el carrito a comparar.
+        inCart && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-background',
+      )}
+    >
       <button onClick={onOpen} className="block w-full">
         <img
+          ref={imgRef}
           src={previewUrl(photo)}
           alt={`Foto de ${eventTitle}`}
           loading="lazy"
           className={cn(
-            'w-full object-cover transition-transform duration-500 group-hover:scale-105',
+            // `scale-110` (antes 105): zoom de hover un poco más notorio.
+            'w-full object-cover transition-transform duration-500 group-hover:scale-110',
             // `aspect-[3/4]` (antes 4/5): marco un poco más alto — con muchos
             // fotógrafos subiendo fotos verticales, el marco anterior recortaba
             // algo de la parte superior/inferior en esas fotos. No sabemos aún
@@ -49,9 +91,10 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
       <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
 
-      {/* Barra superior: frescura + favorito */}
+      {/* Barra superior: frescura + favorito — la frescura se oculta en
+          marcos chicos (grilla densa), donde ocupa demasiado espacio. */}
       <div className="absolute inset-x-2 top-2 flex items-start justify-between opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
-        {freshness ? (
+        {freshness && tileSize >= FRESHNESS_MIN_TILE_SIZE ? (
           <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">{freshness}</span>
         ) : (
           <span />
@@ -77,18 +120,21 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           </span>
         ) : (
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              inCart
-                ? remove(photo.id)
-                : add({ photoId: photo.id, eventId: photo.event_id, eventTitle, photographerId: photo.photographer_id, photographerName, price: photo.price, storagePath: photo.storage_path, previewPath: photo.preview_path })
-            }}
+            onClick={handleAddClick}
+            aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
             className={cn(
               'pointer-events-auto flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-all duration-200',
               inCart ? 'bg-secondary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
             )}
           >
-            {inCart ? '✓ En carrito' : `Q${photo.price} · Agregar`}
+            {inCart ? (
+              <>✓ En carrito</>
+            ) : (
+              <>
+                <IconCart className="h-3.5 w-3.5" />
+                Q{photo.price}
+              </>
+            )}
           </button>
         )}
       </div>

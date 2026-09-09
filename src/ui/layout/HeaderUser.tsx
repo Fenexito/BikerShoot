@@ -117,6 +117,7 @@ export function HeaderUser() {
                   <IconBookmark className="h-5 w-5" />
                 </Link>
                 <Link
+                  id="header-cart-icon"
                   to="/app/checkout"
                   aria-label="Carrito"
                   title="Carrito"

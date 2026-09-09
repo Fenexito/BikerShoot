@@ -1,12 +1,13 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { usePublicEvents, useApprovedPhotographers, useSearchPhotos } from './usePublicData'
+import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type PublicEvent, type PublicEventPoint } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
-import { SearchFilterModal, type SearchFilterDraft } from './components/SearchFilterModal'
 import { Badge } from '../../ui/flat/Badge'
-import { IconFilter, IconSearch, IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
+import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
+import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
+import { IconSearch, IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
@@ -15,15 +16,15 @@ import { cn } from '../../lib/cn'
 // Rango del resizer de tamaño de foto — el tope (270px) está calculado
 // para que, incluso en el tamaño MÁS GRANDE posible, sigan cabiendo al
 // menos 6 fotos por fila en el ancho máximo del contenedor: 1800px menos
-// padding (md:px-8 = 32px por lado) = 1736px disponibles; con gap-3
-// (12px) entre columnas, 6 fotos de 270px + 5 gaps = 1680+60 = 1740px…
-// ligeramente ajustado a 270 (no 279, el límite matemático exacto) para
-// dejar margen a la barra de scroll del navegador, que resta ancho real
-// sin que el cálculo de CSS lo sepa. El piso (130px) da bastantes más
-// por fila para quien prefiera una vista densa tipo contact-sheet.
+// padding (md:px-8 = 32px por lado) = 1736px disponibles; con gap-2
+// (8px) entre columnas, 6 fotos de 270px + 5 gaps = 1620+40 = 1660px…
+// el piso (130px) da ~12 por fila en ese mismo ancho.
 const TILE_SIZE_MIN = 130
 const TILE_SIZE_MAX = 270
 const TILE_SIZE_DEFAULT = 220
+// Pasos grandes a propósito: cada movimiento del control debe sentirse
+// como un cambio de tamaño real, no un ajuste casi imperceptible.
+const TILE_SIZE_STEP = 20
 const TILE_SIZE_KEY = 'motoshots_biker_photo_tile_size'
 
 function loadTileSize() {
@@ -37,8 +38,97 @@ function loadTileSize() {
 }
 
 function writeList(next: URLSearchParams, key: string, values: string[]) {
-  if (values.length > 0) next.set(key, values.join(','))
+  if (values.length > 0) next.set(key, values.map(encodeURIComponent).join(','))
   else next.delete(key)
+}
+
+function readList(raw: string): string[] {
+  return raw ? raw.split(',').filter(Boolean).map(decodeURIComponent) : []
+}
+
+function timeToMinutes(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+
+function minutesToHHMM(mins: number) {
+  const h = Math.floor(mins / 60).toString().padStart(2, '0')
+  const m = Math.round(mins % 60).toString().padStart(2, '0')
+  return `${h}:${m}`
+}
+
+interface FieldFilters {
+  categories: string[]
+  routeIds: string[]
+  pointLabels: string[]
+  photographerIds: string[]
+}
+
+/** Todos los pares evento+punto que cumplen los filtros elegidos — EXCEPTO
+ * el campo `skip`, para poder calcular las opciones de ESE campo a partir de
+ * los demás ("interconectados": elegir un fotógrafo limita categoría/ruta/
+ * punto a lo que ese fotógrafo realmente tiene, y viceversa con cualquier
+ * otro campo). Sin `skip`, aplica los cuatro filtros a la vez (usado para
+ * calcular el rango de horario disponible). */
+function matchingPoints(events: PublicEvent[], f: FieldFilters, skip?: keyof FieldFilters): { event: PublicEvent; point: PublicEventPoint }[] {
+  const eff: FieldFilters = { ...f, ...(skip ? { [skip]: [] } : {}) }
+  const pairs: { event: PublicEvent; point: PublicEventPoint }[] = []
+  for (const e of events) {
+    if (eff.categories.length && !eff.categories.includes(e.category)) continue
+    if (eff.photographerIds.length && !eff.photographerIds.includes(e.photographer_id)) continue
+    for (const pt of e.event_points) {
+      if (eff.routeIds.length && !(pt.route_point && eff.routeIds.includes(pt.route_point.route_id))) continue
+      if (eff.pointLabels.length && !eff.pointLabels.includes(pt.label)) continue
+      pairs.push({ event: e, point: pt })
+    }
+  }
+  return pairs
+}
+
+function dedupeOptions(values: string[]): FilterDropdownOption[] {
+  return Array.from(new Set(values)).map((v) => ({ value: v, label: v }))
+}
+
+function HourRangeDropdown({ boundsMin, boundsMax, valueMin, valueMax, active, onChange }: {
+  boundsMin: number
+  boundsMax: number
+  valueMin: number
+  valueMax: number
+  active: boolean
+  onChange: (min: number, max: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          'flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors',
+          active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground hover:bg-muted',
+        )}
+      >
+        {active ? `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}` : 'Horario'}
+        <span className={cn('shrink-0 text-[10px] transition-transform', open && 'rotate-180')}>▾</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-2 w-72 origin-top animate-menu-in rounded-2xl border border-border bg-background p-4 shadow-2xl">
+          <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} />
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function Search() {
@@ -47,13 +137,10 @@ export function Search() {
   const { data: routes = [] } = useRoutes()
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  // Histéresis (activa a 140px, desactiva a 60px): el hero colapsado abajo
-  // encoge la página varios cientos de píxeles, y sin este margen el cambio
-  // de layout podía empujar el scroll justo por debajo del umbral en el
-  // mismo instante en que se cruzaba, atascando el header en un ciclo de
-  // animación entrada/salida sin fin.
-  const scrolled = useScrolledPast(140, 60)
+  // Umbral simple (sin histéresis): ya no hace falta — el hero dejó de
+  // encogerse con el scroll (ver nota más abajo), así que no hay cambio de
+  // layout que pueda empujar el scroll de un lado al otro del umbral.
+  const scrolled = useScrolledPast(120)
   const [tileSize, setTileSize] = useState(TILE_SIZE_DEFAULT)
 
   useEffect(() => {
@@ -72,20 +159,12 @@ export function Search() {
 
   const query = searchParams.get('q') ?? ''
   const eventId = searchParams.get('evento') ?? ''
-  const categoriasParam = searchParams.get('categorias') ?? ''
-  const rutasParam = searchParams.get('rutas') ?? ''
-  const puntosParam = searchParams.get('puntos') ?? ''
-  const fotografosParam = searchParams.get('fotografos') ?? ''
+  const categories = readList(searchParams.get('categorias') ?? '')
+  const routeIds = readList(searchParams.get('rutas') ?? '')
+  const pointLabels = readList(searchParams.get('puntos') ?? '')
+  const photographerIds = readList(searchParams.get('fotografos') ?? '')
   const horaDesde = searchParams.get('hora_desde') ?? ''
   const horaHasta = searchParams.get('hora_hasta') ?? ''
-  // Memoizados sobre el string crudo (no sobre `searchParams` en sí, que es
-  // un objeto nuevo en cada render) para que los useMemo encadenados más
-  // abajo (opciones de ruta/punto/fotógrafo, todas derivadas de estas
-  // listas) tengan una dependencia realmente estable entre renders.
-  const categories = useMemo(() => (categoriasParam ? categoriasParam.split(',').filter(Boolean) : []), [categoriasParam])
-  const routeIds = useMemo(() => (rutasParam ? rutasParam.split(',').filter(Boolean) : []), [rutasParam])
-  const pointIds = useMemo(() => (puntosParam ? puntosParam.split(',').filter(Boolean) : []), [puntosParam])
-  const photographerIds = useMemo(() => (fotografosParam ? fotografosParam.split(',').filter(Boolean) : []), [fotografosParam])
 
   function setQuery(value: string) {
     const next = new URLSearchParams(searchParams)
@@ -94,22 +173,9 @@ export function Search() {
     setSearchParams(next, { replace: true })
   }
 
-  function applyFilters(draft: SearchFilterDraft) {
+  function setListParam(key: 'categorias' | 'rutas' | 'puntos' | 'fotografos', values: string[]) {
     const next = new URLSearchParams(searchParams)
-    writeList(next, 'categorias', draft.categories)
-    writeList(next, 'rutas', draft.routeIds)
-    writeList(next, 'puntos', draft.pointIds)
-    writeList(next, 'fotografos', draft.photographerIds)
-    if (draft.horaDesde) next.set('hora_desde', draft.horaDesde)
-    else next.delete('hora_desde')
-    if (draft.horaHasta) next.set('hora_hasta', draft.horaHasta)
-    else next.delete('hora_hasta')
-    setSearchParams(next, { replace: true })
-  }
-
-  function clearFilter(key: string) {
-    const next = new URLSearchParams(searchParams)
-    next.delete(key)
+    writeList(next, key, values)
     setSearchParams(next, { replace: true })
   }
 
@@ -124,148 +190,125 @@ export function Search() {
     eventId: eventId || undefined,
     categories: categories.length ? categories : undefined,
     routeIds: routeIds.length ? routeIds : undefined,
-    pointIds: pointIds.length ? pointIds : undefined,
+    pointLabels: pointLabels.length ? pointLabels : undefined,
     photographerIds: photographerIds.length ? photographerIds : undefined,
     horaDesde: horaDesde || undefined,
     horaHasta: horaHasta || undefined,
   })
 
-  const results: GridPhoto[] = useMemo(
-    () =>
-      rawResults.map((p) => ({
-        ...p,
-        eventTitle: p.event?.title ?? '',
-        photographerName: p.photographer?.display_name ?? '',
-        pointLabel: p.point?.label,
-      })),
-    [rawResults],
-  )
+  const results: GridPhoto[] = rawResults.map((p) => ({
+    ...p,
+    eventTitle: p.event?.title ?? '',
+    photographerName: p.photographer?.display_name ?? '',
+    pointLabel: p.point?.label,
+  }))
 
-  // Opciones de cada filtro DEPENDEN de las anteriores (item 6: "que solo
-  // aparezcan opciones disponibles si coinciden con los filtros padres" para
-  // no sobrepoblar el modal) — se recalculan sobre `events`, no sobre
-  // `rawResults`, porque una foto ya filtrada por categoría no debería poder
-  // "resucitar" una ruta que ya quedó descartada.
-  const eventsMatchingCategory = useMemo(
-    () => (categories.length ? events.filter((e) => categories.includes(e.category)) : events),
-    [events, categories],
+  // Cada campo calcula sus opciones a partir de los DEMÁS filtros elegidos
+  // (interconectados en ambas direcciones) — ver `matchingPoints`.
+  const fieldFilters: FieldFilters = { categories, routeIds, pointLabels, photographerIds }
+
+  const categoryOptions = dedupeOptions(matchingPoints(events, fieldFilters, 'categories').map((p) => p.event.category))
+
+  const routeIdsAvailable = new Set(
+    matchingPoints(events, fieldFilters, 'routeIds')
+      .map((p) => p.point.route_point?.route_id)
+      .filter((id): id is string => !!id),
   )
-  const routeOptions = useMemo(() => routes.map((r) => ({ value: r.id, label: r.name })), [routes])
-  const eventsMatchingRoute = useMemo(
-    () =>
-      routeIds.length
-        ? eventsMatchingCategory.filter((e) => e.event_points.some((pt) => pt.route_point && routeIds.includes(pt.route_point.route_id)))
-        : eventsMatchingCategory,
-    [eventsMatchingCategory, routeIds],
-  )
-  const pointOptions = useMemo(() => {
-    const seen = new Map<string, string>()
-    for (const e of eventsMatchingRoute) {
-      for (const pt of e.event_points) {
-        if (routeIds.length && !(pt.route_point && routeIds.includes(pt.route_point.route_id))) continue
-        seen.set(pt.id, `${pt.label} · ${e.title}`)
-      }
+  const routeOptions: FilterDropdownOption[] = routes.filter((r) => routeIdsAvailable.has(r.id)).map((r) => ({ value: r.id, label: r.name }))
+
+  // Sin importar cuántos fotógrafos/eventos distintos usen el mismo punto
+  // físico, cada uno vive como una fila de `event_points` separada — se
+  // deduplica por NOMBRE del punto para que aparezca una sola vez en la
+  // lista (ver el comentario de `pointLabels` en `usePublicData.ts`).
+  const pointOptions = dedupeOptions(matchingPoints(events, fieldFilters, 'pointLabels').map((p) => p.point.label)).sort((a, b) => a.label.localeCompare(b.label))
+
+  const photographerIdsAvailable = new Set(matchingPoints(events, fieldFilters, 'photographerIds').map((p) => p.event.photographer_id))
+  const photographerOptions: FilterDropdownOption[] = photographers
+    .filter((p) => photographerIdsAvailable.has(p.id))
+    .map((p) => ({ value: p.id, label: p.display_name }))
+
+  // Rango de horario disponible dados TODOS los filtros activos (no hay
+  // campo propio que excluir, a diferencia de los de arriba) — si ninguno
+  // de los puntos que cumplen los demás filtros tiene horario (o no hay
+  // filtros elegidos todavía), el usuario puede elegir cualquier hora del
+  // día completo.
+  const hourPairs = matchingPoints(events, fieldFilters)
+  const boundsMin = hourPairs.length ? Math.min(...hourPairs.map((p) => timeToMinutes(p.point.time_start))) : 0
+  const boundsMax = hourPairs.length ? Math.max(...hourPairs.map((p) => timeToMinutes(p.point.time_end))) : 23 * 60 + 59
+  const hourActive = Boolean(horaDesde || horaHasta)
+  const valueMin = Math.max(boundsMin, Math.min(horaDesde ? timeToMinutes(horaDesde) : boundsMin, boundsMax))
+  const valueMax = Math.max(boundsMin, Math.min(horaHasta ? timeToMinutes(horaHasta) : boundsMax, boundsMax))
+
+  function changeHourRange(min: number, max: number) {
+    const next = new URLSearchParams(searchParams)
+    if (min <= boundsMin && max >= boundsMax) {
+      next.delete('hora_desde')
+      next.delete('hora_hasta')
+    } else {
+      next.set('hora_desde', minutesToHHMM(min))
+      next.set('hora_hasta', minutesToHHMM(max))
     }
-    return Array.from(seen, ([value, label]) => ({ value, label }))
-  }, [eventsMatchingRoute, routeIds])
-  const eventsMatchingPoint = useMemo(
-    () => (pointIds.length ? eventsMatchingRoute.filter((e) => e.event_points.some((pt) => pointIds.includes(pt.id))) : eventsMatchingRoute),
-    [eventsMatchingRoute, pointIds],
-  )
-  const photographerOptions = useMemo(() => {
-    const ids = new Set(eventsMatchingPoint.map((e) => e.photographer_id))
-    return photographers.filter((p) => ids.has(p.id)).map((p) => ({ value: p.id, label: p.display_name }))
-  }, [eventsMatchingPoint, photographers])
-  const categoryOptions = useMemo(() => Array.from(new Set(events.map((e) => e.category))).map((c) => ({ value: c, label: c })), [events])
-
-  function countFor(draft: SearchFilterDraft) {
-    return rawResults.filter((p) => {
-      if (draft.categories.length && !draft.categories.includes(p.event?.category ?? '')) return false
-      if (draft.routeIds.length && !(p.point?.route_point?.route_id && draft.routeIds.includes(p.point.route_point.route_id))) return false
-      if (draft.pointIds.length && !(p.point_id && draft.pointIds.includes(p.point_id))) return false
-      if (draft.photographerIds.length && !draft.photographerIds.includes(p.photographer_id)) return false
-      return true
-    }).length
+    setSearchParams(next, { replace: true })
   }
 
+  const activeFilterCount = categories.length + routeIds.length + pointLabels.length + photographerIds.length + (hourActive ? 1 : 0)
+
   const activeChips = [
-    query && { key: 'q', label: `"${query}"` },
-    ...categories.map((c) => ({ key: 'categorias', label: c, remove: () => clearFilter('categorias') })),
-    ...routeIds.map((id) => ({ key: `ruta-${id}`, label: routes.find((r) => r.id === id)?.name ?? 'Ruta', remove: () => setSearchParams((p) => { const n = new URLSearchParams(p); writeList(n, 'rutas', routeIds.filter((v) => v !== id)); return n }, { replace: true }) })),
-    ...pointIds.map((id) => ({
-      key: `punto-${id}`,
-      label: pointOptions.find((o) => o.value === id)?.label ?? 'Punto',
-      remove: () => setSearchParams((p) => { const n = new URLSearchParams(p); writeList(n, 'puntos', pointIds.filter((v) => v !== id)); return n }, { replace: true }),
+    query && { key: 'q', label: `"${query}"`, remove: () => setQuery('') },
+    ...categories.map((c) => ({ key: `cat-${c}`, label: c, remove: () => setListParam('categorias', categories.filter((v) => v !== c)) })),
+    ...routeIds.map((id) => ({
+      key: `ruta-${id}`,
+      label: routes.find((r) => r.id === id)?.name ?? 'Ruta',
+      remove: () => setListParam('rutas', routeIds.filter((v) => v !== id)),
     })),
+    ...pointLabels.map((label) => ({ key: `punto-${label}`, label, remove: () => setListParam('puntos', pointLabels.filter((v) => v !== label)) })),
     ...photographerIds.map((id) => ({
       key: `foto-${id}`,
       label: photographers.find((p) => p.id === id)?.display_name ?? 'Fotógrafo',
-      remove: () => setSearchParams((p) => { const n = new URLSearchParams(p); writeList(n, 'fotografos', photographerIds.filter((v) => v !== id)); return n }, { replace: true }),
+      remove: () => setListParam('fotografos', photographerIds.filter((v) => v !== id)),
     })),
-    (horaDesde || horaHasta) && { key: 'hora', label: `${horaDesde || '…'} - ${horaHasta || '…'}`, remove: () => { clearFilter('hora_desde'); clearFilter('hora_hasta') } },
-  ].filter(Boolean) as { key: string; label: string; remove?: () => void }[]
+    hourActive && { key: 'hora', label: `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}`, remove: () => changeHourRange(boundsMin, boundsMax) },
+  ].filter(Boolean) as { key: string; label: string; remove: () => void }[]
 
-  const activeFilterCount = categories.length + routeIds.length + pointIds.length + photographerIds.length + (horaDesde || horaHasta ? 1 : 0)
-
-  // El header (HeaderUser) se transforma al pasar el umbral de scroll: en
-  // vez del nav+buscador genérico, muestra el buscador propio de esta
-  // página + el botón de Filtros (con una "x limpiar" rápida si ya hay
-  // filtros aplicados) — reemplaza la barra flotante que antes vivía aparte,
-  // pegada justo debajo del header. `hideSearchTrigger` evita que HeaderUser
-  // agregue SU propio botón "Buscar…" al lado — esta página ya trae uno.
-  useHeaderTransform(
-    <div className="flex w-full items-center gap-2">
-      <div className="flex flex-1 items-center gap-2 rounded-full bg-muted px-4">
-        <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Evento, ciudad, fotógrafo…"
-          className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-      </div>
-      <button
-        onClick={() => setFiltersOpen(true)}
-        className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"
-      >
-        <IconFilter className="h-4 w-4" />
-        Filtros
+  // Barra de filtros — vive tanto en la página (siempre visible, debajo del
+  // hero) como dentro del header interactivo una vez se cruza el umbral de
+  // scroll (mismo contenido, un solo lugar de verdad). El usuario filtra
+  // directo desde acá: ya no hace falta un botón "Filtros" que abra un
+  // modal aparte.
+  function renderFilterBar() {
+    return (
+      <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+        <FilterDropdown label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
+        <FilterDropdown label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
+        <FilterDropdown label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+        <FilterDropdown label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+        <HourRangeDropdown boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} active={hourActive} onChange={changeHourRange} />
         {activeFilterCount > 0 && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-            {activeFilterCount}
-          </span>
+          <button
+            onClick={clearAllFilters}
+            aria-label="Limpiar filtros"
+            title="Limpiar filtros"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
+          >
+            <IconClose className="h-4 w-4" />
+          </button>
         )}
-      </button>
-      {activeFilterCount > 0 && (
-        <button
-          onClick={clearAllFilters}
-          aria-label="Limpiar filtros"
-          title="Limpiar filtros"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
-        >
-          <IconClose className="h-4 w-4" />
-        </button>
-      )}
-    </div>,
-    scrolled,
-    true,
-  )
+      </div>
+    )
+  }
+
+  useHeaderTransform(renderFilterBar(), scrolled)
 
   return (
     <div className="font-flat">
-      {/* Hero simplificado: antes tenía, además del buscador, una fila de
-          botones de categoría (Rodada/Pista/Sesión) que duplicaba el nuevo
-          filtro multi-selectivo de categoría del modal — con hasta 40
-          fotógrafos, 100+ eventos/mes y ~500,000 fotos por filtrar, la
-          categoría es solo UNO de varios filtros que se combinan entre sí
-          (ruta, punto, fotógrafo, horario), así que vive mejor dentro del
-          modal de Filtros que como botones sueltos aquí arriba. */}
-      <div
-        className={cn(
-          'overflow-hidden px-4 text-center transition-all duration-300 md:px-8',
-          scrolled ? 'max-h-0 py-0 opacity-0' : 'max-h-96 py-14 opacity-100',
-        )}
-      >
+      {/* Hero estático — antes se encogía (max-height) al cruzar el mismo
+          umbral que activa el header interactivo, y ese cambio de layout
+          bajo los pies del usuario mientras seguía scrolleando se sentía
+          como un "jalón" hacia arriba. Ahora es un bloque normal que se
+          desplaza como cualquier otro contenido — el header interactivo
+          sigue apareciendo al scrollear, pero sin mover nada del layout de
+          la página en sí. */}
+      <div className="px-4 py-14 text-center md:px-8">
         <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">Encuentra tus fotos en segundos.</h1>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">
           Busca por evento, ciudad o fotógrafo — {results.length} fotos disponibles ahora mismo.
@@ -278,22 +321,26 @@ export function Search() {
             placeholder="Evento, ciudad, fotógrafo…"
             className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
           />
-          <button
-            onClick={() => setFiltersOpen(true)}
-            className="flex shrink-0 items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            <IconFilter className="h-4 w-4" />
-            Filtros
-            {activeFilterCount > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-6 md:px-8">
+      <div className="mx-auto max-w-[1800px] px-4 md:px-8">
+        <div className="mb-5">{renderFilterBar()}</div>
+
+        {activeChips.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {activeChips.map((chip) => (
+              <button key={chip.key} onClick={chip.remove}>
+                <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
+                  {chip.label} ✕
+                </Badge>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
         <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
           <p className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
@@ -313,7 +360,7 @@ export function Search() {
               type="range"
               min={TILE_SIZE_MIN}
               max={TILE_SIZE_MAX}
-              step={10}
+              step={TILE_SIZE_STEP}
               value={tileSize}
               onChange={(e) => changeTileSize(Number(e.target.value))}
               aria-label="Tamaño de las fotos"
@@ -323,46 +370,19 @@ export function Search() {
           </div>
         </div>
 
-        {activeChips.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-2">
-            {activeChips.map((chip) => (
-              <button key={chip.key} onClick={() => (chip.remove ? chip.remove() : clearFilter(chip.key))}>
-                <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
-                  {chip.label} ✕
-                </Badge>
-              </button>
-            ))}
-            <button onClick={clearAllFilters} className="text-sm font-medium text-muted-foreground underline">
-              Limpiar todo
-            </button>
-          </div>
-        )}
-
         {/* `key` fuerza a PhotoGrid a re-montar (y así re-disparar la
             animación de entrada de sus primeras fotos) cada vez que cambia
             el conjunto de filtros aplicados — sin esto, cambiar de filtro
             solo reordenaba/recortaba el mismo grid sin dar ninguna señal
             visual de "esto se acaba de refiltrar". */}
         <PhotoGrid
-          key={`${categories.join(',')}|${routeIds.join(',')}|${pointIds.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}|${query}`}
+          key={`${categories.join(',')}|${routeIds.join(',')}|${pointLabels.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}|${query}`}
           photos={results}
           isLoading={resultsLoading}
           tileSize={tileSize}
           onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
         />
       </div>
-
-      <SearchFilterModal
-        open={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
-        categoryOptions={categoryOptions}
-        routeOptions={routeOptions}
-        pointOptions={pointOptions}
-        photographerOptions={photographerOptions}
-        value={{ categories, routeIds, pointIds, photographerIds, horaDesde, horaHasta }}
-        onApply={applyFilters}
-        countFor={countFor}
-      />
 
       {lightbox && (
         <PhotoLightbox

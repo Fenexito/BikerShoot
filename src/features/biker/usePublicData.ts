@@ -38,7 +38,11 @@ export interface SearchFilters {
    * Pista trae fotos de cualquiera de las dos). */
   categories?: string[]
   routeIds?: string[]
-  pointIds?: string[]
+  /** Por NOMBRE del punto (no por id de `event_points`) — el mismo punto
+   * físico (ej. "Km 45") existe como una fila de `event_points` distinta
+   * por cada evento/fotógrafo que lo usó, así que filtrar por id lo hacía
+   * aparecer duplicado una vez por cada uno. Filtrar por label lo unifica. */
+  pointLabels?: string[]
   photographerIds?: string[]
   horaDesde?: string
   horaHasta?: string
@@ -280,7 +284,7 @@ export function useSearchPhotos(filters: SearchFilters) {
         if (filters.eventId && p.event_id !== filters.eventId) return false
         if (filters.categories?.length && !filters.categories.includes(p.event?.category ?? '')) return false
         if (filters.routeIds?.length && !(p.point?.route_point?.route_id && filters.routeIds.includes(p.point.route_point.route_id))) return false
-        if (filters.pointIds?.length && !(p.point_id && filters.pointIds.includes(p.point_id))) return false
+        if (filters.pointLabels?.length && !(p.point?.label && filters.pointLabels.includes(p.point.label))) return false
         if (filters.photographerIds?.length && !filters.photographerIds.includes(p.photographer_id)) return false
         if ((filters.horaDesde || filters.horaHasta) && (!p.point || !pointMatchesTime(p.point, filters.horaDesde, filters.horaHasta))) return false
         if (filters.query) {
