@@ -8,6 +8,7 @@ import { useRoutes } from '../shared/useRoutes'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { Button } from '../../ui/flat/Button'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
+import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import type { MapPoint } from './usePublicData'
 
 const GUATEMALA_CENTER: [number, number] = [14.6349, -90.5069]
@@ -46,6 +47,15 @@ function FlyToPoints({ points }: { points: MapPoint[] }) {
   return null
 }
 
+/** Antes esta página era el único lugar de la app pensado como "app de
+ * mapa a pantalla completa" (sin título, sin el ancho/padding del resto
+ * de páginas, con un panel de filtros flotando ENCIMA del mapa) — eso la
+ * hacía sentir fuera de lugar frente a Eventos/Fotógrafos (que sí tienen
+ * título+intro+contenido dentro del ancho normal), y el cálculo de alto
+ * fijo (`100dvh - 64px`) no descontaba el padding real que el layout ya
+ * le agrega en móvil, dejando un hueco vacío de sobra debajo. Ahora es
+ * una página normal: título, filtros en línea, y el mapa vive dentro de
+ * una tarjeta de alto fijo (no toda la pantalla). */
 export function RouteMap() {
   const { data: points = [] } = useMapPoints()
   const { data: routes = [] } = useRoutes()
@@ -53,6 +63,7 @@ export function RouteMap() {
   const [routeId, setRouteId] = useState(searchParams.get('ruta') ?? '')
   const [city, setCity] = useState('')
   const [timePreset, setTimePreset] = useState(0)
+  const scrolledPast = useScrolledPast(160)
 
   // Llegar aquí desde un resultado de búsqueda (BikerSearchModal) trae la
   // ruta ya elegida en la URL — sincroniza el select si cambia sin que el
@@ -73,81 +84,76 @@ export function RouteMap() {
   const activeIds = new Set(activePoints.map((p) => p.id))
   const routeName = routeId ? routes.find((r) => r.id === routeId)?.name : null
 
-  // El mapa no tiene scroll de página (es un lienzo de altura fija), así
-  // que el header se transforma SIEMPRE que se está en esta vista — no
-  // reemplaza el panel flotante (donde de verdad se editan los filtros),
-  // solo muestra un resumen compacto de qué se está viendo, consistente
-  // con el resto de páginas que sí usan el header interactivo.
   useHeaderTransform(
     <p className="min-w-0 truncate text-sm font-semibold text-foreground">
       {routeName ?? 'Todas las rutas'}
       {city ? ` · ${city}` : ''}
       <span className="ml-2 font-normal text-muted-foreground">{activePoints.length} de {cityFilteredPoints.length} puntos</span>
     </p>,
-    true,
+    scrolledPast,
   )
 
   return (
-    <div className="relative font-flat" style={{ height: 'calc(100dvh - 64px)' }}>
-      <div className="absolute left-4 right-4 top-4 z-[500] flex flex-col gap-3 rounded-3xl border border-border bg-background/95 p-5 shadow-lg backdrop-blur sm:right-auto sm:w-[420px]">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Mapa de puntos</h1>
-          <p className="text-sm text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <FancySelect
-            value={routeId}
-            onChange={(v) => { setRouteId(v); setCity('') }}
-            options={routes.map((r) => ({ value: r.id, label: r.name }))}
-            placeholder="Toda ruta"
-          />
-          <FancySelect value={city} onChange={setCity} options={cities.map((c) => ({ value: c, label: c }))} placeholder="Toda ciudad" />
-        </div>
+    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+      <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Mapa de puntos</h1>
+      <p className="mb-6 text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
+
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <FancySelect
+          value={routeId}
+          onChange={(v) => { setRouteId(v); setCity('') }}
+          options={routes.map((r) => ({ value: r.id, label: r.name }))}
+          placeholder="Toda ruta"
+        />
+        <FancySelect value={city} onChange={setCity} options={cities.map((c) => ({ value: c, label: c }))} placeholder="Toda ciudad" />
         <FancySelect
           value={String(timePreset)}
           onChange={(v) => setTimePreset(Number(v))}
           options={TIME_PRESETS.map((t, i) => ({ value: String(i), label: t.label }))}
           clearable={false}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-2">
-          <span className="text-sm font-semibold text-primary">
-            {activePoints.length} de {cityFilteredPoints.length} puntos coinciden
-          </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary" /> Activo
-            <span className="ml-1 h-2.5 w-2.5 rounded-full bg-gray-400 opacity-45" /> Fuera de horario
-          </span>
-        </div>
       </div>
 
-      <MapContainer center={GUATEMALA_CENTER} zoom={9} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <FlyToPoints points={cityFilteredPoints} />
-        {cityFilteredPoints.map((point) => {
-          const isActive = activeIds.has(point.id)
-          return (
-            <Marker key={point.id} position={[point.lat, point.lng]} icon={makeIcon(isActive)}>
-              <Popup>
-                <div className="w-56 font-flat">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {point.time_start.slice(0, 5)} - {point.time_end.slice(0, 5)}
-                  </p>
-                  <p className="font-bold">{point.label}</p>
-                  <p className="text-sm text-muted-foreground">{point.event?.photographer?.display_name}</p>
-                  {point.event && (
-                    <Link to={`/app/eventos/${point.event.id}?punto=${point.id}`}>
-                      <Button size="sm" className="mt-3 w-full">Ver fotos de este punto</Button>
-                    </Link>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          )
-        })}
-      </MapContainer>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-3">
+        <span className="text-sm font-semibold text-primary">
+          {activePoints.length} de {cityFilteredPoints.length} puntos coinciden
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span className="h-2.5 w-2.5 rounded-full bg-primary" /> Activo
+          <span className="ml-1 h-2.5 w-2.5 rounded-full bg-gray-400 opacity-45" /> Fuera de horario
+        </span>
+      </div>
+
+      <div className="h-[65vh] min-h-[420px] overflow-hidden rounded-3xl border border-border">
+        <MapContainer center={GUATEMALA_CENTER} zoom={9} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <FlyToPoints points={cityFilteredPoints} />
+          {cityFilteredPoints.map((point) => {
+            const isActive = activeIds.has(point.id)
+            return (
+              <Marker key={point.id} position={[point.lat, point.lng]} icon={makeIcon(isActive)}>
+                <Popup>
+                  <div className="w-56 font-flat">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {point.time_start.slice(0, 5)} - {point.time_end.slice(0, 5)}
+                    </p>
+                    <p className="font-bold">{point.label}</p>
+                    <p className="text-sm text-muted-foreground">{point.event?.photographer?.display_name}</p>
+                    {point.event && (
+                      <Link to={`/app/eventos/${point.event.id}?punto=${point.id}`}>
+                        <Button size="sm" className="mt-3 w-full">Ver fotos de este punto</Button>
+                      </Link>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
+        </MapContainer>
+      </div>
     </div>
   )
 }

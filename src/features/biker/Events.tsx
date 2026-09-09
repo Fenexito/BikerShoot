@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { usePublicEvents, useApprovedPhotographers, useFeaturedEventPhotos } from './usePublicData'
-import { useRoutes } from '../shared/useRoutes'
+import { usePublicEvents, useApprovedPhotographers, useFeaturedEventPhotos, pointMatchesTime } from './usePublicData'
+import { useRoutes, useRoutePoints } from '../shared/useRoutes'
 import { EventCard } from './components/EventCard'
 import { EventsFilterModal } from './components/EventsFilterModal'
 import { FilterBar, type FilterOption } from '../../ui/shared/FilterBar'
@@ -26,8 +26,25 @@ const EVENT_TYPE_TABS: FilterOption[] = [
   { value: 'Sesión de Fotos', label: 'Sesión de fotos' },
 ]
 
+// Mismos presets que la página de Mapa — filtra eventos que tengan AL
+// MENOS un punto de cobertura dentro de ese rango horario.
+const TIME_PRESETS: { value: string; label: string; after?: string; before?: string }[] = [
+  { value: '', label: 'Cualquier hora' },
+  { value: 'madrugada', label: 'Madrugada (5:00 - 6:00)', after: '05:00', before: '06:00' },
+  { value: 'amanecer', label: 'Amanecer (6:00 - 7:00)', after: '06:00', before: '07:00' },
+]
+
 function monthKey(iso: string) {
   const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Un mes antes del key dado (ej. "2026-09" -> "2026-08") — usado para
+// decidir qué meses arrancan desplegados: el mes anterior, el actual y
+// todos los futuros; solo los más viejos que eso arrancan colapsados.
+function prevMonthKey(key: string) {
+  const [y, m] = key.split('-').map(Number)
+  const d = new Date(y, m - 2, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
@@ -89,9 +106,12 @@ export function Events() {
   const city = searchParams.get('ciudad') ?? ''
   const category = searchParams.get('categoria') ?? ''
   const routeId = searchParams.get('ruta') ?? ''
+  const pointId = searchParams.get('punto') ?? ''
   const photographerId = searchParams.get('fotografo') ?? ''
+  const hora = searchParams.get('hora') ?? ''
   const sort = searchParams.get('orden') ?? 'recientes'
   const scrolledPast = useScrolledPast(160)
+  const { data: routePoints = [] } = useRoutePoints(group === 'rodada' && routeId ? routeId : undefined)
 
   function setParam(key: string, value: string | undefined) {
     const next = new URLSearchParams(searchParams)
@@ -105,6 +125,18 @@ export function Events() {
     params.set('tipo', next)
     params.delete('ruta')
     params.delete('categoria')
+    params.delete('punto')
+    setSearchParams(params, { replace: true })
+  }
+
+  function setRoute(next: string | undefined) {
+    // Cambiar de ruta invalida el punto elegido (los puntos pertenecen a
+    // una ruta específica) — se limpia junto para no dejar un filtro de
+    // punto "huérfano" apuntando a otra ruta.
+    const params = new URLSearchParams(searchParams)
+    if (next) params.set('ruta', next)
+    else params.delete('ruta')
+    params.delete('punto')
     setSearchParams(params, { replace: true })
   }
 
@@ -124,6 +156,8 @@ export function Events() {
     return map
   }, [featuredPhotos])
 
+  const timePreset = TIME_PRESETS.find((t) => t.value === hora)
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return [...events]
@@ -132,11 +166,13 @@ export function Events() {
       .filter((e) => (group === 'evento' && category ? e.category === category : true))
       .filter((e) => (photographerId ? e.photographer_id === photographerId : true))
       .filter((e) => (group === 'rodada' && routeId ? e.event_points.some((pt) => pt.route_point?.route_id === routeId) : true))
+      .filter((e) => (group === 'rodada' && pointId ? e.event_points.some((pt) => pt.route_point_id === pointId) : true))
+      .filter((e) => (timePreset?.after || timePreset?.before ? e.event_points.some((pt) => pointMatchesTime(pt, timePreset.after, timePreset.before)) : true))
       .filter((e) => (q ? e.title.toLowerCase().includes(q) || e.city.toLowerCase().includes(q) : true))
       .sort((a, b) =>
         sort === 'proximos' ? +new Date(a.event_date) - +new Date(b.event_date) : +new Date(b.event_date) - +new Date(a.event_date),
       )
-  }, [events, group, city, category, routeId, photographerId, sort, query])
+  }, [events, group, city, category, routeId, pointId, photographerId, timePreset, sort, query])
 
   const months = useMemo(() => {
     const map = new Map<string, PublicEvent[]>()
@@ -147,12 +183,16 @@ export function Events() {
       map.set(key, list)
     }
     const now = monthKey(new Date().toISOString())
+    const oldestOpenKey = prevMonthKey(now)
     return [...map.entries()]
       .sort((a, b) => (sort === 'proximos' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0])))
-      .map(([key, list]) => ({ key, label: monthLabel(list[0].event_date), events: list, isPast: key < now }))
+      .map(([key, list]) => ({ key, label: monthLabel(list[0].event_date), events: list, isPast: key < oldestOpenKey }))
   }, [filtered, sort])
 
-  const activeFilterCount = [city, photographerId].filter(Boolean).length
+  // El tipo/ruta/categoría ya se ven reflejados en la pastilla+tabs
+  // siempre visibles — el badge del botón "Filtros" solo cuenta lo que
+  // NO tiene su propio control siempre visible en la página.
+  const activeFilterCount = [city, photographerId, pointId, hora].filter(Boolean).length
 
   // Mismo bloque (pastilla + tabs + botón Filtros) tanto en la página como
   // en el header transformado — se registra tal cual una vez que se hizo
@@ -181,7 +221,7 @@ export function Events() {
           onSegmentChange={setGroup}
           tabs={group === 'rodada' ? ROUTE_TABS : group === 'evento' ? EVENT_TYPE_TABS : []}
           tabValue={group === 'rodada' ? routeId : category}
-          onTabChange={(v) => setParam(group === 'rodada' ? 'ruta' : 'categoria', v || undefined)}
+          onTabChange={(v) => (group === 'rodada' ? setRoute(v || undefined) : setParam('categoria', v || undefined))}
         />
         <button
           onClick={() => setFiltersOpen(true)}
@@ -213,10 +253,21 @@ export function Events() {
       <EventsFilterModal
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
+        group={group}
+        onGroupChange={setGroup}
+        routeOptions={ROUTE_TABS.filter((t) => t.value)}
+        categoryOptions={EVENT_TYPE_TABS.filter((t) => t.value)}
+        routeId={routeId}
+        onRouteChange={setRoute}
+        category={category}
+        pointOptions={routePoints.map((p) => ({ value: p.id, label: p.label }))}
+        pointId={pointId}
         cityOptions={CITIES.map((c) => ({ value: c, label: c }))}
         photographerOptions={photographers.map((p) => ({ value: p.id, label: p.display_name }))}
         city={city}
         photographerId={photographerId}
+        timePresetOptions={TIME_PRESETS}
+        hora={hora}
         sort={sort}
         onChange={(key, value) => setParam(key, value)}
         resultCount={filtered.length}
