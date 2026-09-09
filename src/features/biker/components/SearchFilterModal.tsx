@@ -1,64 +1,99 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
-import { DarkSelectField as FilterField } from '../../../ui/shared/DarkSelectField'
+import { useScrollLock } from '../../../ui/shared/useScrollLock'
+import { DarkMultiSelectField } from '../../../ui/shared/DarkMultiSelectField'
 import { IconClose } from '../../../ui/shared/icons'
+import type { DarkSelectOption } from '../../../ui/shared/DarkSelectField'
 
-interface FilterOption {
-  value: string
-  label: string
+export interface SearchFilterDraft {
+  categories: string[]
+  routeIds: string[]
+  pointIds: string[]
+  photographerIds: string[]
+  horaDesde: string
+  horaHasta: string
 }
 
 interface SearchFilterModalProps {
   open: boolean
   onClose: () => void
-  routeOptions: FilterOption[]
-  cityOptions: FilterOption[]
-  categoryOptions: FilterOption[]
-  brandOptions: FilterOption[]
-  routeId: string
-  city: string
-  category: string
-  motoBrand: string
-  onlyMyBrand: boolean
-  myBrand?: string
-  sort: string
-  onChange: (key: string, value: string | undefined) => void
-  resultCount: number
+  categoryOptions: DarkSelectOption[]
+  routeOptions: DarkSelectOption[]
+  pointOptions: DarkSelectOption[]
+  photographerOptions: DarkSelectOption[]
+  value: SearchFilterDraft
+  onApply: (next: SearchFilterDraft) => void
+  /** Cuenta resultados que darían las selecciones actuales del borrador —
+   * SIN aplicarlas todavía (ver nota sobre el bug de "tiempo real" abajo). */
+  countFor: (draft: SearchFilterDraft) => number
 }
 
+const EMPTY_DRAFT: SearchFilterDraft = { categories: [], routeIds: [], pointIds: [], photographerIds: [], horaDesde: '', horaHasta: '' }
+
+/** Antes este modal aplicaba cada cambio al instante (cada click reescribía
+ * la URL y volvía a filtrar la búsqueda en vivo, con el modal todavía
+ * abierto) — se sentía errático con selects múltiples, porque cada click en
+ * una opción de checklist disparaba de inmediato un refiltrado completo de
+ * la página de atrás. Ahora el modal tiene su propio "borrador" (`draft`,
+ * inicializado desde `value` al abrir) y solo escribe hacia afuera cuando el
+ * usuario presiona "Aplicar filtros" — el conteo de resultados en el botón
+ * SÍ se recalcula en vivo contra ese borrador (vía `countFor`, puramente de
+ * lectura) para que el usuario vea el efecto antes de comprometerse. */
 export function SearchFilterModal({
   open,
   onClose,
-  routeOptions,
-  cityOptions,
   categoryOptions,
-  brandOptions,
-  routeId,
-  city,
-  category,
-  motoBrand,
-  onlyMyBrand,
-  myBrand,
-  sort,
-  onChange,
-  resultCount,
+  routeOptions,
+  pointOptions,
+  photographerOptions,
+  value,
+  onApply,
+  countFor,
 }: SearchFilterModalProps) {
+  const [draft, setDraft] = useState<SearchFilterDraft>(value)
+
+  useEffect(() => {
+    if (open) setDraft(value)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  useScrollLock(open)
+
   useEffect(() => {
     if (!open) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKeyDown)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = prevOverflow
-    }
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
   if (!open) return null
+
+  // Ruta y Punto solo tienen sentido si la categoría elegida incluye "Rodada"
+  // (o si no se eligió ninguna categoría todavía, en cuyo caso todo aplica) —
+  // ver la nota de `EventsFilterModal` para el mismo criterio en Eventos.
+  const routesApply = draft.categories.length === 0 || draft.categories.includes('Rodada')
+
+  function update<K extends keyof SearchFilterDraft>(key: K, next: SearchFilterDraft[K]) {
+    setDraft((d) => {
+      const merged = { ...d, [key]: next }
+      // Cambiar la categoría a algo que ya no incluya Rodada limpia ruta/punto
+      // (dejarlos "aplicados por debajo" sin poder verse ni editarse sería
+      // confuso). Cambiar la ruta reduce los puntos ya elegidos a los que
+      // sigan perteneciendo a alguna ruta seleccionada.
+      if (key === 'categories' && !(next as string[]).includes('Rodada') && (next as string[]).length > 0) {
+        merged.routeIds = []
+        merged.pointIds = []
+      }
+      return merged
+    })
+  }
+
+  const resultCount = countFor(draft)
+  const activeCount =
+    draft.categories.length + draft.routeIds.length + draft.pointIds.length + draft.photographerIds.length + (draft.horaDesde || draft.horaHasta ? 1 : 0)
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto p-4 pt-16 sm:pt-24">
@@ -71,60 +106,74 @@ export function SearchFilterModal({
           </button>
         </div>
 
+        <p className="mb-5 text-xs text-white/50">
+          Todos los filtros son opcionales y admiten varias selecciones a la vez — combínalos como quieras.
+        </p>
+
         <div className="grid gap-5 sm:grid-cols-2">
-          <FilterField label="Ruta" value={routeId} onChange={(v) => onChange('ruta', v || undefined)} options={routeOptions} />
-          <FilterField label="Ciudad" value={city} onChange={(v) => onChange('ciudad', v || undefined)} options={cityOptions} />
-          <FilterField label="Categoría" value={category} onChange={(v) => onChange('categoria', v || undefined)} options={categoryOptions} />
-          <FilterField
-            label="Marca de moto"
-            value={motoBrand}
-            onChange={(v) => onChange('marca', v || undefined)}
-            options={brandOptions}
-            placeholder={onlyMyBrand ? myBrand ?? 'Todas' : 'Todas'}
+          <DarkMultiSelectField label="Categoría" values={draft.categories} onChange={(v) => update('categories', v)} options={categoryOptions} />
+          <DarkMultiSelectField
+            label="Ruta"
+            values={draft.routeIds}
+            onChange={(v) => update('routeIds', v)}
+            options={routeOptions}
+            disabled={!routesApply}
+            disabledHint="Solo aplica si la categoría incluye Rodada"
           />
+          <DarkMultiSelectField
+            label="Punto de cobertura"
+            values={draft.pointIds}
+            onChange={(v) => update('pointIds', v)}
+            options={pointOptions}
+            disabled={!routesApply}
+            disabledHint="Solo aplica si la categoría incluye Rodada"
+          />
+          <DarkMultiSelectField label="Fotógrafo" values={draft.photographerIds} onChange={(v) => update('photographerIds', v)} options={photographerOptions} />
         </div>
 
-        {myBrand && (
-          <label className="mt-5 flex items-center gap-2 text-sm text-white/80">
-            <input
-              type="checkbox"
-              checked={onlyMyBrand}
-              onChange={(e) => onChange('mi_moto', e.target.checked ? '1' : undefined)}
-              className="h-4 w-4 accent-white"
-            />
-            Solo mi moto ({myBrand})
-          </label>
-        )}
-
-        <div className="mt-6 flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Ordenar por</span>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: 'relevancia', label: 'Relevancia' },
-              { value: 'precio-asc', label: 'Precio: menor a mayor' },
-              { value: 'precio-desc', label: 'Precio: mayor a menor' },
-            ].map((o) => (
-              <button
-                key={o.value}
-                onClick={() => onChange('orden', o.value)}
-                className={
-                  sort === o.value
-                    ? 'rounded-full bg-white px-4 py-2 text-sm font-semibold text-black'
-                    : 'rounded-full bg-white/10 px-4 py-2 text-sm text-white/80 hover:bg-white/20'
-                }
-              >
-                {o.label}
-              </button>
-            ))}
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-white/50">Horario en el punto</span>
+          <div className="flex items-center gap-3">
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="text-[11px] text-white/40">Desde</span>
+              <input
+                type="time"
+                value={draft.horaDesde}
+                onChange={(e) => update('horaDesde', e.target.value)}
+                className="h-11 rounded-full border border-white/10 bg-white/5 px-4 text-sm text-white outline-none focus:border-white/30 [color-scheme:dark]"
+              />
+            </label>
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="text-[11px] text-white/40">Hasta</span>
+              <input
+                type="time"
+                value={draft.horaHasta}
+                onChange={(e) => update('horaHasta', e.target.value)}
+                className="h-11 rounded-full border border-white/10 bg-white/5 px-4 text-sm text-white outline-none focus:border-white/30 [color-scheme:dark]"
+              />
+            </label>
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="mt-8 flex w-full items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
-        >
-          Ver {resultCount} {resultCount === 1 ? 'foto' : 'fotos'}
-        </button>
+        <div className="mt-8 flex gap-3">
+          {activeCount > 0 && (
+            <button
+              onClick={() => setDraft(EMPTY_DRAFT)}
+              className="flex shrink-0 items-center justify-center rounded-full bg-white/10 px-5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/20"
+            >
+              Borrar filtros
+            </button>
+          )}
+          <button
+            onClick={() => {
+              onApply(draft)
+              onClose()
+            }}
+            className="flex flex-1 items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+          >
+            Aplicar filtros · Ver {resultCount} {resultCount === 1 ? 'foto' : 'fotos'}
+          </button>
+        </div>
       </div>
     </div>,
     getPortalRoot(),

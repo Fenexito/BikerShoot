@@ -33,7 +33,14 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           loading="lazy"
           className={cn(
             'w-full object-cover transition-transform duration-500 group-hover:scale-105',
-            layout === 'mosaic' ? 'h-auto' : 'aspect-[4/5]',
+            // `aspect-[3/4]` (antes 4/5): marco un poco más alto — con muchos
+            // fotógrafos subiendo fotos verticales, el marco anterior recortaba
+            // algo de la parte superior/inferior en esas fotos. No sabemos aún
+            // las dimensiones reales de cada foto (no se guardan en `photos`),
+            // así que este es un ajuste global de prueba, no una detección de
+            // orientación por foto — si el recorte lateral en fotos horizontales
+            // se siente peor que antes, es la contraparte de este cambio.
+            layout === 'mosaic' ? 'h-auto' : 'aspect-[3/4]',
           )}
         />
       </button>

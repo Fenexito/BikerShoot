@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
+import { useScrollLock } from '../../../ui/shared/useScrollLock'
 import { DarkSelectField, type DarkSelectOption } from '../../../ui/shared/DarkSelectField'
 import { IconClose } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
@@ -62,21 +63,15 @@ export function EventsFilterModal({
   onChange,
   resultCount,
 }: EventsFilterModalProps) {
+  useScrollLock(open)
+
   useEffect(() => {
     if (!open) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKeyDown)
-    const prevHtmlOverflow = document.documentElement.style.overflow
-    const prevBodyOverflow = document.body.style.overflow
-    document.documentElement.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.documentElement.style.overflow = prevHtmlOverflow
-      document.body.style.overflow = prevBodyOverflow
-    }
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
   if (!open) return null

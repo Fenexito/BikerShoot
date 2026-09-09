@@ -75,7 +75,9 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
   return (
     <div>
       <div
-        className={cn(layout === 'mosaic' ? 'columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4' : 'grid gap-2.5 sm:gap-3')}
+        className={cn(
+          layout === 'mosaic' ? 'columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4' : 'grid gap-2.5 transition-[grid-template-columns] duration-300 ease-out sm:gap-3',
+        )}
         style={layout === 'grid' ? { gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize}px, 1fr))` } : undefined}
       >
         {visible.map((photo, i) => (
@@ -95,7 +97,7 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
         ))}
         {loadingMore &&
           layout !== 'mosaic' &&
-          Array.from({ length: 5 }).map((_, i) => <Skeleton key={`sk-${i}`} className="aspect-[4/5] w-full" />)}
+          Array.from({ length: 5 }).map((_, i) => <Skeleton key={`sk-${i}`} className="aspect-[3/4] w-full" />)}
       </div>
       {visibleCount < photos.length && <div ref={sentinelRef} className="h-1" />}
       {visibleCount >= photos.length && photos.length > BATCH_SIZE && (

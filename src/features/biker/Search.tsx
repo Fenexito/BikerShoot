@@ -1,19 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
-import { useBikerDetails } from './useBikerDetails'
-import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type SearchFilters } from './usePublicData'
+import { usePublicEvents, useApprovedPhotographers, useSearchPhotos } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
-import { SearchFilterModal } from './components/SearchFilterModal'
+import { SearchFilterModal, type SearchFilterDraft } from './components/SearchFilterModal'
 import { Badge } from '../../ui/flat/Badge'
-import { IconFilter, IconSearch, IconGridSmall, IconGridLarge } from '../../ui/shared/icons'
+import { IconFilter, IconSearch, IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
+import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { cn } from '../../lib/cn'
-
-const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos']
 
 // Rango del resizer de tamaño de foto — el tope (270px) está calculado
 // para que, incluso en el tamaño MÁS GRANDE posible, sigan cabiendo al
@@ -39,16 +36,24 @@ function loadTileSize() {
   }
 }
 
+function writeList(next: URLSearchParams, key: string, values: string[]) {
+  if (values.length > 0) next.set(key, values.join(','))
+  else next.delete(key)
+}
+
 export function Search() {
-  const { user } = useAuth()
-  const { data: bikerDetails } = useBikerDetails(user?.id)
   const { data: events = [] } = usePublicEvents()
   const { data: photographers = [] } = useApprovedPhotographers()
   const { data: routes = [] } = useRoutes()
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
+  // Histéresis (activa a 140px, desactiva a 60px): el hero colapsado abajo
+  // encoge la página varios cientos de píxeles, y sin este margen el cambio
+  // de layout podía empujar el scroll justo por debajo del umbral en el
+  // mismo instante en que se cruzaba, atascando el header en un ciclo de
+  // animación entrada/salida sin fin.
+  const scrolled = useScrolledPast(140, 60)
   const [tileSize, setTileSize] = useState(TILE_SIZE_DEFAULT)
 
   useEffect(() => {
@@ -65,45 +70,64 @@ export function Search() {
     }
   }
 
-  useEffect(() => {
-    function onScroll() {
-      setScrolled(window.scrollY > 140)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
   const query = searchParams.get('q') ?? ''
-  const city = searchParams.get('ciudad') ?? ''
-  const category = searchParams.get('categoria') ?? ''
-  const motoBrand = searchParams.get('marca') ?? ''
-  const photographerId = searchParams.get('fotografo') ?? ''
-  const routeId = searchParams.get('ruta') ?? ''
   const eventId = searchParams.get('evento') ?? ''
-  const pointId = searchParams.get('punto') ?? ''
-  const sort = (searchParams.get('orden') as SearchFilters['sort']) ?? 'relevancia'
-  const onlyMyBrand = searchParams.get('mi_moto') === '1'
+  const categoriasParam = searchParams.get('categorias') ?? ''
+  const rutasParam = searchParams.get('rutas') ?? ''
+  const puntosParam = searchParams.get('puntos') ?? ''
+  const fotografosParam = searchParams.get('fotografos') ?? ''
+  const horaDesde = searchParams.get('hora_desde') ?? ''
+  const horaHasta = searchParams.get('hora_hasta') ?? ''
+  // Memoizados sobre el string crudo (no sobre `searchParams` en sí, que es
+  // un objeto nuevo en cada render) para que los useMemo encadenados más
+  // abajo (opciones de ruta/punto/fotógrafo, todas derivadas de estas
+  // listas) tengan una dependencia realmente estable entre renders.
+  const categories = useMemo(() => (categoriasParam ? categoriasParam.split(',').filter(Boolean) : []), [categoriasParam])
+  const routeIds = useMemo(() => (rutasParam ? rutasParam.split(',').filter(Boolean) : []), [rutasParam])
+  const pointIds = useMemo(() => (puntosParam ? puntosParam.split(',').filter(Boolean) : []), [puntosParam])
+  const photographerIds = useMemo(() => (fotografosParam ? fotografosParam.split(',').filter(Boolean) : []), [fotografosParam])
 
-  function setParam(key: string, value: string | undefined) {
+  function setQuery(value: string) {
     const next = new URLSearchParams(searchParams)
-    if (value) next.set(key, value)
-    else next.delete(key)
+    if (value) next.set('q', value)
+    else next.delete('q')
     setSearchParams(next, { replace: true })
   }
 
-  const effectiveBrand = onlyMyBrand ? bikerDetails?.moto_brand ?? '' : motoBrand
+  function applyFilters(draft: SearchFilterDraft) {
+    const next = new URLSearchParams(searchParams)
+    writeList(next, 'categorias', draft.categories)
+    writeList(next, 'rutas', draft.routeIds)
+    writeList(next, 'puntos', draft.pointIds)
+    writeList(next, 'fotografos', draft.photographerIds)
+    if (draft.horaDesde) next.set('hora_desde', draft.horaDesde)
+    else next.delete('hora_desde')
+    if (draft.horaHasta) next.set('hora_hasta', draft.horaHasta)
+    else next.delete('hora_hasta')
+    setSearchParams(next, { replace: true })
+  }
+
+  function clearFilter(key: string) {
+    const next = new URLSearchParams(searchParams)
+    next.delete(key)
+    setSearchParams(next, { replace: true })
+  }
+
+  function clearAllFilters() {
+    const next = new URLSearchParams()
+    if (query) next.set('q', query)
+    setSearchParams(next, { replace: true })
+  }
 
   const { data: rawResults = [], isLoading: resultsLoading } = useSearchPhotos({
     query: query || undefined,
-    city: city || undefined,
-    category: category || undefined,
-    motoBrand: effectiveBrand || undefined,
-    photographerId: photographerId || undefined,
-    routeId: routeId || undefined,
     eventId: eventId || undefined,
-    pointId: pointId || undefined,
-    sort,
+    categories: categories.length ? categories : undefined,
+    routeIds: routeIds.length ? routeIds : undefined,
+    pointIds: pointIds.length ? pointIds : undefined,
+    photographerIds: photographerIds.length ? photographerIds : undefined,
+    horaDesde: horaDesde || undefined,
+    horaHasta: horaHasta || undefined,
   })
 
   const results: GridPhoto[] = useMemo(
@@ -117,40 +141,85 @@ export function Search() {
     [rawResults],
   )
 
-  const CITIES = useMemo(() => Array.from(new Set(events.map((e) => e.city))), [events])
-  const MOTO_BRANDS = useMemo(
-    () => Array.from(new Set(rawResults.map((p) => p.moto_brand).filter(Boolean))) as string[],
-    [rawResults],
+  // Opciones de cada filtro DEPENDEN de las anteriores (item 6: "que solo
+  // aparezcan opciones disponibles si coinciden con los filtros padres" para
+  // no sobrepoblar el modal) — se recalculan sobre `events`, no sobre
+  // `rawResults`, porque una foto ya filtrada por categoría no debería poder
+  // "resucitar" una ruta que ya quedó descartada.
+  const eventsMatchingCategory = useMemo(
+    () => (categories.length ? events.filter((e) => categories.includes(e.category)) : events),
+    [events, categories],
   )
+  const routeOptions = useMemo(() => routes.map((r) => ({ value: r.id, label: r.name })), [routes])
+  const eventsMatchingRoute = useMemo(
+    () =>
+      routeIds.length
+        ? eventsMatchingCategory.filter((e) => e.event_points.some((pt) => pt.route_point && routeIds.includes(pt.route_point.route_id)))
+        : eventsMatchingCategory,
+    [eventsMatchingCategory, routeIds],
+  )
+  const pointOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const e of eventsMatchingRoute) {
+      for (const pt of e.event_points) {
+        if (routeIds.length && !(pt.route_point && routeIds.includes(pt.route_point.route_id))) continue
+        seen.set(pt.id, `${pt.label} · ${e.title}`)
+      }
+    }
+    return Array.from(seen, ([value, label]) => ({ value, label }))
+  }, [eventsMatchingRoute, routeIds])
+  const eventsMatchingPoint = useMemo(
+    () => (pointIds.length ? eventsMatchingRoute.filter((e) => e.event_points.some((pt) => pointIds.includes(pt.id))) : eventsMatchingRoute),
+    [eventsMatchingRoute, pointIds],
+  )
+  const photographerOptions = useMemo(() => {
+    const ids = new Set(eventsMatchingPoint.map((e) => e.photographer_id))
+    return photographers.filter((p) => ids.has(p.id)).map((p) => ({ value: p.id, label: p.display_name }))
+  }, [eventsMatchingPoint, photographers])
+  const categoryOptions = useMemo(() => Array.from(new Set(events.map((e) => e.category))).map((c) => ({ value: c, label: c })), [events])
+
+  function countFor(draft: SearchFilterDraft) {
+    return rawResults.filter((p) => {
+      if (draft.categories.length && !draft.categories.includes(p.event?.category ?? '')) return false
+      if (draft.routeIds.length && !(p.point?.route_point?.route_id && draft.routeIds.includes(p.point.route_point.route_id))) return false
+      if (draft.pointIds.length && !(p.point_id && draft.pointIds.includes(p.point_id))) return false
+      if (draft.photographerIds.length && !draft.photographerIds.includes(p.photographer_id)) return false
+      return true
+    }).length
+  }
 
   const activeChips = [
     query && { key: 'q', label: `"${query}"` },
-    city && { key: 'ciudad', label: city },
-    category && { key: 'categoria', label: category },
-    motoBrand && !onlyMyBrand && { key: 'marca', label: motoBrand },
-    onlyMyBrand && bikerDetails?.moto_brand && { key: 'mi_moto', label: `Mi moto: ${bikerDetails.moto_brand}` },
-    photographerId && { key: 'fotografo', label: photographers.find((p) => p.id === photographerId)?.display_name ?? '' },
-    routeId && { key: 'ruta', label: routes.find((r) => r.id === routeId)?.name ?? '' },
-    eventId && { key: 'evento', label: events.find((e) => e.id === eventId)?.title ?? '' },
-    pointId && {
-      key: 'punto',
-      label: events.find((e) => e.id === eventId)?.event_points.find((pt) => pt.id === pointId)?.label ?? 'Punto',
-    },
-  ].filter(Boolean) as { key: string; label: string }[]
+    ...categories.map((c) => ({ key: 'categorias', label: c, remove: () => clearFilter('categorias') })),
+    ...routeIds.map((id) => ({ key: `ruta-${id}`, label: routes.find((r) => r.id === id)?.name ?? 'Ruta', remove: () => setSearchParams((p) => { const n = new URLSearchParams(p); writeList(n, 'rutas', routeIds.filter((v) => v !== id)); return n }, { replace: true }) })),
+    ...pointIds.map((id) => ({
+      key: `punto-${id}`,
+      label: pointOptions.find((o) => o.value === id)?.label ?? 'Punto',
+      remove: () => setSearchParams((p) => { const n = new URLSearchParams(p); writeList(n, 'puntos', pointIds.filter((v) => v !== id)); return n }, { replace: true }),
+    })),
+    ...photographerIds.map((id) => ({
+      key: `foto-${id}`,
+      label: photographers.find((p) => p.id === id)?.display_name ?? 'Fotógrafo',
+      remove: () => setSearchParams((p) => { const n = new URLSearchParams(p); writeList(n, 'fotografos', photographerIds.filter((v) => v !== id)); return n }, { replace: true }),
+    })),
+    (horaDesde || horaHasta) && { key: 'hora', label: `${horaDesde || '…'} - ${horaHasta || '…'}`, remove: () => { clearFilter('hora_desde'); clearFilter('hora_hasta') } },
+  ].filter(Boolean) as { key: string; label: string; remove?: () => void }[]
 
-  const activeFilterCount = activeChips.length
+  const activeFilterCount = categories.length + routeIds.length + pointIds.length + photographerIds.length + (horaDesde || horaHasta ? 1 : 0)
 
   // El header (HeaderUser) se transforma al pasar el umbral de scroll: en
   // vez del nav+buscador genérico, muestra el buscador propio de esta
-  // página + el botón de Filtros — reemplaza la barra flotante que antes
-  // vivía aparte, pegada justo debajo del header.
+  // página + el botón de Filtros (con una "x limpiar" rápida si ya hay
+  // filtros aplicados) — reemplaza la barra flotante que antes vivía aparte,
+  // pegada justo debajo del header. `hideSearchTrigger` evita que HeaderUser
+  // agregue SU propio botón "Buscar…" al lado — esta página ya trae uno.
   useHeaderTransform(
-    <div className="flex w-full items-center gap-3">
+    <div className="flex w-full items-center gap-2">
       <div className="flex flex-1 items-center gap-2 rounded-full bg-muted px-4">
         <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
           value={query}
-          onChange={(e) => setParam('q', e.target.value || undefined)}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Evento, ciudad, fotógrafo…"
           className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
@@ -167,13 +236,30 @@ export function Search() {
           </span>
         )}
       </button>
+      {activeFilterCount > 0 && (
+        <button
+          onClick={clearAllFilters}
+          aria-label="Limpiar filtros"
+          title="Limpiar filtros"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
+        >
+          <IconClose className="h-4 w-4" />
+        </button>
+      )}
     </div>,
     scrolled,
+    true,
   )
 
   return (
     <div className="font-flat">
-      {/* Hero — se colapsa al hacer scroll, como la referencia */}
+      {/* Hero simplificado: antes tenía, además del buscador, una fila de
+          botones de categoría (Rodada/Pista/Sesión) que duplicaba el nuevo
+          filtro multi-selectivo de categoría del modal — con hasta 40
+          fotógrafos, 100+ eventos/mes y ~500,000 fotos por filtrar, la
+          categoría es solo UNO de varios filtros que se combinan entre sí
+          (ruta, punto, fotógrafo, horario), así que vive mejor dentro del
+          modal de Filtros que como botones sueltos aquí arriba. */}
       <div
         className={cn(
           'overflow-hidden px-4 text-center transition-all duration-300 md:px-8',
@@ -182,41 +268,19 @@ export function Search() {
       >
         <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">Encuentra tus fotos en segundos.</h1>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-          Busca por evento, ruta, ciudad o fotógrafo — {results.length} fotos disponibles ahora mismo.
+          Busca por evento, ciudad o fotógrafo — {results.length} fotos disponibles ahora mismo.
         </p>
         <div className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-full bg-muted px-5 shadow-sm">
           <IconSearch className="h-5 w-5 shrink-0 text-muted-foreground" />
           <input
             value={query}
-            onChange={(e) => setParam('q', e.target.value || undefined)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Evento, ciudad, fotógrafo…"
             className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
           />
-        </div>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => setParam('categoria', category === c ? undefined : c)}
-              className={cn(
-                'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                category === c ? 'bg-primary text-white' : 'bg-muted text-foreground hover:bg-border',
-              )}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-6 md:px-8">
-        <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
-          </p>
           <button
             onClick={() => setFiltersOpen(true)}
-            className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"
+            className="flex shrink-0 items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90"
           >
             <IconFilter className="h-4 w-4" />
             Filtros
@@ -226,6 +290,14 @@ export function Search() {
               </span>
             )}
           </button>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-6 md:px-8">
+        <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
+          </p>
         </div>
 
         {/* Contador + resizer de tamaño de foto — solo desde md:, en móvil
@@ -254,40 +326,42 @@ export function Search() {
         {activeChips.length > 0 && (
           <div className="mb-5 flex flex-wrap gap-2">
             {activeChips.map((chip) => (
-              <button key={chip.key} onClick={() => setParam(chip.key, undefined)}>
+              <button key={chip.key} onClick={() => (chip.remove ? chip.remove() : clearFilter(chip.key))}>
                 <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
                   {chip.label} ✕
                 </Badge>
               </button>
             ))}
-            <button
-              onClick={() => setSearchParams({}, { replace: true })}
-              className="text-sm font-medium text-muted-foreground underline"
-            >
+            <button onClick={clearAllFilters} className="text-sm font-medium text-muted-foreground underline">
               Limpiar todo
             </button>
           </div>
         )}
 
-        <PhotoGrid photos={results} isLoading={resultsLoading} tileSize={tileSize} onOpenPhoto={(photos, index) => setLightbox({ photos, index })} />
+        {/* `key` fuerza a PhotoGrid a re-montar (y así re-disparar la
+            animación de entrada de sus primeras fotos) cada vez que cambia
+            el conjunto de filtros aplicados — sin esto, cambiar de filtro
+            solo reordenaba/recortaba el mismo grid sin dar ninguna señal
+            visual de "esto se acaba de refiltrar". */}
+        <PhotoGrid
+          key={`${categories.join(',')}|${routeIds.join(',')}|${pointIds.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}|${query}`}
+          photos={results}
+          isLoading={resultsLoading}
+          tileSize={tileSize}
+          onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
+        />
       </div>
 
       <SearchFilterModal
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
-        routeOptions={routes.map((r) => ({ value: r.id, label: r.name }))}
-        cityOptions={CITIES.map((c) => ({ value: c, label: c }))}
-        categoryOptions={CATEGORIES.map((c) => ({ value: c, label: c }))}
-        brandOptions={MOTO_BRANDS.map((b) => ({ value: b, label: b }))}
-        routeId={routeId}
-        city={city}
-        category={category}
-        motoBrand={motoBrand}
-        onlyMyBrand={onlyMyBrand}
-        myBrand={bikerDetails?.moto_brand ?? undefined}
-        sort={sort}
-        onChange={setParam}
-        resultCount={results.length}
+        categoryOptions={categoryOptions}
+        routeOptions={routeOptions}
+        pointOptions={pointOptions}
+        photographerOptions={photographerOptions}
+        value={{ categories, routeIds, pointIds, photographerIds, horaDesde, horaHasta }}
+        onApply={applyFilters}
+        countFor={countFor}
       />
 
       {lightbox && (

@@ -14,7 +14,7 @@ export interface PublicEvent extends Omit<DbEvent, 'event_points'> {
 export interface PublicPhoto extends DbPhoto {
   event: { title: string; city: string; category: string; deleted_at: string | null; status: string } | null
   photographer: { display_name: string } | null
-  point: { label: string; route_point: { route_id: string } | null } | null
+  point: { label: string; time_start: string; time_end: string; route_point: { route_id: string } | null } | null
 }
 
 export interface MapPoint extends DbEventPoint {
@@ -32,14 +32,16 @@ export interface MapPoint extends DbEventPoint {
 
 export interface SearchFilters {
   query?: string
-  city?: string
-  category?: string
-  motoBrand?: string
-  photographerId?: string
   eventId?: string
-  pointId?: string
-  routeId?: string
-  sort?: 'relevancia' | 'precio-asc' | 'precio-desc'
+  /** Todos multi-selectivos y opcionales — se combinan como AND entre
+   * campos distintos, OR dentro del mismo campo (ej. categorías Rodada Y
+   * Pista trae fotos de cualquiera de las dos). */
+  categories?: string[]
+  routeIds?: string[]
+  pointIds?: string[]
+  photographerIds?: string[]
+  horaDesde?: string
+  horaHasta?: string
 }
 
 /** Muestra liviana de fotos públicas para muros decorativos (login, landing) —
@@ -265,21 +267,22 @@ export function useSearchPhotos(filters: SearchFilters) {
     queryFn: async (): Promise<PublicPhoto[]> => {
       const { data, error } = await supabase
         .from('photos')
-        .select('*, event:events(title, city, category, deleted_at, status), photographer:profiles(display_name), point:event_points(label, route_point:route_points(route_id))')
+        .select(
+          '*, event:events(title, city, category, deleted_at, status), photographer:profiles(display_name), point:event_points(label, time_start, time_end, route_point:route_points(route_id))',
+        )
       if (error) throw error
       return (data as unknown as PublicPhoto[]) ?? []
     },
     select: (photos) => {
-      let results = photos.filter((p) => {
+      const results = photos.filter((p) => {
         if (p.event?.deleted_at) return false
         if (p.event?.status === 'pausado') return false
-        if (filters.photographerId && p.photographer_id !== filters.photographerId) return false
         if (filters.eventId && p.event_id !== filters.eventId) return false
-        if (filters.pointId && p.point_id !== filters.pointId) return false
-        if (filters.routeId && p.point?.route_point?.route_id !== filters.routeId) return false
-        if (filters.motoBrand && p.moto_brand !== filters.motoBrand) return false
-        if (filters.city && p.event?.city !== filters.city) return false
-        if (filters.category && p.event?.category !== filters.category) return false
+        if (filters.categories?.length && !filters.categories.includes(p.event?.category ?? '')) return false
+        if (filters.routeIds?.length && !(p.point?.route_point?.route_id && filters.routeIds.includes(p.point.route_point.route_id))) return false
+        if (filters.pointIds?.length && !(p.point_id && filters.pointIds.includes(p.point_id))) return false
+        if (filters.photographerIds?.length && !filters.photographerIds.includes(p.photographer_id)) return false
+        if ((filters.horaDesde || filters.horaHasta) && (!p.point || !pointMatchesTime(p.point, filters.horaDesde, filters.horaHasta))) return false
         if (filters.query) {
           const q = filters.query.toLowerCase()
           const haystack = [p.event?.title, p.event?.city, p.photographer?.display_name].join(' ').toLowerCase()
@@ -287,8 +290,6 @@ export function useSearchPhotos(filters: SearchFilters) {
         }
         return true
       })
-      if (filters.sort === 'precio-asc') results = [...results].sort((a, b) => a.price - b.price)
-      if (filters.sort === 'precio-desc') results = [...results].sort((a, b) => b.price - a.price)
       return results
     },
   })
@@ -299,7 +300,7 @@ function timeToMinutes(t: string) {
   return h * 60 + m
 }
 
-export function pointMatchesTime(point: DbEventPoint, afterTime?: string, beforeTime?: string) {
+export function pointMatchesTime(point: { time_start: string; time_end: string }, afterTime?: string, beforeTime?: string) {
   if (!afterTime && !beforeTime) return true
   const start = timeToMinutes(point.time_start)
   if (afterTime && start < timeToMinutes(afterTime)) return false

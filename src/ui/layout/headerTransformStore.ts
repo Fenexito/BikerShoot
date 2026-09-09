@@ -7,7 +7,13 @@ interface HeaderTransformState {
    * página (no un umbral genérico), porque cada página sabe cuándo tiene
    * sentido transformarse (ej. cuando termina de reducirse su portada). */
   active: boolean
-  setTransform: (content: ReactNode | null, active: boolean) => void
+  /** HeaderUser siempre agrega, junto a `content`, un botón fijo de "Buscar…"
+   * (búsqueda global) en el mismo lugar donde vivían buscar/favoritos/
+   * carrito/notificaciones/perfil. Una página cuyo propio `content` YA
+   * incluye una caja de búsqueda (ej. Search.tsx) pasa `true` aquí para que
+   * ese botón extra no se duplique al lado del suyo. */
+  hideSearchTrigger: boolean
+  setTransform: (content: ReactNode | null, active: boolean, hideSearchTrigger?: boolean) => void
 }
 
 /** Contenido (y condición de activación) que reemplaza el header por defecto
@@ -19,5 +25,6 @@ interface HeaderTransformState {
 export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   content: null,
   active: false,
-  setTransform: (content, active) => set({ content, active }),
+  hideSearchTrigger: false,
+  setTransform: (content, active, hideSearchTrigger = false) => set({ content, active, hideSearchTrigger }),
 }))

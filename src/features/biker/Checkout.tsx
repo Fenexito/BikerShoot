@@ -104,7 +104,7 @@ export function Checkout() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 pb-24 font-flat md:px-8 lg:pb-10">
+    <div className="mx-auto max-w-6xl px-4 py-10 pb-24 font-flat md:px-8 lg:pb-10">
       <h1 className="mb-8 text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
 
       <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">

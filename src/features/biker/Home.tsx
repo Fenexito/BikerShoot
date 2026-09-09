@@ -55,8 +55,14 @@ export function Home() {
 
   return (
     <div className="font-flat">
-      {/* Hero — collage de fotos reales de fondo */}
-      <section className="relative isolate flex min-h-[560px] items-center overflow-hidden bg-primary md:min-h-[640px]">
+      {/* Hero — collage de fotos reales de fondo. `-mt-[4.75rem] md:mt-0`
+          cancela el padding móvil que PortalLayout agrega al contenido
+          (`pt-[4.75rem]`, para que el header flotante fijo no tape nada) —
+          sin esto, esta sección (pensada a sangre completa, como la
+          portada de StudioProfilePage) dejaba un tramo de fondo plano
+          visible entre el header y el collage. En desktop el header es
+          `sticky` (no `fixed`) y el padding ya es 0, así que no aplica. */}
+      <section className="relative isolate -mt-[4.75rem] flex min-h-[560px] items-center overflow-hidden bg-primary md:mt-0 md:min-h-[640px]">
         {collagePhotos.length > 0 && (
           <div className="absolute inset-0 grid grid-cols-4 grid-rows-3 gap-1 md:grid-cols-6">
             {collagePhotos.map((photo, i) => (

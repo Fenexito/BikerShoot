@@ -55,6 +55,7 @@ export function HeaderUser() {
   // existe, la capa normal se queda siempre visible.
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
+  const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const transformed = transformActive && transformContent != null
 
   return (
@@ -175,13 +176,15 @@ export function HeaderUser() {
               )}
             >
               <div className="min-w-0 flex-1">{transformContent}</div>
-              <button
-                onClick={() => setSearchOpen(true)}
-                className="flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
-              >
-                <IconSearch className="h-5 w-5 shrink-0" />
-                <span className="truncate">Buscar…</span>
-              </button>
+              {!hideSearchTrigger && (
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
+                >
+                  <IconSearch className="h-5 w-5 shrink-0" />
+                  <span className="truncate">Buscar…</span>
+                </button>
+              )}
             </div>
           </div>
         </header>

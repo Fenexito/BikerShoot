@@ -8,6 +8,7 @@ import { useRoutes } from '../../shared/useRoutes'
 import { r2Url } from '../../../lib/r2'
 import { formatOrderCode } from '../../../lib/orderStatus'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
+import { useScrollLock } from '../../../ui/shared/useScrollLock'
 import { InitialsAvatar } from '../../../ui/shared/InitialsAvatar'
 import { IconSearch, IconClose, IconCart, IconMap } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
@@ -89,18 +90,14 @@ export function BikerSearchModal({ open, onClose }: { open: boolean; onClose: ()
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKeyDown)
-    // Bloquea scroll en html Y body — html es el scrollingElement real de
-    // la app, bloquear solo body no basta (ver motoshots_v2_layout_overflow_bugs).
-    const prevHtmlOverflow = document.documentElement.style.overflow
-    const prevBodyOverflow = document.body.style.overflow
-    document.documentElement.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.documentElement.style.overflow = prevHtmlOverflow
-      document.body.style.overflow = prevBodyOverflow
-    }
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
+
+  // `overflow:hidden` en html/body (el intento anterior) no bastaba en todo
+  // dispositivo/navegador — el "rubber-band"/overscroll seguía moviendo la
+  // página de fondo detrás del overlay. `useScrollLock` fija el body en su
+  // lugar en vez de solo esconder su scrollbar (ver el comentario del hook).
+  useScrollLock(open)
 
   useEffect(() => {
     if (open) {
