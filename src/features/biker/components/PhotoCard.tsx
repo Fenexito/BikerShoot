@@ -76,7 +76,12 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           que dejaba un hueco de 1-2px entre la foto y el borde. Visible
           incluso sin pasar el cursor encima, para que al reiniciar o repetir
           una búsqueda el usuario sepa de un vistazo cuáles ya eligió. */}
-      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-2xl ring-2 ring-inset ring-blue-500" />}
+      {/* Grosor subido de 2px a 3px — el de 2px se perdía un poco contra
+          fotos de fondo oscuro. Se mantiene azul a propósito (no rojo):
+          rojo ya quedó reservado para "quitar/limpiar" en toda esta
+          página, y usarlo aquí también se prestaría a confundirlo con una
+          advertencia en vez de una confirmación de "ya lo tienes". */}
+      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-2xl ring-[3px] ring-inset ring-blue-500" />}
 
       {saveBurstKey !== null && (
         <div key={saveBurstKey} className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center" onAnimationEnd={() => setSaveBurstKey(null)}>

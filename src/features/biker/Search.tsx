@@ -7,12 +7,16 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { Badge } from '../../ui/flat/Badge'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { IconSearch, IconGridSmall, IconGridLarge, IconClose, IconChevronDown } from '../../ui/shared/icons'
+import { IconSearch, IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
-import { useOutsideClick } from '../../ui/shared/useOutsideClick'
 import { cn } from '../../lib/cn'
+
+// Orden fijo (no alfabético ni de aparición) — el biker espera verlas
+// siempre en este orden sin importar cuáles estén disponibles en cada
+// combinación de filtros.
+const CATEGORY_ORDER = ['Rodada', 'Pista', 'Sesión de Fotos']
 
 // Rango del resizer de tamaño de foto — el tope (270px) está calculado
 // para que, incluso en el tamaño MÁS GRANDE posible, sigan cabiendo al
@@ -90,12 +94,19 @@ function dedupeOptions(values: string[]): FilterDropdownOption[] {
   return Array.from(new Set(values)).map((v) => ({ value: v, label: v }))
 }
 
-function HourRangeDropdown({
+function orderedCategoryOptions(values: string[]): FilterDropdownOption[] {
+  const present = new Set(values)
+  return CATEGORY_ORDER.filter((c) => present.has(c)).map((c) => ({ value: c, label: c }))
+}
+
+/** Barra SIEMPRE visible (no un menú desplegable que hay que abrir) — el
+ * horario es un rango, no una opción de una lista, así que tiene más
+ * sentido como control directo que como algo escondido detrás de un click. */
+function HourRangeBar({
   boundsMin,
   boundsMax,
   valueMin,
   valueMax,
-  active,
   onChange,
   variant = 'pill',
 }: {
@@ -103,38 +114,14 @@ function HourRangeDropdown({
   boundsMax: number
   valueMin: number
   valueMax: number
-  active: boolean
   onChange: (min: number, max: number) => void
   variant?: 'pill' | 'text'
 }) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  useOutsideClick(rootRef, () => setOpen(false), open)
+  const slider = <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} size={variant === 'text' ? 'compact' : 'default'} />
 
-  return (
-    <div ref={rootRef} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={
-          variant === 'text'
-            ? cn('flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1 text-sm font-medium transition-colors', active ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground')
-            : cn(
-                'flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors',
-                active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground hover:bg-muted',
-              )
-        }
-      >
-        {active ? `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}` : 'Horario'}
-        <IconChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-72 origin-top animate-menu-in rounded-2xl border border-border bg-background p-4 shadow-2xl">
-          <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} />
-        </div>
-      )}
-    </div>
-  )
+  if (variant === 'text') return <div className="shrink-0">{slider}</div>
+
+  return <div className="flex shrink-0 items-center rounded-full border border-border bg-background px-4 py-1.5">{slider}</div>
 }
 
 export function Search() {
@@ -225,7 +212,7 @@ export function Search() {
   // (interconectados en ambas direcciones) — ver `matchingPoints`.
   const fieldFilters: FieldFilters = { categories, routeIds, pointLabels, photographerIds }
 
-  const categoryOptions = dedupeOptions(matchingPoints(events, fieldFilters, 'categories').map((p) => p.event.category))
+  const categoryOptions = orderedCategoryOptions(matchingPoints(events, fieldFilters, 'categories').map((p) => p.event.category))
 
   const routeIdsAvailable = new Set(
     matchingPoints(events, fieldFilters, 'routeIds')
@@ -306,37 +293,36 @@ export function Search() {
   // acá: ya no hace falta un botón "Filtros" que abra un modal aparte.
   function renderFilterBar(variant: 'pill' | 'text') {
     return (
-      <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2', variant === 'pill' ? 'w-full justify-center gap-x-2' : 'w-full')}>
+      <div
+        className={cn(
+          'flex items-center gap-x-4 gap-y-2',
+          // Pastillas (en la página): hay ancho de sobra, así que se
+          // envuelven y centran. Texto (header): sin salto de línea — en
+          // móvil no caben todas en el ancho del header, así que esta fila
+          // scrollea horizontalmente en vez de recortarse (el panel de cada
+          // FilterDropdown vive en un portal aparte, no lo afecta este
+          // overflow).
+          variant === 'pill' ? 'w-full flex-wrap justify-center gap-x-2' : 'w-full flex-nowrap overflow-x-auto',
+        )}
+      >
         <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
         <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
         <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
         <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
-        <HourRangeDropdown
-          variant={variant}
-          boundsMin={boundsMin}
-          boundsMax={boundsMax}
-          valueMin={valueMin}
-          valueMax={valueMax}
-          active={hourActive}
-          onChange={changeHourRange}
-        />
+        <HourRangeBar variant={variant} boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
         {activeFilterCount > 0 && (
-          <button
-            onClick={clearAllFilters}
-            className={cn(
-              'shrink-0 whitespace-nowrap text-sm font-semibold text-red-500 transition-colors hover:text-red-600',
-              variant === 'pill' && 'flex h-9 items-center gap-1.5 rounded-full bg-red-50 px-4',
-            )}
-          >
-            {variant === 'pill' && <IconClose className="h-4 w-4" />}
-            Limpiar filtros
+          <button onClick={clearAllFilters} aria-label="Limpiar filtros" title="Limpiar filtros" className="shrink-0 text-red-500 transition-colors hover:text-red-600">
+            <IconClose className="h-4 w-4" />
           </button>
         )}
       </div>
     )
   }
 
-  useHeaderTransform(renderFilterBar('text'), scrolled)
+  // `mobileEnabled`: el biker entra sobre todo desde el teléfono a esta
+  // página — el header interactivo (y sus filtros) también debe estar
+  // disponible ahí, no solo en escritorio (ver headerTransformStore).
+  useHeaderTransform(renderFilterBar('text'), scrolled, false, true)
 
   return (
     <div className="font-flat">
@@ -361,6 +347,12 @@ export function Search() {
         </div>
       </div>
 
+      {/* El centinela vive justo debajo del buscador del hero — el header
+          interactivo se activa exactamente cuando ESTE buscador (no la
+          barra de filtros, que vive más abajo) queda tapado por el header,
+          un par de scrolls antes de lo que hacía antes. */}
+      <div ref={sentinelRef} />
+
       <div className="mx-auto max-w-[1800px] px-4 md:px-8">
         <div className="mb-5">{renderFilterBar('pill')}</div>
 
@@ -376,8 +368,6 @@ export function Search() {
           </div>
         )}
       </div>
-
-      <div ref={sentinelRef} />
 
       <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
         <div className="mb-4 flex items-center justify-between gap-3 md:hidden">

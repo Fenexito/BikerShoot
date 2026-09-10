@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { useCartStore } from './cartStore'
+import { useCartStore, type CartItem } from './cartStore'
 import { useCartDrawerStore } from './cartDrawerStore'
 import { getPortalRoot } from '../../ui/shared/portalRoot'
 import { useScrollLock } from '../../ui/shared/useScrollLock'
@@ -18,6 +18,32 @@ export function CartDrawer() {
   const items = useCartStore((s) => s.items)
   const remove = useCartStore((s) => s.remove)
   const total = useCartStore((s) => s.total())
+
+  // Agrupado por fotógrafo (sin importar el evento) y, dentro de cada
+  // fotógrafo, por evento — así el biker ve de un vistazo cuánto lleva de
+  // cada quien, sin que fotos del mismo fotógrafo en eventos distintos
+  // queden mezcladas sin orden.
+  const groups = useMemo(() => {
+    const byPhotographer = new Map<string, { photographerName: string; byEvent: Map<string, { eventTitle: string; items: CartItem[] }> }>()
+    for (const item of items) {
+      let photographerGroup = byPhotographer.get(item.photographerId)
+      if (!photographerGroup) {
+        photographerGroup = { photographerName: item.photographerName, byEvent: new Map() }
+        byPhotographer.set(item.photographerId, photographerGroup)
+      }
+      let eventGroup = photographerGroup.byEvent.get(item.eventId)
+      if (!eventGroup) {
+        eventGroup = { eventTitle: item.eventTitle, items: [] }
+        photographerGroup.byEvent.set(item.eventId, eventGroup)
+      }
+      eventGroup.items.push(item)
+    }
+    return Array.from(byPhotographer.entries()).map(([photographerId, g]) => ({
+      photographerId,
+      photographerName: g.photographerName,
+      events: Array.from(g.byEvent.entries()).map(([eventId, e]) => ({ eventId, eventTitle: e.eventTitle, items: e.items })),
+    }))
+  }, [items])
 
   useScrollLock(open)
 
@@ -55,26 +81,40 @@ export function CartDrawer() {
               <p className="text-sm text-muted-foreground">Agrega fotos desde cualquier búsqueda o evento.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {items.map((item) => (
-                <div key={item.photoId} className="flex items-center gap-3 rounded-2xl border border-border p-2">
-                  <img
-                    src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
-                    alt=""
-                    className="h-14 w-14 shrink-0 rounded-xl object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{item.eventTitle}</p>
-                    <p className="truncate text-xs text-muted-foreground">{item.photographerName}</p>
+            <div className="flex flex-col gap-6">
+              {groups.map((group) => (
+                <div key={group.photographerId}>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.photographerName}</p>
+                  <div className="flex flex-col gap-4">
+                    {group.events.map((event) => (
+                      <div key={event.eventId}>
+                        {group.events.length > 1 && <p className="mb-1.5 truncate text-xs font-medium text-muted-foreground">{event.eventTitle}</p>}
+                        <div className="flex flex-col gap-2">
+                          {event.items.map((item) => (
+                            <div key={item.photoId} className="flex items-center gap-3 rounded-2xl border border-border p-2">
+                              <img
+                                src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
+                                alt=""
+                                className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold">{event.eventTitle}</p>
+                                <p className="truncate text-xs text-muted-foreground">{item.photographerName}</p>
+                              </div>
+                              <p className="shrink-0 text-sm font-bold">Q{item.price}</p>
+                              <button
+                                onClick={() => remove(item.photoId)}
+                                aria-label="Quitar del carrito"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <p className="shrink-0 text-sm font-bold">Q{item.price}</p>
-                  <button
-                    onClick={() => remove(item.photoId)}
-                    aria-label="Quitar del carrito"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <IconTrash className="h-4 w-4" />
-                  </button>
                 </div>
               ))}
             </div>

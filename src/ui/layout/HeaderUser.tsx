@@ -46,20 +46,27 @@ export function HeaderUser() {
   }
 
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
-  const hidden = useAutoHideHeader()
+  const autoHidden = useAutoHideHeader()
 
   // Mismo mecanismo que HeaderStudio: si la página actual registró
   // contenido y señaló que ya toca mostrarlo (useHeaderTransform), TODO lo
   // que hay a la derecha del botón atrás (logo, nav, buscar, favoritos,
   // carrito, notificaciones, perfil) cede su lugar a las herramientas
   // propias de esa página, con un crossfade — el header nunca cambia de
-  // tamaño ni posición, solo lo que hay adentro. Solo aplica en escritorio
-  // (capa transformada `hidden md:flex`) — en móvil este mecanismo no
-  // existe, la capa normal se queda siempre visible.
+  // tamaño ni posición, solo lo que hay adentro. Por defecto solo aplica en
+  // escritorio — una página puede pedir `mobileEnabled` (ver
+  // headerTransformStore) para que también aplique en móvil.
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
+  const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
   const transformed = transformActive && transformContent != null
+  // Buscar fotos pide `mobileEnabled` porque el biker entra sobre todo desde
+  // el teléfono y necesita el header (y, más abajo del scroll, sus filtros)
+  // siempre a la vista — a diferencia del resto de páginas, acá el
+  // auto-ocultado queda desactivado del todo, no solo mientras ya está
+  // transformado.
+  const hidden = autoHidden && !mobileEnabled
 
   return (
     <>
@@ -69,17 +76,21 @@ export function HeaderUser() {
           hidden ? '-translate-y-[calc(100%+1rem)]' : 'translate-y-0',
         )}
       >
-        <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background/90 px-3 shadow-sm backdrop-blur-md md:gap-5 md:px-4">
+        {/* `bg-background` sólido (antes `bg-background/90 backdrop-blur-md`):
+            con el header interactivo activo sobre una grilla de fotos de
+            colores variados, la translucidez + blur se leía como una mancha
+            gris/oscurecida encima de la barra en vez de un blanco limpio. */}
+        <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background px-3 shadow-sm md:gap-5 md:px-4">
           <HeaderBackSlot />
           <div className="relative h-11 min-w-0 flex-1">
             {/* Capa normal: logo + nav + buscar/favoritos/carrito/
-                notificaciones/perfil — sigue mostrándose completa en
-                móvil (la transformación nunca aplica ahí), y en
-                escritorio se desvanece cuando `transformed`. */}
+                notificaciones/perfil — se desvanece cuando `transformed`,
+                siempre a partir de md, y también en móvil si la página pidió
+                `mobileEnabled`. */}
             <div
               className={cn(
                 'absolute inset-0 flex translate-y-0 items-center gap-3 opacity-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-5',
-                transformed && 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0',
+                transformed && (mobileEnabled ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0'),
               )}
             >
               <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
@@ -166,24 +177,32 @@ export function HeaderUser() {
               </div>
             </div>
 
-            {/* Capa transformada: solo existe en el DOM a partir de md —
-                en móvil `hidden` la saca del todo, sin importar
-                `transformed`. La búsqueda global se queda disponible
+            {/* Capa transformada: por defecto solo existe en el DOM a
+                partir de md (`hidden md:flex`) — en móvil no aplica salvo
+                que la página pida `mobileEnabled`, en cuyo caso está
+                disponible siempre. La búsqueda global se queda disponible
                 aquí también (a la derecha, con forma de cuadro de
                 búsqueda), en el mismo lugar donde vivían buscar/
                 favoritos/carrito/notificaciones/perfil — nunca en medio
                 del contenido de la página. */}
             <div
               className={cn(
-                'absolute inset-0 hidden items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
+                'absolute inset-0 items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                mobileEnabled ? 'flex' : 'hidden md:flex',
                 transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-2.5 opacity-0',
               )}
             >
-              <div className="min-w-0 flex-1">{transformContent}</div>
+              <div className="min-w-0 flex-1 overflow-hidden">{transformContent}</div>
               {!hideSearchTrigger && (
                 <button
                   onClick={() => setSearchOpen(true)}
-                  className="flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
+                  className={cn(
+                    'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
+                    // En móvil los filtros ya necesitan todo el espacio
+                    // disponible — el buscador permanente vuelve a partir
+                    // de `sm` (tablet en adelante), donde sí sobra sitio.
+                    mobileEnabled && 'hidden sm:flex',
+                  )}
                 >
                   <IconSearch className="h-5 w-5 shrink-0" />
                   <span className="truncate">Buscar…</span>

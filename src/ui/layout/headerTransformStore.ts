@@ -13,7 +13,15 @@ interface HeaderTransformState {
    * incluye una caja de búsqueda (ej. Search.tsx) pasa `true` aquí para que
    * ese botón extra no se duplique al lado del suyo. */
   hideSearchTrigger: boolean
-  setTransform: (content: ReactNode | null, active: boolean, hideSearchTrigger?: boolean) => void
+  /** Por defecto la transformación del header SOLO aplica en escritorio — en
+   * móvil la navegación real vive en la barra inferior y el header además se
+   * auto-oculta al hacer scroll (ver `useAutoHideHeader`). Una página como
+   * Buscar fotos, donde el biker entra sobre todo desde el teléfono y
+   * NECESITA los filtros a mano en todo momento, pasa `true` aquí para que
+   * en móvil también: (a) el header deje de auto-ocultarse, y (b) también
+   * muestre el contenido transformado (con scroll horizontal si no cabe). */
+  mobileEnabled: boolean
+  setTransform: (content: ReactNode | null, active: boolean, hideSearchTrigger?: boolean, mobileEnabled?: boolean) => void
 }
 
 /** Contenido (y condición de activación) que reemplaza el header por defecto
@@ -26,5 +34,6 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   content: null,
   active: false,
   hideSearchTrigger: false,
-  setTransform: (content, active, hideSearchTrigger = false) => set({ content, active, hideSearchTrigger }),
+  mobileEnabled: false,
+  setTransform: (content, active, hideSearchTrigger = false, mobileEnabled = false) => set({ content, active, hideSearchTrigger, mobileEnabled }),
 }))

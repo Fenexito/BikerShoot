@@ -21,11 +21,11 @@ import { useHeaderTransformStore } from './headerTransformStore'
  * actualiza un valor en un store, no dispara ningún efecto secundario caro)
  * y así los manejadores de eventos que capture (onClick, onChange...) nunca
  * quedan obsoletos. Un efecto aparte, solo con `[]`, limpia al desmontar. */
-export function useHeaderTransform(content: ReactNode | null, active: boolean, hideSearchTrigger = false) {
+export function useHeaderTransform(content: ReactNode | null, active: boolean, hideSearchTrigger = false, mobileEnabled = false) {
   const setTransform = useHeaderTransformStore((s) => s.setTransform)
 
   useEffect(() => {
-    setTransform(content, active, hideSearchTrigger)
+    setTransform(content, active, hideSearchTrigger, mobileEnabled)
   })
 
   useEffect(() => {

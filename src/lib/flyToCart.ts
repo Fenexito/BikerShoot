@@ -33,19 +33,47 @@ export function flyToCart(sourceRect: DOMRect, imageUrl: string) {
   el.style.zIndex = '9999'
   el.style.pointerEvents = 'none'
   el.style.willChange = 'transform, opacity'
+  el.style.transformOrigin = 'center center'
   document.body.appendChild(el)
 
-  const deltaX = targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2)
-  const deltaY = targetRect.top + targetRect.height / 2 - (sourceRect.top + sourceRect.height / 2)
+  const startX = sourceRect.left + sourceRect.width / 2
+  const startY = sourceRect.top + sourceRect.height / 2
+  const endX = targetRect.left + targetRect.width / 2
+  const endY = targetRect.top + targetRect.height / 2
 
-  const anim = el.animate(
-    [
-      { transform: 'translate(0px, 0px) scale(1)', opacity: 1 },
-      { transform: `translate(${deltaX * 0.55}px, ${deltaY * 0.55 - 40}px) scale(0.55)`, opacity: 1, offset: 0.6 },
-      { transform: `translate(${deltaX}px, ${deltaY}px) scale(0.08)`, opacity: 0.3 },
-    ],
-    { duration: 600, easing: 'cubic-bezier(0.3, 0, 0.6, 1)' },
-  )
+  // Curva de Bézier cuadrática con el punto de control levantado por
+  // encima de la línea recta entre origen y destino — un arco, no una
+  // línea. La altura del "salto" se adapta a la distancia real para que
+  // se sienta proporcional tanto en una tarjeta pegada al header como en
+  // una al fondo de la página.
+  const dist = Math.hypot(endX - startX, endY - startY)
+  const arcLift = Math.min(160, Math.max(60, dist * 0.35))
+  const controlX = (startX + endX) / 2
+  const controlY = Math.min(startY, endY) - arcLift
+
+  function bezier(t: number) {
+    const x = (1 - t) ** 2 * startX + 2 * (1 - t) * t * controlX + t ** 2 * endX
+    const y = (1 - t) ** 2 * startY + 2 * (1 - t) * t * controlY + t ** 2 * endY
+    return { x, y }
+  }
+
+  const STEPS = 10
+  const keyframes: Keyframe[] = Array.from({ length: STEPS + 1 }, (_, i) => {
+    const t = i / STEPS
+    const { x, y } = bezier(t)
+    // Un ligero balanceo (no una rotación continua en una sola dirección) —
+    // se siente más como algo que vuela con peso propio que como un ícono
+    // deslizándose sobre rieles.
+    const rotate = Math.sin(t * Math.PI) * 10 * (startX < endX ? 1 : -1)
+    const scale = 1 - 0.82 * t ** 1.4
+    return {
+      transform: `translate(${x - startX}px, ${y - startY}px) rotate(${rotate}deg) scale(${scale})`,
+      opacity: t < 0.75 ? 1 : 1 - (t - 0.75) / 0.25,
+      offset: t,
+    }
+  })
+
+  const anim = el.animate(keyframes, { duration: 650, easing: 'cubic-bezier(0.33, 0, 0.2, 1)', fill: 'forwards' })
   anim.onfinish = () => el.remove()
   anim.oncancel = () => el.remove()
 }
