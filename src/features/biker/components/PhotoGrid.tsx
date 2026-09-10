@@ -62,6 +62,29 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
 
   const visible = useMemo(() => photos.slice(0, visibleCount), [photos, visibleCount])
 
+  // Si la foto resaltada (la que se acaba de cerrar en el visor) todavía no
+  // está renderizada (el usuario navegó más allá de las primeras
+  // `BATCH_SIZE`), primero hay que revelarla antes de poder desplazarse
+  // hasta ella.
+  useEffect(() => {
+    if (!highlightedId) return
+    const idx = photos.findIndex((p) => p.id === highlightedId)
+    if (idx >= 0 && idx >= visibleCount) setVisibleCount(Math.min(photos.length, idx + BATCH_SIZE))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedId])
+
+  // Ya con la foto renderizada (o si ya lo estaba), centra la vista en ella
+  // — pero solo si no está ya visible en pantalla, para no mover nada si el
+  // usuario apenas cerró el visor sin haber navegado a otra foto.
+  useEffect(() => {
+    if (!highlightedId) return
+    const el = document.getElementById(`photo-${highlightedId}`)
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
+    if (!inView) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightedId, visibleCount])
+
   if (isLoading) {
     return <SkeletonGrid count={12} className="sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" />
   }
@@ -80,17 +103,19 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
     <div>
       <div
         className={cn(
-          // Separación reducida (antes gap-2.5/gap-3, y de nuevo un poco
-          // más en móvil) para aprovechar mejor el espacio — con grillas de
-          // hasta 6-12+ fotos por fila, un gap más chico se nota bastante
-          // en cuántas fotos caben cómodas.
-          layout === 'mosaic' ? 'columns-2 gap-1 sm:columns-3 sm:gap-2 lg:columns-4' : 'grid gap-1 transition-[grid-template-columns] duration-300 ease-out sm:gap-2',
+          // Separación reducida (antes gap-2.5/gap-3) para aprovechar mejor
+          // el espacio — con grillas de hasta 6-12+ fotos por fila, un gap
+          // más chico se nota bastante en cuántas fotos caben cómodas. Ya
+          // NO crece en escritorio (`sm:gap-2` se quitó) — al usuario le
+          // gustó cómo se ve la separación chica también ahí.
+          layout === 'mosaic' ? 'columns-2 gap-1 sm:columns-3 lg:columns-4' : 'grid gap-1 transition-[grid-template-columns] duration-300 ease-out',
         )}
         style={layout === 'grid' ? { gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize}px, 1fr))` } : undefined}
       >
         {visible.map((photo, i) => (
           <div
             key={photo.id}
+            id={`photo-${photo.id}`}
             className={cn(layout === 'mosaic' && 'break-inside-avoid', i < 24 && 'animate-[fade-in-up_.35s_ease-out_backwards]')}
             style={i < 24 ? { animationDelay: `${(i % 12) * 25}ms` } : undefined}
           >

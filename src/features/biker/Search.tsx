@@ -383,9 +383,13 @@ export function Search() {
 
   // Orden fijo en TODOS lados: Categoría, Ruta, Fotógrafo, Evento, Punto,
   // Horario. En la página (pastillas) es un solo `flex-wrap` — con ancho de
-  // sobra caben en una fila; si no, envuelve solo. En el header (texto) los
-  // primeros 3 van siempre visibles; los otros 3 viven en la tarjeta
-  // flotante que "más filtros" revela (ver `mobileExpanded`).
+  // sobra caben en una fila; si no, envuelve solo. En el header (texto):
+  // en escritorio los 6 viven en UNA sola fila (nunca en dos, a diferencia
+  // de móvil); en móvil solo los primeros 3 se ven de entrada, y los otros
+  // 3 viven en la tarjeta flotante que "más filtros" revela (ver
+  // `mobileExpanded`) — dos copias separadas de los mismos 3 controles,
+  // una por escritorio (siempre en la fila) y otra por móvil (en la fila
+  // que crece), cada una mostrándose solo en su propio breakpoint.
   function renderPillFilters() {
     return (
       <div className="flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2">
@@ -406,18 +410,17 @@ export function Search() {
         <FilterDropdown variant="text" label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
         <FilterDropdown variant="text" label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
         <FilterDropdown variant="text" label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
-        {/* El botón de "más filtros" solo existe en móvil (`sm:hidden`) —
-            en escritorio hay ancho de sobra, así que ahí los 6 filtros
-            viven siempre visibles de una vez (ver `extraActive` más
-            abajo), sin ningún botón que expanda/colapse nada. */}
-        <button
-          onClick={() => setMobileExpanded((v) => !v)}
-          aria-label="Más filtros"
-          title="Más filtros"
-          className="flex shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground sm:hidden"
-        >
-          <IconChevronDown className={cn('h-5 w-5 transition-transform duration-300', mobileExpanded && 'rotate-180')} />
-        </button>
+        {/* Escritorio: los otros 3 filtros viven acá mismo, en la MISMA
+            fila (nunca en una segunda fila) — solo visibles a partir de
+            `sm`. En móvil no ocupan espacio (`hidden`); ahí esos 3 viven en
+            la copia de `renderHeaderSecondaryFilters`, en la fila que el
+            header hace crecer al tocar "más filtros" (el botón que
+            reemplaza la flecha de volver, ver `mobileBackSlotContent`). */}
+        <div className="hidden shrink-0 flex-nowrap items-center gap-x-4 sm:flex">
+          <FilterDropdown variant="text" label="Evento" values={eventIds} onChange={(v) => setListParam('eventos', v)} options={eventOptions} />
+          <FilterDropdown variant="text" label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+          <HourRangeBar variant="text" boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+        </div>
         {clearButton}
       </div>
     )
@@ -433,19 +436,28 @@ export function Search() {
     )
   }
 
-  // `hideBackSlotOnMobile`: esta página no usa la flecha de "volver" — ese
-  // hueco se libera en móvil para que el botón de flecha (arriba) viva ahí
-  // en su lugar, en vez de dejarlo vacío. `extraContent`/`extraActive` es
-  // lo que hace que el propio header CREZCA de alto para revelar Evento/
-  // Punto/Horario — no un panel flotante aparte.
+  // El botón que extiende el header en móvil ocupa EXACTAMENTE el mismo
+  // lugar que la flecha de "volver" en el resto de páginas (mismo hueco,
+  // mismo tamaño) — ver `mobileBackSlotContent` en HeaderUser.tsx. En
+  // escritorio esta página no usa nada de esto: los 6 filtros ya viven
+  // juntos en una sola fila dentro de `content` (ver arriba), así que
+  // `extraActive` nunca se activa ahí.
+  const mobileMoreFiltersButton = (
+    <button
+      onClick={() => setMobileExpanded((v) => !v)}
+      aria-label="Más filtros"
+      title="Más filtros"
+      className="flex h-full w-full items-center justify-center text-foreground transition-colors hover:text-muted-foreground"
+    >
+      <IconChevronDown className={cn('h-5 w-5 transition-transform duration-300', mobileExpanded && 'rotate-180')} />
+    </button>
+  )
+
   useHeaderTransform(renderHeaderPrimaryFilters(), scrolled, {
     mobileEnabled: true,
-    hideBackSlotOnMobile: true,
+    mobileBackSlotContent: mobileMoreFiltersButton,
     extraContent: renderHeaderSecondaryFilters(),
-    // En escritorio los otros 3 filtros están SIEMPRE a la vista en cuanto
-    // el header se transforma (no hay botón para colapsarlos ahí) — solo
-    // en móvil dependen de si el usuario tocó "más filtros".
-    extraActive: isNarrow ? mobileExpanded : scrolled,
+    extraActive: isNarrow && mobileExpanded,
   })
 
   return (
@@ -466,7 +478,11 @@ export function Search() {
           activa exactamente cuando este bloque queda tapado por el header. */}
       <div ref={sentinelRef} />
 
-      <div className="mx-auto max-w-[1800px] px-4 md:px-8">
+      {/* Margen lateral reducido (antes px-4/md:px-8) — el usuario pidió
+          achicarlo un poco para que el aire entre la última foto de cada
+          fila y el borde de la página se pareciera más al gap entre
+          fotos, en vez de sentirse desproporcionadamente más ancho. */}
+      <div className="mx-auto max-w-[1800px] px-2 md:px-4">
         <div className="mb-5">{renderPillFilters()}</div>
 
         {activeChips.length > 0 && (
@@ -482,7 +498,7 @@ export function Search() {
         )}
       </div>
 
-      <div ref={gridWrapRef} className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
+      <div ref={gridWrapRef} className="mx-auto max-w-[1800px] px-2 pb-8 pt-2 md:px-4">
         {/* Contador + resizer de tamaño de foto — ahora también en móvil
             (antes el control de densidad era solo de escritorio); en
             pantallas angostas el slider simplemente se ve un poco más

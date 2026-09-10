@@ -81,12 +81,13 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   }
 
   return (
-    // Radio de borde un poco más chico en móvil (`rounded-lg`, antes
-    // `rounded-2xl` en todos lados) — con miniaturas más chicas ese radio
-    // se comía proporcionalmente más detalle de la esquina de la foto.
+    // Radio de borde más chico en todos lados (`rounded-lg`, antes
+    // `rounded-2xl`) — con miniaturas chicas ese radio se comía
+    // proporcionalmente más detalle de la esquina de la foto; al usuario le
+    // gustó cómo se ve también en escritorio, así que ya no crece ahí.
     <div
       className={cn(
-        'group relative overflow-hidden rounded-lg bg-muted transition-shadow sm:rounded-2xl',
+        'group relative overflow-hidden rounded-lg bg-muted transition-shadow',
         layout === 'mosaic' && 'mb-3 break-inside-avoid',
         justClosed && 'animate-photo-just-closed',
       )}
@@ -102,7 +103,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           rojo ya quedó reservado para "quitar/limpiar" en toda esta
           página, y usarlo aquí también se prestaría a confundirlo con una
           advertencia en vez de una confirmación de "ya lo tienes". */}
-      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-lg ring-[3px] ring-inset ring-blue-500 sm:rounded-2xl" />}
+      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-lg ring-[3px] ring-inset ring-blue-500" />}
 
       {saveBurstKey !== null && (
         <div key={saveBurstKey} className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center" onAnimationEnd={() => setSaveBurstKey(null)}>
@@ -191,7 +192,11 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
                   // color y el ícono (carrito relleno vs. contorno) son la
                   // única diferencia entre "agregar" y "ya en el carrito".
                   'pointer-events-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-sm transition-all duration-200 sm:h-9 sm:px-3',
-                  inCart ? 'bg-primary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
+                  // `sm:hover:` (no `hover:` a secas): en móvil no hay
+                  // verdadero hover, y el :hover "pegajoso" tras un toque
+                  // podía quedarse en azul, mismo color que "ya agregada",
+                  // prestándose a confundirlas.
+                  inCart ? 'bg-primary text-white' : 'bg-white text-foreground sm:hover:bg-primary sm:hover:text-white',
                 )}
               >
                 <IconCart className="h-3.5 w-3.5" filled={inCart} />

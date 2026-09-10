@@ -64,7 +64,7 @@ export function HeaderUser() {
   const transformActive = useHeaderTransformStore((s) => s.active)
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
-  const hideBackSlotOnMobile = useHeaderTransformStore((s) => s.hideBackSlotOnMobile)
+  const mobileBackSlotContent = useHeaderTransformStore((s) => s.mobileBackSlotContent)
   const extraContent = useHeaderTransformStore((s) => s.extraContent)
   const extraActive = useHeaderTransformStore((s) => s.extraActive)
   const transformed = transformActive && transformContent != null
@@ -97,8 +97,17 @@ export function HeaderUser() {
           )}
         >
         <div className="flex h-16 items-center gap-3 px-3 md:gap-5 md:px-4">
-          <div className={cn(hideBackSlotOnMobile && transformed && 'hidden sm:block')}>
-            <HeaderBackSlot />
+          {/* La flecha de "volver" y su reemplazo móvil (si la página pidió
+              uno) ocupan EXACTAMENTE el mismo hueco de 36×36 — un overlay
+              encima del otro, nunca dos elementos con su propio espacio,
+              así no hay ningún salto de layout al cambiar entre uno y otro. */}
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+            <div className={cn(mobileBackSlotContent && transformed && 'invisible sm:visible')}>
+              <HeaderBackSlot />
+            </div>
+            {mobileBackSlotContent && (
+              <div className={cn('absolute inset-0 flex items-center justify-center sm:hidden', !transformed && 'invisible')}>{mobileBackSlotContent}</div>
+            )}
           </div>
           <div className="relative h-11 min-w-0 flex-1">
             {/* Capa normal: logo + nav + buscar/favoritos/carrito/

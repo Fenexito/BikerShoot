@@ -16,17 +16,19 @@ export interface HeaderTransformOptions {
    * en móvil también: (a) el header deje de auto-ocultarse, y (b) también
    * muestre el contenido transformado (con scroll horizontal si no cabe). */
   mobileEnabled?: boolean
-  /** En móvil, con `mobileEnabled`, el hueco de la flecha de "volver" (que
-   * normalmente esta página ni usa) se libera para que la propia página
-   * pueda poner ahí su propio control (ej. el botón de "más filtros" de
-   * Buscar fotos) en vez de un espacio reservado vacío. */
-  hideBackSlotOnMobile?: boolean
+  /** En móvil, con `mobileEnabled`, esta página puede poner SU PROPIO control
+   * exactamente donde vive la flecha de "volver" (mismo lugar, mismo
+   * espaciado) — reemplazándola en vez de solo dejar el hueco vacío. Pensado
+   * para el botón de "más filtros" de Buscar fotos: antes vivía metido en la
+   * fila de filtros; ahora ocupa el mismo lugar/tamaño que la flecha atrás
+   * en el resto de páginas. En escritorio (o si esto no aplica) se sigue
+   * viendo la flecha de volver normal. */
+  mobileBackSlotContent?: ReactNode | null
   /** Segunda fila OPCIONAL que, cuando `extraActive` es true, hace que el
    * propio `<header>` (el pill) CREZCA de alto para mostrarla — no es un
    * panel flotante aparte, es el mismo header extendiéndose. Pensado para
-   * "más filtros" en Buscar fotos: no caben los 6 filtros en una sola fila
-   * en móvil, así que los primeros 3 viven en `content` y los otros 3 acá,
-   * revelados/ocultados con una animación de alto (ver HeaderUser.tsx). */
+   * "más filtros" en Buscar fotos EN MÓVIL — en escritorio esta página
+   * pone los 6 filtros en una sola fila dentro de `content` y no usa esto. */
   extraContent?: ReactNode | null
   extraActive?: boolean
 }
@@ -51,7 +53,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   active: false,
   hideSearchTrigger: false,
   mobileEnabled: false,
-  hideBackSlotOnMobile: false,
+  mobileBackSlotContent: null,
   extraContent: null,
   extraActive: false,
   setTransform: (content, active, options = {}) =>
@@ -60,7 +62,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
       active,
       hideSearchTrigger: options.hideSearchTrigger ?? false,
       mobileEnabled: options.mobileEnabled ?? false,
-      hideBackSlotOnMobile: options.hideBackSlotOnMobile ?? false,
+      mobileBackSlotContent: options.mobileBackSlotContent ?? null,
       extraContent: options.extraContent ?? null,
       extraActive: options.extraActive ?? false,
     }),
