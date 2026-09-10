@@ -68,7 +68,15 @@ export function HeaderUser() {
   const extraContent = useHeaderTransformStore((s) => s.extraContent)
   const extraActive = useHeaderTransformStore((s) => s.extraActive)
   const transformed = transformActive && transformContent != null
-  const expanded = extraActive && extraContent != null
+  const secondaryRowOpen = extraActive && extraContent != null
+  // El radio de esquina se decide por si la página PUEDE llegar a extender
+  // el header (trae `extraContent`) y ya está transformada — NO por si la
+  // fila secundaria está abierta o cerrada en este instante. Antes cambiaba
+  // junto con `secondaryRowOpen`, así que el radio "se reajustaba" visible
+  // apenas terminaba la animación de abrir/cerrar; ahora es constante
+  // mientras el header sigue transformado, sin importar cuántas veces se
+  // abra/cierre la fila de abajo.
+  const canExpand = extraContent != null
   // El auto-ocultado (bajar = esconder, subir = mostrar) aplica siempre,
   // también en páginas con `mobileEnabled` como Buscar fotos — el biker
   // quiere seguir viendo fotos sin el header/menú estorbando mientras
@@ -88,12 +96,13 @@ export function HeaderUser() {
             colores variados, la translucidez + blur se leía como una mancha
             gris/oscurecida encima de la barra en vez de un blanco limpio.
             El radio de borde pasa de `rounded-full` (pill) a `rounded-3xl`
-            cuando `expanded` — un pill totalmente redondeado se ve raro en
-            cuanto crece de alto, un radio más chico ya lee como "tarjeta". */}
+            en cuanto el header transforma (si la página puede llegar a
+            extenderlo) — y se queda ahí fijo, sin volver a cambiar cada vez
+            que la fila secundaria se abre/cierra. */}
         <header
           className={cn(
             'mx-auto max-w-6xl border border-border bg-background shadow-sm transition-[border-radius] duration-300',
-            expanded ? 'rounded-3xl' : 'rounded-full',
+            transformed && canExpand ? 'rounded-3xl' : 'rounded-full',
           )}
         >
         <div className="flex h-16 items-center gap-3 px-3 md:gap-5 md:px-4">
@@ -277,7 +286,7 @@ export function HeaderUser() {
             cada página) sin tener que medirlo a mano; el `overflow-hidden`
             de adentro es lo que realmente recorta durante la transición. */}
         {extraContent && (
-          <div className={cn('grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]', expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className={cn('grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]', secondaryRowOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
             <div className="overflow-hidden">
               <div className="px-4 pb-4 pt-1 md:px-6">{extraContent}</div>
             </div>
@@ -293,11 +302,12 @@ export function HeaderUser() {
         items={[
           { to: '/app', label: 'Inicio', icon: <IconHome className="h-full w-full" />, end: true },
           { to: '/app/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
-          { to: '/app/checkout', label: 'Carrito', icon: <IconCart className="h-full w-full" /> },
+          { to: '/app/checkout', label: 'Carrito', icon: <IconCart className="h-full w-full" />, badge: itemCount },
           { to: '/app/perfil', label: 'Perfil', icon: <IconUser className="h-full w-full" /> },
         ]}
         primary={{ to: '/app/buscar', label: 'Buscar', icon: <IconSearch className="h-full w-full" /> }}
         activeClassName="text-primary"
+        autoHide={mobileEnabled}
       />
     </>
   )

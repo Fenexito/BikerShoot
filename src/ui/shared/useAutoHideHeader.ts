@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useScrollFocusStore } from './scrollFocusStore'
 
 const HIDE_THRESHOLD = 12
 const SHOW_THRESHOLD = 16
@@ -26,6 +27,7 @@ const REAPPEAR_BELOW = 100
 export function useAutoHideHeader() {
   const [hidden, setHidden] = useState(false)
   const lastY = useRef(0)
+  const suppressed = useScrollFocusStore((s) => s.suppressed)
 
   useEffect(() => {
     lastY.current = window.scrollY
@@ -45,5 +47,9 @@ export function useAutoHideHeader() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  return hidden
+  // Mientras un scroll programático está centrando una foto (ver
+  // `scrollFocusStore`), nunca se oculta — ocultarse/mostrarse a mitad de
+  // esa animación competía visualmente con ella y la foto terminaba
+  // perdiendo el centrado.
+  return suppressed ? false : hidden
 }

@@ -21,6 +21,12 @@ interface PhotoCardProps {
   /** true por un instante justo después de cerrar el visor sobre esta foto
    * — dispara un resalte breve para que no se pierda entre las demás. */
   justClosed?: boolean
+  /** Columnas realmente renderizadas en la grilla (solo se calcula en
+   * móvil, ver Search.tsx) — cuando viene, reemplaza el criterio basado en
+   * `tileSize` para decidir si mostrar frescura/acciones: con muchas fotos
+   * por fila el usuario ya está en modo "ver miniaturas", no "elegir una",
+   * así que ni la pastilla de frescura ni los botones caben con sentido. */
+  columns?: number | null
 }
 
 const FRESHNESS_MIN_TILE_SIZE = 170
@@ -32,7 +38,7 @@ const ACTIONS_MIN_TILE_SIZE = 110
 
 /** Foto limpia por defecto — toda la info (precio, favorito, carrito,
  * fotógrafo) solo aparece al pasar el cursor, como en la referencia. */
-export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout = 'grid', tileSize = 220, justClosed = false }: PhotoCardProps) {
+export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout = 'grid', tileSize = 220, justClosed = false, columns = null }: PhotoCardProps) {
   const inCart = useCartStore((s) => s.has(photo.id))
   const add = useCartStore((s) => s.add)
   const remove = useCartStore((s) => s.remove)
@@ -46,6 +52,13 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   // seguidas antes de que termine la anterior).
   const [saveBurstKey, setSaveBurstKey] = useState<number | null>(null)
   const [unsaveBurstKey, setUnsaveBurstKey] = useState<number | null>(null)
+  // En móvil, con la columna real ya calculada (ver Search.tsx), el criterio
+  // pasa de "tamaño de miniatura" a "cuántas caben por fila" — con 3+
+  // columnas el usuario está hojeando muchas fotos chicas a la vez, no
+  // decidiendo sobre una en particular, así que ni acciones ni frescura
+  // caben con sentido ahí.
+  const showActions = columns == null ? tileSize >= ACTIONS_MIN_TILE_SIZE : columns <= 2
+  const showFreshness = columns == null ? tileSize >= FRESHNESS_MIN_TILE_SIZE : columns <= 1
 
   function handleToggleFavorite() {
     const next = !isFavorite
@@ -153,12 +166,12 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           resizer en móvil) estos botones ya no caben sin verse amontonados
           — el usuario los usa desde el visor en su lugar, que sí tiene
           espacio de sobra. */}
-      {tileSize >= ACTIONS_MIN_TILE_SIZE && (
+      {showActions && (
         <>
           {/* Barra superior: frescura + favorito — la frescura se oculta en
               marcos chicos (grilla densa), donde ocupa demasiado espacio. */}
           <div className="absolute inset-x-2 top-2 flex items-start justify-between opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
-            {freshness && tileSize >= FRESHNESS_MIN_TILE_SIZE ? (
+            {freshness && showFreshness ? (
               <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">{freshness}</span>
             ) : (
               <span />
@@ -200,10 +213,6 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
                 )}
               >
                 <IconCart className="h-3.5 w-3.5" filled={inCart} />
-                {/* Precio oculto en móvil — con miniaturas chicas y varias por
-                    fila, este botón ya compite por poco espacio; el ícono solo
-                    sigue dejando claro qué hace. */}
-                {!inCart && <span className="hidden sm:inline">Q{photo.price}</span>}
               </button>
             )}
           </div>

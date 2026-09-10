@@ -4,7 +4,6 @@ import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type Public
 import { useRoutes } from '../shared/useRoutes'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
-import { Badge } from '../../ui/flat/Badge'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
 import { IconGridSmall, IconGridLarge, IconClose, IconChevronDown } from '../../ui/shared/icons'
@@ -181,6 +180,12 @@ export function Search() {
   const GRID_GAP_MOBILE = 4 // `gap-1` en PhotoGrid.tsx
   const mobileFloor = gridWidth > 0 ? Math.max(60, Math.floor((gridWidth - 3 * GRID_GAP_MOBILE) / 4)) : TILE_SIZE_MIN_MOBILE
   const tileSizeMin = isNarrow ? mobileFloor : TILE_SIZE_MIN
+  // Columnas REALMENTE renderizadas en móvil (mismo cálculo que hace el CSS
+  // `grid-template-columns: repeat(auto-fill, minmax(tileSize,1fr))`) — se
+  // usa para decidir, en PhotoCard, si aún caben frescura/acciones por
+  // fila. En escritorio no hace falta (ese criterio sigue siendo por
+  // tamaño de miniatura, no por columnas).
+  const columns = isNarrow && gridWidth > 0 ? Math.max(1, Math.floor((gridWidth + GRID_GAP_MOBILE) / (tileSize + GRID_GAP_MOBILE))) : null
 
   // Si la pantalla cambia de angosta a ancha (o al revés, ej. al rotar el
   // teléfono) y el valor guardado queda por debajo del nuevo mínimo, se
@@ -334,26 +339,46 @@ export function Search() {
 
   const activeFilterCount = categories.length + routeIds.length + eventIds.length + pointLabels.length + photographerIds.length + (hourActive ? 1 : 0)
 
+  // Un color distinto por tipo de filtro — con muchos filtros aplicados a
+  // la vez, el color ayuda a distinguir de un vistazo "esta chip es de
+  // categoría" vs. "esta es de fotógrafo" sin tener que leer cada una.
+  const CHIP_TONES = {
+    categoria: 'bg-violet-100 text-violet-800 hover:bg-violet-200',
+    ruta: 'bg-amber-100 text-amber-800 hover:bg-amber-200',
+    fotografo: 'bg-sky-100 text-sky-800 hover:bg-sky-200',
+    evento: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200',
+    punto: 'bg-rose-100 text-rose-800 hover:bg-rose-200',
+    hora: 'bg-slate-200 text-slate-800 hover:bg-slate-300',
+  } as const
+
   const activeChips = [
-    ...categories.map((c) => ({ key: `cat-${c}`, label: c, remove: () => setListParam('categorias', categories.filter((v) => v !== c)) })),
+    ...categories.map((c) => ({ key: `cat-${c}`, label: c, tone: CHIP_TONES.categoria, remove: () => setListParam('categorias', categories.filter((v) => v !== c)) })),
     ...routeIds.map((id) => ({
       key: `ruta-${id}`,
       label: routes.find((r) => r.id === id)?.name ?? 'Ruta',
+      tone: CHIP_TONES.ruta,
       remove: () => setListParam('rutas', routeIds.filter((v) => v !== id)),
     })),
     ...eventIds.map((id) => ({
       key: `evento-${id}`,
       label: eventOptionsMap.get(id) ?? events.find((e) => e.id === id)?.title ?? 'Evento',
+      tone: CHIP_TONES.evento,
       remove: () => setListParam('eventos', eventIds.filter((v) => v !== id)),
     })),
-    ...pointLabels.map((label) => ({ key: `punto-${label}`, label, remove: () => setListParam('puntos', pointLabels.filter((v) => v !== label)) })),
+    ...pointLabels.map((label) => ({ key: `punto-${label}`, label, tone: CHIP_TONES.punto, remove: () => setListParam('puntos', pointLabels.filter((v) => v !== label)) })),
     ...photographerIds.map((id) => ({
       key: `foto-${id}`,
       label: photographers.find((p) => p.id === id)?.display_name ?? 'Fotógrafo',
+      tone: CHIP_TONES.fotografo,
       remove: () => setListParam('fotografos', photographerIds.filter((v) => v !== id)),
     })),
-    hourActive && { key: 'hora', label: `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}`, remove: () => changeHourRange(boundsMin, boundsMax) },
-  ].filter(Boolean) as { key: string; label: string; remove: () => void }[]
+    hourActive && {
+      key: 'hora',
+      label: `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}`,
+      tone: CHIP_TONES.hora,
+      remove: () => changeHourRange(boundsMin, boundsMax),
+    },
+  ].filter(Boolean) as { key: string; label: string; tone: string; remove: () => void }[]
 
   // Descripción dinámica del hero — reemplaza el texto genérico en cuanto
   // hay algún filtro multi-selectivo elegido.
@@ -415,23 +440,32 @@ export function Search() {
             `sm`. En móvil no ocupan espacio (`hidden`); ahí esos 3 viven en
             la copia de `renderHeaderSecondaryFilters`, en la fila que el
             header hace crecer al tocar "más filtros" (el botón que
-            reemplaza la flecha de volver, ver `mobileBackSlotContent`). */}
+            reemplaza la flecha de volver, ver `mobileBackSlotContent`). El
+            botón de limpiar también vive solo ahí en móvil — en escritorio
+            se queda aquí, al final de la única fila. */}
         <div className="hidden shrink-0 flex-nowrap items-center gap-x-4 sm:flex">
           <FilterDropdown variant="text" label="Evento" values={eventIds} onChange={(v) => setListParam('eventos', v)} options={eventOptions} />
           <FilterDropdown variant="text" label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
           <HourRangeBar variant="text" boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+          {clearButton}
         </div>
-        {clearButton}
       </div>
     )
   }
 
+  // Fila que el header hace crecer en móvil al tocar "más filtros" — se
+  // centra (en vez de alinearse a la izquierda) porque puede quedar con
+  // espacio libre debajo del ícono del carrito, y centrado se ve más
+  // intencional que un bloque pegado a un lado. El botón de limpiar vive
+  // acá abajo (no en la fila principal) para que los 3 filtros + horario +
+  // limpiar quepan sin apretarse contra el ícono de "más filtros".
   function renderHeaderSecondaryFilters() {
     return (
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3" onClick={bumpIdleTimer}>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3" onClick={bumpIdleTimer}>
         <FilterDropdown variant="text" label="Evento" values={eventIds} onChange={(v) => setListParam('eventos', v)} options={eventOptions} />
         <FilterDropdown variant="text" label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
         <HourRangeBar variant="text" boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+        {clearButton}
       </div>
     )
   }
@@ -486,12 +520,20 @@ export function Search() {
         <div className="mb-5">{renderPillFilters()}</div>
 
         {activeChips.length > 0 && (
-          <div className="mb-5 flex flex-wrap justify-center gap-2">
+          // Una sola fila desplazable (no envuelve en varias) — con muchos
+          // filtros aplicados, envolver en 2-3 filas se comía demasiado
+          // espacio vertical; un scroll horizontal contenido cuesta menos
+          // que eso, y el usuario igual puede eliminar cada chip con un
+          // click sin tener que "encontrarla" entre varias filas.
+          <div className="mb-5 -mx-2 flex gap-2 overflow-x-auto px-2 pb-1 sm:justify-center sm:overflow-visible sm:px-0">
             {activeChips.map((chip) => (
-              <button key={chip.key} onClick={chip.remove}>
-                <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
-                  {chip.label} ✕
-                </Badge>
+              <button
+                key={chip.key}
+                onClick={chip.remove}
+                className={cn('flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors', chip.tone)}
+              >
+                {chip.label}
+                <IconClose className="h-3 w-3" />
               </button>
             ))}
           </div>
@@ -547,6 +589,7 @@ export function Search() {
           photos={results}
           isLoading={resultsLoading}
           tileSize={tileSize}
+          columns={columns}
           highlightedId={justClosedId}
           onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
         />

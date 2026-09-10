@@ -8,6 +8,9 @@ export interface MobileNavItem {
   label: string
   icon: ReactNode
   end?: boolean
+  /** Número a mostrar como insignia sobre el ícono (ej. cuántas fotos hay
+   * en el carrito) — se omite si es 0/undefined. */
+  badge?: number
 }
 
 interface MobileBottomNavProps {
@@ -17,20 +20,39 @@ interface MobileBottomNavProps {
    * el portal biker, Crear evento en el portal del fotógrafo). */
   primary: MobileNavItem
   activeClassName?: string
+  /** Auto-ocultarse al bajar (y reaparecer al subir) — false por defecto,
+   * así el menú se queda fijo en la mayoría de páginas. Solo Buscar fotos
+   * lo activa: ahí conviene ceder ese espacio a la vista de fotos. */
+  autoHide?: boolean
 }
 
 /** Barra inferior estilo Instagram — reemplaza la navegación por header en
  * pantallas chicas. 5 accesos: 2 + 2 alrededor de una acción central elevada. */
-export function MobileBottomNav({ items, primary, activeClassName }: MobileBottomNavProps) {
+export function MobileBottomNav({ items, primary, activeClassName, autoHide = false }: MobileBottomNavProps) {
   const [left1, left2, right1, right2] = items
   // Mismo criterio de auto-ocultado que el header: al bajar se esconde
-  // (más espacio para ver fotos), al subir vuelve a aparecer.
-  const hidden = useAutoHideHeader()
+  // (más espacio para ver fotos), al subir vuelve a aparecer — pero solo
+  // si `autoHide` lo pide (ver el comentario de esa prop).
+  const autoHidden = useAutoHideHeader()
+  const hidden = autoHide && autoHidden
 
   function itemClass({ isActive }: { isActive: boolean }) {
     return cn(
       'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
       isActive ? cn('text-foreground', activeClassName) : 'text-muted-foreground',
+    )
+  }
+
+  function renderIcon(item: MobileNavItem) {
+    return (
+      <span className="relative h-5 w-5">
+        {item.icon}
+        {!!item.badge && (
+          <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
+            {item.badge > 9 ? '9+' : item.badge}
+          </span>
+        )}
+      </span>
     )
   }
 
@@ -44,7 +66,7 @@ export function MobileBottomNav({ items, primary, activeClassName }: MobileBotto
       <div className="mx-auto flex max-w-lg items-center">
         {[left1, left2].map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} className={itemClass}>
-            <span className="h-5 w-5">{item.icon}</span>
+            {renderIcon(item)}
             {item.label}
           </NavLink>
         ))}
@@ -68,7 +90,7 @@ export function MobileBottomNav({ items, primary, activeClassName }: MobileBotto
 
         {[right1, right2].map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} className={itemClass}>
-            <span className="h-5 w-5">{item.icon}</span>
+            {renderIcon(item)}
             {item.label}
           </NavLink>
         ))}

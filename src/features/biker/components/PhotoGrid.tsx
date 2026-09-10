@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DbPhoto } from '../../../types/db'
 import { PhotoCard } from './PhotoCard'
 import { Skeleton, SkeletonGrid } from '../../../ui/shared/Skeleton'
+import { useScrollFocusStore } from '../../../ui/shared/scrollFocusStore'
 import { cn } from '../../../lib/cn'
+
+// Suficiente para que cualquier `scrollIntoView({behavior:'smooth'})` haya
+// terminado con margen — no hay un evento nativo confiable multiplataforma
+// para "el scroll suave ya terminó", así que se libera la supresión del
+// auto-ocultado (ver `scrollFocusStore`) con un simple temporizador.
+const SCROLL_FOCUS_SUPPRESS_MS = 900
 
 const BATCH_SIZE = 36
 
@@ -29,9 +36,13 @@ interface PhotoGridProps {
    * breve para que el usuario no pierda de vista cuál era, entre tantas
    * fotos parecidas. */
   highlightedId?: string | null
+  /** Columnas realmente renderizadas (solo se calcula en móvil, ver
+   * Search.tsx) — se reenvía a cada `PhotoCard` para decidir ahí si
+   * mostrar frescura/acciones según cuántas caben por fila. */
+  columns?: number | null
 }
 
-export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false, tileSize = 150, highlightedId = null }: PhotoGridProps) {
+export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false, tileSize = 150, highlightedId = null, columns = null }: PhotoGridProps) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -82,7 +93,16 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
     if (!el) return
     const rect = el.getBoundingClientRect()
     const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
-    if (!inView) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (!inView) {
+      // En móvil, el scroll de este `scrollIntoView` también dispara el
+      // auto-ocultado del header/menú inferior (ver `useAutoHideHeader`) —
+      // que aparecieran/desaparecieran A MITAD de esta animación competía
+      // visualmente con ella, y la foto terminaba perdiendo el centrado.
+      // Se suprime ese auto-ocultado mientras dura este scroll puntual.
+      useScrollFocusStore.getState().suppress()
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setTimeout(() => useScrollFocusStore.getState().release(), SCROLL_FOCUS_SUPPRESS_MS)
+    }
   }, [highlightedId, visibleCount])
 
   if (isLoading) {
@@ -125,6 +145,7 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
               photographerName={photo.photographerName}
               layout={layout}
               tileSize={tileSize}
+              columns={columns}
               justClosed={photo.id === highlightedId}
               onOpen={() => onOpenPhoto(visible, visible.indexOf(photo))}
             />
