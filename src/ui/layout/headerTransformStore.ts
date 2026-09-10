@@ -21,6 +21,14 @@ export interface HeaderTransformOptions {
    * pueda poner ahí su propio control (ej. el botón de "más filtros" de
    * Buscar fotos) en vez de un espacio reservado vacío. */
   hideBackSlotOnMobile?: boolean
+  /** Segunda fila OPCIONAL que, cuando `extraActive` es true, hace que el
+   * propio `<header>` (el pill) CREZCA de alto para mostrarla — no es un
+   * panel flotante aparte, es el mismo header extendiéndose. Pensado para
+   * "más filtros" en Buscar fotos: no caben los 6 filtros en una sola fila
+   * en móvil, así que los primeros 3 viven en `content` y los otros 3 acá,
+   * revelados/ocultados con una animación de alto (ver HeaderUser.tsx). */
+  extraContent?: ReactNode | null
+  extraActive?: boolean
 }
 
 interface HeaderTransformState extends HeaderTransformOptions {
@@ -44,6 +52,8 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   hideSearchTrigger: false,
   mobileEnabled: false,
   hideBackSlotOnMobile: false,
+  extraContent: null,
+  extraActive: false,
   setTransform: (content, active, options = {}) =>
     set({
       content,
@@ -51,5 +61,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
       hideSearchTrigger: options.hideSearchTrigger ?? false,
       mobileEnabled: options.mobileEnabled ?? false,
       hideBackSlotOnMobile: options.hideBackSlotOnMobile ?? false,
+      extraContent: options.extraContent ?? null,
+      extraActive: options.extraActive ?? false,
     }),
 }))

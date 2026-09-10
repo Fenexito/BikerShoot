@@ -76,10 +76,11 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
     <div>
       <div
         className={cn(
-          // Separación reducida (antes gap-2.5/gap-3) para aprovechar mejor
-          // el espacio — con grillas de hasta 6-12 fotos por fila, un gap
-          // más chico se nota bastante en cuántas fotos caben cómodas.
-          layout === 'mosaic' ? 'columns-2 gap-1.5 sm:columns-3 sm:gap-2 lg:columns-4' : 'grid gap-1.5 transition-[grid-template-columns] duration-300 ease-out sm:gap-2',
+          // Separación reducida (antes gap-2.5/gap-3, y de nuevo un poco
+          // más en móvil) para aprovechar mejor el espacio — con grillas de
+          // hasta 6-12+ fotos por fila, un gap más chico se nota bastante
+          // en cuántas fotos caben cómodas.
+          layout === 'mosaic' ? 'columns-2 gap-1 sm:columns-3 sm:gap-2 lg:columns-4' : 'grid gap-1 transition-[grid-template-columns] duration-300 ease-out sm:gap-2',
         )}
         style={layout === 'grid' ? { gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize}px, 1fr))` } : undefined}
       >

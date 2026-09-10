@@ -18,7 +18,8 @@ interface PhotoLightboxProps {
   onNavigate: (index: number) => void
 }
 
-const SWIPE_DOWN_CLOSE_THRESHOLD = 120
+const SWIPE_UP_CLOSE_THRESHOLD = 110
+const SWIPE_NAV_THRESHOLD = 70
 const CLOSE_ANIMATION_MS = 180
 const ZOOM_MIN = 1
 const ZOOM_MAX = 4
@@ -31,13 +32,15 @@ const ZOOM_MAX = 4
 export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLightboxProps) {
   const photo = photos[index]
   const imgRef = useRef<HTMLImageElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
+  const [dragX, setDragX] = useState(0)
   const [dragY, setDragY] = useState(0)
   const [saveBurstKey, setSaveBurstKey] = useState<number | null>(null)
   const [unsaveBurstKey, setUnsaveBurstKey] = useState<number | null>(null)
   const [slideDir, setSlideDir] = useState(1)
   const [closing, setClosing] = useState(false)
-  const draggingRef = useRef<{ startY: number } | null>(null)
+  const touchRef = useRef<{ mode: 'pan' | 'pinch'; startX: number; startY: number; startDistance: number; startZoom: number } | null>(null)
 
   const inCart = useCartStore((s) => s.has(photo.id))
   const add = useCartStore((s) => s.add)
@@ -49,6 +52,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
 
   useEffect(() => {
     setZoom(1)
+    setDragX(0)
     setDragY(0)
   }, [index])
 
@@ -100,31 +104,81 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
     else setUnsaveBurstKey((k) => (k ?? 0) + 1)
   }
 
-  // Zoom con scroll/rueda (no con click) — mientras la foto está ampliada,
-  // el gesto vertical de deslizar sigue siendo el zoom, no el cierre.
-  function onWheel(e: React.WheelEvent) {
-    e.preventDefault()
-    setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z - e.deltaY * 0.0015)))
-  }
+  // Zoom con scroll/rueda — React registra los listeners de `wheel` como
+  // PASIVOS por defecto (para no trabar el scroll de la página en general),
+  // así que un `onWheel` normal no puede llamar `preventDefault()` sin que
+  // el navegador tire un error/advertencia. Hace falta un listener nativo
+  // agregado a mano con `{ passive: false }` para poder frenar el scroll de
+  // la página mientras se hace zoom sobre la foto.
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      e.preventDefault()
+      setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z - e.deltaY * 0.0015)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
-  // Deslizar hacia abajo para cerrar (móvil) — solo si la foto no está
-  // ampliada.
+  // Gestos táctiles: un dedo desliza (izq/der cambia de foto, arriba
+  // cierra — abajo se dejó de usar porque el navegador lo confunde con
+  // "recargar la página"); dos dedos (pellizcar) hacen zoom.
   function onTouchStart(e: React.TouchEvent) {
-    if (zoom > 1) return
-    draggingRef.current = { startY: e.touches[0].clientY }
-  }
-  function onTouchMove(e: React.TouchEvent) {
-    if (!draggingRef.current) return
-    const delta = e.touches[0].clientY - draggingRef.current.startY
-    if (delta > 0) setDragY(delta)
-  }
-  function onTouchEnd() {
-    if (dragY > SWIPE_DOWN_CLOSE_THRESHOLD) requestClose()
-    else setDragY(0)
-    draggingRef.current = null
+    if (e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]]
+      touchRef.current = {
+        mode: 'pinch',
+        startX: 0,
+        startY: 0,
+        startDistance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        startZoom: zoom,
+      }
+    } else if (e.touches.length === 1 && zoom <= 1) {
+      touchRef.current = { mode: 'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, startDistance: 0, startZoom: zoom }
+    }
   }
 
-  const backdropOpacity = dragY > 0 ? Math.max(0.3, 1 - dragY / 400) : 1
+  function onTouchMove(e: React.TouchEvent) {
+    const t = touchRef.current
+    if (!t) return
+    if (t.mode === 'pinch' && e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]]
+      const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+      const ratio = distance / (t.startDistance || distance)
+      setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, t.startZoom * ratio)))
+    } else if (t.mode === 'pan' && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - t.startX
+      const dy = e.touches[0].clientY - t.startY
+      if (Math.abs(dx) > Math.abs(dy)) {
+        setDragX(dx)
+        setDragY(0)
+      } else if (dy < 0) {
+        // Solo hacia ARRIBA cierra — hacia abajo se ignora a propósito
+        // (en el navegador, deslizar hacia abajo desde arriba de la
+        // página se confunde con "recargar", con o sin scroll-lock).
+        setDragY(dy)
+        setDragX(0)
+      }
+    }
+  }
+
+  function onTouchEnd() {
+    if (touchRef.current?.mode === 'pan') {
+      if (dragY < -SWIPE_UP_CLOSE_THRESHOLD) {
+        requestClose()
+      } else if (dragX < -SWIPE_NAV_THRESHOLD) {
+        go(1)
+      } else if (dragX > SWIPE_NAV_THRESHOLD) {
+        go(-1)
+      }
+    }
+    touchRef.current = null
+    setDragX(0)
+    setDragY(0)
+  }
+
+  const backdropOpacity = dragY < 0 ? Math.max(0.3, 1 - Math.abs(dragY) / 400) : 1
 
   return createPortal(
     <div
@@ -137,11 +191,11 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
           dentro de un padding fijo resuelve ambos casos solo). Click fuera
           de la imagen cierra el visor; la rueda/scroll hace zoom. */}
       <div
+        ref={stageRef}
         className="flex h-full w-full items-center justify-center p-6 sm:p-12"
         onClick={(e) => {
           if (e.target === e.currentTarget) requestClose()
         }}
-        onWheel={onWheel}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -152,7 +206,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
             src={previewUrl(photo)}
             alt={photo.eventTitle}
             className="max-h-[calc(100vh-3rem)] max-w-[calc(100vw-3rem)] select-none object-contain transition-transform duration-150 sm:max-h-[calc(100vh-6rem)] sm:max-w-[calc(100vw-6rem)]"
-            style={{ transform: `scale(${zoom}) translateY(${dragY / zoom}px)` }}
+            style={{ transform: `scale(${zoom}) translate(${dragX}px, ${dragY}px)` }}
             draggable={false}
           />
         </div>

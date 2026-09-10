@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type PublicEvent, type PublicEventPoint } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
@@ -8,11 +7,11 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { Badge } from '../../ui/flat/Badge'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { getPortalRoot } from '../../ui/shared/portalRoot'
 import { IconGridSmall, IconGridLarge, IconClose, IconChevronDown } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
+import { useIsNarrowViewport } from '../../ui/shared/useIsNarrowViewport'
 import { cn } from '../../lib/cn'
 
 // Orden fijo (no alfabético ni de aparición) — el biker espera verlas
@@ -27,6 +26,12 @@ const CATEGORY_ORDER = ['Rodada', 'Pista', 'Sesión de Fotos']
 // (8px) entre columnas, 6 fotos de 270px + 5 gaps = 1620+40 = 1660px…
 // el piso (130px) da ~12 por fila en ese mismo ancho.
 const TILE_SIZE_MIN = 130
+// En móvil el contenedor es mucho más angosto — 130px de mínimo ahí daba
+// apenas ~2 columnas en el ajuste MÁS chico del slider. Este piso más bajo
+// (calculado para ~360-390px de ancho real de pantalla, con `gap-1` y el
+// padding de la página) garantiza al menos 4 columnas incluso en el
+// extremo más denso.
+const TILE_SIZE_MIN_MOBILE = 70
 const TILE_SIZE_MAX = 270
 const TILE_SIZE_DEFAULT = 220
 // Pasos grandes a propósito: cada movimiento del control debe sentirse
@@ -40,7 +45,7 @@ function loadTileSize() {
   try {
     const raw = localStorage.getItem(TILE_SIZE_KEY)
     const n = raw ? Number(raw) : NaN
-    return Number.isFinite(n) && n >= TILE_SIZE_MIN && n <= TILE_SIZE_MAX ? n : TILE_SIZE_DEFAULT
+    return Number.isFinite(n) && n >= TILE_SIZE_MIN_MOBILE && n <= TILE_SIZE_MAX ? n : TILE_SIZE_DEFAULT
   } catch {
     return TILE_SIZE_DEFAULT
   }
@@ -144,6 +149,16 @@ export function Search() {
   // Lee localStorage directo en el estado inicial (sin useEffect) — esta es
   // una SPA sin SSR, así que no hay riesgo de mismatch de hidratación.
   const [tileSize, setTileSize] = useState(loadTileSize)
+  const isNarrow = useIsNarrowViewport()
+  const tileSizeMin = isNarrow ? TILE_SIZE_MIN_MOBILE : TILE_SIZE_MIN
+
+  // Si la pantalla cambia de angosta a ancha (o al revés, ej. al rotar el
+  // teléfono) y el valor guardado queda por debajo del nuevo mínimo, se
+  // sube justo a ese mínimo — nunca por debajo de lo que el slider permite.
+  useEffect(() => {
+    setTileSize((t) => Math.max(tileSizeMin, t))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tileSizeMin])
 
   // En el header interactivo (móvil sobre todo) solo caben 3 filtros —
   // "más filtros" reemplaza el hueco de la flecha de "volver" (que esta
@@ -365,10 +380,9 @@ export function Search() {
           onClick={() => setMobileExpanded((v) => !v)}
           aria-label="Más filtros"
           title="Más filtros"
-          className="flex shrink-0 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="flex shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
         >
-          Más
-          <IconChevronDown className={cn('h-3.5 w-3.5 transition-transform', mobileExpanded && 'rotate-180')} />
+          <IconChevronDown className={cn('h-5 w-5 transition-transform duration-300', mobileExpanded && 'rotate-180')} />
         </button>
         {clearButton}
       </div>
@@ -386,9 +400,16 @@ export function Search() {
   }
 
   // `hideBackSlotOnMobile`: esta página no usa la flecha de "volver" — ese
-  // hueco se libera en móvil para que "Más" (el botón de arriba) viva ahí
-  // en su lugar, en vez de dejarlo vacío.
-  useHeaderTransform(renderHeaderPrimaryFilters(), scrolled, { mobileEnabled: true, hideBackSlotOnMobile: true })
+  // hueco se libera en móvil para que el botón de flecha (arriba) viva ahí
+  // en su lugar, en vez de dejarlo vacío. `extraContent`/`extraActive` es
+  // lo que hace que el propio header CREZCA de alto para revelar Evento/
+  // Punto/Horario — no un panel flotante aparte.
+  useHeaderTransform(renderHeaderPrimaryFilters(), scrolled, {
+    mobileEnabled: true,
+    hideBackSlotOnMobile: true,
+    extraContent: renderHeaderSecondaryFilters(),
+    extraActive: mobileExpanded,
+  })
 
   return (
     <div className="font-flat">
@@ -437,7 +458,7 @@ export function Search() {
             <IconGridSmall className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               type="range"
-              min={TILE_SIZE_MIN}
+              min={tileSizeMin}
               max={TILE_SIZE_MAX}
               step={TILE_SIZE_STEP}
               value={tileSize}
@@ -462,14 +483,6 @@ export function Search() {
           onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
         />
       </div>
-
-      {mobileExpanded &&
-        createPortal(
-          <div className="fixed left-3 right-3 top-[76px] z-40 rounded-3xl border border-border bg-background p-4 shadow-2xl sm:left-4 sm:right-4 sm:top-20">
-            {renderHeaderSecondaryFilters()}
-          </div>,
-          getPortalRoot(),
-        )}
 
       {lightbox && (
         <PhotoLightbox

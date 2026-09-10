@@ -99,7 +99,10 @@ export function FilterDropdown({ label, values, onChange, options, className, va
       >
         <span className={cn(variant === 'pill' && 'max-w-[9rem] truncate')}>
           {label}
-          {values.length > 0 && ` (${values.length})`}
+          {/* El contador ocupa espacio que no sobra en móvil (donde varios
+              de estos filtros ya conviven apretados en el header) — se
+              queda solo desde `sm` en adelante. */}
+          {values.length > 0 && <span className="hidden sm:inline"> ({values.length})</span>}
         </span>
         <IconChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
       </button>

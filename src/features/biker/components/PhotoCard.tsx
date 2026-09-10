@@ -72,7 +72,10 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   }
 
   return (
-    <div className={cn('group relative overflow-hidden rounded-2xl bg-muted transition-shadow', layout === 'mosaic' && 'mb-3 break-inside-avoid')}>
+    // Radio de borde un poco más chico en móvil (`rounded-lg`, antes
+    // `rounded-2xl` en todos lados) — con miniaturas más chicas ese radio
+    // se comía proporcionalmente más detalle de la esquina de la foto.
+    <div className={cn('group relative overflow-hidden rounded-lg bg-muted transition-shadow sm:rounded-2xl', layout === 'mosaic' && 'mb-3 break-inside-avoid')}>
       {/* Borde azul persistente en fotos ya agregadas al carrito — un
           overlay `inset-0` con `ring-inset` (mismo patrón que el borde rojo
           de selección en el portal del fotógrafo) en vez de `ring-offset`,
@@ -84,7 +87,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           rojo ya quedó reservado para "quitar/limpiar" en toda esta
           página, y usarlo aquí también se prestaría a confundirlo con una
           advertencia en vez de una confirmación de "ya lo tienes". */}
-      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-2xl ring-[3px] ring-inset ring-blue-500" />}
+      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-lg ring-[3px] ring-inset ring-blue-500 sm:rounded-2xl" />}
 
       {saveBurstKey !== null && (
         <div key={saveBurstKey} className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center" onAnimationEnd={() => setSaveBurstKey(null)}>
@@ -162,16 +165,22 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
             onClick={handleAddClick}
             aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
             className={cn(
-              'pointer-events-auto flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-all duration-200',
+              'pointer-events-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-sm transition-all duration-200 sm:h-9 sm:px-3',
               inCart ? 'bg-secondary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
             )}
           >
             {inCart ? (
-              <>✓ En carrito</>
+              <>
+                <span className="sm:hidden">✓</span>
+                <span className="hidden sm:inline">✓ En carrito</span>
+              </>
             ) : (
               <>
                 <IconCart className="h-3.5 w-3.5" />
-                Q{photo.price}
+                {/* Precio oculto en móvil — con miniaturas chicas y varias
+                    por fila, este botón ya compite por poco espacio; el
+                    ícono solo sigue dejando claro qué hace. */}
+                <span className="hidden sm:inline">Q{photo.price}</span>
               </>
             )}
           </button>

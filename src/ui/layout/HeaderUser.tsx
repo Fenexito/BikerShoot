@@ -61,7 +61,10 @@ export function HeaderUser() {
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
   const hideBackSlotOnMobile = useHeaderTransformStore((s) => s.hideBackSlotOnMobile)
+  const extraContent = useHeaderTransformStore((s) => s.extraContent)
+  const extraActive = useHeaderTransformStore((s) => s.extraActive)
   const transformed = transformActive && transformContent != null
+  const expanded = extraActive && extraContent != null
   // Buscar fotos pide `mobileEnabled` porque el biker entra sobre todo desde
   // el teléfono y necesita el header (y, más abajo del scroll, sus filtros)
   // siempre a la vista — a diferencia del resto de páginas, acá el
@@ -80,8 +83,17 @@ export function HeaderUser() {
         {/* `bg-background` sólido (antes `bg-background/90 backdrop-blur-md`):
             con el header interactivo activo sobre una grilla de fotos de
             colores variados, la translucidez + blur se leía como una mancha
-            gris/oscurecida encima de la barra en vez de un blanco limpio. */}
-        <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background px-3 shadow-sm md:gap-5 md:px-4">
+            gris/oscurecida encima de la barra en vez de un blanco limpio.
+            El radio de borde pasa de `rounded-full` (pill) a `rounded-3xl`
+            cuando `expanded` — un pill totalmente redondeado se ve raro en
+            cuanto crece de alto, un radio más chico ya lee como "tarjeta". */}
+        <header
+          className={cn(
+            'mx-auto max-w-6xl border border-border bg-background shadow-sm transition-[border-radius] duration-300',
+            expanded ? 'rounded-3xl' : 'rounded-full',
+          )}
+        >
+        <div className="flex h-16 items-center gap-3 px-3 md:gap-5 md:px-4">
           <div className={cn(hideBackSlotOnMobile && transformed && 'hidden sm:block')}>
             <HeaderBackSlot />
           </div>
@@ -245,6 +257,20 @@ export function HeaderUser() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Segunda fila que hace crecer el propio header (no un panel
+            flotante aparte) — el truco de `grid-template-rows` 0fr↔1fr anima
+            un alto que no conocemos de antemano (depende del contenido de
+            cada página) sin tener que medirlo a mano; el `overflow-hidden`
+            de adentro es lo que realmente recorta durante la transición. */}
+        {extraContent && (
+          <div className={cn('grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]', expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+            <div className="overflow-hidden">
+              <div className="px-4 pb-4 pt-1 md:px-6">{extraContent}</div>
+            </div>
+          </div>
+        )}
         </header>
       </div>
 

@@ -87,10 +87,10 @@ export function CartDrawer() {
   return createPortal(
     <div className="fixed inset-0 z-[250] flex justify-end">
       <div className={`fixed inset-0 bg-black/50 ${open ? 'animate-backdrop-in' : 'animate-backdrop-out'}`} onClick={close} />
-      {/* En móvil ya no ocupa casi toda la pantalla: `w-[86%]` dejaba ver
-          un margen a la izquierda (y de paso deja adivinar que hay algo
-          detrás), en vez de sentirse como una página nueva completa. */}
-      <div className={`relative flex h-full w-[86%] max-w-md flex-col bg-background shadow-2xl ${open ? 'animate-drawer-in' : 'animate-drawer-out'}`}>
+      {/* Más angosto en móvil (`w-[70%]`, antes 86%) — en escritorio no se
+          toca: `sm:w-full` + `max-w-md` lo deja exactamente igual que antes
+          a partir de esa resolución. */}
+      <div className={`relative flex h-full w-[70%] max-w-md flex-col bg-background shadow-2xl sm:w-full ${open ? 'animate-drawer-in' : 'animate-drawer-out'}`}>
         <div className="flex items-center justify-between border-b border-border px-4 py-3.5 sm:px-5 sm:py-4">
           <h2 className="flex items-center gap-2 text-base font-bold sm:text-lg">
             <IconCart className="h-5 w-5" />
@@ -110,45 +110,39 @@ export function CartDrawer() {
               <p className="text-sm text-muted-foreground">Agrega fotos desde cualquier búsqueda o evento.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-5 sm:gap-6">
+            <div className="flex flex-col gap-5">
               {groups.map((group) => (
                 <div key={group.photographerId}>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.photographerName}</p>
-                  <div className="flex flex-col gap-3">
-                    {group.events.map((event) => {
-                      // Solo se envuelve en "tarjeta de evento" cuando ESTE
-                      // fotógrafo tiene fotos de más de un evento en el
-                      // carrito — con uno solo, la tarjeta extra no
-                      // aportaría nada y se deja la fila suelta.
-                      const rows = event.items.map((item) => (
-                        <div key={item.photoId} className="flex items-center gap-3 rounded-2xl border border-border p-2">
-                          <img
-                            src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
-                            alt=""
-                            className="h-12 w-12 shrink-0 rounded-xl object-cover sm:h-14 sm:w-14"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">{event.eventTitle}</p>
-                            <p className="truncate text-xs text-muted-foreground">{item.photographerName}</p>
-                          </div>
-                          <p className="shrink-0 text-sm font-bold">Q{item.price}</p>
-                          <button
-                            onClick={() => handleRemove(item)}
-                            aria-label="Quitar del carrito"
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
-                          >
-                            <IconTrash className="h-4 w-4" />
-                          </button>
+                  <div className="flex flex-col gap-2.5">
+                    {/* Una tarjeta por evento SIEMPRE (no solo cuando hay más
+                        de uno) — adentro, filas compactas sin su propio
+                        borde/tarjeta individual, separadas por una línea
+                        fina, para no gastar tanto alto vertical. */}
+                    {group.events.map((event) => (
+                      <div key={event.eventId} className="rounded-2xl border border-border bg-muted/30 p-2.5">
+                        <p className="mb-1.5 truncate px-1 text-xs font-medium text-muted-foreground">{event.eventTitle}</p>
+                        <div className="flex flex-col divide-y divide-border">
+                          {event.items.map((item) => (
+                            <div key={item.photoId} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0">
+                              <img
+                                src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
+                                alt=""
+                                className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                              />
+                              <p className="min-w-0 flex-1 truncate text-sm font-bold">Q{item.price}</p>
+                              <button
+                                onClick={() => handleRemove(item)}
+                                aria-label="Quitar del carrito"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                      ))
-                      if (group.events.length <= 1) return <div key={event.eventId} className="flex flex-col gap-2">{rows}</div>
-                      return (
-                        <div key={event.eventId} className="rounded-2xl border border-border bg-muted/40 p-2.5">
-                          <p className="mb-2 truncate px-1 text-xs font-medium text-muted-foreground">{event.eventTitle}</p>
-                          <div className="flex flex-col gap-2">{rows}</div>
-                        </div>
-                      )
-                    })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
