@@ -35,7 +35,13 @@ export function ConfirmDialog() {
   const danger = request.tone === 'danger'
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    // z-[500]: este diálogo se invoca desde CUALQUIER parte de la app,
+    // incluido desde adentro de otros overlays (el carrito lateral es
+    // z-[250], el visor de fotos y los modales de búsqueda son z-[300]) —
+    // antes, con z-[200], quedaba realmente ABIERTO pero VISUALMENTE
+    // detrás de esos overlays, así que parecía que había que cerrarlos
+    // primero para "verlo" aparecer.
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
       <div
         className={cn(
           'absolute inset-0 bg-black/60 transition-opacity duration-150',
@@ -53,7 +59,7 @@ export function ConfirmDialog() {
           closing ? 'translate-y-1 opacity-0' : 'animate-confirm-in',
         )}
       >
-        <h2 id="confirm-dialog-title" className="text-xs font-bold uppercase tracking-wide text-accent">
+        <h2 id="confirm-dialog-title" className={cn('text-xs font-bold uppercase tracking-wide', danger ? 'text-red-600' : 'text-accent')}>
           {danger ? 'Confirmar eliminación' : 'Confirmar'}
         </h2>
         <p className="mt-3 text-base font-semibold leading-snug">{request.title}</p>
@@ -70,7 +76,7 @@ export function ConfirmDialog() {
             onClick={() => close(true)}
             className={cn(
               'rounded-full px-5 py-2.5 text-sm font-semibold transition-all',
-              danger ? 'bg-accent text-accent-foreground hover:opacity-90' : 'bg-foreground text-background hover:opacity-90',
+              danger ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-foreground text-background hover:opacity-90',
             )}
           >
             {request.confirmLabel ?? 'Confirmar'}

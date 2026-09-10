@@ -1,3 +1,23 @@
+/** `getComputedStyle(el).opacity` solo devuelve la opacidad DECLARADA en
+ * ESE elemento — no la opacidad EFECTIVA/compuesta que se ve en pantalla,
+ * que también depende de sus ancestros. En HeaderUser.tsx las clases
+ * `opacity-0`/`opacity-100` viven en el DIV que envuelve cada capa (normal
+ * o transformada), no en el botón del carrito en sí — así que revisar solo
+ * el botón siempre daba `opacity: 1` (su propio valor, nunca tocado),
+ * incluso cuando su capa contenedora estaba invisible. Por eso la animación
+ * seguía "viendo" el ícono equivocado. Subir por los ancestros hasta
+ * `document.body` y revisar cada uno es lo que realmente detecta si el
+ * elemento (o cualquier contenedor suyo) está oculto. */
+function isReallyVisible(el: HTMLElement): boolean {
+  let node: HTMLElement | null = el
+  while (node && node !== document.body) {
+    const style = getComputedStyle(node)
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false
+    node = node.parentElement
+  }
+  return true
+}
+
 /** Anima una miniatura "volando" desde `sourceRect` hasta el ícono del
  * carrito en el header (`#header-cart-icon`) — puramente decorativo, no
  * afecta el estado real del carrito (eso ya pasó antes de llamar esto).
@@ -8,19 +28,12 @@ export function flyToCart(sourceRect: DOMRect, imageUrl: string) {
   // header y la capa transformada conviven, una encima de la otra con
   // opacidad 0 en vez de desmontada — ver HeaderUser.tsx), así que se
   // marcan con el mismo atributo y se toma el primero que de verdad esté
-  // visible. OJO: `opacity:0`/`pointer-events:none` NO reducen el rect a
-  // cero (el elemento sigue ocupando su lugar en el layout, solo se ve
-  // transparente) — por eso antes, con el header interactivo activo, la
-  // animación seguía apuntando al ícono de la capa normal (invisible pero
-  // con rect "real") en vez del de la capa transformada (el que de verdad
-  // se ve, más a la derecha). Revisar el estilo computado, no solo el rect,
-  // es lo que distingue cuál de los dos es el que el usuario ve.
+  // visible.
   const candidates = document.querySelectorAll<HTMLElement>('[data-cart-icon]')
   let target: HTMLElement | null = null
   let targetRect: DOMRect | null = null
   for (const el of candidates) {
-    const style = getComputedStyle(el)
-    if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue
+    if (!isReallyVisible(el)) continue
     const rect = el.getBoundingClientRect()
     if (rect.width > 0 && rect.height > 0) {
       target = el

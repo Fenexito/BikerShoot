@@ -37,14 +37,17 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   // animación CSS aunque el usuario guarde/quite/guarde varias veces
   // seguidas antes de que termine la anterior).
   const [saveBurstKey, setSaveBurstKey] = useState<number | null>(null)
+  const [unsaveBurstKey, setUnsaveBurstKey] = useState<number | null>(null)
 
   function handleToggleFavorite() {
     const next = !isFavorite
     toggleFavorite(photo.id)
-    // Confirmación visual solo al GUARDAR (no al quitar) — como el corazón
-    // de Instagram, se muestra sola y se desvanece, sin necesitar ningún
-    // click para cerrarla.
+    // Confirmación visual en ambos sentidos: al GUARDAR, como el corazón de
+    // Instagram (crece y se desvanece); al QUITAR, el ícono se "rompe" en
+    // dos mitades que se separan — ninguna necesita ningún click para
+    // cerrarse sola.
     if (next) setSaveBurstKey((k) => (k ?? 0) + 1)
+    else setUnsaveBurstKey((k) => (k ?? 0) + 1)
   }
 
   function handleAddClick(e: React.MouseEvent) {
@@ -86,6 +89,19 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
       {saveBurstKey !== null && (
         <div key={saveBurstKey} className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center" onAnimationEnd={() => setSaveBurstKey(null)}>
           <IconBookmark filled className="h-16 w-16 animate-save-burst text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]" />
+        </div>
+      )}
+
+      {unsaveBurstKey !== null && (
+        <div
+          key={unsaveBurstKey}
+          className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center"
+          onAnimationEnd={() => setUnsaveBurstKey(null)}
+        >
+          <div className="relative h-16 w-16 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+            <IconBookmark filled className="absolute inset-0 h-16 w-16 animate-unsave-break-left text-white" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+            <IconBookmark filled className="absolute inset-0 h-16 w-16 animate-unsave-break-right text-white" style={{ clipPath: 'inset(0 0 0 50%)' }} />
+          </div>
         </div>
       )}
 

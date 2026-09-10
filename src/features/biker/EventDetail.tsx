@@ -122,11 +122,17 @@ export function EventDetail() {
   }
 
   function seeMoreOfPoint(point: PublicEventPoint) {
+    // Los filtros de Buscar fotos son multi-selectivos (listas separadas
+    // por coma, ver Search.tsx) — aunque acá solo mandemos un valor cada
+    // uno, tienen que ir en los parámetros EN PLURAL que esa página
+    // realmente lee (`rutas`/`puntos`/`fotografos`), y "punto" ahora se
+    // identifica por NOMBRE (no por id — ver el comentario de
+    // `pointLabels` en usePublicData.ts, points se deduplican por label).
     const params = new URLSearchParams()
-    if (id) params.set('evento', id)
-    if (event?.photographer_id) params.set('fotografo', event.photographer_id)
-    if (point.route_point?.route_id) params.set('ruta', point.route_point.route_id)
-    params.set('punto', point.id)
+    if (id) params.set('eventos', id)
+    if (event?.photographer_id) params.set('fotografos', event.photographer_id)
+    if (point.route_point?.route_id) params.set('rutas', point.route_point.route_id)
+    params.set('puntos', point.label)
     navigate(`/app/buscar?${params.toString()}`)
   }
 

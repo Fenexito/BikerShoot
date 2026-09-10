@@ -223,7 +223,7 @@ export function PhotographerProfile() {
 
         <p className="pb-8 text-center text-sm text-muted-foreground">
           ¿Buscas más de {photographer.display_name}?{' '}
-          <Link to={`/app/buscar?fotografo=${photographer.id}`} className="font-semibold text-primary">
+          <Link to={`/app/buscar?fotografos=${photographer.id}`} className="font-semibold text-primary">
             Ver todas sus fotos en la búsqueda
           </Link>
         </p>

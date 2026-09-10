@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type PublicEvent, type PublicEventPoint } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
@@ -7,7 +8,8 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { Badge } from '../../ui/flat/Badge'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
+import { getPortalRoot } from '../../ui/shared/portalRoot'
+import { IconGridSmall, IconGridLarge, IconClose, IconChevronDown } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
@@ -31,6 +33,8 @@ const TILE_SIZE_DEFAULT = 220
 // como un cambio de tamaño real, no un ajuste casi imperceptible.
 const TILE_SIZE_STEP = 20
 const TILE_SIZE_KEY = 'motoshots_biker_photo_tile_size'
+
+const MOBILE_EXPAND_IDLE_MS = 5000
 
 function loadTileSize() {
   try {
@@ -65,6 +69,7 @@ function minutesToHHMM(mins: number) {
 interface FieldFilters {
   categories: string[]
   routeIds: string[]
+  eventIds: string[]
   pointLabels: string[]
   photographerIds: string[]
 }
@@ -72,15 +77,16 @@ interface FieldFilters {
 /** Todos los pares evento+punto que cumplen los filtros elegidos — EXCEPTO
  * el campo `skip`, para poder calcular las opciones de ESE campo a partir de
  * los demás ("interconectados": elegir un fotógrafo limita categoría/ruta/
- * punto a lo que ese fotógrafo realmente tiene, y viceversa con cualquier
- * otro campo). Sin `skip`, aplica los cuatro filtros a la vez (usado para
- * calcular el rango de horario disponible). */
+ * evento/punto a lo que ese fotógrafo realmente tiene, y viceversa con
+ * cualquier otro campo). Sin `skip`, aplica los cinco filtros a la vez
+ * (usado para calcular el rango de horario disponible). */
 function matchingPoints(events: PublicEvent[], f: FieldFilters, skip?: keyof FieldFilters): { event: PublicEvent; point: PublicEventPoint }[] {
   const eff: FieldFilters = { ...f, ...(skip ? { [skip]: [] } : {}) }
   const pairs: { event: PublicEvent; point: PublicEventPoint }[] = []
   for (const e of events) {
     if (eff.categories.length && !eff.categories.includes(e.category)) continue
     if (eff.photographerIds.length && !eff.photographerIds.includes(e.photographer_id)) continue
+    if (eff.eventIds.length && !eff.eventIds.includes(e.id)) continue
     for (const pt of e.event_points) {
       if (eff.routeIds.length && !(pt.route_point && eff.routeIds.includes(pt.route_point.route_id))) continue
       if (eff.pointLabels.length && !eff.pointLabels.includes(pt.label)) continue
@@ -117,12 +123,11 @@ function HourRangeBar({
   onChange: (min: number, max: number) => void
   variant?: 'pill' | 'text'
 }) {
-  // Sin tarjeta/borde alrededor en ninguna variante — es una fila de
-  // control más, igual que cualquier otro filtro, no algo que necesite su
-  // propio contenedor.
-  return <div className="shrink-0">
-    <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} size={variant === 'text' ? 'compact' : 'default'} />
-  </div>
+  return (
+    <div className="shrink-0">
+      <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} size={variant === 'text' ? 'compact' : 'default'} />
+    </div>
+  )
 }
 
 export function Search() {
@@ -132,18 +137,50 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
   // El header interactivo se activa justo cuando este "centinela" (colocado
-  // apenas arriba de la fila de "N fotos encontradas" + el resizer) queda
-  // tapado por el header — no un número de píxeles fijo, sino el layout
-  // real de la página. Como la barra de filtros de la página vive justo
-  // arriba del centinela, para cuando el header se activa esa barra ya se
-  // está escondiendo debajo del propio header: se siente como que la
-  // misma barra "se muda" de la página al header, no como dos cosas
-  // independientes prendiendo/apagando por su cuenta.
+  // apenas debajo del hero) queda tapado por el header — no un número de
+  // píxeles fijo, sino el layout real de la página.
   const sentinelRef = useRef<HTMLDivElement>(null)
   const scrolled = useScrollPastElement(sentinelRef)
   // Lee localStorage directo en el estado inicial (sin useEffect) — esta es
   // una SPA sin SSR, así que no hay riesgo de mismatch de hidratación.
   const [tileSize, setTileSize] = useState(loadTileSize)
+
+  // En el header interactivo (móvil sobre todo) solo caben 3 filtros —
+  // "más filtros" reemplaza el hueco de la flecha de "volver" (que esta
+  // página no usa) y revela los otros 3 en una tarjeta flotante debajo del
+  // header. Se colapsa solo tras 5s sin interacción, o si el usuario sigue
+  // bajando en la página — así no se queda estorbando la vista de fotos.
+  const [mobileExpanded, setMobileExpanded] = useState(false)
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function bumpIdleTimer() {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    idleTimerRef.current = setTimeout(() => setMobileExpanded(false), MOBILE_EXPAND_IDLE_MS)
+  }
+
+  // Si el header vuelve a su estado normal (el usuario subió de nuevo por
+  // encima del centinela), la tarjeta de "más filtros" no debe quedar
+  // huérfana flotando bajo un header que ya no muestra filtros.
+  useEffect(() => {
+    if (!scrolled) setMobileExpanded(false)
+  }, [scrolled])
+
+  useEffect(() => {
+    if (!mobileExpanded) return
+    bumpIdleTimer()
+    let lastY = window.scrollY
+    function onScroll() {
+      const y = window.scrollY
+      if (y > lastY + 4) setMobileExpanded(false)
+      lastY = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileExpanded])
 
   function changeTileSize(next: number) {
     setTileSize(next)
@@ -155,15 +192,15 @@ export function Search() {
     }
   }
 
-  const eventId = searchParams.get('evento') ?? ''
   const categories = readList(searchParams.get('categorias') ?? '')
   const routeIds = readList(searchParams.get('rutas') ?? '')
+  const eventIds = readList(searchParams.get('eventos') ?? '')
   const pointLabels = readList(searchParams.get('puntos') ?? '')
   const photographerIds = readList(searchParams.get('fotografos') ?? '')
   const horaDesde = searchParams.get('hora_desde') ?? ''
   const horaHasta = searchParams.get('hora_hasta') ?? ''
 
-  function setListParam(key: 'categorias' | 'rutas' | 'puntos' | 'fotografos', values: string[]) {
+  function setListParam(key: 'categorias' | 'rutas' | 'eventos' | 'puntos' | 'fotografos', values: string[]) {
     const next = new URLSearchParams(searchParams)
     writeList(next, key, values)
     setSearchParams(next, { replace: true })
@@ -174,9 +211,9 @@ export function Search() {
   }
 
   const { data: rawResults = [], isLoading: resultsLoading } = useSearchPhotos({
-    eventId: eventId || undefined,
     categories: categories.length ? categories : undefined,
     routeIds: routeIds.length ? routeIds : undefined,
+    eventIds: eventIds.length ? eventIds : undefined,
     pointLabels: pointLabels.length ? pointLabels : undefined,
     photographerIds: photographerIds.length ? photographerIds : undefined,
     horaDesde: horaDesde || undefined,
@@ -200,7 +237,7 @@ export function Search() {
 
   // Cada campo calcula sus opciones a partir de los DEMÁS filtros elegidos
   // (interconectados en ambas direcciones) — ver `matchingPoints`.
-  const fieldFilters: FieldFilters = { categories, routeIds, pointLabels, photographerIds }
+  const fieldFilters: FieldFilters = { categories, routeIds, eventIds, pointLabels, photographerIds }
 
   const categoryOptions = orderedCategoryOptions(matchingPoints(events, fieldFilters, 'categories').map((p) => p.event.category))
 
@@ -210,6 +247,10 @@ export function Search() {
       .filter((id): id is string => !!id),
   )
   const routeOptions: FilterDropdownOption[] = routes.filter((r) => routeIdsAvailable.has(r.id)).map((r) => ({ value: r.id, label: r.name }))
+
+  const eventOptionsMap = new Map<string, string>()
+  for (const p of matchingPoints(events, fieldFilters, 'eventIds')) eventOptionsMap.set(p.event.id, p.event.title)
+  const eventOptions: FilterDropdownOption[] = Array.from(eventOptionsMap, ([value, label]) => ({ value, label }))
 
   // Sin importar cuántos fotógrafos/eventos distintos usen el mismo punto
   // físico, cada uno vive como una fila de `event_points` separada — se
@@ -246,7 +287,7 @@ export function Search() {
     setSearchParams(next, { replace: true })
   }
 
-  const activeFilterCount = categories.length + routeIds.length + pointLabels.length + photographerIds.length + (hourActive ? 1 : 0)
+  const activeFilterCount = categories.length + routeIds.length + eventIds.length + pointLabels.length + photographerIds.length + (hourActive ? 1 : 0)
 
   const activeChips = [
     ...categories.map((c) => ({ key: `cat-${c}`, label: c, remove: () => setListParam('categorias', categories.filter((v) => v !== c)) })),
@@ -254,6 +295,11 @@ export function Search() {
       key: `ruta-${id}`,
       label: routes.find((r) => r.id === id)?.name ?? 'Ruta',
       remove: () => setListParam('rutas', routeIds.filter((v) => v !== id)),
+    })),
+    ...eventIds.map((id) => ({
+      key: `evento-${id}`,
+      label: eventOptionsMap.get(id) ?? events.find((e) => e.id === id)?.title ?? 'Evento',
+      remove: () => setListParam('eventos', eventIds.filter((v) => v !== id)),
     })),
     ...pointLabels.map((label) => ({ key: `punto-${label}`, label, remove: () => setListParam('puntos', pointLabels.filter((v) => v !== label)) })),
     ...photographerIds.map((id) => ({
@@ -269,69 +315,80 @@ export function Search() {
   const filterDescriptionParts = [
     categories.length && categories.join(', '),
     routeIds.length && `ruta ${routeIds.map((id) => routes.find((r) => r.id === id)?.name).filter(Boolean).join(', ')}`,
+    eventIds.length && `evento ${eventIds.map((id) => eventOptionsMap.get(id)).filter(Boolean).join(', ')}`,
     pointLabels.length && `punto ${pointLabels.join(', ')}`,
     photographerIds.length && `fotógrafo ${photographerIds.map((id) => photographers.find((p) => p.id === id)?.display_name).filter(Boolean).join(', ')}`,
     hourActive && `entre ${minutesToHHMM(valueMin)} y ${minutesToHHMM(valueMax)}`,
   ].filter(Boolean) as string[]
-  const heroDescription = filterDescriptionParts.length > 0 ? `Filtrando por ${filterDescriptionParts.join(' · ')}` : 'Elige categoría, ruta, punto, fotógrafo u horario para empezar.'
+  const heroDescription = filterDescriptionParts.length > 0 ? `Filtrando por ${filterDescriptionParts.join(' · ')}` : 'Elige categoría, ruta, fotógrafo, evento, punto u horario para empezar.'
 
-  // Barra de filtros — vive tanto en la página (pastillas, siempre visible
-  // debajo del hero) como dentro del header interactivo una vez se cruza
-  // el centinela (mismo contenido/estado, solo texto en vez de pastillas —
-  // ver `variant` en `FilterDropdown`). El usuario filtra directo desde
-  // acá: ya no hace falta un botón "Filtros" que abra un modal aparte.
-  // Mismo orden en ambas variantes (y en las dos filas de la pastilla en
-  // página, que no caben en una sola línea): Categoría, Ruta y Fotógrafo
-  // primero; Punto y Horario después — es el mismo agrupamiento que usará
-  // el header interactivo cuando se "extiende" en móvil.
-  function renderFilterBar(variant: 'pill' | 'text') {
-    const clearButton = (
-      <button
-        onClick={clearAllFilters}
-        aria-label="Limpiar filtros"
-        title="Limpiar filtros"
-        // `invisible` (no `hidden`/desmontar condicional): reserva su
-        // espacio siempre, así aparecer/desaparecer no empuja el resto de
-        // los filtros de lugar.
-        className={cn('shrink-0 text-red-500 transition-colors hover:text-red-600', activeFilterCount === 0 && 'invisible')}
-      >
-        <IconClose className="h-4 w-4" />
-      </button>
-    )
+  const clearButton = (
+    <button
+      onClick={clearAllFilters}
+      aria-label="Limpiar filtros"
+      title="Limpiar filtros"
+      // `invisible` (no `hidden`/desmontar condicional): reserva su espacio
+      // siempre, así aparecer/desaparecer no empuja el resto de los
+      // filtros de lugar.
+      className={cn('shrink-0 text-red-500 transition-colors hover:text-red-600', activeFilterCount === 0 && 'invisible')}
+    >
+      <IconClose className="h-4 w-4" />
+    </button>
+  )
 
-    if (variant === 'text') {
-      return (
-        <div className="flex w-full flex-nowrap items-center gap-x-4 overflow-x-auto">
-          <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
-          <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
-          <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
-          <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
-          <HourRangeBar variant={variant} boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
-          {clearButton}
-        </div>
-      )
-    }
-
+  // Orden fijo en TODOS lados: Categoría, Ruta, Fotógrafo, Evento, Punto,
+  // Horario. En la página (pastillas) es un solo `flex-wrap` — con ancho de
+  // sobra caben en una fila; si no, envuelve solo. En el header (texto) los
+  // primeros 3 van siempre visibles; los otros 3 viven en la tarjeta
+  // flotante que "más filtros" revela (ver `mobileExpanded`).
+  function renderPillFilters() {
     return (
-      <div className="flex w-full flex-col items-center gap-2">
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-          <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
-          <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
-          <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-          <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
-          <HourRangeBar variant={variant} boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
-          {clearButton}
-        </div>
+      <div className="flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2">
+        <FilterDropdown label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
+        <FilterDropdown label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
+        <FilterDropdown label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+        <FilterDropdown label="Evento" values={eventIds} onChange={(v) => setListParam('eventos', v)} options={eventOptions} />
+        <FilterDropdown label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+        <HourRangeBar boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+        {clearButton}
       </div>
     )
   }
 
-  // `mobileEnabled`: el biker entra sobre todo desde el teléfono a esta
-  // página — el header interactivo (y sus filtros) también debe estar
-  // disponible ahí, no solo en escritorio (ver headerTransformStore).
-  useHeaderTransform(renderFilterBar('text'), scrolled, { mobileEnabled: true })
+  function renderHeaderPrimaryFilters() {
+    return (
+      <div className="flex w-full flex-nowrap items-center gap-x-4 overflow-x-auto">
+        <FilterDropdown variant="text" label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
+        <FilterDropdown variant="text" label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
+        <FilterDropdown variant="text" label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+        <button
+          onClick={() => setMobileExpanded((v) => !v)}
+          aria-label="Más filtros"
+          title="Más filtros"
+          className="flex shrink-0 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Más
+          <IconChevronDown className={cn('h-3.5 w-3.5 transition-transform', mobileExpanded && 'rotate-180')} />
+        </button>
+        {clearButton}
+      </div>
+    )
+  }
+
+  function renderHeaderSecondaryFilters() {
+    return (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3" onClick={bumpIdleTimer}>
+        <FilterDropdown variant="text" label="Evento" values={eventIds} onChange={(v) => setListParam('eventos', v)} options={eventOptions} />
+        <FilterDropdown variant="text" label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+        <HourRangeBar variant="text" boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+      </div>
+    )
+  }
+
+  // `hideBackSlotOnMobile`: esta página no usa la flecha de "volver" — ese
+  // hueco se libera en móvil para que "Más" (el botón de arriba) viva ahí
+  // en su lugar, en vez de dejarlo vacío.
+  useHeaderTransform(renderHeaderPrimaryFilters(), scrolled, { mobileEnabled: true, hideBackSlotOnMobile: true })
 
   return (
     <div className="font-flat">
@@ -348,12 +405,11 @@ export function Search() {
       </div>
 
       {/* El centinela vive justo debajo del hero — el header interactivo se
-          activa exactamente cuando este bloque queda tapado por el header,
-          un par de scrolls antes de lo que hacía cuando vivía más abajo. */}
+          activa exactamente cuando este bloque queda tapado por el header. */}
       <div ref={sentinelRef} />
 
       <div className="mx-auto max-w-[1800px] px-4 md:px-8">
-        <div className="mb-5">{renderFilterBar('pill')}</div>
+        <div className="mb-5">{renderPillFilters()}</div>
 
         {activeChips.length > 0 && (
           <div className="mb-5 flex flex-wrap justify-center gap-2">
@@ -399,13 +455,21 @@ export function Search() {
             solo reordenaba/recortaba el mismo grid sin dar ninguna señal
             visual de "esto se acaba de refiltrar". */}
         <PhotoGrid
-          key={`${categories.join(',')}|${routeIds.join(',')}|${pointLabels.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}`}
+          key={`${categories.join(',')}|${routeIds.join(',')}|${eventIds.join(',')}|${pointLabels.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}`}
           photos={results}
           isLoading={resultsLoading}
           tileSize={tileSize}
           onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
         />
       </div>
+
+      {mobileExpanded &&
+        createPortal(
+          <div className="fixed left-3 right-3 top-[76px] z-40 rounded-3xl border border-border bg-background p-4 shadow-2xl sm:left-4 sm:right-4 sm:top-20">
+            {renderHeaderSecondaryFilters()}
+          </div>,
+          getPortalRoot(),
+        )}
 
       {lightbox && (
         <PhotoLightbox

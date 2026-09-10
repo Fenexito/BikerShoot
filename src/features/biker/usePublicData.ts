@@ -32,12 +32,12 @@ export interface MapPoint extends DbEventPoint {
 
 export interface SearchFilters {
   query?: string
-  eventId?: string
   /** Todos multi-selectivos y opcionales — se combinan como AND entre
    * campos distintos, OR dentro del mismo campo (ej. categorías Rodada Y
    * Pista trae fotos de cualquiera de las dos). */
   categories?: string[]
   routeIds?: string[]
+  eventIds?: string[]
   /** Por NOMBRE del punto (no por id de `event_points`) — el mismo punto
    * físico (ej. "Km 45") existe como una fila de `event_points` distinta
    * por cada evento/fotógrafo que lo usó, así que filtrar por id lo hacía
@@ -281,7 +281,7 @@ export function useSearchPhotos(filters: SearchFilters) {
       const results = photos.filter((p) => {
         if (p.event?.deleted_at) return false
         if (p.event?.status === 'pausado') return false
-        if (filters.eventId && p.event_id !== filters.eventId) return false
+        if (filters.eventIds?.length && !filters.eventIds.includes(p.event_id)) return false
         if (filters.categories?.length && !filters.categories.includes(p.event?.category ?? '')) return false
         if (filters.routeIds?.length && !(p.point?.route_point?.route_id && filters.routeIds.includes(p.point.route_point.route_id))) return false
         if (filters.pointLabels?.length && !(p.point?.label && filters.pointLabels.includes(p.point.label))) return false

@@ -39,7 +39,9 @@ export function TypedConfirmDialog() {
   const matches = value.trim() === request.matchText
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    // Mismo z-[500] que ConfirmDialog — puede invocarse desde adentro de
+    // otro overlay y siempre debe quedar por encima.
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
       <div
         className={cn('absolute inset-0 bg-black/60 transition-opacity duration-150', closing ? 'opacity-0' : 'opacity-100')}
         onClick={() => close(false)}
@@ -54,7 +56,7 @@ export function TypedConfirmDialog() {
           closing ? 'translate-y-1 opacity-0' : 'animate-confirm-in',
         )}
       >
-        <h2 id="typed-confirm-title" className="text-xs font-bold uppercase tracking-wide text-accent">
+        <h2 id="typed-confirm-title" className="text-xs font-bold uppercase tracking-wide text-red-600">
           Confirmar eliminación
         </h2>
         <p className="mt-3 text-base font-semibold leading-snug">{request.title}</p>
@@ -102,7 +104,7 @@ export function TypedConfirmDialog() {
           <button
             onClick={() => close(true)}
             disabled={!matches}
-            className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground transition-all hover:opacity-90 disabled:pointer-events-none disabled:opacity-40"
+            className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:pointer-events-none disabled:opacity-40"
           >
             {request.confirmLabel ?? 'Eliminar'}
           </button>
