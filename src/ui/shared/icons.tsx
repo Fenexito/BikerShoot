@@ -202,12 +202,12 @@ export function IconBookmark({ filled, ...props }: SVGProps<SVGSVGElement> & { f
   )
 }
 
-export function IconCart(props: SVGProps<SVGSVGElement>) {
+export function IconCart({ filled, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean }) {
   return (
     <svg {...base(props)}>
-      <circle cx="9" cy="20" r="1" />
-      <circle cx="18" cy="20" r="1" />
-      <path d="M2.5 3h2l2.4 12.1a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6" />
+      <circle cx="9" cy="20" r="1" fill={filled ? 'currentColor' : 'none'} />
+      <circle cx="18" cy="20" r="1" fill={filled ? 'currentColor' : 'none'} />
+      <path d="M2.5 3h2l2.4 12.1a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6" fill={filled ? 'currentColor' : 'none'} fillOpacity={filled ? 0.25 : undefined} />
     </svg>
   )
 }

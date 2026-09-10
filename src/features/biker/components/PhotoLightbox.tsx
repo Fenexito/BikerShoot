@@ -40,7 +40,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
   const [unsaveBurstKey, setUnsaveBurstKey] = useState<number | null>(null)
   const [slideDir, setSlideDir] = useState(1)
   const [closing, setClosing] = useState(false)
-  const touchRef = useRef<{ mode: 'pan' | 'pinch'; startX: number; startY: number; startDistance: number; startZoom: number } | null>(null)
+  const touchRef = useRef<{ startX: number; startY: number } | null>(null)
 
   const inCart = useCartStore((s) => s.has(photo.id))
   const add = useCartStore((s) => s.add)
@@ -93,6 +93,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
       price: photo.price,
       storagePath: photo.storage_path,
       previewPath: photo.preview_path,
+      originalFilename: photo.original_filename,
     })
     if (imgRef.current) flyToCart(imgRef.current.getBoundingClientRect(), previewUrl(photo))
   }
@@ -123,48 +124,35 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
 
   // Gestos táctiles: un dedo desliza (izq/der cambia de foto, arriba
   // cierra — abajo se dejó de usar porque el navegador lo confunde con
-  // "recargar la página"); dos dedos (pellizcar) hacen zoom.
+  // "recargar la página"). El zoom de dos dedos (pellizcar) se DESACTIVÓ a
+  // propósito: interfería con el zoom nativo del navegador en móvil y
+  // producía un glitch visual — en el teléfono el zoom vive solo en los
+  // botones +/- del visor (ver el resizer más abajo); acá solo queda el
+  // gesto de un dedo.
   function onTouchStart(e: React.TouchEvent) {
-    if (e.touches.length === 2) {
-      const [a, b] = [e.touches[0], e.touches[1]]
-      touchRef.current = {
-        mode: 'pinch',
-        startX: 0,
-        startY: 0,
-        startDistance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
-        startZoom: zoom,
-      }
-    } else if (e.touches.length === 1 && zoom <= 1) {
-      touchRef.current = { mode: 'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, startDistance: 0, startZoom: zoom }
-    }
+    if (e.touches.length !== 1 || zoom > 1) return
+    touchRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY }
   }
 
   function onTouchMove(e: React.TouchEvent) {
     const t = touchRef.current
-    if (!t) return
-    if (t.mode === 'pinch' && e.touches.length === 2) {
-      const [a, b] = [e.touches[0], e.touches[1]]
-      const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
-      const ratio = distance / (t.startDistance || distance)
-      setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, t.startZoom * ratio)))
-    } else if (t.mode === 'pan' && e.touches.length === 1) {
-      const dx = e.touches[0].clientX - t.startX
-      const dy = e.touches[0].clientY - t.startY
-      if (Math.abs(dx) > Math.abs(dy)) {
-        setDragX(dx)
-        setDragY(0)
-      } else if (dy < 0) {
-        // Solo hacia ARRIBA cierra — hacia abajo se ignora a propósito
-        // (en el navegador, deslizar hacia abajo desde arriba de la
-        // página se confunde con "recargar", con o sin scroll-lock).
-        setDragY(dy)
-        setDragX(0)
-      }
+    if (!t || e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - t.startX
+    const dy = e.touches[0].clientY - t.startY
+    if (Math.abs(dx) > Math.abs(dy)) {
+      setDragX(dx)
+      setDragY(0)
+    } else if (dy < 0) {
+      // Solo hacia ARRIBA cierra — hacia abajo se ignora a propósito
+      // (en el navegador, deslizar hacia abajo desde arriba de la
+      // página se confunde con "recargar", con o sin scroll-lock).
+      setDragY(dy)
+      setDragX(0)
     }
   }
 
   function onTouchEnd() {
-    if (touchRef.current?.mode === 'pan') {
+    if (touchRef.current) {
       if (dragY < -SWIPE_UP_CLOSE_THRESHOLD) {
         requestClose()
       } else if (dragX < -SWIPE_NAV_THRESHOLD) {
@@ -234,7 +222,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
           — grid de 2 columnas, la primera se ajusta sola al ancho de la
           etiqueta más larga, así todas quedan en la misma línea vertical. */}
       <div className="pointer-events-none absolute left-4 top-4 z-10 sm:left-6 sm:top-6">
-        <div className="pointer-events-auto grid max-w-[65vw] grid-cols-[auto_1fr] items-baseline gap-x-1.5 gap-y-1 rounded-2xl bg-black/40 px-3.5 py-2.5 text-sm text-white backdrop-blur-sm sm:max-w-xs">
+        <div className="pointer-events-auto grid max-w-[55vw] grid-cols-[auto_1fr] items-baseline gap-x-1.5 gap-y-0.5 rounded-xl bg-black/40 px-2.5 py-2 text-[11px] text-white backdrop-blur-sm sm:max-w-xs sm:gap-y-1 sm:rounded-2xl sm:px-3.5 sm:py-2.5 sm:text-sm">
           <span className="text-white/50">Fotógrafo:</span>
           <Link to={`/app/fotografos/${photo.photographer_id}`} className="min-w-0 truncate font-medium hover:underline">
             {photo.photographerName}
@@ -279,30 +267,29 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
           {!photo.featured && (
             <button
               onClick={handleAdd}
+              aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
               className={cn(
-                'flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors',
-                inCart ? 'bg-secondary text-white' : 'bg-white text-black hover:bg-primary hover:text-white',
+                // Blanco por defecto, azul relleno una vez agregada — mismo
+                // criterio que la miniatura de la grilla (PhotoCard.tsx).
+                'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
+                inCart ? 'bg-primary text-white' : 'bg-white text-black hover:bg-primary hover:text-white',
               )}
             >
-              {inCart ? (
-                '✓'
-              ) : (
-                <>
-                  <IconCart className="h-4 w-4" />
-                </>
-              )}
+              <IconCart className="h-4 w-4" filled={inCart} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Flechas prev/siguiente — escritorio únicamente (en móvil se navega
-          deslizando el carrusel de miniaturas o volviendo a la grilla). */}
+      {/* Flechas prev/siguiente — antes solo en escritorio; ahora también en
+          móvil (además del gesto de deslizar), ya que el pellizcar para
+          zoom se desactivó ahí y conviene dejar una forma de navegar con
+          un toque sin depender solo del gesto. */}
       {index > 0 && (
         <button
           onClick={() => go(-1)}
           aria-label="Foto anterior"
-          className="absolute left-4 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:flex"
+          className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:left-4 sm:h-12 sm:w-12"
         >
           <IconChevronLeft className="h-5 w-5" />
         </button>
@@ -311,7 +298,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
         <button
           onClick={() => go(1)}
           aria-label="Foto siguiente"
-          className="absolute right-4 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:flex"
+          className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:right-4 sm:h-12 sm:w-12"
         >
           <IconChevronRight className="h-5 w-5" />
         </button>

@@ -4,6 +4,7 @@ import { useAuth } from '../../features/auth/AuthContext'
 import { useBikerDetails } from '../../features/biker/useBikerDetails'
 import { useCartStore } from '../../features/cart/cartStore'
 import { useCartDrawerStore } from '../../features/cart/cartDrawerStore'
+import { useCartSync } from '../../features/cart/useCartSync'
 import { CartDrawer } from '../../features/cart/CartDrawer'
 import { r2Url } from '../../lib/r2'
 import { IconBookmark, IconCart, IconUser, IconLogOut, IconSearch, IconSparkles, IconHome, IconImages } from '../shared/icons'
@@ -32,6 +33,9 @@ export function HeaderUser() {
   const navigate = useNavigate()
   const itemCount = useCartStore((s) => s.items.length)
   const openCartDrawer = useCartDrawerStore((s) => s.openDrawer)
+  // Sincroniza el carrito con Supabase mientras haya sesión — así el mismo
+  // carrito se ve igual en el teléfono y en la computadora.
+  useCartSync(user?.id)
   const [signingOut, setSigningOut] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -65,12 +69,11 @@ export function HeaderUser() {
   const extraActive = useHeaderTransformStore((s) => s.extraActive)
   const transformed = transformActive && transformContent != null
   const expanded = extraActive && extraContent != null
-  // Buscar fotos pide `mobileEnabled` porque el biker entra sobre todo desde
-  // el teléfono y necesita el header (y, más abajo del scroll, sus filtros)
-  // siempre a la vista — a diferencia del resto de páginas, acá el
-  // auto-ocultado queda desactivado del todo, no solo mientras ya está
-  // transformado.
-  const hidden = autoHidden && !mobileEnabled
+  // El auto-ocultado (bajar = esconder, subir = mostrar) aplica siempre,
+  // también en páginas con `mobileEnabled` como Buscar fotos — el biker
+  // quiere seguir viendo fotos sin el header/menú estorbando mientras
+  // sigue bajando, y recuperarlos apenas sube un poco.
+  const hidden = autoHidden
 
   return (
     <>

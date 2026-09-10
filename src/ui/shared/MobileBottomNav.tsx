@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '../../lib/cn'
+import { useAutoHideHeader } from './useAutoHideHeader'
 import type { ReactNode } from 'react'
 
 export interface MobileNavItem {
@@ -22,6 +23,9 @@ interface MobileBottomNavProps {
  * pantallas chicas. 5 accesos: 2 + 2 alrededor de una acción central elevada. */
 export function MobileBottomNav({ items, primary, activeClassName }: MobileBottomNavProps) {
   const [left1, left2, right1, right2] = items
+  // Mismo criterio de auto-ocultado que el header: al bajar se esconde
+  // (más espacio para ver fotos), al subir vuelve a aparecer.
+  const hidden = useAutoHideHeader()
 
   function itemClass({ isActive }: { isActive: boolean }) {
     return cn(
@@ -31,7 +35,12 @@ export function MobileBottomNav({ items, primary, activeClassName }: MobileBotto
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+    <nav
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md transition-transform duration-300 md:hidden',
+        hidden ? 'translate-y-full' : 'translate-y-0',
+      )}
+    >
       <div className="mx-auto flex max-w-lg items-center">
         {[left1, left2].map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} className={itemClass}>

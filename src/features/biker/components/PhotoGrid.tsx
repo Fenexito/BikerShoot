@@ -25,9 +25,13 @@ interface PhotoGridProps {
    * por breakpoint (`columns-2 sm:columns-3 lg:columns-4`), no relacionado
    * con este control. */
   tileSize?: number
+  /** Id de la foto que se acaba de cerrar en el visor — recibe un resalte
+   * breve para que el usuario no pierda de vista cuál era, entre tantas
+   * fotos parecidas. */
+  highlightedId?: string | null
 }
 
-export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false, tileSize = 150 }: PhotoGridProps) {
+export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = false, tileSize = 150, highlightedId = null }: PhotoGridProps) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -96,6 +100,7 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
               photographerName={photo.photographerName}
               layout={layout}
               tileSize={tileSize}
+              justClosed={photo.id === highlightedId}
               onOpen={() => onOpenPhoto(visible, visible.indexOf(photo))}
             />
           </div>

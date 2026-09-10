@@ -20,7 +20,13 @@ export function ScrollToTopButton({ threshold = 600 }: { threshold?: number }) {
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       aria-label="Volver al inicio"
       className={cn(
-        'fixed bottom-24 right-4 z-40 flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-all duration-300 md:bottom-6 md:right-6 md:h-11 md:w-11',
+        // El offset móvil suma `env(safe-area-inset-bottom)` — sin eso, en
+        // dispositivos con una franja segura grande (ej. iPhone con línea
+        // de inicio) el menú inferior real (que sí la suma en su propio
+        // padding) termina siendo más alto que lo que este botón asumía, y
+        // se solapan.
+        'fixed right-4 z-40 flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-all duration-300 md:bottom-6 md:right-6 md:h-11 md:w-11',
+        'bottom-[calc(5rem+env(safe-area-inset-bottom))]',
         visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0',
       )}
     >

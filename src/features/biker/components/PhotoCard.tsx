@@ -18,13 +18,21 @@ interface PhotoCardProps {
    * la etiqueta de frescura ("hace 2h") ocupa demasiado espacio relativo a
    * la foto, así que se oculta por debajo de cierto tamaño. */
   tileSize?: number
+  /** true por un instante justo después de cerrar el visor sobre esta foto
+   * — dispara un resalte breve para que no se pierda entre las demás. */
+  justClosed?: boolean
 }
 
 const FRESHNESS_MIN_TILE_SIZE = 170
+// Por debajo de este tamaño (solo alcanzable en el extremo más denso del
+// resizer en móvil) los botones de guardar/agregar ya no caben sin verse
+// amontonados — se ocultan de la miniatura y el usuario los usa desde el
+// visor (que sí tiene espacio de sobra) en su lugar.
+const ACTIONS_MIN_TILE_SIZE = 110
 
 /** Foto limpia por defecto — toda la info (precio, favorito, carrito,
  * fotógrafo) solo aparece al pasar el cursor, como en la referencia. */
-export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout = 'grid', tileSize = 220 }: PhotoCardProps) {
+export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout = 'grid', tileSize = 220, justClosed = false }: PhotoCardProps) {
   const inCart = useCartStore((s) => s.has(photo.id))
   const add = useCartStore((s) => s.add)
   const remove = useCartStore((s) => s.remove)
@@ -65,6 +73,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
       price: photo.price,
       storagePath: photo.storage_path,
       previewPath: photo.preview_path,
+      originalFilename: photo.original_filename,
     })
     // Puramente decorativo (prueba pedida explícitamente) — no afecta el
     // carrito en sí, que ya se actualizó arriba.
@@ -75,7 +84,13 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
     // Radio de borde un poco más chico en móvil (`rounded-lg`, antes
     // `rounded-2xl` en todos lados) — con miniaturas más chicas ese radio
     // se comía proporcionalmente más detalle de la esquina de la foto.
-    <div className={cn('group relative overflow-hidden rounded-lg bg-muted transition-shadow sm:rounded-2xl', layout === 'mosaic' && 'mb-3 break-inside-avoid')}>
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-lg bg-muted transition-shadow sm:rounded-2xl',
+        layout === 'mosaic' && 'mb-3 break-inside-avoid',
+        justClosed && 'animate-photo-just-closed',
+      )}
+    >
       {/* Borde azul persistente en fotos ya agregadas al carrito — un
           overlay `inset-0` con `ring-inset` (mismo patrón que el borde rojo
           de selección en el portal del fotógrafo) en vez de `ring-offset`,
@@ -133,59 +148,62 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
       <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
 
-      {/* Barra superior: frescura + favorito — la frescura se oculta en
-          marcos chicos (grilla densa), donde ocupa demasiado espacio. */}
-      <div className="absolute inset-x-2 top-2 flex items-start justify-between opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
-        {freshness && tileSize >= FRESHNESS_MIN_TILE_SIZE ? (
-          <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">{freshness}</span>
-        ) : (
-          <span />
-        )}
-        <button
-          onClick={handleToggleFavorite}
-          aria-label="Guardar"
-          className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
-            isFavorite ? 'text-foreground' : 'text-muted-foreground',
-          )}
-        >
-          <IconBookmark className="h-3.5 w-3.5" filled={isFavorite} />
-        </button>
-      </div>
-
-      {/* Barra inferior: solo agregar al carrito — sin recuadro de fotógrafo/evento
-          (esa info ya vive en el visor). Las destacadas no están a la venta. */}
-      <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-end gap-2 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
-        {photo.featured ? (
-          <span className="pointer-events-auto flex h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-3 text-xs font-semibold text-black shadow-sm">
-            ★ Destacada
-          </span>
-        ) : (
-          <button
-            onClick={handleAddClick}
-            aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
-            className={cn(
-              'pointer-events-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-sm transition-all duration-200 sm:h-9 sm:px-3',
-              inCart ? 'bg-secondary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
-            )}
-          >
-            {inCart ? (
-              <>
-                <span className="sm:hidden">✓</span>
-                <span className="hidden sm:inline">✓ En carrito</span>
-              </>
+      {/* Por debajo de `ACTIONS_MIN_TILE_SIZE` (el extremo más denso del
+          resizer en móvil) estos botones ya no caben sin verse amontonados
+          — el usuario los usa desde el visor en su lugar, que sí tiene
+          espacio de sobra. */}
+      {tileSize >= ACTIONS_MIN_TILE_SIZE && (
+        <>
+          {/* Barra superior: frescura + favorito — la frescura se oculta en
+              marcos chicos (grilla densa), donde ocupa demasiado espacio. */}
+          <div className="absolute inset-x-2 top-2 flex items-start justify-between opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+            {freshness && tileSize >= FRESHNESS_MIN_TILE_SIZE ? (
+              <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">{freshness}</span>
             ) : (
-              <>
-                <IconCart className="h-3.5 w-3.5" />
-                {/* Precio oculto en móvil — con miniaturas chicas y varias
-                    por fila, este botón ya compite por poco espacio; el
-                    ícono solo sigue dejando claro qué hace. */}
-                <span className="hidden sm:inline">Q{photo.price}</span>
-              </>
+              <span />
             )}
-          </button>
-        )}
-      </div>
+            <button
+              onClick={handleToggleFavorite}
+              aria-label="Guardar"
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
+                isFavorite ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              <IconBookmark className="h-3.5 w-3.5" filled={isFavorite} />
+            </button>
+          </div>
+
+          {/* Barra inferior: solo agregar al carrito — sin recuadro de fotógrafo/evento
+              (esa info ya vive en el visor). Las destacadas no están a la venta. */}
+          <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-end gap-2 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+            {photo.featured ? (
+              <span className="pointer-events-auto flex h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-3 text-xs font-semibold text-black shadow-sm">
+                ★ Destacada
+              </span>
+            ) : (
+              <button
+                onClick={handleAddClick}
+                aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
+                className={cn(
+                  // Blanco por defecto, azul relleno una vez agregada — antes
+                  // usaba un check verde separado; ahora es el mismo botón, el
+                  // color y el ícono (carrito relleno vs. contorno) son la
+                  // única diferencia entre "agregar" y "ya en el carrito".
+                  'pointer-events-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-sm transition-all duration-200 sm:h-9 sm:px-3',
+                  inCart ? 'bg-primary text-white' : 'bg-white text-foreground hover:bg-primary hover:text-white',
+                )}
+              >
+                <IconCart className="h-3.5 w-3.5" filled={inCart} />
+                {/* Precio oculto en móvil — con miniaturas chicas y varias por
+                    fila, este botón ya compite por poco espacio; el ícono solo
+                    sigue dejando claro qué hace. */}
+                {!inCart && <span className="hidden sm:inline">Q{photo.price}</span>}
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

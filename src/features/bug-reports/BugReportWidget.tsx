@@ -149,7 +149,11 @@ export function BugReportWidget() {
 
   return (
     <>
-      <div className="fixed bottom-20 left-0 z-40 flex items-center md:bottom-5">
+      {/* `env(safe-area-inset-bottom)` sumado al offset móvil — sin eso, en
+          dispositivos con una franja segura grande el menú inferior real
+          (que sí la suma en su propio padding) termina más alto de lo que
+          este botón asumía, y se solapan. */}
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 z-40 flex items-center md:bottom-5">
         {expanded ? (
           <button
             onClick={() => setOpen(true)}

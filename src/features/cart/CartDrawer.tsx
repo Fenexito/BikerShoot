@@ -130,7 +130,14 @@ export function CartDrawer() {
                                 alt=""
                                 className="h-10 w-10 shrink-0 rounded-lg object-cover"
                               />
-                              <p className="min-w-0 flex-1 truncate text-sm font-bold">Q{item.price}</p>
+                              {/* El nombre del archivo (no el evento, que ya
+                                  se lee arriba) es lo que distingue una fila
+                                  de otra — dos fotos del mismo punto suelen
+                                  costar lo mismo, así que solo el precio
+                                  repetido no alcanza para saber cuál es
+                                  cuál. */}
+                              <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
+                              <p className="shrink-0 text-sm font-bold">Q{item.price}</p>
                               <button
                                 onClick={() => handleRemove(item)}
                                 aria-label="Quitar del carrito"

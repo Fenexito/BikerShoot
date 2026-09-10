@@ -168,6 +168,24 @@ html {
   animation: unsave-break-right 550ms cubic-bezier(0.33, 0, 0.4, 1) both;
 }
 
+/* Resalte breve sobre la foto que se acaba de cerrar en el visor — un
+   parpadeo de resplandor, no un borde fijo (para no confundirse con el
+   borde azul de "ya está en el carrito", que sí es permanente). */
+@keyframes photo-just-closed {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+  15%,
+  55% {
+    box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.7);
+  }
+}
+
+.animate-photo-just-closed {
+  animation: photo-just-closed 1.6s ease-in-out;
+}
+
 /* Entrada/salida del visor de fotos completo (backdrop + contenido). */
 @keyframes lightbox-in {
   from {

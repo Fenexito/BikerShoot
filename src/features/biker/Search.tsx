@@ -141,6 +141,18 @@ export function Search() {
   const { data: routes = [] } = useRoutes()
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
+  // Con tantas fotos parecidas, al cerrar el visor es fácil perder de vista
+  // cuál era la que se estaba viendo — se guarda su id un momento para que
+  // PhotoGrid le ponga un resalte breve (ver `highlightedId`).
+  const [justClosedId, setJustClosedId] = useState<string | null>(null)
+  function closeLightbox() {
+    if (lightbox) {
+      const id = lightbox.photos[lightbox.index]?.id ?? null
+      setJustClosedId(id)
+      setTimeout(() => setJustClosedId((current) => (current === id ? null : current)), 1600)
+    }
+    setLightbox(null)
+  }
   // El header interactivo se activa justo cuando este "centinela" (colocado
   // apenas debajo del hero) queda tapado por el header — no un número de
   // píxeles fijo, sino el layout real de la página.
@@ -150,7 +162,25 @@ export function Search() {
   // una SPA sin SSR, así que no hay riesgo de mismatch de hidratación.
   const [tileSize, setTileSize] = useState(loadTileSize)
   const isNarrow = useIsNarrowViewport()
-  const tileSizeMin = isNarrow ? TILE_SIZE_MIN_MOBILE : TILE_SIZE_MIN
+
+  // El piso del resizer en móvil se mide de verdad (ResizeObserver sobre el
+  // propio contenedor de la grilla) en vez de un número fijo — un valor fijo
+  // "acertaba" 4 columnas en algunos anchos de pantalla y daba 5 en otros
+  // (pantallas más anchas caben más columnas para el mismo tamaño mínimo).
+  // Con el ancho real disponible se despeja el tamaño exacto que deja
+  // EXACTAMENTE 4 columnas, sin importar el dispositivo.
+  const gridWrapRef = useRef<HTMLDivElement>(null)
+  const [gridWidth, setGridWidth] = useState(0)
+  useEffect(() => {
+    const el = gridWrapRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => setGridWidth(entry.contentRect.width))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  const GRID_GAP_MOBILE = 4 // `gap-1` en PhotoGrid.tsx
+  const mobileFloor = gridWidth > 0 ? Math.max(60, Math.floor((gridWidth - 3 * GRID_GAP_MOBILE) / 4)) : TILE_SIZE_MIN_MOBILE
+  const tileSizeMin = isNarrow ? mobileFloor : TILE_SIZE_MIN
 
   // Si la pantalla cambia de angosta a ancha (o al revés, ej. al rotar el
   // teléfono) y el valor guardado queda por debajo del nuevo mínimo, se
@@ -376,11 +406,15 @@ export function Search() {
         <FilterDropdown variant="text" label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
         <FilterDropdown variant="text" label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
         <FilterDropdown variant="text" label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+        {/* El botón de "más filtros" solo existe en móvil (`sm:hidden`) —
+            en escritorio hay ancho de sobra, así que ahí los 6 filtros
+            viven siempre visibles de una vez (ver `extraActive` más
+            abajo), sin ningún botón que expanda/colapse nada. */}
         <button
           onClick={() => setMobileExpanded((v) => !v)}
           aria-label="Más filtros"
           title="Más filtros"
-          className="flex shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+          className="flex shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground sm:hidden"
         >
           <IconChevronDown className={cn('h-5 w-5 transition-transform duration-300', mobileExpanded && 'rotate-180')} />
         </button>
@@ -408,7 +442,10 @@ export function Search() {
     mobileEnabled: true,
     hideBackSlotOnMobile: true,
     extraContent: renderHeaderSecondaryFilters(),
-    extraActive: mobileExpanded,
+    // En escritorio los otros 3 filtros están SIEMPRE a la vista en cuanto
+    // el header se transforma (no hay botón para colapsarlos ahí) — solo
+    // en móvil dependen de si el usuario tocó "más filtros".
+    extraActive: isNarrow ? mobileExpanded : scrolled,
   })
 
   return (
@@ -445,17 +482,25 @@ export function Search() {
         )}
       </div>
 
-      <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
+      <div ref={gridWrapRef} className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
         {/* Contador + resizer de tamaño de foto — ahora también en móvil
             (antes el control de densidad era solo de escritorio); en
             pantallas angostas el slider simplemente se ve un poco más
-            corto para no competir por espacio con el contador. */}
+            corto para no competir por espacio con el contador. Los íconos
+            de los extremos también son botones: un click acerca/aleja un
+            paso sin tener que arrastrar la barra. */}
         <div className="mb-4 flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
           </p>
           <div className="flex items-center gap-2 sm:gap-3">
-            <IconGridSmall className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <button
+              onClick={() => changeTileSize(Math.max(tileSizeMin, tileSize - TILE_SIZE_STEP))}
+              aria-label="Fotos más chicas"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <IconGridSmall className="h-4 w-4" />
+            </button>
             <input
               type="range"
               min={tileSizeMin}
@@ -466,7 +511,13 @@ export function Search() {
               aria-label="Tamaño de las fotos"
               className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-muted accent-primary sm:w-32"
             />
-            <IconGridLarge className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <button
+              onClick={() => changeTileSize(Math.min(TILE_SIZE_MAX, tileSize + TILE_SIZE_STEP))}
+              aria-label="Fotos más grandes"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <IconGridLarge className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -480,6 +531,7 @@ export function Search() {
           photos={results}
           isLoading={resultsLoading}
           tileSize={tileSize}
+          highlightedId={justClosedId}
           onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
         />
       </div>
@@ -488,7 +540,7 @@ export function Search() {
         <PhotoLightbox
           photos={lightbox.photos}
           index={lightbox.index}
-          onClose={() => setLightbox(null)}
+          onClose={() => closeLightbox()}
           onNavigate={(index) => setLightbox({ photos: lightbox.photos, index })}
         />
       )}
