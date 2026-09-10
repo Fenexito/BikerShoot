@@ -5,13 +5,22 @@
  * quitar el `onClick` que la dispara sin tocar nada del carrito en sí. */
 export function flyToCart(sourceRect: DOMRect, imageUrl: string) {
   // Hay más de un ícono de carrito en el DOM a la vez (la capa normal del
-  // header y la capa transformada conviven, una de las dos con opacidad 0 —
-  // ver HeaderUser.tsx), así que se marcan con el mismo atributo y se toma
-  // el primero que de verdad esté visible (rect con tamaño real).
+  // header y la capa transformada conviven, una encima de la otra con
+  // opacidad 0 en vez de desmontada — ver HeaderUser.tsx), así que se
+  // marcan con el mismo atributo y se toma el primero que de verdad esté
+  // visible. OJO: `opacity:0`/`pointer-events:none` NO reducen el rect a
+  // cero (el elemento sigue ocupando su lugar en el layout, solo se ve
+  // transparente) — por eso antes, con el header interactivo activo, la
+  // animación seguía apuntando al ícono de la capa normal (invisible pero
+  // con rect "real") en vez del de la capa transformada (el que de verdad
+  // se ve, más a la derecha). Revisar el estilo computado, no solo el rect,
+  // es lo que distingue cuál de los dos es el que el usuario ve.
   const candidates = document.querySelectorAll<HTMLElement>('[data-cart-icon]')
   let target: HTMLElement | null = null
   let targetRect: DOMRect | null = null
   for (const el of candidates) {
+    const style = getComputedStyle(el)
+    if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue
     const rect = el.getBoundingClientRect()
     if (rect.width > 0 && rect.height > 0) {
       target = el
@@ -57,17 +66,18 @@ export function flyToCart(sourceRect: DOMRect, imageUrl: string) {
     return { x, y }
   }
 
-  const STEPS = 10
+  const STEPS = 12
   const keyframes: Keyframe[] = Array.from({ length: STEPS + 1 }, (_, i) => {
     const t = i / STEPS
     const { x, y } = bezier(t)
-    // Un ligero balanceo (no una rotación continua en una sola dirección) —
-    // se siente más como algo que vuela con peso propio que como un ícono
-    // deslizándose sobre rieles.
-    const rotate = Math.sin(t * Math.PI) * 10 * (startX < endX ? 1 : -1)
+    // Una vuelta completa (360°) sobre el eje vertical en horizontal —
+    // como una moneda girando de canto — durante todo el trayecto, más un
+    // `perspective()` en el mismo transform para que de verdad se vea como
+    // un giro en 3D y no un simple achatado horizontal.
+    const rotateY = t * 360 * (startX <= endX ? 1 : -1)
     const scale = 1 - 0.82 * t ** 1.4
     return {
-      transform: `translate(${x - startX}px, ${y - startY}px) rotate(${rotate}deg) scale(${scale})`,
+      transform: `perspective(500px) translate(${x - startX}px, ${y - startY}px) rotateY(${rotateY}deg) scale(${scale})`,
       opacity: t < 0.75 ? 1 : 1 - (t - 0.75) / 0.25,
       offset: t,
     }

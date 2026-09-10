@@ -60,6 +60,7 @@ export function HeaderUser() {
   const transformActive = useHeaderTransformStore((s) => s.active)
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
+  const hideBackSlotOnMobile = useHeaderTransformStore((s) => s.hideBackSlotOnMobile)
   const transformed = transformActive && transformContent != null
   // Buscar fotos pide `mobileEnabled` porque el biker entra sobre todo desde
   // el teléfono y necesita el header (y, más abajo del scroll, sus filtros)
@@ -81,16 +82,33 @@ export function HeaderUser() {
             colores variados, la translucidez + blur se leía como una mancha
             gris/oscurecida encima de la barra en vez de un blanco limpio. */}
         <header className="mx-auto flex h-16 max-w-6xl items-center gap-3 rounded-full border border-border bg-background px-3 shadow-sm md:gap-5 md:px-4">
-          <HeaderBackSlot />
+          <div className={cn(hideBackSlotOnMobile && transformed && 'hidden sm:block')}>
+            <HeaderBackSlot />
+          </div>
           <div className="relative h-11 min-w-0 flex-1">
             {/* Capa normal: logo + nav + buscar/favoritos/carrito/
                 notificaciones/perfil — se desvanece cuando `transformed`,
                 siempre a partir de md, y también en móvil si la página pidió
-                `mobileEnabled`. */}
+                `mobileEnabled`.
+                OJO: cada rama del ternario reemplaza el set COMPLETO de
+                clases de opacidad/traslado (nunca las agrega encima de una
+                base fija) — `cn` aquí es un simple `clsx`, SIN el merge de
+                `tailwind-merge`, así que dos utilidades que apunten a la
+                misma propiedad en el MISMO breakpoint (ej. `opacity-100` y
+                `opacity-0` sueltos, sin prefijo `md:` en ninguna) quedan
+                ambas en el string de clases a la vez, y cuál "gana" depende
+                del orden interno en el que Tailwind generó el CSS, no del
+                orden en el que aparecen aquí — eso es justo lo que causaba
+                que en móvil (`mobileEnabled`, sin prefijo `md:` de por
+                medio) se vieran las dos capas superpuestas al mismo tiempo. */}
             <div
               className={cn(
-                'absolute inset-0 flex translate-y-0 items-center gap-3 opacity-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-5',
-                transformed && (mobileEnabled ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0'),
+                'absolute inset-0 flex items-center gap-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-5',
+                transformed
+                  ? mobileEnabled
+                    ? 'pointer-events-none -translate-y-2.5 opacity-0'
+                    : 'translate-y-0 opacity-100 md:pointer-events-none md:-translate-y-2.5 md:opacity-0'
+                  : 'translate-y-0 opacity-100',
               )}
             >
               <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">

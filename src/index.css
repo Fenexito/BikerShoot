@@ -149,6 +149,32 @@ html {
   animation: drawer-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+@keyframes drawer-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-drawer-out {
+  animation: drawer-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animate-backdrop-out {
+  animation: backdrop-out 220ms ease forwards;
+}
+
 @keyframes backdrop-in {
   from {
     opacity: 0;

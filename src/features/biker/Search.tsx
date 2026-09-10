@@ -7,7 +7,7 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { Badge } from '../../ui/flat/Badge'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { IconSearch, IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
+import { IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
@@ -117,11 +117,12 @@ function HourRangeBar({
   onChange: (min: number, max: number) => void
   variant?: 'pill' | 'text'
 }) {
-  const slider = <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} size={variant === 'text' ? 'compact' : 'default'} />
-
-  if (variant === 'text') return <div className="shrink-0">{slider}</div>
-
-  return <div className="flex shrink-0 items-center rounded-full border border-border bg-background px-4 py-1.5">{slider}</div>
+  // Sin tarjeta/borde alrededor en ninguna variante — es una fila de
+  // control más, igual que cualquier otro filtro, no algo que necesite su
+  // propio contenedor.
+  return <div className="shrink-0">
+    <TimeRangeSlider boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={onChange} size={variant === 'text' ? 'compact' : 'default'} />
+  </div>
 }
 
 export function Search() {
@@ -154,7 +155,6 @@ export function Search() {
     }
   }
 
-  const query = searchParams.get('q') ?? ''
   const eventId = searchParams.get('evento') ?? ''
   const categories = readList(searchParams.get('categorias') ?? '')
   const routeIds = readList(searchParams.get('rutas') ?? '')
@@ -163,13 +163,6 @@ export function Search() {
   const horaDesde = searchParams.get('hora_desde') ?? ''
   const horaHasta = searchParams.get('hora_hasta') ?? ''
 
-  function setQuery(value: string) {
-    const next = new URLSearchParams(searchParams)
-    if (value) next.set('q', value)
-    else next.delete('q')
-    setSearchParams(next, { replace: true })
-  }
-
   function setListParam(key: 'categorias' | 'rutas' | 'puntos' | 'fotografos', values: string[]) {
     const next = new URLSearchParams(searchParams)
     writeList(next, key, values)
@@ -177,13 +170,10 @@ export function Search() {
   }
 
   function clearAllFilters() {
-    const next = new URLSearchParams()
-    if (query) next.set('q', query)
-    setSearchParams(next, { replace: true })
+    setSearchParams(new URLSearchParams(), { replace: true })
   }
 
   const { data: rawResults = [], isLoading: resultsLoading } = useSearchPhotos({
-    query: query || undefined,
     eventId: eventId || undefined,
     categories: categories.length ? categories : undefined,
     routeIds: routeIds.length ? routeIds : undefined,
@@ -259,7 +249,6 @@ export function Search() {
   const activeFilterCount = categories.length + routeIds.length + pointLabels.length + photographerIds.length + (hourActive ? 1 : 0)
 
   const activeChips = [
-    query && { key: 'q', label: `"${query}"`, remove: () => setQuery('') },
     ...categories.map((c) => ({ key: `cat-${c}`, label: c, remove: () => setListParam('categorias', categories.filter((v) => v !== c)) })),
     ...routeIds.map((id) => ({
       key: `ruta-${id}`,
@@ -284,37 +273,57 @@ export function Search() {
     photographerIds.length && `fotógrafo ${photographerIds.map((id) => photographers.find((p) => p.id === id)?.display_name).filter(Boolean).join(', ')}`,
     hourActive && `entre ${minutesToHHMM(valueMin)} y ${minutesToHHMM(valueMax)}`,
   ].filter(Boolean) as string[]
-  const heroDescription = filterDescriptionParts.length > 0 ? `Filtrando por ${filterDescriptionParts.join(' · ')}` : 'Busca por evento, ciudad o fotógrafo.'
+  const heroDescription = filterDescriptionParts.length > 0 ? `Filtrando por ${filterDescriptionParts.join(' · ')}` : 'Elige categoría, ruta, punto, fotógrafo u horario para empezar.'
 
   // Barra de filtros — vive tanto en la página (pastillas, siempre visible
   // debajo del hero) como dentro del header interactivo una vez se cruza
   // el centinela (mismo contenido/estado, solo texto en vez de pastillas —
   // ver `variant` en `FilterDropdown`). El usuario filtra directo desde
   // acá: ya no hace falta un botón "Filtros" que abra un modal aparte.
+  // Mismo orden en ambas variantes (y en las dos filas de la pastilla en
+  // página, que no caben en una sola línea): Categoría, Ruta y Fotógrafo
+  // primero; Punto y Horario después — es el mismo agrupamiento que usará
+  // el header interactivo cuando se "extiende" en móvil.
   function renderFilterBar(variant: 'pill' | 'text') {
-    return (
-      <div
-        className={cn(
-          'flex items-center gap-x-4 gap-y-2',
-          // Pastillas (en la página): hay ancho de sobra, así que se
-          // envuelven y centran. Texto (header): sin salto de línea — en
-          // móvil no caben todas en el ancho del header, así que esta fila
-          // scrollea horizontalmente en vez de recortarse (el panel de cada
-          // FilterDropdown vive en un portal aparte, no lo afecta este
-          // overflow).
-          variant === 'pill' ? 'w-full flex-wrap justify-center gap-x-2' : 'w-full flex-nowrap overflow-x-auto',
-        )}
+    const clearButton = (
+      <button
+        onClick={clearAllFilters}
+        aria-label="Limpiar filtros"
+        title="Limpiar filtros"
+        // `invisible` (no `hidden`/desmontar condicional): reserva su
+        // espacio siempre, así aparecer/desaparecer no empuja el resto de
+        // los filtros de lugar.
+        className={cn('shrink-0 text-red-500 transition-colors hover:text-red-600', activeFilterCount === 0 && 'invisible')}
       >
-        <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
-        <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
-        <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
-        <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
-        <HourRangeBar variant={variant} boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
-        {activeFilterCount > 0 && (
-          <button onClick={clearAllFilters} aria-label="Limpiar filtros" title="Limpiar filtros" className="shrink-0 text-red-500 transition-colors hover:text-red-600">
-            <IconClose className="h-4 w-4" />
-          </button>
-        )}
+        <IconClose className="h-4 w-4" />
+      </button>
+    )
+
+    if (variant === 'text') {
+      return (
+        <div className="flex w-full flex-nowrap items-center gap-x-4 overflow-x-auto">
+          <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
+          <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
+          <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+          <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+          <HourRangeBar variant={variant} boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+          {clearButton}
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex w-full flex-col items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
+          <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
+          <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+          <HourRangeBar variant={variant} boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} onChange={changeHourRange} />
+          {clearButton}
+        </div>
       </div>
     )
   }
@@ -322,7 +331,7 @@ export function Search() {
   // `mobileEnabled`: el biker entra sobre todo desde el teléfono a esta
   // página — el header interactivo (y sus filtros) también debe estar
   // disponible ahí, no solo en escritorio (ver headerTransformStore).
-  useHeaderTransform(renderFilterBar('text'), scrolled, false, true)
+  useHeaderTransform(renderFilterBar('text'), scrolled, { mobileEnabled: true })
 
   return (
     <div className="font-flat">
@@ -336,21 +345,11 @@ export function Search() {
         <p className="mt-1 text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{results.length}</span> fotos disponibles ahora mismo
         </p>
-        <div className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-full bg-muted px-5 shadow-sm">
-          <IconSearch className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Evento, ciudad, fotógrafo…"
-            className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
-          />
-        </div>
       </div>
 
-      {/* El centinela vive justo debajo del buscador del hero — el header
-          interactivo se activa exactamente cuando ESTE buscador (no la
-          barra de filtros, que vive más abajo) queda tapado por el header,
-          un par de scrolls antes de lo que hacía antes. */}
+      {/* El centinela vive justo debajo del hero — el header interactivo se
+          activa exactamente cuando este bloque queda tapado por el header,
+          un par de scrolls antes de lo que hacía cuando vivía más abajo. */}
       <div ref={sentinelRef} />
 
       <div className="mx-auto max-w-[1800px] px-4 md:px-8">
@@ -370,20 +369,15 @@ export function Search() {
       </div>
 
       <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
-        <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
+        {/* Contador + resizer de tamaño de foto — ahora también en móvil
+            (antes el control de densidad era solo de escritorio); en
+            pantallas angostas el slider simplemente se ve un poco más
+            corto para no competir por espacio con el contador. */}
+        <div className="mb-4 flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
           </p>
-        </div>
-
-        {/* Contador + resizer de tamaño de foto — solo desde md:, en móvil
-            no hay espacio real para aprovechar el control de densidad y el
-            grid ya usa el mínimo de columnas cómodo por defecto. */}
-        <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
-          </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <IconGridSmall className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               type="range"
@@ -393,7 +387,7 @@ export function Search() {
               value={tileSize}
               onChange={(e) => changeTileSize(Number(e.target.value))}
               aria-label="Tamaño de las fotos"
-              className="h-1.5 w-32 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+              className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-muted accent-primary sm:w-32"
             />
             <IconGridLarge className="h-4 w-4 shrink-0 text-muted-foreground" />
           </div>
@@ -405,7 +399,7 @@ export function Search() {
             solo reordenaba/recortaba el mismo grid sin dar ninguna señal
             visual de "esto se acaba de refiltrar". */}
         <PhotoGrid
-          key={`${categories.join(',')}|${routeIds.join(',')}|${pointLabels.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}|${query}`}
+          key={`${categories.join(',')}|${routeIds.join(',')}|${pointLabels.join(',')}|${photographerIds.join(',')}|${horaDesde}|${horaHasta}`}
           photos={results}
           isLoading={resultsLoading}
           tileSize={tileSize}

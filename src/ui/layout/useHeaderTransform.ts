@@ -1,14 +1,14 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { useHeaderTransformStore } from './headerTransformStore'
+import { useHeaderTransformStore, type HeaderTransformOptions } from './headerTransformStore'
 
 /** Registra el contenido que el header (Studio o Biker) debe mostrar, y
  * CUÁNDO mostrarlo (`active`) — en vez de los links de navegación normales.
  * `active` lo calcula la propia página (ej. "ya se scrolleó pasado un
  * umbral genérico", o algo más específico como "la portada ya terminó de
- * reducirse"), no un umbral fijo dentro del header. Solo aplica en
- * escritorio: el header ignora `active` en móvil (gatea ese contenido con
- * clases `hidden md:flex`, nunca lo muestra ahí sin importar el estado).
+ * reducirse"), no un umbral fijo dentro del header. Por defecto solo aplica
+ * en escritorio — pasa `{ mobileEnabled: true }` en `options` para que
+ * también aplique en móvil (ver `HeaderTransformOptions`).
  *
  * Uso: `useHeaderTransform(<MiToolbarDePagina />, huboScrollSuficiente)`
  * dentro del componente de la página — se limpia solo al desmontar
@@ -21,11 +21,11 @@ import { useHeaderTransformStore } from './headerTransformStore'
  * actualiza un valor en un store, no dispara ningún efecto secundario caro)
  * y así los manejadores de eventos que capture (onClick, onChange...) nunca
  * quedan obsoletos. Un efecto aparte, solo con `[]`, limpia al desmontar. */
-export function useHeaderTransform(content: ReactNode | null, active: boolean, hideSearchTrigger = false, mobileEnabled = false) {
+export function useHeaderTransform(content: ReactNode | null, active: boolean, options?: HeaderTransformOptions) {
   const setTransform = useHeaderTransformStore((s) => s.setTransform)
 
   useEffect(() => {
-    setTransform(content, active, hideSearchTrigger, mobileEnabled)
+    setTransform(content, active, options)
   })
 
   useEffect(() => {
