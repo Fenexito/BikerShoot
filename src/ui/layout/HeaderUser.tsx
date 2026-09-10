@@ -3,6 +3,8 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useBikerDetails } from '../../features/biker/useBikerDetails'
 import { useCartStore } from '../../features/cart/cartStore'
+import { useCartDrawerStore } from '../../features/cart/cartDrawerStore'
+import { CartDrawer } from '../../features/cart/CartDrawer'
 import { r2Url } from '../../lib/r2'
 import { IconBookmark, IconCart, IconUser, IconLogOut, IconSearch, IconSparkles, IconHome, IconImages } from '../shared/icons'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
@@ -29,6 +31,7 @@ export function HeaderUser() {
   const { data: bikerDetails } = useBikerDetails(user?.id)
   const navigate = useNavigate()
   const itemCount = useCartStore((s) => s.items.length)
+  const openCartDrawer = useCartDrawerStore((s) => s.openDrawer)
   const [signingOut, setSigningOut] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -116,9 +119,9 @@ export function HeaderUser() {
                 >
                   <IconBookmark className="h-5 w-5" />
                 </Link>
-                <Link
-                  id="header-cart-icon"
-                  to="/app/checkout"
+                <button
+                  data-cart-icon
+                  onClick={openCartDrawer}
                   aria-label="Carrito"
                   title="Carrito"
                   className="relative hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border md:flex"
@@ -129,7 +132,7 @@ export function HeaderUser() {
                       {itemCount}
                     </span>
                   )}
-                </Link>
+                </button>
                 <NotificationsMenu />
                 <div className="hidden md:block">
                   <ProfileMenu
@@ -186,12 +189,30 @@ export function HeaderUser() {
                   <span className="truncate">Buscar…</span>
                 </button>
               )}
+              {/* El carrito se conserva también en la capa transformada,
+                  siempre al borde derecho — es la única herramienta que no
+                  cede su lugar al contenido de la página. */}
+              <button
+                data-cart-icon
+                onClick={openCartDrawer}
+                aria-label="Carrito"
+                title="Carrito"
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+              >
+                <IconCart className="h-5 w-5" />
+                {itemCount > 0 && (
+                  <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                    {itemCount}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </header>
       </div>
 
       <BikerSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <CartDrawer />
 
       <MobileBottomNav
         items={[

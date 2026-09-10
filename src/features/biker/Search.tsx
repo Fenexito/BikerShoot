@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type PublicEvent, type PublicEventPoint } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
@@ -7,10 +7,11 @@ import { PhotoLightbox } from './components/PhotoLightbox'
 import { Badge } from '../../ui/flat/Badge'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { IconSearch, IconGridSmall, IconGridLarge, IconClose } from '../../ui/shared/icons'
+import { IconSearch, IconGridSmall, IconGridLarge, IconClose, IconChevronDown } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
-import { useScrolledPast } from '../../ui/shared/useScrolledPast'
+import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
+import { useOutsideClick } from '../../ui/shared/useOutsideClick'
 import { cn } from '../../lib/cn'
 
 // Rango del resizer de tamaño de foto — el tope (270px) está calculado
@@ -89,38 +90,43 @@ function dedupeOptions(values: string[]): FilterDropdownOption[] {
   return Array.from(new Set(values)).map((v) => ({ value: v, label: v }))
 }
 
-function HourRangeDropdown({ boundsMin, boundsMax, valueMin, valueMax, active, onChange }: {
+function HourRangeDropdown({
+  boundsMin,
+  boundsMax,
+  valueMin,
+  valueMax,
+  active,
+  onChange,
+  variant = 'pill',
+}: {
   boundsMin: number
   boundsMax: number
   valueMin: number
   valueMax: number
   active: boolean
   onChange: (min: number, max: number) => void
+  variant?: 'pill' | 'text'
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function onClickOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [open])
+  useOutsideClick(rootRef, () => setOpen(false), open)
 
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors',
-          active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground hover:bg-muted',
-        )}
+        className={
+          variant === 'text'
+            ? cn('flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1 text-sm font-medium transition-colors', active ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground')
+            : cn(
+                'flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors',
+                active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground hover:bg-muted',
+              )
+        }
       >
         {active ? `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}` : 'Horario'}
-        <span className={cn('shrink-0 text-[10px] transition-transform', open && 'rotate-180')}>▾</span>
+        <IconChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
         <div className="absolute left-0 top-full z-50 mt-2 w-72 origin-top animate-menu-in rounded-2xl border border-border bg-background p-4 shadow-2xl">
@@ -137,15 +143,19 @@ export function Search() {
   const { data: routes = [] } = useRoutes()
   const [searchParams, setSearchParams] = useSearchParams()
   const [lightbox, setLightbox] = useState<{ photos: GridPhoto[]; index: number } | null>(null)
-  // Umbral simple (sin histéresis): ya no hace falta — el hero dejó de
-  // encogerse con el scroll (ver nota más abajo), así que no hay cambio de
-  // layout que pueda empujar el scroll de un lado al otro del umbral.
-  const scrolled = useScrolledPast(120)
-  const [tileSize, setTileSize] = useState(TILE_SIZE_DEFAULT)
-
-  useEffect(() => {
-    setTileSize(loadTileSize())
-  }, [])
+  // El header interactivo se activa justo cuando este "centinela" (colocado
+  // apenas arriba de la fila de "N fotos encontradas" + el resizer) queda
+  // tapado por el header — no un número de píxeles fijo, sino el layout
+  // real de la página. Como la barra de filtros de la página vive justo
+  // arriba del centinela, para cuando el header se activa esa barra ya se
+  // está escondiendo debajo del propio header: se siente como que la
+  // misma barra "se muda" de la página al header, no como dos cosas
+  // independientes prendiendo/apagando por su cuenta.
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const scrolled = useScrollPastElement(sentinelRef)
+  // Lee localStorage directo en el estado inicial (sin useEffect) — esta es
+  // una SPA sin SSR, así que no hay riesgo de mismatch de hidratación.
+  const [tileSize, setTileSize] = useState(loadTileSize)
 
   function changeTileSize(next: number) {
     setTileSize(next)
@@ -196,12 +206,20 @@ export function Search() {
     horaHasta: horaHasta || undefined,
   })
 
-  const results: GridPhoto[] = rawResults.map((p) => ({
-    ...p,
-    eventTitle: p.event?.title ?? '',
-    photographerName: p.photographer?.display_name ?? '',
-    pointLabel: p.point?.label,
-  }))
+  // Las destacadas son curadas por el fotógrafo como muestra — nunca están
+  // a la venta (ver PhotoCard.tsx) — así que no deben aparecer como
+  // resultado en esta búsqueda de fotos PARA COMPRAR. Se excluyen aquí (no
+  // en `useSearchPhotos`, que también usan Home.tsx para su collage
+  // decorativo y Favorites.tsx para favoritos ya guardados — ahí sí pueden
+  // aparecer destacadas).
+  const results: GridPhoto[] = rawResults
+    .filter((p) => !p.featured)
+    .map((p) => ({
+      ...p,
+      eventTitle: p.event?.title ?? '',
+      photographerName: p.photographer?.display_name ?? '',
+      pointLabel: p.point?.label,
+    }))
 
   // Cada campo calcula sus opciones a partir de los DEMÁS filtros elegidos
   // (interconectados en ambas direcciones) — ver `matchingPoints`.
@@ -270,48 +288,67 @@ export function Search() {
     hourActive && { key: 'hora', label: `${minutesToHHMM(valueMin)} - ${minutesToHHMM(valueMax)}`, remove: () => changeHourRange(boundsMin, boundsMax) },
   ].filter(Boolean) as { key: string; label: string; remove: () => void }[]
 
-  // Barra de filtros — vive tanto en la página (siempre visible, debajo del
-  // hero) como dentro del header interactivo una vez se cruza el umbral de
-  // scroll (mismo contenido, un solo lugar de verdad). El usuario filtra
-  // directo desde acá: ya no hace falta un botón "Filtros" que abra un
-  // modal aparte.
-  function renderFilterBar() {
+  // Descripción dinámica del hero — reemplaza el texto genérico en cuanto
+  // hay algún filtro multi-selectivo elegido.
+  const filterDescriptionParts = [
+    categories.length && categories.join(', '),
+    routeIds.length && `ruta ${routeIds.map((id) => routes.find((r) => r.id === id)?.name).filter(Boolean).join(', ')}`,
+    pointLabels.length && `punto ${pointLabels.join(', ')}`,
+    photographerIds.length && `fotógrafo ${photographerIds.map((id) => photographers.find((p) => p.id === id)?.display_name).filter(Boolean).join(', ')}`,
+    hourActive && `entre ${minutesToHHMM(valueMin)} y ${minutesToHHMM(valueMax)}`,
+  ].filter(Boolean) as string[]
+  const heroDescription = filterDescriptionParts.length > 0 ? `Filtrando por ${filterDescriptionParts.join(' · ')}` : 'Busca por evento, ciudad o fotógrafo.'
+
+  // Barra de filtros — vive tanto en la página (pastillas, siempre visible
+  // debajo del hero) como dentro del header interactivo una vez se cruza
+  // el centinela (mismo contenido/estado, solo texto en vez de pastillas —
+  // ver `variant` en `FilterDropdown`). El usuario filtra directo desde
+  // acá: ya no hace falta un botón "Filtros" que abra un modal aparte.
+  function renderFilterBar(variant: 'pill' | 'text') {
     return (
-      <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
-        <FilterDropdown label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
-        <FilterDropdown label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
-        <FilterDropdown label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
-        <FilterDropdown label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
-        <HourRangeDropdown boundsMin={boundsMin} boundsMax={boundsMax} valueMin={valueMin} valueMax={valueMax} active={hourActive} onChange={changeHourRange} />
+      <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2', variant === 'pill' ? 'w-full justify-center gap-x-2' : 'w-full')}>
+        <FilterDropdown variant={variant} label="Categoría" values={categories} onChange={(v) => setListParam('categorias', v)} options={categoryOptions} />
+        <FilterDropdown variant={variant} label="Ruta" values={routeIds} onChange={(v) => setListParam('rutas', v)} options={routeOptions} />
+        <FilterDropdown variant={variant} label="Punto" values={pointLabels} onChange={(v) => setListParam('puntos', v)} options={pointOptions} />
+        <FilterDropdown variant={variant} label="Fotógrafo" values={photographerIds} onChange={(v) => setListParam('fotografos', v)} options={photographerOptions} />
+        <HourRangeDropdown
+          variant={variant}
+          boundsMin={boundsMin}
+          boundsMax={boundsMax}
+          valueMin={valueMin}
+          valueMax={valueMax}
+          active={hourActive}
+          onChange={changeHourRange}
+        />
         {activeFilterCount > 0 && (
           <button
             onClick={clearAllFilters}
-            aria-label="Limpiar filtros"
-            title="Limpiar filtros"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
+            className={cn(
+              'shrink-0 whitespace-nowrap text-sm font-semibold text-red-500 transition-colors hover:text-red-600',
+              variant === 'pill' && 'flex h-9 items-center gap-1.5 rounded-full bg-red-50 px-4',
+            )}
           >
-            <IconClose className="h-4 w-4" />
+            {variant === 'pill' && <IconClose className="h-4 w-4" />}
+            Limpiar filtros
           </button>
         )}
       </div>
     )
   }
 
-  useHeaderTransform(renderFilterBar(), scrolled)
+  useHeaderTransform(renderFilterBar('text'), scrolled)
 
   return (
     <div className="font-flat">
-      {/* Hero estático — antes se encogía (max-height) al cruzar el mismo
-          umbral que activa el header interactivo, y ese cambio de layout
-          bajo los pies del usuario mientras seguía scrolleando se sentía
-          como un "jalón" hacia arriba. Ahora es un bloque normal que se
-          desplaza como cualquier otro contenido — el header interactivo
-          sigue apareciendo al scrollear, pero sin mover nada del layout de
-          la página en sí. */}
+      {/* Hero estático — ya no se encoge con el scroll (ese cambio de
+          layout bajo los pies del usuario se sentía como un "jalón" hacia
+          arriba). El header interactivo aparece por scroll real (ver
+          `sentinelRef` más abajo), sin mover nada de este bloque. */}
       <div className="px-4 py-14 text-center md:px-8">
         <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">Encuentra tus fotos en segundos.</h1>
-        <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-          Busca por evento, ciudad o fotógrafo — {results.length} fotos disponibles ahora mismo.
+        <p className="mx-auto mt-3 max-w-md text-muted-foreground">{heroDescription}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{results.length}</span> fotos disponibles ahora mismo
         </p>
         <div className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-full bg-muted px-5 shadow-sm">
           <IconSearch className="h-5 w-5 shrink-0 text-muted-foreground" />
@@ -325,10 +362,10 @@ export function Search() {
       </div>
 
       <div className="mx-auto max-w-[1800px] px-4 md:px-8">
-        <div className="mb-5">{renderFilterBar()}</div>
+        <div className="mb-5">{renderFilterBar('pill')}</div>
 
         {activeChips.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-2">
+          <div className="mb-5 flex flex-wrap justify-center gap-2">
             {activeChips.map((chip) => (
               <button key={chip.key} onClick={chip.remove}>
                 <Badge tone="secondary" className="cursor-pointer gap-1 hover:bg-emerald-200">
@@ -339,6 +376,8 @@ export function Search() {
           </div>
         )}
       </div>
+
+      <div ref={sentinelRef} />
 
       <div className="mx-auto max-w-[1800px] px-4 pb-8 pt-2 md:px-8">
         <div className="mb-4 flex items-center justify-between gap-3 md:hidden">

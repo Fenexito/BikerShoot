@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { DbPhoto } from '../../../types/db'
 import { previewUrl } from '../../../lib/r2'
 import { useCartStore } from '../../cart/cartStore'
@@ -32,6 +32,20 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   const toggleFavorite = useFavoritesStore((s) => s.toggle)
   const freshness = timeAgo(photo.created_at)
   const imgRef = useRef<HTMLImageElement>(null)
+  // `null` = sin animación en curso; un número = "monta el overlay de nuevo
+  // con esta key" (fuerza a React a re-crear el nodo y así reiniciar la
+  // animación CSS aunque el usuario guarde/quite/guarde varias veces
+  // seguidas antes de que termine la anterior).
+  const [saveBurstKey, setSaveBurstKey] = useState<number | null>(null)
+
+  function handleToggleFavorite() {
+    const next = !isFavorite
+    toggleFavorite(photo.id)
+    // Confirmación visual solo al GUARDAR (no al quitar) — como el corazón
+    // de Instagram, se muestra sola y se desvanece, sin necesitar ningún
+    // click para cerrarla.
+    if (next) setSaveBurstKey((k) => (k ?? 0) + 1)
+  }
 
   function handleAddClick(e: React.MouseEvent) {
     e.stopPropagation()
@@ -55,17 +69,21 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   }
 
   return (
-    <div
-      className={cn(
-        'group relative overflow-hidden rounded-2xl bg-muted transition-shadow',
-        layout === 'mosaic' && 'mb-3 break-inside-avoid',
-        // Borde azul persistente en fotos ya agregadas al carrito — visible
-        // incluso sin pasar el cursor encima, para que al reiniciar o
-        // repetir una búsqueda el usuario sepa de un vistazo cuáles ya
-        // eligió sin tener que abrir el carrito a comparar.
-        inCart && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-background',
+    <div className={cn('group relative overflow-hidden rounded-2xl bg-muted transition-shadow', layout === 'mosaic' && 'mb-3 break-inside-avoid')}>
+      {/* Borde azul persistente en fotos ya agregadas al carrito — un
+          overlay `inset-0` con `ring-inset` (mismo patrón que el borde rojo
+          de selección en el portal del fotógrafo) en vez de `ring-offset`,
+          que dejaba un hueco de 1-2px entre la foto y el borde. Visible
+          incluso sin pasar el cursor encima, para que al reiniciar o repetir
+          una búsqueda el usuario sepa de un vistazo cuáles ya eligió. */}
+      {inCart && <span className="pointer-events-none absolute inset-0 z-[2] rounded-2xl ring-2 ring-inset ring-blue-500" />}
+
+      {saveBurstKey !== null && (
+        <div key={saveBurstKey} className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center" onAnimationEnd={() => setSaveBurstKey(null)}>
+          <IconBookmark filled className="h-16 w-16 animate-save-burst text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]" />
+        </div>
       )}
-    >
+
       <button onClick={onOpen} className="block w-full">
         <img
           ref={imgRef}
@@ -100,7 +118,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           <span />
         )}
         <button
-          onClick={() => toggleFavorite(photo.id)}
+          onClick={handleToggleFavorite}
           aria-label="Guardar"
           className={cn(
             'flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',

@@ -4,13 +4,22 @@
  * Es una prueba (pedida explícitamente como tal): si no gusta, se puede
  * quitar el `onClick` que la dispara sin tocar nada del carrito en sí. */
 export function flyToCart(sourceRect: DOMRect, imageUrl: string) {
-  const target = document.getElementById('header-cart-icon')
-  if (!target) return
-  const targetRect = target.getBoundingClientRect()
-  // El ícono del carrito del header vive en `hidden md:flex` — en móvil no
-  // existe visualmente y su rect sale en (0,0,0,0). Sin este chequeo la
-  // animación "volaría" hacia la esquina superior izquierda de la pantalla.
-  if (targetRect.width === 0 || targetRect.height === 0) return
+  // Hay más de un ícono de carrito en el DOM a la vez (la capa normal del
+  // header y la capa transformada conviven, una de las dos con opacidad 0 —
+  // ver HeaderUser.tsx), así que se marcan con el mismo atributo y se toma
+  // el primero que de verdad esté visible (rect con tamaño real).
+  const candidates = document.querySelectorAll<HTMLElement>('[data-cart-icon]')
+  let target: HTMLElement | null = null
+  let targetRect: DOMRect | null = null
+  for (const el of candidates) {
+    const rect = el.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) {
+      target = el
+      targetRect = rect
+      break
+    }
+  }
+  if (!target || !targetRect) return
 
   const el = document.createElement('img')
   el.src = imageUrl
