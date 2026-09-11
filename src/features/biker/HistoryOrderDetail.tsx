@@ -39,7 +39,7 @@ export function HistoryOrderDetail() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-10 font-flat md:px-8">
+      <div className="mx-auto max-w-4xl px-3 py-6 font-flat md:px-8 md:py-10">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="mt-3 h-4 w-1/3" />
         <SkeletonGrid count={6} className="mt-8" />
@@ -50,7 +50,7 @@ export function HistoryOrderDetail() {
   if (!order) return <PlaceholderPage title="Pedido no encontrado" />
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 font-flat md:px-8">
+    <div className="mx-auto max-w-4xl px-3 py-6 font-flat md:px-8 md:py-10">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card p-5 sm:p-6">
         <div>
           <p className="text-sm text-muted-foreground">

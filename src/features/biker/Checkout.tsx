@@ -92,7 +92,7 @@ export function Checkout() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center font-flat">
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-16 text-center font-flat md:py-24">
         <span className="text-5xl">🛒</span>
         <h1 className="text-2xl font-bold tracking-tight">Tu carrito está vacío</h1>
         <p className="text-muted-foreground">Busca tus fotos y agrégalas aquí para comprarlas.</p>
@@ -104,7 +104,7 @@ export function Checkout() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 pb-24 font-flat md:px-8 lg:pb-10">
+    <div className="mx-auto max-w-6xl px-3 py-6 pb-24 font-flat md:px-8 md:py-10 lg:pb-10">
       <h1 className="mb-8 text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
 
       <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">

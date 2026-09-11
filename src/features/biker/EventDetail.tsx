@@ -138,7 +138,7 @@ export function EventDetail() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+      <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="mt-3 h-4 w-1/3" />
         <SkeletonGrid count={8} className="mt-8" />
@@ -154,7 +154,7 @@ export function EventDetail() {
     <div className="pb-24 font-flat">
       {coverUrl ? (
         <ScrollExpand
-          className="-mt-[4.75rem] md:-mt-20"
+          className="-mt-[4.25rem] md:-mt-20"
           src={coverUrl}
           alt={event.title}
           title={event.title}
@@ -176,7 +176,7 @@ export function EventDetail() {
         </div>
       )}
 
-      <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
+      <div className="mx-auto max-w-6xl px-3 py-6 md:px-8 md:py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Badge tone="accent">{event.category}</Badge>

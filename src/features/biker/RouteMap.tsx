@@ -94,7 +94,7 @@ export function RouteMap() {
   )
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+    <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Mapa de puntos</h1>
       <p className="mb-6 text-muted-foreground">Encuentra a los fotógrafos por ciudad y horario de salida.</p>
 

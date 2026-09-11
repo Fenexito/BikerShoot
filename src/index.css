@@ -505,6 +505,25 @@ html {
   font-family: 'Inter Tight', Inter, system-ui, sans-serif;
 }
 
+.theme-flat.dark {
+  --color-background: 15 17 21;
+  --color-foreground: 245 246 248;
+  --color-primary: 96 165 250;
+  --color-primary-foreground: 15 17 21;
+  --color-secondary: 52 211 153;
+  --color-secondary-foreground: 15 17 21;
+  --color-accent: 251 191 36;
+  --color-accent-foreground: 15 17 21;
+  --color-muted: 30 33 39;
+  --color-muted-foreground: 156 163 175;
+  --color-border: 45 48 56;
+  --color-border-hover: 63 67 77;
+  --color-input: 30 33 39;
+  --color-card: 22 24 29;
+  --color-card-foreground: 245 246 248;
+  --color-ring: 96 165 250;
+}
+
 /* ---------- Bold Typography (studio / fotógrafo) — claro y oscuro ---------- */
 .theme-studio {
   --color-background: 250 250 250;

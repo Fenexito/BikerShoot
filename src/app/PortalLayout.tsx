@@ -13,6 +13,7 @@ import { SegmentPickerDialog } from '../ui/overlays/SegmentPickerDialog'
 import { ScrollRestoration } from './ScrollRestoration'
 import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
+import { useFlatTheme } from '../ui/flat/themeStore'
 import { RouteFallback } from '../ui/shared/RouteFallback'
 
 const AUTH_PATHS = [
@@ -35,6 +36,7 @@ const STUDIO_ALWAYS_DARK_PATHS = ['/studio/login', '/studio/signup', '/studio/fo
 export function PortalLayout() {
   const { pathname } = useLocation()
   const studioTheme = useStudioTheme((s) => s.theme)
+  const flatTheme = useFlatTheme((s) => s.theme)
 
   const isUserPortal = pathname.startsWith('/app')
   const isStudioPortal = pathname.startsWith('/studio')
@@ -43,7 +45,9 @@ export function PortalLayout() {
 
   const themeClass = isStudioPortal
     ? cn('theme-studio', STUDIO_ALWAYS_DARK_PATHS.includes(pathname) ? 'dark' : studioTheme)
-    : 'theme-flat'
+    : isUserPortal
+      ? cn('theme-flat', flatTheme)
+      : 'theme-flat'
   const isDark = themeClass.includes('dark')
 
   // Los colores del tema (incluido --color-background/--color-muted-foreground,
@@ -79,7 +83,12 @@ export function PortalLayout() {
       <div
         className={cn(
           'flex-1',
-          (isUserPortal || isStudioPortal) && !isAuthPage && 'pb-20 pt-[4.75rem] md:pb-0 md:pt-0',
+          // El header del portal biker bajó de alto (h-16 → h-14 en móvil,
+          // ver HeaderUser.tsx) para ocupar menos espacio en pantallas
+          // chicas — el padding compensatorio baja con él. Studio no tocó
+          // su alto, así que se queda con el valor de siempre.
+          isUserPortal && !isAuthPage && 'pb-20 pt-[4.25rem] md:pb-0 md:pt-0',
+          isStudioPortal && !isAuthPage && 'pb-20 pt-[4.75rem] md:pb-0 md:pt-0',
         )}
       >
         <Suspense fallback={<RouteFallback />}>

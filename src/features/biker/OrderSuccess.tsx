@@ -6,7 +6,7 @@ export function OrderSuccess() {
   const state = location.state as { total?: number; count?: number } | null
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-24 text-center font-flat">
+    <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-16 text-center font-flat md:py-24">
       <span className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-4xl">✓</span>
       <h1 className="text-3xl font-bold tracking-tight">¡Listo, {state?.count ?? 'tus'} fotos son tuyas!</h1>
       <p className="text-muted-foreground">

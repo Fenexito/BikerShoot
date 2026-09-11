@@ -71,7 +71,7 @@ export function History() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+      <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
         <SkeletonRows count={3} />
       </div>
     )
@@ -79,7 +79,7 @@ export function History() {
 
   if (orders.length === 0) {
     return (
-      <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-24 text-center font-flat">
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-16 text-center font-flat md:py-24">
         <span className="text-5xl">🧾</span>
         <h1 className="text-2xl font-bold tracking-tight">Aún no tienes compras</h1>
         <p className="text-muted-foreground">Cuando compres fotos, las verás aquí listas para descargar.</p>
@@ -91,7 +91,7 @@ export function History() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+    <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Mis compras</h1>
       <p className="mb-6 text-muted-foreground">{orders.length} pedidos</p>
 

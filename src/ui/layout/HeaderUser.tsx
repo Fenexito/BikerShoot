@@ -12,6 +12,7 @@ import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
+import { ThemeSwitcherInline } from '../flat/ThemeSwitcherInline'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
@@ -105,7 +106,7 @@ export function HeaderUser() {
             transformed && canExpand ? 'rounded-3xl' : 'rounded-full',
           )}
         >
-        <div className="flex h-16 items-center gap-3 px-3 md:gap-5 md:px-4">
+        <div className="flex h-14 items-center gap-3 px-3 md:h-16 md:gap-5 md:px-4">
           {/* La flecha de "volver" y su reemplazo móvil (si la página pidió
               uno) ocupan EXACTAMENTE el mismo hueco de 36×36 — un overlay
               encima del otro, nunca dos elementos con su propio espacio,
@@ -212,6 +213,7 @@ export function HeaderUser() {
                         ? { label: 'Completar perfil', to: '/app/perfil' }
                         : undefined
                     }
+                    themeSwitcher={<ThemeSwitcherInline />}
                     sections={[
                       [
                         { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },

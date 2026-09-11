@@ -1,17 +1,18 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useBikerDetails } from './useBikerDetails'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
-import { IconUser, IconSettings, IconBell } from '../../ui/shared/icons'
+import { IconUser, IconSettings, IconBell, IconCart, IconBookmark, IconSun, IconMoon } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { SettingsSection, SettingsEditableRow, SettingsNotificationToggle, settingsInputClass } from '../../ui/shared/SettingsPrimitives'
+import { useFlatTheme } from '../../ui/flat/themeStore'
 import { cn } from '../../lib/cn'
 import type { NotificationType } from '../notifications/useNotifications'
 
@@ -37,6 +38,7 @@ type TabId = (typeof TABS)[number]['id']
 export function BikerProfilePage() {
   const { user, profile, updateProfileLocal, refreshProfile, signOut, signOutEverywhere, updatePassword } = useAuth()
   const { data: details, isLoading } = useBikerDetails(user?.id)
+  const { theme, toggle: toggleTheme } = useFlatTheme()
   const push = useToastStore((s) => s.push)
   const navigate = useNavigate()
   const [tab, setTab] = useState<TabId>('perfil')
@@ -200,7 +202,7 @@ export function BikerProfilePage() {
 
   if (isLoading || !profile) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+      <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
         <Skeleton className="h-8 w-40" />
         <div className="mt-8 grid gap-8 lg:grid-cols-[180px_1fr]">
           <Skeleton className="h-32 w-full lg:h-64" />
@@ -216,9 +218,30 @@ export function BikerProfilePage() {
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 font-flat md:px-8">
+    <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
       <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Configuración</h1>
       <p className="mt-2 text-muted-foreground">Tu perfil, tu cuenta y tus notificaciones.</p>
+
+      {/* Solo móvil — en escritorio "Mis compras"/"Favoritos" ya viven en el
+          menú de perfil del header (oculto en móvil, donde ese espacio lo
+          ocupa el menú inferior). Sin esto no había NINGÚN acceso a esas dos
+          páginas desde el teléfono. */}
+      <div className="mt-6 grid grid-cols-2 gap-3 md:hidden">
+        <Link
+          to="/app/historial"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-muted"
+        >
+          <IconCart className="h-5 w-5 shrink-0 text-muted-foreground" />
+          Mis compras
+        </Link>
+        <Link
+          to="/app/favoritos"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-muted"
+        >
+          <IconBookmark className="h-5 w-5 shrink-0 text-muted-foreground" />
+          Favoritos
+        </Link>
+      </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[180px_1fr]">
         {/* Móvil: pestañas horizontales subrayadas. Escritorio: lista
@@ -273,6 +296,37 @@ export function BikerProfilePage() {
 
           {tab === 'cuenta' && (
             <>
+              <SettingsSection title="Apariencia">
+                <div className="flex items-center justify-between gap-3 py-1">
+                  <div>
+                    <p className="text-sm font-semibold">Tema</p>
+                    <p className="text-sm text-muted-foreground">Elige cómo se ve la app en este dispositivo.</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1 rounded-full bg-muted p-1">
+                    <button
+                      onClick={() => theme !== 'light' && toggleTheme()}
+                      aria-label="Modo claro"
+                      className={cn(
+                        'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
+                        theme === 'light' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <IconSun className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => theme !== 'dark' && toggleTheme()}
+                      aria-label="Modo oscuro"
+                      className={cn(
+                        'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
+                        theme === 'dark' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <IconMoon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </SettingsSection>
+
               <SettingsSection title="Datos de acceso">
                 <SettingsEditableRow label="Correo" value={user?.email ?? ''} type="email" onSave={saveEmail} description="Te enviaremos un enlace de confirmación al nuevo correo." />
                 <div className="border-b border-border py-4 last:border-b-0">

@@ -37,7 +37,7 @@ export function PhotographerProfile() {
     return (
       <div className="font-flat">
         <div className="h-48 w-full animate-pulse bg-muted md:h-64" />
-        <div className="mx-auto max-w-6xl px-4 md:px-8">
+        <div className="mx-auto max-w-6xl px-3 md:px-8">
           <div className="-mt-14 flex items-end gap-4">
             <Skeleton className="h-28 w-28 shrink-0 rounded-full border-4 border-background" />
             <div className="flex-1 space-y-2 pb-2">
@@ -60,7 +60,7 @@ export function PhotographerProfile() {
     <div className="font-flat">
       {coverUrl ? (
         <ScrollExpand
-          className="-mt-[4.75rem] md:-mt-20"
+          className="-mt-[4.25rem] md:-mt-20"
           src={coverUrl}
           alt={photographer.display_name}
           title={photographer.logo_path ? undefined : photographer.display_name}
@@ -91,7 +91,7 @@ export function PhotographerProfile() {
         </div>
       )}
 
-      <div className="mx-auto max-w-5xl px-4 md:px-8">
+      <div className="mx-auto max-w-5xl px-3 md:px-8">
         <div className="relative -mt-14 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           {avatarUrl ? (
             <img src={avatarUrl} alt={photographer.display_name} className="h-28 w-28 rounded-full border-4 border-background object-cover" />

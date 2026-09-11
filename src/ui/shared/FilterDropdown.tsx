@@ -39,6 +39,9 @@ export function FilterDropdown({ label, values, onChange, options, className, va
   const [coords, setCoords] = useState({ top: 0, left: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollUp, setCanScrollUp] = useState(false)
+  const [canScrollDown, setCanScrollDown] = useState(false)
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
@@ -47,6 +50,16 @@ export function FilterDropdown({ label, values, onChange, options, className, va
     setCoords({ top: rect.bottom + 8, left: Math.max(8, left) })
   }, [open])
 
+  function updateScrollEdges(el: HTMLDivElement) {
+    setCanScrollUp(el.scrollTop > 2)
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 2)
+  }
+
+  useLayoutEffect(() => {
+    if (!open || !scrollRef.current) return
+    updateScrollEdges(scrollRef.current)
+  }, [open, options.length])
+
   useLayoutEffect(() => {
     if (!open) return
     function onPointerDown(e: MouseEvent) {
@@ -54,10 +67,17 @@ export function FilterDropdown({ label, values, onChange, options, className, va
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return
       setOpen(false)
     }
-    // El scroll (de la página, o del propio contenedor horizontal de
-    // filtros) cierra el panel en vez de re-posicionarlo — más simple y
-    // predecible que perseguir al botón con un listener de scroll continuo.
-    function onScroll() {
+    // El scroll de la PÁGINA (o del contenedor horizontal de filtros) cierra
+    // el panel en vez de re-posicionarlo — más simple y predecible que
+    // perseguir al botón con un listener de scroll continuo. `capture:true`
+    // es necesario porque el scroll no burbujea, pero eso también hace que
+    // este listener vea el scroll INTERNO de la lista de opciones (su
+    // `scroll` sí llega aquí en fase de captura) — sin el chequeo de abajo,
+    // intentar scrollear la lista cerraba el panel al instante en vez de
+    // desplazarla. Se ignora cualquier scroll que haya ocurrido DENTRO del
+    // panel mismo.
+    function onScroll(e: Event) {
+      if (panelRef.current?.contains(e.target as Node)) return
       setOpen(false)
     }
     document.addEventListener('mousedown', onPointerDown)
@@ -106,9 +126,9 @@ export function FilterDropdown({ label, values, onChange, options, className, va
           <div
             ref={panelRef}
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: PANEL_WIDTH }}
-            className="z-50 max-h-64 origin-top animate-menu-in overflow-y-auto rounded-2xl border border-border bg-background py-1.5 shadow-2xl"
+            className="z-50 origin-top animate-menu-in overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
           >
-            <div className="flex items-center justify-between px-4 py-1.5">
+            <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
               {values.length > 0 && (
                 <button type="button" onClick={() => onChange([])} aria-label="Limpiar" className="text-red-500 hover:text-red-600">
@@ -116,28 +136,55 @@ export function FilterDropdown({ label, values, onChange, options, className, va
                 </button>
               )}
             </div>
-            {options.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">Sin opciones para esta combinación</p>}
-            {options.map((o) => {
-              const checked = values.includes(o.value)
-              return (
-                <button
-                  type="button"
-                  key={o.value}
-                  onClick={() => toggle(o.value)}
-                  className="flex w-full items-center gap-2.5 truncate px-4 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                >
-                  <span
-                    className={cn(
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                      checked ? 'border-primary bg-primary text-white' : 'border-border',
-                    )}
-                  >
-                    {checked && '✓'}
-                  </span>
-                  <span className="truncate">{o.label}</span>
-                </button>
-              )
-            })}
+            {/* La lista es el único elemento que scrollea (el encabezado de
+                arriba queda fijo) — los degradados de los bordes son el
+                indicador visual de que hay más opciones arriba/abajo, y solo
+                se muestran cuando de verdad hay contenido oculto de ese
+                lado (`canScrollUp`/`canScrollDown`, medidos con el propio
+                scroll de la lista). Sin esto, en móvil no había ninguna
+                pista de que la lista se podía desplazar. */}
+            <div className="relative">
+              <div
+                ref={scrollRef}
+                onScroll={(e) => updateScrollEdges(e.currentTarget)}
+                className="max-h-52 overflow-y-auto pb-1.5"
+              >
+                {options.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">Sin opciones para esta combinación</p>}
+                {options.map((o) => {
+                  const checked = values.includes(o.value)
+                  return (
+                    <button
+                      type="button"
+                      key={o.value}
+                      onClick={() => toggle(o.value)}
+                      className="flex w-full items-center gap-2.5 truncate px-4 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      <span
+                        className={cn(
+                          'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                          checked ? 'border-primary bg-primary text-white' : 'border-border',
+                        )}
+                      >
+                        {checked && '✓'}
+                      </span>
+                      <span className="truncate">{o.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div
+                className={cn(
+                  'pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-background to-transparent transition-opacity duration-150',
+                  canScrollUp ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              <div
+                className={cn(
+                  'pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-background to-transparent transition-opacity duration-150',
+                  canScrollDown ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+            </div>
           </div>,
           getPortalRoot(),
         )}

@@ -500,7 +500,7 @@ export function Search() {
           layout bajo los pies del usuario se sentía como un "jalón" hacia
           arriba). El header interactivo aparece por scroll real (ver
           `sentinelRef` más abajo), sin mover nada de este bloque. */}
-      <div className="px-4 py-14 text-center md:px-8">
+      <div className="px-4 py-8 text-center md:px-8 md:py-14">
         <h1 className="text-3xl font-extrabold tracking-tight md:text-5xl">Encuentra tus fotos en segundos.</h1>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">{heroDescription}</p>
         <p className="mt-1 text-sm text-muted-foreground">
