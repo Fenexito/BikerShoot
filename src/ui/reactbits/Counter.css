@@ -1,0 +1,29 @@
+.counter-js-css {
+  display: inline-flex;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.counter-js-css__digit {
+  position: relative;
+  overflow: hidden;
+}
+
+.counter-js-css__strip {
+  display: flex;
+  flex-direction: column;
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.counter-js-css__num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .counter-js-css__strip {
+    transition-duration: 1ms;
+  }
+}
