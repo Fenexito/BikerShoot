@@ -7,7 +7,9 @@ import { useFavoritesStore } from '../favoritesStore'
 import { flyToCart } from '../../../lib/flyToCart'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { useScrollLock } from '../../../ui/shared/useScrollLock'
-import { IconClose, IconBookmark, IconCart, IconChevronLeft, IconChevronRight } from '../../../ui/shared/icons'
+import { useToastStore } from '../../../ui/overlays/toastStore'
+import { createSharedLink } from '../../share/sharedLinks'
+import { IconClose, IconBookmark, IconCart, IconChevronLeft, IconChevronRight, IconShare } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 import type { GridPhoto } from './PhotoGrid'
 
@@ -16,6 +18,13 @@ interface PhotoLightboxProps {
   index: number
   onClose: () => void
   onNavigate: (index: number) => void
+  /** Query string de los filtros de búsqueda activos en la página que abrió
+   * este visor — se guarda junto al link de "compartir" para que, si quien
+   * lo recibe ya tiene sesión, la vuelva a abrir en Search.tsx con estos
+   * mismos filtros (además y no solo la foto suelta). Se omite en páginas
+   * sin un concepto de "filtros" propio (perfil de fotógrafo, favoritos,
+   * detalle de evento) — el link sigue funcionando, solo sin filtros. */
+  shareSearchParams?: string
 }
 
 const SWIPE_UP_CLOSE_THRESHOLD = 110
@@ -29,7 +38,7 @@ const ZOOM_MAX = 4
  * overlays chicos que NO le quitan espacio real a la imagen — a diferencia
  * de la versión anterior (filas reales de header/footer), que sí achicaba
  * la foto para hacerle lugar. */
-export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLightboxProps) {
+export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams }: PhotoLightboxProps) {
   const photo = photos[index]
   const imgRef = useRef<HTMLImageElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -40,7 +49,9 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
   const [unsaveBurstKey, setUnsaveBurstKey] = useState<number | null>(null)
   const [slideDir, setSlideDir] = useState(1)
   const [closing, setClosing] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const touchRef = useRef<{ startX: number; startY: number } | null>(null)
+  const push = useToastStore((s) => s.push)
 
   const inCart = useCartStore((s) => s.has(photo.id))
   const add = useCartStore((s) => s.add)
@@ -103,6 +114,36 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
     toggleFavorite(photo.id)
     if (next) setSaveBurstKey((k) => (k ?? 0) + 1)
     else setUnsaveBurstKey((k) => (k ?? 0) + 1)
+  }
+
+  // Crea un link corto (`/f/<code>`) apuntando a esta foto + los filtros de
+  // búsqueda activos, y lo entrega usando lo que el navegador tenga a mano:
+  // en móvil, `navigator.share` abre el panel nativo del sistema (WhatsApp,
+  // Instagram, lo que sea que el usuario tenga instalado); en escritorio
+  // (sin esa API) el respaldo es copiar el link al portapapeles.
+  async function handleShare() {
+    if (sharing) return
+    setSharing(true)
+    try {
+      const code = await createSharedLink(photo.id, shareSearchParams ?? '')
+      const url = `${window.location.origin}/f/${code}`
+      const text = `Mira esta foto de ${photo.eventTitle} en MotoShots 🏍️📸`
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'MotoShots', text, url })
+        } catch {
+          // AbortError si la persona cierra el panel nativo sin elegir nada
+          // — no es un error real, no hay nada que avisar.
+        }
+      } else {
+        await navigator.clipboard.writeText(url)
+        push({ type: 'success', title: 'Enlace copiado', description: 'Pégalo donde quieras compartirlo.' })
+      }
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo crear el enlace', description: (err as Error).message })
+    } finally {
+      setSharing(false)
+    }
   }
 
   // Zoom con scroll/rueda — React registra los listeners de `wheel` como
@@ -241,6 +282,15 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate }: PhotoLight
       {/* Esquina superior derecha: contador + cerrar — nunca se
           superponen, cada uno es su propio elemento en la misma fila. */}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-3 sm:right-6 sm:top-6">
+        <button
+          onClick={handleShare}
+          disabled={sharing}
+          aria-label="Compartir esta foto"
+          title="Compartir"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-50"
+        >
+          {sharing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <IconShare className="h-4 w-4" />}
+        </button>
         <span className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-sm sm:text-sm">
           {index + 1} / {photos.length}
         </span>

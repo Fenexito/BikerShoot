@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
-import { IconUser, IconSettings, IconBell, IconCart, IconBookmark, IconSun, IconMoon } from '../../ui/shared/icons'
+import { IconUser, IconSettings, IconBell, IconCart, IconBookmark, IconSun, IconMoon, IconEye, IconEyeOff } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
@@ -48,6 +48,7 @@ export function BikerProfilePage() {
 
   const [newPassword, setNewPassword] = useState('')
   const [editingPassword, setEditingPassword] = useState(false)
+  const [passwordRevealed, setPasswordRevealed] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
 
   const [signingOut, setSigningOut] = useState(false)
@@ -338,14 +339,25 @@ export function BikerProfilePage() {
                   </div>
                   {editingPassword ? (
                     <div className="mt-3 flex flex-col">
-                      <input
-                        autoFocus
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Nueva contraseña"
-                        className={settingsInputClass}
-                      />
+                      <div className="relative">
+                        <input
+                          autoFocus
+                          type={passwordRevealed ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Nueva contraseña"
+                          className={cn(settingsInputClass, 'w-full pr-11')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPasswordRevealed((v) => !v)}
+                          aria-label={passwordRevealed ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                          tabIndex={-1}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {passwordRevealed ? <IconEyeOff className="h-[18px] w-[18px]" /> : <IconEye className="h-[18px] w-[18px]" />}
+                        </button>
+                      </div>
                       <button
                         onClick={savePassword}
                         disabled={savingPassword}

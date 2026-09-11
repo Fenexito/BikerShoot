@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -25,6 +25,8 @@ type FormValues = z.infer<typeof schema>
 export function BikerSignup() {
   const { signUp, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const next = searchParams.get('next')
   const [formError, setFormError] = useState<string | null>(null)
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -32,7 +34,7 @@ export function BikerSignup() {
   const onGoogle = async () => {
     setFormError(null)
     setGoogleLoading(true)
-    const { error } = await signInWithGoogle('biker')
+    const { error } = await signInWithGoogle('biker', next ?? undefined)
     if (error) {
       setFormError(error)
       setGoogleLoading(false)
@@ -56,7 +58,7 @@ export function BikerSignup() {
       setPendingConfirmation(true)
       return
     }
-    navigate('/app')
+    navigate(next || '/app')
   }
 
   if (pendingConfirmation) {
@@ -68,7 +70,7 @@ export function BikerSignup() {
           <p className="mt-3 text-muted-foreground">
             Te enviamos un enlace de confirmación. Ábrelo para activar tu cuenta y luego inicia sesión.
           </p>
-          <Link to="/login" className="mt-8 inline-block font-semibold text-primary">
+          <Link to={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} className="mt-8 inline-block font-semibold text-primary">
             Ir a iniciar sesión
           </Link>
         </div>

@@ -19,6 +19,7 @@ export function AuthCallback() {
 
     const intendedRole = (searchParams.get('role') as 'biker' | 'photographer' | null) ?? 'biker'
     const allowedRoles: Role[] = intendedRole === 'biker' ? ['biker', 'admin'] : ['photographer', 'admin']
+    const next = searchParams.get('next')
 
     const createdAt = new Date(user.created_at).getTime()
     const lastSignInAt = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : createdAt
@@ -42,7 +43,7 @@ export function AuthCallback() {
 
     async function run() {
       if (allowedRoles.includes(profile!.role)) {
-        finish(profile!.role === 'photographer' ? '/studio' : '/app')
+        finish(next || (profile!.role === 'photographer' ? '/studio' : '/app'))
         return
       }
 

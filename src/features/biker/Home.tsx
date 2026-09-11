@@ -202,7 +202,7 @@ export function Home() {
                 que el orden generado "por suerte" coincida. */}
             <button
               type="submit"
-              className="flex h-14 shrink-0 items-center justify-center rounded-full bg-white px-8 text-base font-semibold text-primary shadow-lg transition-colors hover:bg-white/90"
+              className="flex h-14 shrink-0 items-center justify-center rounded-full bg-neutral-900 px-8 text-base font-semibold text-white shadow-lg transition-colors hover:bg-neutral-800"
             >
               Buscar
             </button>

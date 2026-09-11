@@ -12,7 +12,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { cn } from '../../lib/cn'
-import { IconUser, IconSettings, IconBell, IconUsers } from '../../ui/shared/icons'
+import { IconUser, IconSettings, IconBell, IconUsers, IconEye, IconEyeOff } from '../../ui/shared/icons'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import type { NotificationType } from '../notifications/useNotifications'
 
@@ -246,6 +246,7 @@ export function StudioSettings() {
 
   const [newPassword, setNewPassword] = useState('')
   const [editingPassword, setEditingPassword] = useState(false)
+  const [passwordRevealed, setPasswordRevealed] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
 
   const [signingOut, setSigningOut] = useState(false)
@@ -621,14 +622,25 @@ export function StudioSettings() {
                   </div>
                   {editingPassword ? (
                     <div className="mt-3">
-                      <input
-                        autoFocus
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Nueva contraseña"
-                        className={inputClass}
-                      />
+                      <div className="relative">
+                        <input
+                          autoFocus
+                          type={passwordRevealed ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Nueva contraseña"
+                          className={cn(inputClass, 'w-full pr-11')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPasswordRevealed((v) => !v)}
+                          aria-label={passwordRevealed ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                          tabIndex={-1}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {passwordRevealed ? <IconEyeOff className="h-[18px] w-[18px]" /> : <IconEye className="h-[18px] w-[18px]" />}
+                        </button>
+                      </div>
                       <Button variant="dark" size="sm" className="mt-3" onClick={savePassword} loading={savingPassword}>
                         Guardar
                       </Button>

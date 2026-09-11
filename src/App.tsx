@@ -51,6 +51,7 @@ const AuthCallback = lazy(() => import('./features/auth/AuthCallback').then((m) 
 const PrivacyPage = lazy(() => import('./features/legal/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
 const TermsPage = lazy(() => import('./features/legal/TermsPage').then((m) => ({ default: m.TermsPage })))
 const CopyrightPage = lazy(() => import('./features/legal/CopyrightPage').then((m) => ({ default: m.CopyrightPage })))
+const SharedPhotoPage = lazy(() => import('./features/share/SharedPhotoPage').then((m) => ({ default: m.SharedPhotoPage })))
 
 export default function App() {
   return (
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/privacidad" element={<PrivacyPage />} />
           <Route path="/terminos" element={<TermsPage />} />
           <Route path="/derechos-de-autor" element={<CopyrightPage />} />
+          <Route path="/f/:code" element={<SharedPhotoPage />} />
 
           {/* Biker (requiere sesión) */}
           <Route path="/app" element={<RequireBiker><BikerHome /></RequireBiker>} />

@@ -26,7 +26,7 @@ interface AuthState {
     displayName: string,
   ) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>
   signIn: (email: string, password: string, portal: 'biker' | 'studio') => Promise<{ error: string | null }>
-  signInWithGoogle: (portal: 'biker' | 'studio') => Promise<{ error: string | null }>
+  signInWithGoogle: (portal: 'biker' | 'studio', next?: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   signOutEverywhere: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>
@@ -132,11 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
-  async function signInWithGoogle(portal: 'biker' | 'studio') {
+  async function signInWithGoogle(portal: 'biker' | 'studio', next?: string) {
     const intendedRole = portal === 'biker' ? 'biker' : 'photographer'
+    // `next` viaja como query param a través de todo el flujo de Google (no
+    // hay dónde más guardarlo: el navegador se va por completo a
+    // accounts.google.com y vuelve horas o días después en algunos casos) —
+    // AuthCallback.tsx lo lee al volver y redirige ahí en vez de a /app. Se
+    // usa, por ejemplo, para volver a un link de foto compartida después de
+    // iniciar sesión con Google desde ahí.
+    const nextParam = next ? `&next=${encodeURIComponent(next)}` : ''
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?role=${intendedRole}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?role=${intendedRole}${nextParam}` },
     })
     return { error: error?.message ?? null }
   }

@@ -260,6 +260,14 @@ export function Search() {
     setSearchParams(new URLSearchParams(), { replace: true })
   }
 
+  // Foto a resaltar al llegar desde un link "compartido" (ver
+  // SharedPhotoPage.tsx) — trae el id en `?foto=`, se abre el visor sobre
+  // ella apenas los resultados terminan de cargar, y se quita el
+  // parámetro de la URL (con `replace`) para que no se reabra sola si el
+  // usuario cierra el visor y luego recarga o navega hacia atrás.
+  const sharedPhotoId = searchParams.get('foto')
+  const openedSharedPhotoRef = useRef(false)
+
   const { data: rawResults = [], isLoading: resultsLoading } = useSearchPhotos({
     categories: categories.length ? categories : undefined,
     routeIds: routeIds.length ? routeIds : undefined,
@@ -284,6 +292,18 @@ export function Search() {
       photographerName: p.photographer?.display_name ?? '',
       pointLabel: p.point?.label,
     }))
+
+  useEffect(() => {
+    if (!sharedPhotoId || openedSharedPhotoRef.current || resultsLoading) return
+    const idx = results.findIndex((p) => p.id === sharedPhotoId)
+    if (idx < 0) return
+    openedSharedPhotoRef.current = true
+    setLightbox({ photos: results, index: idx })
+    const next = new URLSearchParams(searchParams)
+    next.delete('foto')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedPhotoId, resultsLoading, results])
 
   // Cada campo calcula sus opciones a partir de los DEMÁS filtros elegidos
   // (interconectados en ambas direcciones) — ver `matchingPoints`.
@@ -601,6 +621,7 @@ export function Search() {
           index={lightbox.index}
           onClose={() => closeLightbox()}
           onNavigate={(index) => setLightbox({ photos: lightbox.photos, index })}
+          shareSearchParams={searchParams.toString()}
         />
       )}
 

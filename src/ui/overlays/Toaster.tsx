@@ -70,7 +70,12 @@ function ToastItem({ toast }: { toast: Toast }) {
 export function Toaster() {
   const toasts = useToastStore((s) => s.toasts)
   return (
-    <div className="fixed inset-x-4 top-4 z-[100] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4">
+    // z-[600]: por encima de TODO lo demás en la app (el diálogo de
+    // confirmar, z-[500], era el tope hasta ahora) — un toast disparado
+    // mientras cualquier modal está abierto (el visor de fotos al
+    // compartir, por ejemplo) antes quedaba oculto detrás de él, invisible
+    // aunque sí se hubiera creado en el DOM.
+    <div className="fixed inset-x-4 top-4 z-[600] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4">
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} />
       ))}

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
 import { GoogleIcon } from '../../ui/shared/GoogleIcon'
@@ -24,6 +24,11 @@ interface EmailPasswordAuthFormProps {
 export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPasswordTo, successTo }: EmailPasswordAuthFormProps) {
   const { signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+  // Si se llegó aquí desde un link que exige sesión (ej. una foto
+  // compartida), `next` manda sobre `successTo` — así el login regresa
+  // exactamente a donde el usuario quería llegar, no siempre a Inicio.
+  const [urlParams] = useSearchParams()
+  const next = urlParams.get('next')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [step, setStep] = useState<'email' | 'password' | 'not-found'>('email')
@@ -67,13 +72,13 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
       setError(signInError)
       return
     }
-    navigate(successTo)
+    navigate(next || successTo)
   }
 
   async function onGoogle() {
     setError(null)
     setGoogleLoading(true)
-    const { error: googleError } = await signInWithGoogle(portal)
+    const { error: googleError } = await signInWithGoogle(portal, next ?? undefined)
     if (googleError) {
       setError(googleError)
       setGoogleLoading(false)
@@ -151,7 +156,10 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
         {step === 'not-found' && (
           <div className="rounded-2xl bg-muted px-4 py-3 text-sm">
             No encontramos una cuenta con este correo.{' '}
-            <Link to={`${signupTo}?email=${encodeURIComponent(email)}`} className="font-semibold text-foreground underline">
+            <Link
+              to={`${signupTo}?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ''}`}
+              className="font-semibold text-foreground underline"
+            >
               Crear cuenta
             </Link>
           </div>
