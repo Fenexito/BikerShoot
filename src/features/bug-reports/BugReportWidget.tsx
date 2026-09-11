@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { getPortalRoot } from '../../ui/shared/portalRoot'
 import { IconClose, IconChevronRight } from '../../ui/shared/icons'
+import { cn } from '../../lib/cn'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { supabase } from '../../lib/supabase'
 import type { BugReportKind, BugReportPage } from './types'
@@ -153,23 +154,39 @@ export function BugReportWidget() {
           dispositivos con una franja segura grande el menú inferior real
           (que sí la suma en su propio padding) termina más alto de lo que
           este botón asumía, y se solapan. */}
+      {/* Un solo botón que CRECE/ENCOGE (no dos botones que se intercambian
+          de golpe) — la pestañita angosta se estira hacia la píldora
+          completa y el ícono gira 180° mientras el texto aparece con un
+          leve desliz, y todo se revierte igual de suave al colapsar (por
+          inactividad o tras enviar el reporte). `overflow-hidden` recorta el
+          texto mientras el ancho todavía no da lugar, así nunca se ve
+          "roto" a la mitad de la animación. */}
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 z-40 flex items-center md:bottom-5">
-        {expanded ? (
-          <button
-            onClick={() => setOpen(true)}
-            className="ml-0 flex items-center gap-2 rounded-r-full bg-neutral-900 py-3 pl-4 pr-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-neutral-800"
+        <button
+          onClick={() => (expanded ? setOpen(true) : setExpanded(true))}
+          aria-label={expanded ? 'Reportar un problema' : 'Mostrar botón de reportar bug'}
+          className={cn(
+            'flex h-11 shrink-0 animate-bug-widget-in items-center overflow-hidden rounded-r-full bg-neutral-900 text-white shadow-lg transition-[width] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:bg-neutral-800',
+            expanded ? 'w-[172px] pl-4 pr-5' : 'w-6 justify-center',
+          )}
+        >
+          <span
+            className={cn(
+              'shrink-0 text-base transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
+              expanded ? 'rotate-0' : 'rotate-180',
+            )}
           >
-            🐞 Reportar bug
-          </button>
-        ) : (
-          <button
-            onClick={() => setExpanded(true)}
-            aria-label="Mostrar botón de reportar bug"
-            className="flex h-11 w-6 items-center justify-center rounded-r-full bg-neutral-900 text-white/60 shadow-lg transition-colors hover:bg-neutral-800 hover:text-white"
+            {expanded ? '🐞' : <IconChevronRight className="h-4 w-4 text-white/60" />}
+          </span>
+          <span
+            className={cn(
+              'ml-2 whitespace-nowrap text-sm font-medium transition-all duration-200',
+              expanded ? 'translate-x-0 opacity-100 delay-150' : 'pointer-events-none -translate-x-1 opacity-0',
+            )}
           >
-            <IconChevronRight className="h-4 w-4" />
-          </button>
-        )}
+            Reportar bug
+          </span>
+        </button>
       </div>
 
       {open &&

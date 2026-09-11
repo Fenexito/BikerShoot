@@ -474,6 +474,24 @@ html {
   animation: toast-in 220ms cubic-bezier(0.25, 0, 0, 1);
 }
 
+/* Entrada del botón flotante de "reportar bug" al montar la página — nace
+   desde fuera del borde izquierdo, para que se sienta como que "se asoma"
+   en vez de simplemente aparecer de golpe. */
+@keyframes bug-widget-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-bug-widget-in {
+  animation: bug-widget-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
