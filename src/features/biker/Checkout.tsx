@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
-import { useCartPricing } from './useCartPricing'
+import { useCartPricing, groupByEventAndPoint, formatPointSchedule } from './useCartPricing'
 import { distributeServiceFee } from './photographerPricing'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
@@ -130,55 +130,97 @@ export function Checkout() {
     )
   }
 
-  return (
-    <div className="mx-auto max-w-6xl px-3 py-6 pb-28 font-flat md:px-8 md:py-10 lg:pb-10">
-      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
+  // El aviso de "varios fotógrafos" + el de resolución completa: en
+  // escritorio van arriba de todo (se leen antes de la lista, hay espacio
+  // de sobra); en móvil se leían primero y empujaban toda la lista de fotos
+  // hacia abajo, así que ahí se muestran DESPUÉS de las fotos, justo antes
+  // de "Resumen" — mismo bloque, solo cambia dónde se monta según el
+  // tamaño de pantalla (`lg:hidden` / `hidden lg:block`).
+  const notices = (
+    <div className="flex flex-col gap-2">
       {photographerGroups.length > 1 && (
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Incluye fotos de {photographerGroups.length} fotógrafos distintos — cada uno se paga por separado.
         </p>
       )}
+      <p className="rounded-xl bg-muted px-3.5 py-2.5 text-xs text-muted-foreground">
+        Todas tus fotos: resolución completa, JPEG alta calidad, descarga válida para siempre.
+      </p>
+    </div>
+  )
+
+  return (
+    <div className="mx-auto max-w-6xl px-3 py-6 pb-28 font-flat md:px-8 md:py-10 lg:pb-10">
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
+      <div className="mt-1 hidden lg:block">{notices}</div>
 
       <div className="mt-6 grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
-          {/* Un solo aviso, arriba de toda la lista — antes se repetía
-              idéntico en cada foto individual, ocupando mucho espacio sin
-              decir nada nuevo la segunda vez en adelante. */}
-          <p className="rounded-xl bg-muted px-3.5 py-2.5 text-xs text-muted-foreground">
-            Todas tus fotos: resolución completa, JPEG alta calidad, descarga válida para siempre.
-          </p>
-
           {photographerGroups.map((group) => (
             <div key={group.photographerId} className="flex flex-col gap-3">
+              {/* Solo el conteo de fotos acá — el precio con descuento de
+                  este fotógrafo ya se ve en "Resumen" (a la derecha en
+                  escritorio, más abajo en móvil); repetirlo acá invitaba a
+                  sumar mal (¿es antes o después del descuento por
+                  volumen?). */}
               <div className="flex items-center justify-between gap-2 px-1">
                 <h3 className="font-bold">{group.photographerName}</h3>
                 <span className="text-sm text-muted-foreground">
-                  {group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal}
+                  {group.items.length} foto{group.items.length > 1 ? 's' : ''}
                 </span>
               </div>
-              {group.items.map((item) => (
-                <div key={item.photoId} className="flex items-center gap-3 rounded-2xl bg-muted p-3 sm:gap-4">
-                  <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 shrink-0 rounded object-cover" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold">{item.eventTitle}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <div className="text-right">
-                      {item.hasDiscount && <p className="text-xs text-muted-foreground line-through">Q{item.price}</p>}
-                      <p className="font-bold">Q{item.effectivePrice}</p>
-                    </div>
-                    <button
-                      onClick={() => handleRemove(item.photoId, `${item.eventTitle} — Q${item.effectivePrice}`)}
-                      aria-label="Quitar del carrito"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
-                  </div>
+              {groupByEventAndPoint(group.items).map((event) => (
+                <div key={event.eventId} className="flex flex-col gap-2.5 rounded-2xl bg-muted p-3 sm:p-4">
+                  <p className="truncate text-sm font-semibold">{event.eventTitle}</p>
+                  {event.points.map((point) => {
+                    const schedule = formatPointSchedule(point.pointTimeStart, point.pointTimeEnd)
+                    return (
+                      <div key={point.key}>
+                        {point.pointLabel && (
+                          <p className="mb-1.5 truncate text-xs font-semibold text-foreground">
+                            {point.pointLabel}
+                            {schedule && <span className="ml-1.5 font-normal text-muted-foreground">{schedule}</span>}
+                          </p>
+                        )}
+                        {/* 2 columnas en escritorio cuando comparten
+                            punto+evento — con carritos grandes, mostrar cada
+                            foto en su propia fila de ancho completo
+                            desperdiciaba mucho espacio vertical. En móvil se
+                            queda en 1 columna pero con filas más compactas
+                            (miniatura chica, sin padding de sobra). */}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {point.items.map((item) => (
+                            <div key={item.photoId} className="flex items-center gap-2.5 rounded-xl bg-background p-2 sm:gap-3 sm:p-2.5">
+                              <img
+                                src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
+                                alt=""
+                                className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
+                              />
+                              <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground sm:text-sm">{item.originalFilename ?? 'Foto'}</p>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <div className="text-right">
+                                  {item.hasDiscount && <p className="text-[10px] text-muted-foreground line-through sm:text-xs">Q{item.price}</p>}
+                                  <p className="text-sm font-bold">Q{item.effectivePrice}</p>
+                                </div>
+                                <button
+                                  onClick={() => handleRemove(item.photoId, `${item.eventTitle} — Q${item.effectivePrice}`)}
+                                  aria-label="Quitar del carrito"
+                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <IconTrash className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ))}
             </div>
           ))}
+          <div className="lg:hidden">{notices}</div>
         </div>
 
         <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
@@ -267,7 +309,11 @@ export function Checkout() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 lg:hidden">
+      {/* `pl-10` (en vez de los `px-4` parejos de antes): el botón redondo de
+          "Reportar bug" flota fijo en la misma esquina inferior izquierda,
+          por encima de este footer (z-40 contra z-30) — sin este espacio
+          extra, su píldora colapsada tapaba el conteo de fotos/precio. */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-background/95 py-3 pl-10 pr-4 backdrop-blur md:bottom-0 lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-xs text-muted-foreground">{items.length} fotos</p>

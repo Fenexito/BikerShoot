@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useCartStore } from './cartStore'
 import { useCartDrawerStore } from './cartDrawerStore'
-import { useCartPricing, type CartPricedItem } from '../biker/useCartPricing'
+import { useCartPricing, groupByEventAndPoint, formatPointSchedule, type CartPricedItem } from '../biker/useCartPricing'
 import { getPortalRoot } from '../../ui/shared/portalRoot'
 import { useScrollLock } from '../../ui/shared/useScrollLock'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
@@ -40,25 +40,18 @@ export function CartDrawer() {
     return () => clearTimeout(timeout)
   }, [open])
 
-  // Mismo agrupado que el checkout completo (por fotógrafo y, adentro, por
-  // evento) pero ya con el precio real de cada foto (descuento por volumen
-  // de ESE fotógrafo incluido) — usa `useCartPricing`, la misma fuente que
-  // usa Checkout.tsx, así los dos siempre muestran el mismo número.
+  // Mismo agrupado que el checkout completo (por fotógrafo → evento → punto)
+  // pero ya con el precio real de cada foto (descuento por volumen de ESE
+  // fotógrafo incluido) — usa `useCartPricing`, la misma fuente que usa
+  // Checkout.tsx, así los dos siempre muestran el mismo número y la misma
+  // jerarquía visual.
   const groups = useMemo(() => {
-    return pricedGroups.map((g) => {
-      const byEvent = new Map<string, { eventTitle: string; items: CartPricedItem[] }>()
-      for (const item of g.items) {
-        const e = byEvent.get(item.eventId) ?? { eventTitle: item.eventTitle, items: [] }
-        e.items.push(item)
-        byEvent.set(item.eventId, e)
-      }
-      return {
-        photographerId: g.photographerId,
-        photographerName: g.photographerName,
-        subtotal: g.subtotal,
-        events: Array.from(byEvent.entries()).map(([eventId, e]) => ({ eventId, eventTitle: e.eventTitle, items: e.items })),
-      }
-    })
+    return pricedGroups.map((g) => ({
+      photographerId: g.photographerId,
+      photographerName: g.photographerName,
+      subtotal: g.subtotal,
+      events: groupByEventAndPoint(g.items),
+    }))
   }, [pricedGroups])
 
   useScrollLock(rendered)
@@ -119,40 +112,54 @@ export function CartDrawer() {
                   </div>
                   <div className="flex flex-col gap-2.5">
                     {/* Una tarjeta por evento SIEMPRE (no solo cuando hay más
-                        de uno) — adentro, filas compactas sin su propio
-                        borde/tarjeta individual, separadas por una línea
-                        fina, para no gastar tanto alto vertical. */}
+                        de uno) — adentro, un bloque por punto (con su
+                        horario) y dentro de cada punto, filas compactas en
+                        grid de 2 columnas para no gastar tanto alto vertical
+                        con carritos grandes. */}
                     {group.events.map((event) => (
                       <div key={event.eventId} className="rounded-2xl border border-border bg-muted/30 p-2.5">
                         <p className="mb-1.5 truncate px-1 text-xs font-medium text-muted-foreground">{event.eventTitle}</p>
-                        <div className="flex flex-col divide-y divide-border">
-                          {event.items.map((item) => (
-                            <div key={item.photoId} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0">
-                              <img
-                                src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
-                                alt=""
-                                className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                              />
-                              {/* El nombre del archivo (no el evento, que ya
-                                  se lee arriba) es lo que distingue una fila
-                                  de otra — dos fotos del mismo punto suelen
-                                  costar lo mismo, así que solo el precio
-                                  repetido no alcanza para saber cuál es
-                                  cuál. */}
-                              <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
-                              <div className="shrink-0 text-right">
-                                {item.hasDiscount && <p className="text-[10px] text-muted-foreground line-through">Q{item.price}</p>}
-                                <p className="text-sm font-bold">Q{item.effectivePrice}</p>
+                        <div className="flex flex-col gap-2">
+                          {event.points.map((point) => {
+                            const schedule = formatPointSchedule(point.pointTimeStart, point.pointTimeEnd)
+                            return (
+                              <div key={point.key}>
+                                {point.pointLabel && (
+                                  <p className="mb-1 truncate px-1 text-[11px] font-semibold text-foreground">
+                                    {point.pointLabel}
+                                    {schedule && <span className="ml-1.5 font-normal text-muted-foreground">{schedule}</span>}
+                                  </p>
+                                )}
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {point.items.map((item) => (
+                                    <div key={item.photoId} className="flex items-center gap-1.5 rounded-lg bg-background p-1.5">
+                                      <img
+                                        src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
+                                        alt=""
+                                        className="h-8 w-8 shrink-0 rounded object-cover"
+                                      />
+                                      {/* El nombre del archivo (no el evento,
+                                          que ya se lee arriba) es lo que
+                                          distingue una fila de otra — dos
+                                          fotos del mismo punto suelen costar
+                                          lo mismo, así que solo el precio
+                                          repetido no alcanza para saber cuál
+                                          es cuál. */}
+                                      <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
+                                      <p className="shrink-0 text-xs font-bold">Q{item.effectivePrice}</p>
+                                      <button
+                                        onClick={() => handleRemove(item)}
+                                        aria-label="Quitar del carrito"
+                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
+                                      >
+                                        <IconTrash className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                              <button
-                                onClick={() => handleRemove(item)}
-                                aria-label="Quitar del carrito"
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
-                              >
-                                <IconTrash className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     ))}

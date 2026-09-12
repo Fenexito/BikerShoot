@@ -38,7 +38,7 @@ export function MobileBottomNav({ items, primary, activeClassName, autoHide = fa
 
   function itemClass({ isActive }: { isActive: boolean }) {
     return cn(
-      'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
+      'flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
       isActive ? cn('text-foreground', activeClassName) : 'text-muted-foreground',
     )
   }
@@ -63,7 +63,12 @@ export function MobileBottomNav({ items, primary, activeClassName, autoHide = fa
         hidden ? 'translate-y-full' : 'translate-y-0',
       )}
     >
-      <div className="mx-auto flex max-w-lg items-center">
+      {/* `h-16` fijo (antes la altura salía de `py-2` en cada item, variable
+          según el contenido) — el footer flotante del checkout y el botón
+          de reportar bugs asumen que esta barra mide exactamente 4rem para
+          apilarse justo arriba de ella sin hueco ni superposición; con
+          altura variable ese supuesto fallaba y dejaba un hueco visible. */}
+      <div className="mx-auto flex h-16 max-w-lg items-center">
         {[left1, left2].map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} className={itemClass}>
             {renderIcon(item)}

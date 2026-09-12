@@ -15,6 +15,12 @@ export interface CartItem {
    * solo mostrarían el mismo precio repetido sin ninguna otra pista de
    * cuál es cuál. */
   originalFilename: string | null
+  /** Punto del evento (ej. "Km 45") + su franja horaria — el carrito
+   * agrupa por fotógrafo → evento → punto, y esto es lo que distingue un
+   * grupo de otro dentro del mismo evento. */
+  pointLabel: string | null
+  pointTimeStart: string | null
+  pointTimeEnd: string | null
 }
 
 interface CartState {
@@ -39,16 +45,26 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'motoshots-cart',
-      version: 3,
+      version: 4,
       migrate: (persisted) => {
         const state = persisted as { items?: CartItem[] }
         // Carritos de versiones viejas no tenían photographerId/previewPath —
         // se descartan en vez de romper el checkout con un valor faltante.
-        // `originalFilename` es nuevo pero no crítico (solo se usa para
-        // mostrar) — a un carrito viejo que no lo tenga simplemente se le
-        // rellena en null, no hace falta descartarlo por eso.
+        // `originalFilename`/`pointLabel`/`pointTimeStart`/`pointTimeEnd` son
+        // nuevos pero no críticos (solo se usan para mostrar) — a un
+        // carrito viejo que no los tenga simplemente se le rellenan en
+        // null, no hace falta descartarlo por eso.
         if (state?.items?.some((i) => !('photographerId' in i) || !('previewPath' in i))) return { items: [] }
-        return { ...state, items: (state.items ?? []).map((i) => ({ ...i, originalFilename: i.originalFilename ?? null })) } as CartState
+        return {
+          ...state,
+          items: (state.items ?? []).map((i) => ({
+            ...i,
+            originalFilename: i.originalFilename ?? null,
+            pointLabel: i.pointLabel ?? null,
+            pointTimeStart: i.pointTimeStart ?? null,
+            pointTimeEnd: i.pointTimeEnd ?? null,
+          })),
+        } as CartState
       },
     },
   ),

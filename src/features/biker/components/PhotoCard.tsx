@@ -9,7 +9,7 @@ import { IconBookmark, IconCart } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 
 interface PhotoCardProps {
-  photo: DbPhoto
+  photo: DbPhoto & { pointLabel?: string; pointTimeStart?: string; pointTimeEnd?: string }
   eventTitle: string
   photographerName: string
   onOpen: () => void
@@ -87,6 +87,9 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
       storagePath: photo.storage_path,
       previewPath: photo.preview_path,
       originalFilename: photo.original_filename,
+      pointLabel: photo.pointLabel ?? null,
+      pointTimeStart: photo.pointTimeStart ?? null,
+      pointTimeEnd: photo.pointTimeEnd ?? null,
     })
     // Puramente decorativo (prueba pedida explícitamente) — no afecta el
     // carrito en sí, que ya se actualizó arriba.

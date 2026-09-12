@@ -17,6 +17,8 @@ export interface GridPhoto extends DbPhoto {
   eventTitle: string
   photographerName: string
   pointLabel?: string
+  pointTimeStart?: string
+  pointTimeEnd?: string
 }
 
 interface PhotoGridProps {

@@ -27,6 +27,63 @@ export interface CartPhotographerGroup {
   totalToPay: number
 }
 
+export interface CartPointGroup {
+  /** `pointLabel` real, o `'__sin_punto__'` cuando la foto no tiene punto asignado — nunca se muestra tal cual. */
+  key: string
+  pointLabel: string | null
+  pointTimeStart: string | null
+  pointTimeEnd: string | null
+  items: CartPricedItem[]
+}
+
+export interface CartEventGroup {
+  eventId: string
+  eventTitle: string
+  points: CartPointGroup[]
+}
+
+export interface CartPhotographerEventGroup extends CartPhotographerGroup {
+  events: CartEventGroup[]
+}
+
+/** Agrupa las fotos de UN fotógrafo (ya con precio calculado) en
+ * Evento → Punto — la jerarquía visual que pidió el usuario para el carrito
+ * y el checkout: primero fotógrafo (ya viene agrupado desde
+ * `useCartPricing`), luego evento, luego punto dentro del evento. Vive acá
+ * (no en cada componente) para que CartDrawer.tsx y Checkout.tsx agrupen
+ * exactamente igual sin duplicar la lógica. */
+export function groupByEventAndPoint(items: CartPricedItem[]): CartEventGroup[] {
+  const byEvent = new Map<string, { eventTitle: string; items: CartPricedItem[] }>()
+  for (const item of items) {
+    const e = byEvent.get(item.eventId) ?? { eventTitle: item.eventTitle, items: [] }
+    e.items.push(item)
+    byEvent.set(item.eventId, e)
+  }
+  return Array.from(byEvent.entries()).map(([eventId, e]) => {
+    const byPoint = new Map<string, CartPointGroup>()
+    for (const item of e.items) {
+      const key = item.pointLabel ?? '__sin_punto__'
+      const p = byPoint.get(key) ?? { key, pointLabel: item.pointLabel, pointTimeStart: item.pointTimeStart, pointTimeEnd: item.pointTimeEnd, items: [] }
+      p.items.push(item)
+      byPoint.set(key, p)
+    }
+    return { eventId, eventTitle: e.eventTitle, points: Array.from(byPoint.values()) }
+  })
+}
+
+/** "08:00" → "8:00 a. m." — formato corto sin fecha, para mostrar la franja
+ * horaria de un punto junto al nombre del archivo. */
+export function formatPointSchedule(timeStart: string | null, timeEnd: string | null): string | null {
+  if (!timeStart) return null
+  const fmt = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    const period = h >= 12 ? 'p. m.' : 'a. m.'
+    const h12 = h % 12 === 0 ? 12 : h % 12
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`
+  }
+  return timeEnd ? `${fmt(timeStart)} - ${fmt(timeEnd)}` : fmt(timeStart)
+}
+
 function usePhotographerPricingTiers(photographerIds: string[]) {
   const key = photographerIds.slice().sort().join(',')
   return useQuery({

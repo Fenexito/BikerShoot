@@ -291,6 +291,8 @@ export function Search() {
       eventTitle: p.event?.title ?? '',
       photographerName: p.photographer?.display_name ?? '',
       pointLabel: p.point?.label,
+      pointTimeStart: p.point?.time_start,
+      pointTimeEnd: p.point?.time_end,
     }))
 
   useEffect(() => {

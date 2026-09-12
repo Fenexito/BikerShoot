@@ -105,6 +105,9 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
       storagePath: photo.storage_path,
       previewPath: photo.preview_path,
       originalFilename: photo.original_filename,
+      pointLabel: photo.pointLabel ?? null,
+      pointTimeStart: photo.pointTimeStart ?? null,
+      pointTimeEnd: photo.pointTimeEnd ?? null,
     })
     if (imgRef.current) flyToCart(imgRef.current.getBoundingClientRect(), previewUrl(photo))
   }

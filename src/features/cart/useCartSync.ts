@@ -12,6 +12,9 @@ interface CartRow {
   storage_path: string | null
   preview_path: string | null
   original_filename: string | null
+  point_label: string | null
+  point_time_start: string | null
+  point_time_end: string | null
 }
 
 function toRow(profileId: string, item: CartItem): CartRow & { profile_id: string } {
@@ -26,6 +29,9 @@ function toRow(profileId: string, item: CartItem): CartRow & { profile_id: strin
     storage_path: item.storagePath,
     preview_path: item.previewPath,
     original_filename: item.originalFilename,
+    point_label: item.pointLabel,
+    point_time_start: item.pointTimeStart,
+    point_time_end: item.pointTimeEnd,
   }
 }
 
@@ -40,7 +46,24 @@ function fromRow(row: CartRow): CartItem {
     storagePath: row.storage_path,
     previewPath: row.preview_path,
     originalFilename: row.original_filename,
+    pointLabel: row.point_label ?? null,
+    pointTimeStart: row.point_time_start ?? null,
+    pointTimeEnd: row.point_time_end ?? null,
   }
+}
+
+/** Reintenta UNA vez tras una pausa corta — el respaldo del carrito hacia
+ * Supabase es de "mejor esfuerzo" (la UI ya respondió al instante con el
+ * store local), pero una falla puramente transitoria del backend (ej. un
+ * 504 momentáneo mientras el proyecto "despierta" de estar inactivo, que
+ * Chrome a veces reporta engañosamente como error de CORS) no debería
+ * dejar ese cambio sin sincronizar para siempre — con un solo reintento
+ * alcanza para los casos reales que hemos visto. */
+async function withRetry(fn: () => PromiseLike<{ error: unknown }>): Promise<{ error: unknown }> {
+  const first = await fn()
+  if (!first.error) return first
+  await new Promise((r) => setTimeout(r, 1500))
+  return fn()
 }
 
 /** Sincroniza el carrito (zustand + localStorage, `cartStore.ts`) con la
@@ -147,23 +170,15 @@ export function useCartSync(userId: string | undefined) {
 
       if (added.length) {
         for (const i of added) remoteIdsRef.current.add(i.photoId)
-        supabase
-          .from('cart_items')
-          .upsert(added.map((i) => toRow(uid, i)))
-          .then(({ error }) => {
-            if (error) console.error('No se pudo sincronizar el carrito (agregar):', error)
-          })
+        withRetry(() => supabase.from('cart_items').upsert(added.map((i) => toRow(uid, i)))).then(({ error }) => {
+          if (error) console.error('No se pudo sincronizar el carrito (agregar):', error)
+        })
       }
       if (removedIds.length) {
         for (const id of removedIds) remoteIdsRef.current.delete(id)
-        supabase
-          .from('cart_items')
-          .delete()
-          .eq('profile_id', uid)
-          .in('photo_id', removedIds)
-          .then(({ error }) => {
-            if (error) console.error('No se pudo sincronizar el carrito (quitar):', error)
-          })
+        withRetry(() => supabase.from('cart_items').delete().eq('profile_id', uid).in('photo_id', removedIds)).then(({ error }) => {
+          if (error) console.error('No se pudo sincronizar el carrito (quitar):', error)
+        })
       }
     })
 
