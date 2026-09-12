@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useMyOrders, deriveOrderEffectiveStatus, groupOrderByPhotographer } from './useMyOrders'
-import { PurchasedPhotoTile } from './components/PurchasedPhotoTile'
+import { useMyOrders, deriveOrderEffectiveStatus, groupOrderByPhotographer, type MyOrder } from './useMyOrders'
+import type { EffectiveOrderStatus } from '../../lib/orderStatus'
+import { previewUrl } from '../../lib/r2'
 import { Button } from '../../ui/flat/Button'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { FilterBar } from '../../ui/shared/FilterBar'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { getEffectiveStatusStyle, formatOrderCode } from '../../lib/orderStatus'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
+import { IconFilter } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 
 type StatusFilter = 'todos' | 'entregado' | 'en_proceso' | 'cancelado'
@@ -20,16 +22,72 @@ const STATUS_TABS = [
   { value: 'cancelado', label: 'Cancelados' },
 ]
 
+/** Fila compacta por pedido — antes mostraba TODAS las fotos del pedido en
+ * una grilla completa, lo que hacía la página abrumadora con muchos
+ * pedidos (y esa info ya se repite tal cual en el detalle del pedido). Acá
+ * solo hay un par de miniaturas como referencia visual — ver el detalle
+ * completo requiere entrar al pedido. */
+function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effectiveStatus: EffectiveOrderStatus; index: number }) {
+  const statusStyle = getEffectiveStatusStyle(effectiveStatus)
+  const firstItem = order.order_items[0]
+  const photographerGroups = groupOrderByPhotographer(order)
+  const multiPhotographer = photographerGroups.length > 1
+  // Un par de miniaturas nada más, como referencia visual del pedido — no
+  // hace falta más para reconocerlo de un vistazo.
+  const previewItems = order.order_items.slice(0, 3)
+
+  return (
+    <Link
+      to={`/app/historial/${order.id}`}
+      className={cn(
+        'animate-[fade-in-up_.3s_ease-out_backwards] flex items-center gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3.5 transition-colors hover:border-primary/30 sm:gap-4 sm:p-4',
+        statusStyle.dot.replace('bg-', 'border-l-'),
+      )}
+      style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
+    >
+      {/* Miniaturas — ocultas en móvil (el espacio se prioriza para la
+          info) pero visibles desde `sm:` en escritorio, como un pequeño
+          carrusel de referencia (igual de espíritu que la portada de un
+          evento). */}
+      <div className="hidden shrink-0 -space-x-3 sm:flex">
+        {previewItems.map((item) => (
+          <img
+            key={item.id}
+            src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
+            alt=""
+            className="h-14 w-14 rounded-xl border-2 border-card object-cover"
+          />
+        ))}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate font-bold">{multiPhotographer ? `${photographerGroups.length} fotógrafos` : firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
+          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+        </div>
+        <p className="truncate text-sm text-muted-foreground">
+          {formatOrderCode(order.order_number)} · {firstItem?.event?.title ?? ''} · {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''}
+        </p>
+        <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+      </div>
+
+      <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+    </Link>
+  )
+}
+
 /** Mismo lenguaje visual que Pedidos en el portal del fotógrafo — franja
  * de color por estado a la izquierda, resumen en tarjetas arriba, barra
- * de filtros con pestañas + búsqueda, y un select adicional por
- * fotógrafo (un biker puede haber comprado a varios). */
+ * de filtros con pestañas + búsqueda + botón de filtros (mismo patrón que
+ * Eventos), y filas compactas por pedido (el detalle completo vive en la
+ * página del pedido, no repetido acá). */
 export function History() {
   const { user } = useAuth()
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('todos')
   const [photographerId, setPhotographerId] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const photographers = useMemo(() => {
     const map = new Map<string, string>()
@@ -74,6 +132,8 @@ export function History() {
     return { spent, pending, inProgress }
   }, [orders])
 
+  const activeFilterCount = photographerId ? 1 : 0
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
@@ -115,25 +175,37 @@ export function History() {
         </div>
       </div>
 
-      <FilterBar
-        className="mb-6"
-        searchValue={query}
-        onSearchChange={setQuery}
-        searchPlaceholder="Buscar por evento, fotógrafo o # de pedido…"
-        tabs={STATUS_TABS}
-        tabValue={status}
-        onTabChange={(v) => setStatus(v as StatusFilter)}
-      />
+      {/* Misma línea que Eventos: tabs + buscador + botón de Filtros — en
+          móvil, tabs en su propia fila (scroll horizontal si hace falta) y
+          buscador+filtros en la siguiente, en vez del select suelto de
+          fotógrafo que vivía aparte antes. */}
+      <div className="mb-6 flex w-full min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <FilterBar
+          className="!border-none min-w-0 flex-1 !pb-0"
+          searchValue={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Buscar por evento, fotógrafo o # de pedido…"
+          tabs={STATUS_TABS}
+          tabValue={status}
+          onTabChange={(v) => setStatus(v as StatusFilter)}
+        />
+        {photographers.length > 1 && (
+          <button
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+          >
+            <IconFilter className="h-4 w-4" />
+            <span className="hidden lg:inline">Filtros</span>
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{activeFilterCount}</span>
+            )}
+          </button>
+        )}
+      </div>
 
-      {photographers.length > 1 && (
+      {filtersOpen && photographers.length > 1 && (
         <div className="mb-6">
-          <FancySelect
-            value={photographerId}
-            onChange={setPhotographerId}
-            options={photographers}
-            placeholder="Todo fotógrafo"
-            className="w-56"
-          />
+          <FancySelect value={photographerId} onChange={setPhotographerId} options={photographers} placeholder="Todo fotógrafo" className="w-full sm:w-64" />
         </div>
       )}
 
@@ -144,71 +216,10 @@ export function History() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
-        {filtered.map(({ order, status: s }, i) => {
-          const statusStyle = getEffectiveStatusStyle(s)
-          const firstItem = order.order_items[0]
-          // Con VARIOS fotógrafos en un mismo pedido, cada uno tiene su
-          // propio avance (pago, edición, entrega) — el biker necesita ver
-          // cuál ya terminó y cuál no, no solo un status genérico que
-          // esconde la diferencia.
-          const photographerGroups = groupOrderByPhotographer(order)
-          const multiPhotographer = photographerGroups.length > 1
-          const itemEffectiveStatus = new Map(photographerGroups.flatMap((g) => g.items.map((i) => [i.id, g.effectiveStatus] as const)))
-          return (
-            <Link
-              key={order.id}
-              to={`/app/historial/${order.id}`}
-              className={cn(
-                'animate-[fade-in-up_.3s_ease-out_backwards] block rounded-3xl border-l-4 border-y border-r border-border bg-card p-5 transition-colors hover:border-primary/30',
-                statusStyle.dot.replace('bg-', 'border-l-'),
-              )}
-              style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold">{multiPhotographer ? `${photographerGroups.length} fotógrafos` : firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
-                    <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatOrderCode(order.order_number)} · {firstItem?.event?.title ?? ''} · {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-                <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
-              </div>
-
-              {multiPhotographer && (
-                <div className="mb-4 flex flex-col gap-1.5 rounded-2xl bg-muted/60 p-3">
-                  {photographerGroups.map((g) => {
-                    const gStyle = getEffectiveStatusStyle(g.effectiveStatus)
-                    return (
-                      <div key={g.photographerId} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate font-medium">{g.photographerName}</span>
-                        <StatusPill dot={gStyle.dot} text={gStyle.text} label={gStyle.label} className="text-xs shrink-0" />
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {order.order_items.slice(0, 8).map((item) => (
-                  <PurchasedPhotoTile
-                    key={item.id}
-                    photoId={item.photo_id}
-                    photo={item.photo}
-                    status={item.status}
-                    effectiveStatus={itemEffectiveStatus.get(item.id)}
-                  />
-                ))}
-              </div>
-              {order.order_items.length > 8 && (
-                <p className="mt-3 text-center text-sm font-semibold text-primary">Ver detalle del pedido →</p>
-              )}
-            </Link>
-          )
-        })}
+      <div className="flex flex-col gap-3">
+        {filtered.map(({ order, status: s }, i) => (
+          <OrderRow key={order.id} order={order} effectiveStatus={s} index={i} />
+        ))}
       </div>
     </div>
   )

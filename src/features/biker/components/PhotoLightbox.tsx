@@ -25,6 +25,15 @@ interface PhotoLightboxProps {
    * sin un concepto de "filtros" propio (perfil de fotógrafo, favoritos,
    * detalle de evento) — el link sigue funcionando, solo sin filtros. */
   shareSearchParams?: string
+  /** 'shop' (default): guardar/carrito/compartir/precio, como en Buscar. Se
+   * usa para fotos que TODAVÍA se pueden comprar. 'purchased': fotos ya
+   * compradas (Mis compras, detalle de pedido, o el pedido visto por el
+   * fotógrafo) — sin guardar/carrito/compartir/precio, ya que ninguno de
+   * esos botones aplica a una foto que ya cambió de manos. El caller decide
+   * qué mostrar abajo a la derecha (normalmente descargar, o subir entrega)
+   * vía `cornerSlot`. */
+  mode?: 'shop' | 'purchased'
+  cornerSlot?: React.ReactNode
 }
 
 const SWIPE_UP_CLOSE_THRESHOLD = 110
@@ -38,7 +47,8 @@ const ZOOM_MAX = 4
  * overlays chicos que NO le quitan espacio real a la imagen — a diferencia
  * de la versión anterior (filas reales de header/footer), que sí achicaba
  * la foto para hacerle lugar. */
-export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams }: PhotoLightboxProps) {
+export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot }: PhotoLightboxProps) {
+  const purchased = mode === 'purchased'
   const photo = photos[index]
   const imgRef = useRef<HTMLImageElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -285,15 +295,17 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
       {/* Esquina superior derecha: contador + cerrar — nunca se
           superponen, cada uno es su propio elemento en la misma fila. */}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-3 sm:right-6 sm:top-6">
-        <button
-          onClick={handleShare}
-          disabled={sharing}
-          aria-label="Compartir esta foto"
-          title="Compartir"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-50"
-        >
-          {sharing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <IconShare className="h-4 w-4" />}
-        </button>
+        {!purchased && (
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            aria-label="Compartir esta foto"
+            title="Compartir"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-50"
+          >
+            {sharing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <IconShare className="h-4 w-4" />}
+          </button>
+        )}
         <span className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-sm sm:text-sm">
           {index + 1} / {photos.length}
         </span>
@@ -302,40 +314,47 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
         </button>
       </div>
 
-      {/* Esquina inferior derecha: precio + guardar + carrito. */}
-      <div className="absolute bottom-4 right-4 z-10 sm:bottom-6 sm:right-6">
-        <div className="flex items-center gap-2 rounded-2xl bg-black/40 p-2 backdrop-blur-sm">
-          {photo.featured ? (
-            <span className="px-2 text-xs font-semibold text-amber-300">★ Destacada</span>
-          ) : (
-            <span className="px-2 text-base font-bold text-white">Q{photo.price}</span>
-          )}
-          <button
-            onClick={handleToggleFavorite}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-            aria-label="Guardar"
-          >
-            <IconBookmark className="h-4 w-4" filled={isFavorite} />
-          </button>
-          {!photo.featured && (
+      {/* Esquina inferior derecha: en modo compra, precio + guardar +
+          carrito; en modo "ya comprada", lo que el caller necesite (ej.
+          descargar, o subir entrega final) vía `cornerSlot` — ninguno de
+          los botones de compra aplica ahí. */}
+      {purchased ? (
+        cornerSlot && <div className="absolute bottom-4 right-4 z-10 sm:bottom-6 sm:right-6">{cornerSlot}</div>
+      ) : (
+        <div className="absolute bottom-4 right-4 z-10 sm:bottom-6 sm:right-6">
+          <div className="flex items-center gap-2 rounded-2xl bg-black/40 p-2 backdrop-blur-sm">
+            {photo.featured ? (
+              <span className="px-2 text-xs font-semibold text-amber-300">★ Destacada</span>
+            ) : (
+              <span className="px-2 text-base font-bold text-white">Q{photo.price}</span>
+            )}
             <button
-              onClick={handleAdd}
-              aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
-              className={cn(
-                // Blanco por defecto, azul relleno una vez agregada — mismo
-                // criterio que la miniatura de la grilla (PhotoCard.tsx).
-                'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-                // `sm:hover:` (no `hover:` a secas) — mismo motivo que en
-                // PhotoCard.tsx: en móvil el :hover pegajoso tras un toque
-                // se veía igual que "ya agregada" (mismo azul).
-                inCart ? 'bg-primary text-white' : 'bg-white text-black sm:hover:bg-primary sm:hover:text-white',
-              )}
+              onClick={handleToggleFavorite}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+              aria-label="Guardar"
             >
-              <IconCart className="h-4 w-4" filled={inCart} />
+              <IconBookmark className="h-4 w-4" filled={isFavorite} />
             </button>
-          )}
+            {!photo.featured && (
+              <button
+                onClick={handleAdd}
+                aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
+                className={cn(
+                  // Blanco por defecto, azul relleno una vez agregada — mismo
+                  // criterio que la miniatura de la grilla (PhotoCard.tsx).
+                  'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
+                  // `sm:hover:` (no `hover:` a secas) — mismo motivo que en
+                  // PhotoCard.tsx: en móvil el :hover pegajoso tras un toque
+                  // se veía igual que "ya agregada" (mismo azul).
+                  inCart ? 'bg-primary text-white' : 'bg-white text-black sm:hover:bg-primary sm:hover:text-white',
+                )}
+              >
+                <IconCart className="h-4 w-4" filled={inCart} />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Flechas prev/siguiente — antes solo en escritorio; ahora también en
           móvil (además del gesto de deslizar), ya que el pellizcar para

@@ -1,8 +1,5 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import Lightbox from 'yet-another-react-lightbox'
-import Zoom from 'yet-another-react-lightbox/plugins/zoom'
-import 'yet-another-react-lightbox/styles.css'
 import { supabase } from '../../../lib/supabase'
 import { previewUrl, r2Url } from '../../../lib/r2'
 import { downloadFile } from '../../../lib/download'
@@ -22,7 +19,7 @@ interface PurchasedPhoto {
  * agua) en vez del preview — vive en el bucket privado, así que hace falta
  * una URL firmada (misma Edge Function que ya usa la descarga) en vez de
  * la URL pública que usan preview/portada. */
-function useDeliveredViewUrl(photoId: string, enabled: boolean) {
+export function useDeliveredViewUrl(photoId: string, enabled: boolean) {
   return useQuery({
     queryKey: ['delivered-view-url', photoId],
     queryFn: async (): Promise<string | null> => {
@@ -35,14 +32,29 @@ function useDeliveredViewUrl(photoId: string, enabled: boolean) {
   })
 }
 
-/** Una foto comprada — miniatura + estado + descarga (si ya se puede). Misma
- * tarjeta reusada en la lista de "Mis compras" y en el detalle de un pedido,
- * para no duplicar la lógica de descarga (URL firmada vs. archivo público). */
+/** Descarga (de verdad, blob + `<a download>`) la entrega final de una foto
+ * comprada — reutilizada tanto por la miniatura como por el visor
+ * compartido (ver `cornerSlot` en PhotoLightbox). */
+export async function downloadPurchasedPhoto(photoId: string, filename: string, onDone?: () => void) {
+  const { data, error } = await supabase.functions.invoke('r2-download-url', { body: { photoId } })
+  if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace de descarga')
+  await downloadFile(data.downloadUrl, filename)
+  onDone?.()
+}
+
+/** Una foto comprada — miniatura + estado (opcional) + descarga (si ya se
+ * puede). Misma tarjeta reusada en "Mis compras" y en el detalle de un
+ * pedido. Ya NO abre su propio visor: el click se delega al `onClick` del
+ * caller, que controla un único visor compartido a nivel de página (así
+ * las flechas navegan entre TODAS las fotos del pedido, no solo las de
+ * esta tarjeta). */
 export function PurchasedPhotoTile({
   photoId,
   photo,
   status,
   effectiveStatus,
+  showStatusPill = true,
+  onClick,
 }: {
   photoId: string
   photo: PurchasedPhoto | null
@@ -50,15 +62,20 @@ export function PurchasedPhotoTile({
   /** Status enriquecido (ver `deriveEffectiveStatus`) para el pill — si no
    * se pasa, se usa el status crudo (mismo comportamiento de antes). */
   effectiveStatus?: EffectiveOrderStatus
+  /** false en el detalle de pedido: el pedido/fotógrafo ya muestra un solo
+   * pill con su status — repetirlo en cada foto individual es ruido, no
+   * información nueva. */
+  showStatusPill?: boolean
+  onClick?: () => void
 }) {
   const push = useToastStore((s) => s.push)
   const [downloading, setDownloading] = useState(false)
-  const [viewerOpen, setViewerOpen] = useState(false)
 
   const delivered = !!photo?.delivered_path
   const { data: deliveredUrl } = useDeliveredViewUrl(photoId, delivered)
 
-  async function download() {
+  async function download(e: React.MouseEvent) {
+    e.stopPropagation()
     if (!photo) return
     if (!photo.preview_path) {
       window.open(r2Url(photo.storage_path ?? ''), '_blank')
@@ -66,9 +83,7 @@ export function PurchasedPhotoTile({
     }
     setDownloading(true)
     try {
-      const { data, error } = await supabase.functions.invoke('r2-download-url', { body: { photoId } })
-      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace de descarga')
-      await downloadFile(data.downloadUrl, `motoshots-${photoId}.jpg`)
+      await downloadPurchasedPhoto(photoId, `motoshots-${photoId}.jpg`)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
     } finally {
@@ -84,13 +99,15 @@ export function PurchasedPhotoTile({
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted">
       {thumbnailSrc && (
-        <button onClick={() => setViewerOpen(true)} className="block h-full w-full" aria-label="Ver foto">
+        <button onClick={onClick} className="block h-full w-full" aria-label="Ver foto">
           <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />
         </button>
       )}
-      <span className="pointer-events-none absolute bottom-1.5 left-1.5 right-1.5 truncate rounded-full bg-black/60 px-2 py-1">
-        <StatusPill dot={pillStyle.dot} text="text-white" label={pillStyle.label} className="text-[10px]" />
-      </span>
+      {showStatusPill && (
+        <span className="pointer-events-none absolute bottom-1.5 left-1.5 right-1.5 truncate rounded-full bg-black/60 px-2 py-1">
+          <StatusPill dot={pillStyle.dot} text="text-white" label={pillStyle.label} className="text-[10px]" />
+        </span>
+      )}
       {canDownload && (
         <button
           onClick={download}
@@ -104,34 +121,6 @@ export function PurchasedPhotoTile({
         <span className="pointer-events-none absolute inset-x-1.5 top-1.5 rounded-full bg-black/70 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">
           El fotógrafo está editando tu foto
         </span>
-      )}
-
-      {viewerOpen && thumbnailSrc && (
-        <Lightbox
-          open
-          close={() => setViewerOpen(false)}
-          index={0}
-          slides={[{ src: thumbnailSrc }]}
-          plugins={[Zoom]}
-          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
-          render={
-            canDownload
-              ? {
-                  slideFooter: () => (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-5">
-                      <button
-                        onClick={download}
-                        disabled={downloading}
-                        className="pointer-events-auto rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-                      >
-                        {downloading ? 'Descargando…' : '⬇ Descargar'}
-                      </button>
-                    </div>
-                  ),
-                }
-              : undefined
-          }
-        />
       )}
     </div>
   )

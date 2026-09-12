@@ -1,6 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { deriveEffectiveStatus, deriveOverallStatus, type EffectiveOrderStatus, type OrderItemStatus } from '../../lib/orderStatus'
+import type { GridPhoto } from './components/PhotoGrid'
+
+export interface MyOrderItemPhoto {
+  id: string
+  event_id: string
+  photographer_id: string
+  storage_path: string | null
+  preview_path: string | null
+  delivered_path: string | null
+  raw_path: string | null
+  price: number
+  featured: boolean
+  original_filename: string | null
+  created_at: string
+  point: { label: string; time_start: string; time_end: string } | null
+}
 
 export interface MyOrderItem {
   id: string
@@ -8,7 +24,7 @@ export interface MyOrderItem {
   photographer_id: string
   price: number
   status: OrderItemStatus
-  photo: { storage_path: string | null; preview_path: string | null; delivered_path: string | null } | null
+  photo: MyOrderItemPhoto | null
   event: { title: string } | null
   photographer: { display_name: string } | null
 }
@@ -77,6 +93,35 @@ export function deriveOrderEffectiveStatus(order: MyOrder): EffectiveOrderStatus
   return deriveOverallStatus(groupOrderByPhotographer(order).map((g) => g.effectiveStatus))
 }
 
+/** Adapta un item de "Mis compras" a la forma que espera el visor
+ * compartido (`PhotoLightbox`, el mismo de Buscar) — así el mismo
+ * componente sirve para ver fotos a la venta y fotos ya compradas, sin
+ * duplicar toda su lógica de zoom/gestos/flechas. Un item sin `photo`
+ * (borrado, corrupto) no se puede ver — el caller debe filtrarlo antes. */
+export function toGridPhoto(item: MyOrderItem): GridPhoto | null {
+  if (!item.photo) return null
+  return {
+    id: item.photo.id,
+    event_id: item.photo.event_id,
+    photographer_id: item.photographer_id,
+    point_id: null,
+    storage_path: item.photo.storage_path,
+    preview_path: item.photo.preview_path,
+    raw_path: item.photo.raw_path,
+    delivered_path: item.photo.delivered_path,
+    price: item.photo.price,
+    moto_brand: null,
+    featured: item.photo.featured,
+    original_filename: item.photo.original_filename,
+    created_at: item.photo.created_at,
+    eventTitle: item.event?.title ?? '',
+    photographerName: item.photographer?.display_name ?? 'Fotógrafo',
+    pointLabel: item.photo.point?.label,
+    pointTimeStart: item.photo.point?.time_start,
+    pointTimeEnd: item.photo.point?.time_end,
+  }
+}
+
 export function useMyOrders(bikerId: string | undefined) {
   return useQuery({
     queryKey: ['my-orders', bikerId],
@@ -84,7 +129,7 @@ export function useMyOrders(bikerId: string | undefined) {
       const { data, error } = await supabase
         .from('orders')
         .select(
-          '*, order_items(*, photo:photos(storage_path, preview_path, delivered_path), event:events(title), photographer:profiles(display_name)), order_payment_proofs(photographer_id)',
+          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name)), order_payment_proofs(photographer_id)',
         )
         .eq('biker_id', bikerId)
         .order('created_at', { ascending: false })
