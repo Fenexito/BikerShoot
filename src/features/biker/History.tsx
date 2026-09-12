@@ -37,35 +37,49 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
   // dos eventos distintos — en cualquiera de los dos casos, mostrar "el"
   // nombre del evento sería engañoso, así que se oculta.
   const distinctEventTitles = new Set(order.order_items.map((i) => i.event?.title).filter(Boolean))
-  // Un par de miniaturas nada más, como referencia visual del pedido — no
-  // hace falta más para reconocerlo de un vistazo.
+  // Hasta 3 miniaturas de referencia — si hay más, la última se reemplaza
+  // por un "+N" con la cantidad restante (no una miniatura más).
   const previewItems = order.order_items.slice(0, 3)
+  const extraCount = order.order_items.length - previewItems.length
+  // La barra de progreso del pedido en la LISTA se basa en el TOTAL de
+  // fotos compradas (sin importar de cuántos fotógrafos distintos son) —
+  // así el biker entiende de un vistazo en qué momento se completa TODO
+  // el pedido, no solo la parte de un fotógrafo en particular.
+  const activeItems = order.order_items.filter((i) => i.status !== 'cancelado')
+  const deliveredCount = activeItems.filter((i) => i.status === 'entregado').length
+  const showProgress = (effectiveStatus === 'en_preparacion' || effectiveStatus === 'entrega_parcial') && activeItems.length > 0
 
   return (
     <Link
       to={`/app/historial/${order.id}`}
       className={cn(
-        'animate-[fade-in-up_.3s_ease-out_backwards] flex items-center gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3.5 transition-colors hover:border-primary/30 sm:gap-4 sm:p-4',
+        'animate-[fade-in-up_.3s_ease-out_backwards] flex items-stretch gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-colors hover:border-primary/30 sm:gap-4 sm:p-3.5',
         statusStyle.dot.replace('bg-', 'border-l-'),
       )}
       style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
     >
-      {/* Miniaturas — ocultas en móvil (el espacio se prioriza para la
-          info) pero visibles desde `sm:` en escritorio, como un pequeño
-          carrusel de referencia (igual de espíritu que la portada de un
-          evento). */}
-      <div className="hidden shrink-0 -space-x-3 sm:flex">
+      {/* Miniaturas — la altura se estira para llenar exactamente lo que
+          ocupe el texto de la derecha (sin espacio vacío arriba/abajo),
+          tope de `max-h-24` para que una fila con muchos fotógrafos
+          listados no infle las miniaturas de más. Visibles también en
+          móvil (antes se ocultaban ahí). */}
+      <div className="flex shrink-0 -space-x-4">
         {previewItems.map((item) => (
           <img
             key={item.id}
             src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
             alt=""
-            className="h-14 w-14 rounded-xl border-2 border-card object-cover"
+            className="aspect-square h-full max-h-24 rounded-xl border-2 border-card object-cover"
           />
         ))}
+        {extraCount > 0 && (
+          <span className="flex aspect-square h-full max-h-24 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
+            +{extraCount}
+          </span>
+        )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
         <div className="mb-0.5 flex flex-wrap items-center gap-2">
           <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
           <span className="text-xs text-muted-foreground">{formatOrderCode(order.order_number)}</span>
@@ -90,9 +104,17 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
           {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''}
         </p>
         <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+        {showProgress && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
+            </div>
+            <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length}</span>
+          </div>
+        )}
       </div>
 
-      <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+      <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
     </Link>
   )
 }

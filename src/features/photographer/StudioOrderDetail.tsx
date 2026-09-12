@@ -365,13 +365,16 @@ function OrderPhotosSection({ order, photographerId, expanded, photographerLabel
 
   useHeaderTransform(
     <div className="flex w-full min-w-0 items-center gap-3">
-      <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex" />
+      <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
       <p className="min-w-0 flex-1 truncate text-base font-bold">
         {formatOrderCode(order.orderNumber)}
         {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
       </p>
     </div>,
     scrolledPast,
+    // `mobileEnabled` — sin esto, en móvil el header nunca se transformaba
+    // Y encima se seguía ocultando solo al hacer scroll.
+    { mobileEnabled: true },
   )
 
   const purchased = order.items.filter((i) => !i.is_courtesy)
@@ -776,12 +779,15 @@ export function StudioOrderDetail() {
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [openingProof, setOpeningProof] = useState(false)
-  const [proof, setProof] = useState<{ viewUrl: string; uploadedAt: string } | null>(null)
+  // `viewUrl: null` mientras se resuelve — el visor se abre YA (con su
+  // animación) mostrando un spinner, en vez de dejar al fotógrafo sin
+  // ninguna señal por varios segundos mientras se pide la URL firmada. Si
+  // resulta que el biker no ha subido nada, se cierra solo y se avisa.
+  const [proof, setProof] = useState<{ viewUrl: string | null; uploadedAt: string } | null>(null)
 
   async function viewPaymentProof() {
     if (!order) return
-    setOpeningProof(true)
+    setProof({ viewUrl: null, uploadedAt: '' })
     try {
       const [{ data, error }, { data: row }] = await Promise.all([
         supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId: order.orderId } }),
@@ -789,14 +795,14 @@ export function StudioOrderDetail() {
       ])
       if (error) throw new Error(error.message)
       if (!data?.viewUrl) {
+        setProof(null)
         push({ type: 'info', title: 'El biker todavía no sube su comprobante' })
         return
       }
       setProof({ viewUrl: data.viewUrl, uploadedAt: row?.uploaded_at ?? '' })
     } catch (err) {
+      setProof(null)
       push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
-    } finally {
-      setOpeningProof(false)
     }
   }
 
@@ -895,7 +901,7 @@ export function StudioOrderDetail() {
         {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
       </span>
       {order.paymentMethod === 'transferencia' && (
-        <Button variant="secondary" size="sm" onClick={viewPaymentProof} loading={openingProof}>
+        <Button variant="secondary" size="sm" onClick={viewPaymentProof}>
           Ver comprobante
         </Button>
       )}
@@ -1072,7 +1078,8 @@ export function StudioOrderDetail() {
           onClose={() => setProof(null)}
           onNavigate={() => {}}
           mode="purchased"
-          resolveSrc={() => proof.viewUrl}
+          loading={!proof.viewUrl}
+          resolveSrc={() => proof.viewUrl ?? undefined}
           infoRows={[
             { label: 'Enviado a', value: orderCodeName ?? 'Ti' },
             { label: 'Enviado por', value: order.bikerName },

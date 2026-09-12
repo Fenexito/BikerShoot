@@ -6,9 +6,9 @@ import { PurchasedPhotoTile, downloadPurchasedPhoto } from './components/Purchas
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { queryClient } from '../../lib/queryClient'
 import { buildDeliveredFilename } from '../../lib/download'
-import { Badge } from '../../ui/flat/Badge'
 import { Button } from '../../ui/flat/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
+import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { OrderStepper } from '../../ui/studio/OrderStepper'
 import { formatPointSchedule } from './useCartPricing'
 import { getEffectiveStatusStyle, formatOrderCode, type EffectiveOrderStatus } from '../../lib/orderStatus'
@@ -76,9 +76,11 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
 }) {
   const push = useToastStore((s) => s.push)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [replacing, setReplacing] = useState(false)
-  const [proof, setProof] = useState<{ viewUrl: string; uploadedAt: string } | null>(null)
+  // `viewUrl: null` mientras se resuelve — el visor se abre YA (con su
+  // animación) mostrando un spinner, en vez de dejar al usuario sin
+  // ninguna señal por varios segundos mientras se pide la URL firmada.
+  const [proof, setProof] = useState<{ viewUrl: string | null; uploadedAt: string } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -92,7 +94,7 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
 
   async function openViewer() {
     setMenuOpen(false)
-    setLoading(true)
+    setProof({ viewUrl: null, uploadedAt: '' })
     try {
       const [{ data, error }, { data: row }] = await Promise.all([
         supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId, photographerId } }),
@@ -102,8 +104,7 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
       setProof({ viewUrl: data.viewUrl, uploadedAt: row?.uploaded_at ?? '' })
     } catch (err) {
       push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
-    } finally {
-      setLoading(false)
+      setProof(null)
     }
   }
 
@@ -154,7 +155,7 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
         </button>
         {menuOpen && (
           <div className="absolute right-0 top-full z-50 mt-2 w-52 origin-top overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl animate-menu-in">
-            <button onClick={openViewer} disabled={loading} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
+            <button onClick={openViewer} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
               <IconEye className="h-4 w-4 shrink-0" /> Ver comprobante
             </button>
             <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
@@ -189,7 +190,8 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
           onClose={() => setProof(null)}
           onNavigate={() => {}}
           mode="purchased"
-          resolveSrc={() => proof.viewUrl}
+          loading={!proof.viewUrl}
+          resolveSrc={() => proof.viewUrl ?? undefined}
           infoRows={[
             { label: 'Enviado a', value: photographerName },
             { label: 'Enviado por', value: bikerName },
@@ -280,7 +282,7 @@ export function HistoryOrderDetail() {
   useHeaderTransform(
     order && overallStyle ? (
       <div className="flex w-full min-w-0 items-center gap-3">
-        <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex" />
+        <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
         <p className="min-w-0 flex-1 truncate text-base font-bold">
           {formatOrderCode(order.order_number)}
           {activePhotographerName && <span className="ml-2 text-sm font-normal text-muted-foreground">· {activePhotographerName}</span>}
@@ -288,6 +290,11 @@ export function HistoryOrderDetail() {
       </div>
     ) : null,
     scrolledPast,
+    // `mobileEnabled` — sin esto, el header transformado (y la supresión
+    // del auto-ocultado que trae consigo) solo aplicaba en escritorio; en
+    // móvil nunca se activaba y además el header se seguía ocultando solo
+    // al hacer scroll, aunque este ya mostrara el # de pedido y el estado.
+    { mobileEnabled: true },
   )
 
   // Un solo visor para TODO el pedido — las flechas navegan entre todas
@@ -337,92 +344,83 @@ export function HistoryOrderDetail() {
 
   if (!order) return <PlaceholderPage title="Pedido no encontrado" />
 
+  // Un solo evento (sin importar cuántas fotos) muestra su nombre; varios
+  // eventos del mismo fotógrafo muestran cuántos son, en vez de uno solo
+  // arbitrario que sería engañoso.
+  function eventLabelFor(items: MyOrderItem[]) {
+    const titles = Array.from(new Set(items.map((i) => i.event?.title).filter(Boolean)))
+    return titles.length === 1 ? titles[0] : `${titles.length} eventos`
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card p-5 sm:p-6">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {formatOrderCode(order.order_number)} · {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
-          </p>
-          <p className="text-2xl font-bold">Q{order.total}</p>
-        </div>
-        <Badge tone="secondary">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}</Badge>
-      </div>
-
-      <div className="mt-8 flex flex-col gap-8">
+      {/* Mismo estilo que el pedido visto por el fotógrafo: una tarjeta por
+          fotógrafo (o UNA sola si el pedido tiene un solo fotógrafo) con
+          avatar, código de pedido, pago+comprobante+whatsapp junto al
+          status, y el stepper de 4 pasos debajo. */}
+      <div className="flex flex-col gap-6">
         {photographerGroups.map((group) => {
           const groupStyle = getEffectiveStatusStyle(group.effectiveStatus)
           return (
             <div
               key={group.photographerId}
               ref={(el) => { groupRefs.current[group.photographerId] = el }}
-              className="rounded-3xl border border-border bg-card p-5 sm:p-6"
+              className="rounded-3xl border border-border bg-card p-4 sm:p-6"
             >
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link to={`/app/fotografos/${group.photographerId}`} className="font-bold hover:underline">
-                    {group.photographerName}
-                  </Link>
-                  <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="text-xs" />
-                  {group.photographerPhone && (
-                    <a
-                      href={buildWhatsAppLink(
-                        group.photographerPhone,
-                        `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-                      title="Escribir por WhatsApp"
-                      aria-label="Escribir por WhatsApp"
-                    >
-                      <IconWhatsapp className="h-3.5 w-3.5" />
-                    </a>
-                  )}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <InitialsAvatar name={group.photographerName} className="h-12 w-12 shrink-0 bg-foreground text-base text-background sm:h-14 sm:w-14" />
+                  <div className="min-w-0">
+                    <Link to={`/app/fotografos/${group.photographerId}`} className="truncate text-lg font-bold tracking-tight hover:underline sm:text-xl">
+                      {group.photographerName}
+                    </Link>
+                    <p className="truncate text-xs text-muted-foreground sm:text-sm">{formatOrderCode(order.order_number)} · {eventLabelFor(group.items)}</p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm text-muted-foreground">{group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal}</span>
-                  {/* Botón de comprobante propio de ESTE fotógrafo — un
-                      pedido con varios fotógrafos necesita uno por cada
-                      uno, no un solo botón genérico para todo el pedido. */}
-                  {order.payment_method === 'transferencia' && (
-                    <ProofButton
-                      orderId={order.id}
-                      photographerId={group.photographerId}
-                      photographerName={group.photographerName}
-                      bikerName={profile?.display_name ?? 'Biker'}
-                      amount={group.subtotal}
-                      hasProof={proofPhotographerIds.has(group.photographerId)}
-                    />
-                  )}
-                  {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
-                      bajar todas de un tirón en vez de una por una. */}
-                  {group.effectiveStatus === 'entregado' && (
-                    <DownloadAllButton items={group.items} photographerLabel={group.photographerName} orderNumber={order.order_number} />
-                  )}
-                </div>
+                <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="shrink-0 text-sm font-bold" />
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
+                  {order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{group.totalToPay}
+                </span>
+                {/* Botón de comprobante propio de ESTE fotógrafo — un
+                    pedido con varios fotógrafos necesita uno por cada
+                    uno, no un solo botón genérico para todo el pedido. */}
+                {order.payment_method === 'transferencia' && (
+                  <ProofButton
+                    orderId={order.id}
+                    photographerId={group.photographerId}
+                    photographerName={group.photographerName}
+                    bikerName={profile?.display_name ?? 'Biker'}
+                    amount={group.totalToPay}
+                    hasProof={proofPhotographerIds.has(group.photographerId)}
+                  />
+                )}
+                {group.photographerPhone && (
+                  <a
+                    href={buildWhatsAppLink(
+                      group.photographerPhone,
+                      `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+                    title="Escribir por WhatsApp"
+                    aria-label="Escribir por WhatsApp"
+                  >
+                    <IconWhatsapp className="h-4 w-4" />
+                  </a>
+                )}
+                {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
+                    bajar todas de un tirón en vez de una por una. */}
+                {group.effectiveStatus === 'entregado' && (
+                  <DownloadAllButton items={group.items} photographerLabel={group.photographerName} orderNumber={order.order_number} />
+                )}
               </div>
 
               {group.effectiveStatus !== 'cancelado' && (
-                <>
-                  <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-4" />
-                  {/* Barra de progreso de entrega — mismo espíritu que la de
-                      la lista de pedidos del fotógrafo, para que el biker
-                      también vea cuántas fotos van y cuántas faltan. */}
-                  {group.effectiveStatus === 'en_preparacion' && (
-                    <div className="mb-6 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-amber-500 transition-all"
-                          style={{ width: `${(group.items.filter((i) => i.status === 'entregado').length / group.items.length) * 100}%` }}
-                        />
-                      </div>
-                      <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-                        {group.items.filter((i) => i.status === 'entregado').length}/{group.items.length} entregadas
-                      </span>
-                    </div>
-                  )}
-                </>
+                <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-2 mt-6" />
               )}
 
               {/* Agrupado por evento → punto (con horario) — el status ya

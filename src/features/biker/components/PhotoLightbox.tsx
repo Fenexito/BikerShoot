@@ -44,6 +44,11 @@ interface PhotoLightboxProps {
    * son "una foto de un evento" (ej. un comprobante de pago: a quién se
    * envió, quién lo envió, fecha, monto). */
   infoRows?: { label: string; value: string; href?: string }[]
+  /** true mientras el caller todavía está resolviendo la URL real (ej. un
+   * comprobante de pago que necesita pedir una URL firmada) — el visor se
+   * abre YA (con su animación) mostrando un spinner en el centro, en vez
+   * de esperar a tener la URL para recién abrir. */
+  loading?: boolean
 }
 
 const SWIPE_UP_CLOSE_THRESHOLD = 110
@@ -57,7 +62,7 @@ const ZOOM_MAX = 4
  * overlays chicos que NO le quitan espacio real a la imagen — a diferencia
  * de la versión anterior (filas reales de header/footer), que sí achicaba
  * la foto para hacerle lugar. */
-export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot, resolveSrc, infoRows }: PhotoLightboxProps) {
+export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot, resolveSrc, infoRows, loading = false }: PhotoLightboxProps) {
   const purchased = mode === 'purchased'
   const photo = photos[index]
   const imgSrc = resolveSrc?.(photo) ?? previewUrl(photo)
@@ -254,14 +259,23 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
         onTouchEnd={onTouchEnd}
       >
         <div key={photo.id} className="animate-lightbox-slide" style={{ '--slide-dir': slideDir } as React.CSSProperties}>
-          <img
-            ref={imgRef}
-            src={imgSrc}
-            alt={photo.eventTitle}
-            className="max-h-[calc(100vh-3rem)] max-w-[calc(100vw-3rem)] select-none object-contain transition-transform duration-150 sm:max-h-[calc(100vh-6rem)] sm:max-w-[calc(100vw-6rem)]"
-            style={{ transform: `scale(${zoom}) translate(${dragX}px, ${dragY}px)` }}
-            draggable={false}
-          />
+          {loading ? (
+            // El visor se abre YA, con esta animación, en vez de esperar a
+            // tener la URL real lista — antes el usuario se quedaba varios
+            // segundos sin saber si su click hizo algo.
+            <div className="flex h-[50vh] w-[50vw] max-h-[70vh] max-w-[70vw] items-center justify-center">
+              <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white" />
+            </div>
+          ) : (
+            <img
+              ref={imgRef}
+              src={imgSrc}
+              alt={photo.eventTitle}
+              className="max-h-[calc(100vh-3rem)] max-w-[calc(100vw-3rem)] select-none object-contain transition-transform duration-150 sm:max-h-[calc(100vh-6rem)] sm:max-w-[calc(100vw-6rem)]"
+              style={{ transform: `scale(${zoom}) translate(${dragX}px, ${dragY}px)` }}
+              draggable={false}
+            />
+          )}
         </div>
 
         {saveBurstKey !== null && (

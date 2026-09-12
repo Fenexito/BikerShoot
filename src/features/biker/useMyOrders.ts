@@ -23,6 +23,7 @@ export interface MyOrderItem {
   photo_id: string
   photographer_id: string
   price: number
+  service_fee: number
   position: number
   is_courtesy: boolean
   courtesy_type: 'waiver' | 'extra' | null
@@ -50,7 +51,14 @@ export interface MyOrderPhotographerGroup {
   photographerName: string
   photographerPhone: string | null
   items: MyOrderItem[]
+  /** Suma de precios de las fotos, SIN la tarifa de servicio — usar
+   * `totalToPay` para el monto real que este fotógrafo debe recibir. */
   subtotal: number
+  serviceFeeTotal: number
+  /** Lo que el biker de verdad le transfiere a ESTE fotógrafo — antes se
+   * mostraba solo `subtotal` (sin la tarifa de servicio), y la suma de
+   * todos los grupos no cuadraba con `order.total`. */
+  totalToPay: number
   effectiveStatus: EffectiveOrderStatus
 }
 
@@ -82,6 +90,8 @@ export function groupOrderByPhotographer(order: MyOrder): MyOrderPhotographerGro
     photographerPhone: items[0].photographer?.phone ?? null,
     items,
     subtotal: items.reduce((s, i) => s + i.price, 0),
+    serviceFeeTotal: items.reduce((s, i) => s + i.service_fee, 0),
+    totalToPay: items.reduce((s, i) => s + i.price + i.service_fee, 0),
     effectiveStatus: deriveEffectiveStatus({
       status: deriveGroupStatus(items),
       paymentMethod: order.payment_method,

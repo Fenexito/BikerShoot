@@ -10,7 +10,7 @@ import { getPhotographerStatusStyle, formatOrderCode, type OrderItemStatus } fro
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { FilterBar } from '../../ui/shared/FilterBar'
-import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
+import { previewUrl } from '../../lib/r2'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
 
@@ -77,11 +77,15 @@ export function OrderRow({
   // preparación, para que el fotógrafo vea de un vistazo cuánto le falta
   // sin tener que abrir cada pedido uno por uno.
   const showProgress = order.status === 'en_preparacion' && activeItems.length > 0
+  // Mismo estilo que "Mis compras" del biker: hasta 3 miniaturas de
+  // referencia (fotos DEL PEDIDO, no del comprador) + "+N" si hay más.
+  const previewItems = order.items.slice(0, 3)
+  const extraCount = order.items.length - previewItems.length
 
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-x-4 gap-y-2 rounded-3xl border-l-4 border-y border-r border-border bg-card px-5 py-4 transition-all hover:shadow-sm',
+        'flex items-stretch gap-x-4 gap-y-2 rounded-3xl border-l-4 border-y border-r border-border bg-card p-3 transition-all hover:shadow-sm sm:p-3.5',
         borderColor,
       )}
     >
@@ -90,44 +94,61 @@ export function OrderRow({
           onClick={onToggleSelect}
           aria-label="Seleccionar pedido"
           className={cn(
-            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors',
+            'flex h-6 w-6 shrink-0 items-center justify-center self-center rounded-full border-2 text-xs font-bold transition-colors',
             selected ? 'border-foreground bg-foreground text-background' : 'border-border text-transparent hover:border-foreground/40',
           )}
         >
           ✓
         </button>
       )}
-      <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex min-w-0 items-center gap-4">
-          <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold">{order.bikerName}</p>
-              <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
-            </div>
-            {/* El nombre del evento se oculta en móvil — ahí solo se
-                conserva lo esencial (comprador, foto, estado, # de pedido,
-                cantidad de fotos, fecha y total); en escritorio hay
-                espacio de sobra para mostrarlo también. */}
-            <p className="truncate text-sm text-muted-foreground">
-              {formatOrderCode(order.orderNumber, profileName)} · <span className="hidden sm:inline">{order.eventTitle} · </span>{order.items.length} fotos
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-            <span className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
-              {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+      <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 items-stretch gap-3 sm:gap-4">
+        {/* Miniaturas — la altura se estira para llenar lo que ocupe el
+            texto de la derecha, tope de `max-h-24`. */}
+        <div className="flex shrink-0 -space-x-4">
+          {previewItems.map((item) => (
+            <img
+              key={item.id}
+              src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
+              alt=""
+              className="aspect-square h-full max-h-24 rounded-xl border-2 border-card object-cover"
+            />
+          ))}
+          {extraCount > 0 && (
+            <span className="flex aspect-square h-full max-h-24 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
+              +{extraCount}
             </span>
-            <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
-          </div>
+          )}
         </div>
-        {showProgress && (
-          <div className="flex items-center gap-2 pl-[3.25rem]">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
+
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">{order.bikerName}</p>
+                <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+              </div>
+              {/* El nombre del evento se oculta en móvil — ahí solo se
+                  conserva lo esencial (comprador, foto, estado, # de
+                  pedido, cantidad de fotos, fecha y total); en escritorio
+                  hay espacio de sobra para mostrarlo también. */}
+              <p className="truncate text-sm text-muted-foreground">
+                {formatOrderCode(order.orderNumber, profileName)} · <span className="hidden sm:inline">{order.eventTitle} · </span>{order.items.length} fotos
+              </p>
+              <p className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
+                {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
             </div>
-            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length} entregadas</span>
+            <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
           </div>
-        )}
+          {showProgress && (
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
+              </div>
+              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length} entregadas</span>
+            </div>
+          )}
+        </div>
       </Link>
     </div>
   )
