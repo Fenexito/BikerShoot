@@ -126,12 +126,15 @@ export function PurchasedPhotoTile({
           descarga, esto es para bajar varias sin tener que abrir cada una. */}
       {canDownload && (
         <div className="pointer-events-none absolute bottom-1.5 right-1.5 flex items-center gap-1">
+          {/* Negro sólido a propósito, sin importar el tema — mismo
+              criterio que el verde fijo de WhatsApp: un botón de acción
+              siempre reconocible, no uno que se camufle con el fondo. */}
           <button
             onClick={handleDownload}
             disabled={downloading}
             aria-label="Descargar esta foto"
             title="Descargar"
-            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background disabled:opacity-50"
+            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             <IconDownload className="h-3.5 w-3.5" />
           </button>

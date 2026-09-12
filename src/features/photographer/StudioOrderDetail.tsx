@@ -198,7 +198,7 @@ function DeliverPhotoTile({
               disabled={downloadingOwn}
               aria-label="Descargar"
               title="Descargar"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               <IconDownload className="h-3.5 w-3.5" />
             </button>
@@ -239,7 +239,7 @@ function DeliverPhotoTile({
               disabled={downloadingOwn}
               aria-label="Descargar"
               title="Descargar"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background disabled:opacity-50"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               <IconDownload className="h-3.5 w-3.5" />
             </button>
