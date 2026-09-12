@@ -8,6 +8,11 @@ export interface HeaderTransformOptions {
    * incluye una caja de búsqueda pasa `true` aquí para que ese botón extra
    * no se duplique al lado del suyo. */
   hideSearchTrigger?: boolean
+  /** Igual que `hideSearchTrigger`, pero para el ícono de carrito fijo que
+   * HeaderUser conserva en la capa transformada — el detalle de un pedido no
+   * quiere ningún atajo de compra a la vista, ya que ahí el biker no está
+   * navegando fotos para comprar. */
+  hideCartTrigger?: boolean
   /** Por defecto la transformación del header SOLO aplica en escritorio — en
    * móvil la navegación real vive en la barra inferior y el header además se
    * auto-oculta al hacer scroll (ver `useAutoHideHeader`). Una página como
@@ -60,6 +65,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   content: null,
   active: false,
   hideSearchTrigger: false,
+  hideCartTrigger: false,
   mobileEnabled: false,
   mobileBackSlotContent: null,
   suppressAutoHide: false,
@@ -70,6 +76,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
       content,
       active,
       hideSearchTrigger: options.hideSearchTrigger ?? false,
+      hideCartTrigger: options.hideCartTrigger ?? false,
       mobileEnabled: options.mobileEnabled ?? false,
       mobileBackSlotContent: options.mobileBackSlotContent ?? null,
       suppressAutoHide: options.suppressAutoHide ?? false,

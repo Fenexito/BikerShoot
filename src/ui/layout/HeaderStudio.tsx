@@ -56,6 +56,7 @@ export function HeaderStudio() {
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
+  const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const suppressAutoHide = useHeaderTransformStore((s) => s.suppressAutoHide)
   const transformed = transformActive && transformContent != null
   const hidden = suppressAutoHide ? false : autoHidden
@@ -187,17 +188,21 @@ export function HeaderStudio() {
                   (40px+8px+40px+8px+40px = 176px), así el cambio se siente
                   contenido en vez de brusco. En móvil con `mobileEnabled` no
                   cabe junto al contenido de la página (que ya necesita todo
-                  el ancho angosto disponible), así que se oculta ahí. */}
-              <button
-                onClick={() => setSearchOpen(true)}
-                className={cn(
-                  'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
-                  mobileEnabled && 'hidden sm:flex',
-                )}
-              >
-                <IconSearch className="h-5 w-5 shrink-0" />
-                <span className="truncate">Buscar…</span>
-              </button>
+                  el ancho angosto disponible), así que se oculta ahí. Una
+                  página como el detalle de un pedido lo oculta del todo con
+                  `hideSearchTrigger` — ahí no aporta nada buscar. */}
+              {!hideSearchTrigger && (
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className={cn(
+                    'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
+                    mobileEnabled && 'hidden sm:flex',
+                  )}
+                >
+                  <IconSearch className="h-5 w-5 shrink-0" />
+                  <span className="truncate">Buscar…</span>
+                </button>
+              )}
             </div>
           </div>
         </header>

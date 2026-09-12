@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useOrderGroup, toGridPhoto, type PhotographerOrderGroup, type RawOrderItem, type RawOrderItemPhoto } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
@@ -21,9 +21,11 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconGift, IconWhatsapp, IconDownload } from '../../ui/shared/icons'
+import { IconGift, IconWhatsapp, IconDownload, IconEye, IconTrash, IconChevronLeft } from '../../ui/shared/icons'
+import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
+import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
 import { cn } from '../../lib/cn'
 
 /** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
@@ -143,7 +145,7 @@ function DeliverPhotoTile({
       title={isWaiver ? 'Deshacer el regalo — restaura el precio original' : 'Regalar esta foto (cortesía)'}
       className={cn(
         'flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors disabled:opacity-50',
-        isWaiver ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-white/95 text-foreground hover:bg-white',
+        isWaiver ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-card/95 text-foreground border border-border hover:bg-card',
       )}
     >
       <IconGift className="h-4 w-4" filled={isWaiver} />
@@ -322,7 +324,24 @@ function groupItemsByEventoPunto(items: RawOrderItem[]) {
  * (tarjeta al final, sube directo desde la galería en vez de elegir entre
  * fotos ya existentes del evento). Agrupadas por evento → punto para
  * pedidos que mezclan varios eventos del mismo fotógrafo. */
-function OrderPhotosSection({ order, photographerId, expanded, photographerLabel }: { order: PhotographerOrderGroup; photographerId: string; expanded: boolean; photographerLabel: string }) {
+function OrderPhotosSection({
+  order,
+  photographerId,
+  expanded,
+  photographerLabel,
+  pointRefs,
+}: {
+  order: PhotographerOrderGroup
+  photographerId: string
+  expanded: boolean
+  photographerLabel: string
+  /** Ref compartido con la página padre — ahí vive el header interactivo
+   * (tanto el que transforma el header global en escritorio como la barra
+   * pegajosa local en móvil, ambos calcados de StudioEventView.tsx), que
+   * necesita saber qué punto está cruzando la línea de detección mientras
+   * el fotógrafo hace scroll por ESTAS fotos. */
+  pointRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
+}) {
   const push = useToastStore((s) => s.push)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -330,55 +349,6 @@ function OrderPhotosSection({ order, photographerId, expanded, photographerLabel
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [justClosedId, setJustClosedId] = useState<string | null>(null)
-
-  // Header interactivo — al hacer scroll aparece con el # de pedido y el
-  // estado, y muestra el nombre del punto cuya sección cruza la línea
-  // justo debajo del header (mismo mecanismo que la vista de evento).
-  const scrolledPast = useScrolledPast(140)
-  const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
-  const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const statusStyleForHeader = getPhotographerStatusStyle(order.effectiveStatus)
-
-  useEffect(() => {
-    function onScroll() {
-      let current: string | null = null
-      for (const key of Object.keys(pointRefs.current)) {
-        const el = pointRefs.current[key]
-        if (!el) continue
-        const rect = el.getBoundingClientRect()
-        if (rect.top <= 168 && rect.bottom >= 168) {
-          current = key === '__sin_punto__' ? null : key
-          break
-        }
-      }
-      setActivePointLabel(current)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order.orderId, viewMode])
-
-  useHeaderTransform(
-    // En móvil, estado+código van en su propia fila y el punto activo en
-    // una fila debajo (con el texto tan chico, todo en una sola línea no
-    // se alcanzaba a leer). En escritorio se queda como una sola línea.
-    <div className="flex w-full min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
-      <div className="flex items-center gap-2 sm:contents">
-        <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
-        <span className="truncate text-xs text-muted-foreground sm:hidden">{formatOrderCode(order.orderNumber)}</span>
-      </div>
-      <p className="hidden min-w-0 flex-1 truncate text-base font-bold sm:block">
-        {formatOrderCode(order.orderNumber)}
-        {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
-      </p>
-      {activePointLabel && <p className="truncate text-sm font-semibold sm:hidden">📍 {activePointLabel}</p>}
-    </div>,
-    scrolledPast,
-    // `mobileEnabled` — sin esto, en móvil el header nunca se transformaba
-    // Y encima se seguía ocultando solo al hacer scroll.
-    { mobileEnabled: true, suppressAutoHide: true },
-  )
 
   const purchased = order.items.filter((i) => !i.is_courtesy)
   const courtesies = order.items.filter((i) => i.is_courtesy)
@@ -774,6 +744,7 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
 export function StudioOrderDetail() {
   const { id } = useParams()
   useBackButton('/studio/pedidos')
+  const navigate = useNavigate()
   const { user, profile } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
   const orderCodeName = details?.order_nickname ?? profile?.display_name
@@ -787,6 +758,36 @@ export function StudioOrderDetail() {
   // ninguna señal por varios segundos mientras se pide la URL firmada. Si
   // resulta que el biker no ha subido nada, se cierra solo y se avisa.
   const [proof, setProof] = useState<{ viewUrl: string | null; uploadedAt: string } | null>(null)
+
+  // Header interactivo — misma estructura EXACTA que StudioEventView.tsx:
+  // en escritorio transforma el header global; en móvil vive en su PROPIA
+  // barra pegajosa local (ver el JSX más abajo), nunca en el header global
+  // (que ahí solo se transforma a partir de `md`) — así nunca se ven dos
+  // barras encimadas ni depende de `mobileEnabled` para nada en móvil.
+  const scrolledPast = useScrolledPast(140)
+  const headerHidden = useAutoHideHeader()
+  const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
+  const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  useEffect(() => {
+    function onScroll() {
+      let current: string | null = null
+      for (const key of Object.keys(pointRefs.current)) {
+        const el = pointRefs.current[key]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top <= 168 && rect.bottom >= 168) {
+          current = key === '__sin_punto__' ? null : key
+          break
+        }
+      }
+      setActivePointLabel(current)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.orderId])
 
   async function viewPaymentProof() {
     if (!order) return
@@ -809,6 +810,88 @@ export function StudioOrderDetail() {
     }
   }
 
+  // OJO: la cancelación SOLO es válida mientras el pedido sigue
+  // "pendiente_pago" (el biker aún no transfirió / el fotógrafo aún no
+  // confirmó el pago) — antes también se permitía en "en_preparacion", lo
+  // cual no debería ser posible unilateralmente una vez el pago ya se dio
+  // por recibido.
+  const canCancel = order?.status === 'pendiente_pago'
+  const statusStyleForHeader = order ? getPhotographerStatusStyle(order.effectiveStatus) : null
+
+  const actionMenuItems: ActionMenuItem[] = order
+    ? [
+        ...(order.paymentMethod === 'transferencia' && order.hasPaymentProof
+          ? [{ label: 'Ver comprobante', icon: <IconEye className="h-4 w-4" />, onClick: viewPaymentProof }]
+          : []),
+        ...(order.bikerPhone
+          ? [
+              {
+                label: 'WhatsApp',
+                icon: <IconWhatsapp className="h-4 w-4" />,
+                tone: 'success' as const,
+                href: buildWhatsAppLink(
+                  order.bikerPhone,
+                  `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de MotoShots 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
+                ),
+              },
+            ]
+          : []),
+        ...(canCancel ? [{ label: 'Cancelar pedido', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' as const, onClick: cancelOrder }] : []),
+      ]
+    : []
+
+  useHeaderTransform(
+    order && statusStyleForHeader ? (
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <StatusPill
+          dot={statusStyleForHeader.dot}
+          text={statusStyleForHeader.text}
+          label={statusStyleForHeader.label}
+          className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex"
+        />
+        <p className="min-w-0 flex-1 truncate text-base font-bold">
+          {formatOrderCode(order.orderNumber)}
+          {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
+        </p>
+        <ActionMenu items={actionMenuItems} />
+      </div>
+    ) : null,
+    scrolledPast,
+    { hideSearchTrigger: true },
+  )
+
+  async function cancelOrder() {
+    if (!order) return
+    const orderCode = String(order.orderNumber ?? '').padStart(6, '0')
+    const { confirmed, extraValue } = await typedConfirmDialog.ask({
+      title: `Esto cancela el pedido de ${order.bikerName} — el biker pierde acceso a estas fotos y recibe una notificación.`,
+      description: 'Esta acción no se puede deshacer desde aquí.',
+      matchText: orderCode,
+      matchLabel: 'Escribe el número de pedido para confirmar',
+      confirmLabel: 'Cancelar pedido',
+      extraFieldLabel: 'Motivo de la cancelación',
+      extraFieldPlaceholder: 'El biker verá este motivo en su notificación',
+    })
+    if (!confirmed) return
+    await setStatus('cancelado', { cancelled_at: new Date().toISOString(), cancellation_reason: extraValue || null })
+  }
+
+  async function setStatus(next: OrderItemStatus, extra?: Record<string, unknown>) {
+    if (!user || !order) return
+    const { error } = await supabase
+      .from('order_items')
+      .update({ status: next, ...extra })
+      .eq('order_id', order.orderId)
+      .eq('photographer_id', user.id)
+
+    if (error) {
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: getOrderStatusStyle(next).label })
+    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
+  }
+
   useEffect(() => {
     setNote(order?.note ?? '')
   }, [order?.note])
@@ -826,26 +909,9 @@ export function StudioOrderDetail() {
 
   const stepIndex = TOP_STEP_INDEX[order.status]
   const action = NEXT_ACTION[order.status]
-  const canCancel = order.status === 'pendiente_pago' || order.status === 'en_preparacion'
   const statusStyle = getPhotographerStatusStyle(order.effectiveStatus)
   const unitPrice = order.items[0]?.price ?? 0
   const sameUnitPrice = order.items.every((i) => i.price === unitPrice)
-
-  async function setStatus(next: OrderItemStatus, extra?: Record<string, unknown>) {
-    if (!user) return
-    const { error } = await supabase
-      .from('order_items')
-      .update({ status: next, ...extra })
-      .eq('order_id', order!.orderId)
-      .eq('photographer_id', user.id)
-
-    if (error) {
-      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
-      return
-    }
-    push({ type: 'success', title: getOrderStatusStyle(next).label })
-    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
-  }
 
   async function confirmAction() {
     if (action?.next === 'en_preparacion') {
@@ -853,22 +919,6 @@ export function StudioOrderDetail() {
       return
     }
     if (action) await setStatus(action.next)
-  }
-
-  async function cancelOrder() {
-    if (!order) return
-    const orderCode = String(order.orderNumber ?? '').padStart(6, '0')
-    const { confirmed, extraValue } = await typedConfirmDialog.ask({
-      title: `Esto cancela el pedido de ${order.bikerName} — el biker pierde acceso a estas fotos y recibe una notificación.`,
-      description: 'Esta acción no se puede deshacer desde aquí.',
-      matchText: orderCode,
-      matchLabel: 'Escribe el número de pedido para confirmar',
-      confirmLabel: 'Cancelar pedido',
-      extraFieldLabel: 'Motivo de la cancelación',
-      extraFieldPlaceholder: 'El biker verá este motivo en su notificación',
-    })
-    if (!confirmed) return
-    await setStatus('cancelado', { cancelled_at: new Date().toISOString(), cancellation_reason: extraValue || null })
   }
 
   async function saveNote() {
@@ -930,6 +980,29 @@ export function StudioOrderDetail() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
+      {/* Barra pegajosa SOLO en móvil — calcada de la de StudioEventView.tsx:
+          en escritorio ese rol ya lo cumple el header transformado (mismo
+          código de pedido/status/menú), así que aquí basta con el flujo
+          normal para no tener dos barras encimadas. */}
+      <div
+        className={cn(
+          'sticky z-20 mb-4 transition-[top] duration-300 sm:hidden',
+          headerHidden ? 'top-3' : 'top-[4.75rem]',
+        )}
+      >
+        <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md">
+          <button onClick={() => navigate('/studio/pedidos')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
+            <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-bold tracking-tight2">{formatOrderCode(order.orderNumber)}</h1>
+            {activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
+          </div>
+          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
+          <ActionMenu items={actionMenuItems} />
+        </div>
+      </div>
+
       {/* Cabecera compacta — en escritorio, pago/comprobante/whatsapp viven
           a la derecha junto al status (una sola fila con todo lo
           importante); en móvil no caben ahí, así que bajan a su propia
@@ -1020,14 +1093,6 @@ export function StudioOrderDetail() {
                 </Button>
               </div>
               </div>
-
-              {canCancel && (
-                <div className="flex justify-end border-t border-border pt-4">
-                  <button onClick={cancelOrder} className="text-xs font-medium text-muted-foreground transition-colors hover:text-red-500">
-                    Cancelar pedido
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1049,6 +1114,7 @@ export function StudioOrderDetail() {
             photographerId={user.id}
             expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false}
             photographerLabel={profile?.display_name ?? 'MotoShots'}
+            pointRefs={pointRefs}
           />
         )}
 

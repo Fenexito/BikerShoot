@@ -64,6 +64,7 @@ export function HeaderUser() {
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
+  const hideCartTrigger = useHeaderTransformStore((s) => s.hideCartTrigger)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
   const mobileBackSlotContent = useHeaderTransformStore((s) => s.mobileBackSlotContent)
   const suppressAutoHide = useHeaderTransformStore((s) => s.suppressAutoHide)
@@ -266,21 +267,25 @@ export function HeaderUser() {
               )}
               {/* El carrito se conserva también en la capa transformada,
                   siempre al borde derecho — es la única herramienta que no
-                  cede su lugar al contenido de la página. */}
-              <button
-                data-cart-icon
-                onClick={openCartDrawer}
-                aria-label="Carrito"
-                title="Carrito"
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-              >
-                <IconCart className="h-5 w-5" />
-                {itemCount > 0 && (
-                  <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                    {itemCount}
-                  </span>
-                )}
-              </button>
+                  cede su lugar al contenido de la página. Una página como el
+                  detalle de un pedido lo oculta (`hideCartTrigger`): ahí el
+                  biker no está navegando fotos para comprar. */}
+              {!hideCartTrigger && (
+                <button
+                  data-cart-icon
+                  onClick={openCartDrawer}
+                  aria-label="Carrito"
+                  title="Carrito"
+                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+                >
+                  <IconCart className="h-5 w-5" />
+                  {itemCount > 0 && (
+                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                      {itemCount}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

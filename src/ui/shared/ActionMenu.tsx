@@ -5,10 +5,13 @@ import { cn } from '../../lib/cn'
 
 export interface ActionMenuItem {
   to?: string
+  /** Enlace externo (ej. `wa.me/...`) — se abre en pestaña nueva en vez de
+   * navegar dentro de la app, a diferencia de `to`. */
+  href?: string
   onClick?: () => void
   label: string
   icon?: ReactNode
-  tone?: 'default' | 'danger'
+  tone?: 'default' | 'danger' | 'success'
 }
 
 interface ActionMenuProps {
@@ -74,8 +77,15 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
             )
             const itemClass = cn(
               'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/10',
-              item.tone === 'danger' ? 'text-red-400' : 'text-white/90',
+              item.tone === 'danger' ? 'text-red-400' : item.tone === 'success' ? 'text-emerald-400' : 'text-white/90',
             )
+            if (item.href) {
+              return (
+                <a key={item.label} href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={itemClass}>
+                  {content}
+                </a>
+              )
+            }
             return item.to ? (
               <Link key={item.label} to={item.to} onClick={() => setOpen(false)} className={itemClass}>
                 {content}

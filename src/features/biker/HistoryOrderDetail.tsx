@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useMyOrders, groupOrderByPhotographer, deriveOrderEffectiveStatus, toGridPhoto, type MyOrderItem } from './useMyOrders'
+import { useMyOrders, groupOrderByPhotographer, deriveOrderEffectiveStatus, deriveGroupStatus, toGridPhoto, type MyOrderItem, type MyOrderPhotographerGroup } from './useMyOrders'
 import { PurchasedPhotoTile, downloadPurchasedPhoto } from './components/PurchasedPhotoTile'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { queryClient } from '../../lib/queryClient'
@@ -16,11 +16,15 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
+import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
+import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
 import { supabase } from '../../lib/supabase'
-import { IconDownload, IconEye, IconEdit, IconWhatsapp } from '../../ui/shared/icons'
+import { IconDownload, IconEye, IconEdit, IconWhatsapp, IconTrash, IconChevronLeft } from '../../ui/shared/icons'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
+import { cn } from '../../lib/cn'
 
 // Misma línea (168px) que usa el header pegajoso de la vista de evento del
 // fotógrafo, para decidir qué sección "cuenta" como la que se está viendo.
@@ -240,6 +244,7 @@ function DownloadAllButton({ items, photographerLabel, orderNumber }: { items: M
 export function HistoryOrderDetail() {
   const { id } = useParams()
   useBackButton('/app/historial')
+  const navigate = useNavigate()
   const { user, profile } = useAuth()
   const push = useToastStore((s) => s.push)
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
@@ -251,12 +256,18 @@ export function HistoryOrderDetail() {
   const overallStatus = order ? deriveOrderEffectiveStatus(order) : null
   const overallStyle = overallStatus ? getEffectiveStatusStyle(overallStatus) : null
 
-  // Header interactivo — al hacer scroll aparece con el # de pedido y el
-  // estado general, y muestra el nombre del fotógrafo cuya sección está
-  // cruzando la línea justo debajo del header (mismo mecanismo que el
-  // header pegajoso de la vista de evento del fotógrafo, ahí con el punto).
+  // Header interactivo — misma estructura EXACTA que StudioEventView.tsx (y
+  // ahora que StudioOrderDetail.tsx): en escritorio transforma el header
+  // global; en móvil vive en su PROPIA barra pegajosa local (ver el JSX más
+  // abajo), nunca en el header global — así nunca se ven dos barras
+  // encimadas ni depende de `mobileEnabled`. Además de detectar qué
+  // fotógrafo se está viendo, guarda su `photographerId` — el grupo
+  // "activo" es el que alimenta las acciones del menú de tres puntos
+  // (comprobante/WhatsApp/cancelar), igual que el punto activo alimentaba
+  // el menú de StudioEventView.
   const scrolledPast = useScrolledPast(140)
-  const [activePhotographerName, setActivePhotographerName] = useState<string | null>(null)
+  const headerHidden = useAutoHideHeader()
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
@@ -267,11 +278,11 @@ export function HistoryOrderDetail() {
         if (!el) continue
         const rect = el.getBoundingClientRect()
         if (rect.top <= STICKY_BAR_LINE && rect.bottom >= STICKY_BAR_LINE) {
-          current = group.photographerName
+          current = group.photographerId
           break
         }
       }
-      setActivePhotographerName(current)
+      setActiveGroupId(current)
     }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -279,30 +290,126 @@ export function HistoryOrderDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photographerGroups.length, order?.id])
 
+  const activeGroup = photographerGroups.find((g) => g.photographerId === activeGroupId) ?? photographerGroups[0] ?? null
+  const activePhotographerName = activeGroup && photographerGroups.length > 1 ? activeGroup.photographerName : null
+
+  // Comprobante desde el menú de tres puntos — apunta siempre al grupo
+  // ACTIVO (el fotógrafo cuya sección se está viendo). La tarjeta de cada
+  // fotógrafo conserva su propio botón "Comprobantes" (con el mismo Ver/
+  // Editar) para cuando hay varios y no se quiere depender del scroll.
+  const [headerProof, setHeaderProof] = useState<{ viewUrl: string | null; uploadedAt: string; photographerId: string; photographerName: string } | null>(null)
+  const proofInputRef = useRef<HTMLInputElement>(null)
+
+  async function openHeaderProofViewer(photographerId: string, photographerName: string) {
+    if (!order) return
+    setHeaderProof({ viewUrl: null, uploadedAt: '', photographerId, photographerName })
+    try {
+      const [{ data, error }, { data: row }] = await Promise.all([
+        supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId: order.id, photographerId } }),
+        supabase.from('order_payment_proofs').select('uploaded_at').eq('order_id', order.id).eq('photographer_id', photographerId).maybeSingle(),
+      ])
+      if (error || !data?.viewUrl) throw new Error(error?.message ?? 'No se pudo abrir el comprobante')
+      setHeaderProof((cur) => (cur ? { ...cur, viewUrl: data.viewUrl, uploadedAt: row?.uploaded_at ?? '' } : cur))
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
+      setHeaderProof(null)
+    }
+  }
+
+  async function handleHeaderProofReplace(file: File | undefined, photographerId: string) {
+    if (!file || !order) return
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-payment-proof-upload-url', {
+        body: { orderId: order.id, photographerId, fileName: file.name, contentType: file.type },
+      })
+      if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
+      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+      const { error: upsertError } = await supabase
+        .from('order_payment_proofs')
+        .upsert({ order_id: order.id, photographer_id: photographerId, proof_path: data.proofPath }, { onConflict: 'order_id,photographer_id' })
+      if (upsertError) throw upsertError
+      push({ type: 'success', title: 'Comprobante actualizado' })
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo actualizar el comprobante', description: (err as Error).message })
+    }
+  }
+
+  // OJO: la cancelación SOLO es válida mientras ESE fotógrafo sigue
+  // "pendiente_pago" (el biker aún no subió/el fotógrafo aún no confirmó el
+  // pago) — una vez confirmado, cancelar deja de ser unilateral y el biker
+  // debe acordarlo directamente con el fotógrafo (WhatsApp, ya disponible
+  // en el mismo menú).
+  function canCancelGroup(group: MyOrderPhotographerGroup) {
+    return deriveGroupStatus(group.items) === 'pendiente_pago'
+  }
+
+  async function cancelGroup(group: MyOrderPhotographerGroup) {
+    if (!order) return
+    const orderCode = String(order.order_number ?? '').padStart(6, '0')
+    const { confirmed, extraValue } = await typedConfirmDialog.ask({
+      title: `Esto cancela tu pedido con ${group.photographerName} — perderás acceso a estas fotos.`,
+      description: 'Esta acción no se puede deshacer desde aquí.',
+      matchText: orderCode,
+      matchLabel: 'Escribe el número de pedido para confirmar',
+      confirmLabel: 'Cancelar pedido',
+      extraFieldLabel: 'Motivo de la cancelación',
+      extraFieldPlaceholder: 'El fotógrafo verá este motivo',
+    })
+    if (!confirmed) return
+    const { error } = await supabase
+      .from('order_items')
+      .update({ status: 'cancelado', cancelled_at: new Date().toISOString(), cancellation_reason: extraValue || null })
+      .in('id', group.items.map((i) => i.id))
+    if (error) {
+      push({ type: 'error', title: 'No se pudo cancelar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: 'Pedido cancelado' })
+    queryClient.invalidateQueries({ queryKey: ['my-orders'] })
+  }
+
+  const actionMenuItems: ActionMenuItem[] = activeGroup
+    ? [
+        ...(order?.payment_method === 'transferencia' && proofPhotographerIds.has(activeGroup.photographerId)
+          ? [
+              { label: 'Ver comprobante', icon: <IconEye className="h-4 w-4" />, onClick: () => openHeaderProofViewer(activeGroup.photographerId, activeGroup.photographerName) },
+              { label: 'Editar comprobante', icon: <IconEdit className="h-4 w-4" />, onClick: () => proofInputRef.current?.click() },
+            ]
+          : []),
+        ...(activeGroup.photographerPhone
+          ? [
+              {
+                label: 'WhatsApp',
+                icon: <IconWhatsapp className="h-4 w-4" />,
+                tone: 'success' as const,
+                href: buildWhatsAppLink(
+                  activeGroup.photographerPhone,
+                  `Hola ${activeGroup.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order?.order_number ?? null)}: ${window.location.origin}/studio/pedidos/${order?.id}`,
+                ),
+              },
+            ]
+          : []),
+        ...(canCancelGroup(activeGroup)
+          ? [{ label: 'Cancelar Pedido', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' as const, onClick: () => cancelGroup(activeGroup) }]
+          : []),
+      ]
+    : []
+
   useHeaderTransform(
     order && overallStyle ? (
-      // En móvil, estado+código van en su propia fila y el nombre del
-      // fotógrafo activo en una fila debajo — con el texto tan chico, todo
-      // en una sola línea se perdía y no se alcanzaba a leer a quién se
-      // estaba viendo. En escritorio (`sm:`) se queda como una sola línea.
-      <div className="flex w-full min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex items-center gap-2 sm:contents">
-          <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
-          <span className="truncate text-xs text-muted-foreground sm:hidden">{formatOrderCode(order.order_number)}</span>
-        </div>
-        <p className="hidden min-w-0 flex-1 truncate text-base font-bold sm:block">
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex" />
+        <p className="min-w-0 flex-1 truncate text-base font-bold">
           {formatOrderCode(order.order_number)}
           {activePhotographerName && <span className="ml-2 text-sm font-normal text-muted-foreground">· {activePhotographerName}</span>}
         </p>
-        {activePhotographerName && <p className="truncate text-sm font-semibold sm:hidden">{activePhotographerName}</p>}
+        <ActionMenu items={actionMenuItems} />
       </div>
     ) : null,
     scrolledPast,
-    // `mobileEnabled` — sin esto, el header transformado (y la supresión
-    // del auto-ocultado que trae consigo) solo aplicaba en escritorio; en
-    // móvil nunca se activaba y además el header se seguía ocultando solo
-    // al hacer scroll, aunque este ya mostrara el # de pedido y el estado.
-    { mobileEnabled: true, suppressAutoHide: true },
+    { hideSearchTrigger: true, hideCartTrigger: true },
   )
 
   // Un solo visor para TODO el pedido — las flechas navegan entre todas
@@ -362,6 +469,36 @@ export function HistoryOrderDetail() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
+      {/* Barra pegajosa SOLO en móvil — calcada de la de StudioEventView.tsx
+          (y ahora StudioOrderDetail.tsx): en escritorio ese rol ya lo
+          cumple el header transformado, así que aquí basta con el flujo
+          normal para no tener dos barras encimadas. */}
+      {overallStyle && (
+        <div className={cn('sticky z-20 mb-4 transition-[top] duration-300 sm:hidden', headerHidden ? 'top-3' : 'top-[4.75rem]')}>
+          <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md">
+            <button onClick={() => navigate('/app/historial')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
+              <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-sm font-bold tracking-tight2">{formatOrderCode(order.order_number)}</h1>
+              {activePhotographerName && <p className="mt-0.5 truncate text-xs text-muted-foreground">{activePhotographerName}</p>}
+            </div>
+            <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
+            <ActionMenu items={actionMenuItems} />
+          </div>
+        </div>
+      )}
+
+      <input
+        ref={proofInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (activeGroup) handleHeaderProofReplace(e.target.files?.[0], activeGroup.photographerId)
+        }}
+      />
+
       {/* Mismo estilo que el pedido visto por el fotógrafo: una tarjeta por
           fotógrafo (o UNA sola si el pedido tiene un solo fotógrafo) con
           avatar, código de pedido, pago+comprobante+whatsapp junto al
@@ -505,6 +642,41 @@ export function HistoryOrderDetail() {
               </button>
             ) : undefined
           }
+        />
+      )}
+
+      {headerProof && (
+        <PhotoLightbox
+          photos={[
+            {
+              id: `proof-${headerProof.photographerId}`,
+              event_id: '',
+              photographer_id: headerProof.photographerId,
+              point_id: null,
+              storage_path: null,
+              preview_path: null,
+              raw_path: null,
+              delivered_path: null,
+              price: 0,
+              moto_brand: null,
+              featured: false,
+              original_filename: null,
+              created_at: '',
+              eventTitle: '',
+              photographerName: headerProof.photographerName,
+            },
+          ]}
+          index={0}
+          onClose={() => setHeaderProof(null)}
+          onNavigate={() => {}}
+          mode="purchased"
+          loading={!headerProof.viewUrl}
+          resolveSrc={() => headerProof.viewUrl ?? undefined}
+          infoRows={[
+            { label: 'Enviado a', value: headerProof.photographerName },
+            { label: 'Enviado por', value: profile?.display_name ?? 'Biker' },
+            ...(headerProof.uploadedAt ? [{ label: 'Fecha', value: new Date(headerProof.uploadedAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
+          ]}
         />
       )}
     </div>

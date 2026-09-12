@@ -18,7 +18,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconTrash, IconEdit, IconPlay, IconPause } from '../../ui/shared/icons'
+import { IconTrash, IconEdit, IconPlay, IconPause, IconChevronLeft } from '../../ui/shared/icons'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
@@ -829,6 +829,9 @@ export function StudioEventView() {
               thumbnail no caben cómodos aquí, y pausar/publicar se mueve
               dentro del menú. */}
           <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:hidden">
+            <button onClick={() => navigate('/studio/eventos')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
+              <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
+            </button>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-bold tracking-tight2">{event.title}</h1>
               {scrolled && activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
