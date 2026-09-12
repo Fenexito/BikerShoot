@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import Lightbox from 'yet-another-react-lightbox'
+import Zoom from 'yet-another-react-lightbox/plugins/zoom'
+import 'yet-another-react-lightbox/styles.css'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Button } from '../../ui/flat/Button'
@@ -84,10 +87,30 @@ function useExistingProofs(orderId: string | undefined) {
   })
 }
 
+/** Sube con PUT vía XMLHttpRequest (no `fetch`) porque `fetch` no expone
+ * progreso de subida en todos los navegadores — XHR sí, con el evento
+ * `upload.onprogress`, necesario para la barra de "Subiendo… 42%". */
+function uploadWithProgress(url: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`R2 respondió ${xhr.status}`)))
+    xhr.onerror = () => reject(new Error('Falló la conexión al subir el archivo'))
+    xhr.send(file)
+  })
+}
+
 function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue; orderId: string; hasProof: boolean }) {
   const push = useToastStore((s) => s.push)
-  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null)
+  const [loadingViewer, setLoadingViewer] = useState(false)
 
   const bankLines = due.bank
     ? [
@@ -109,17 +132,32 @@ function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue;
     }
   }
 
+  async function openViewer() {
+    setLoadingViewer(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-payment-proof-view-url', {
+        body: { orderId, photographerId: due.photographerId },
+      })
+      if (error || !data?.viewUrl) throw new Error(error?.message ?? 'No se pudo abrir tu comprobante')
+      setViewerUrl(data.viewUrl)
+      setViewerOpen(true)
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo abrir tu comprobante', description: (err as Error).message })
+    } finally {
+      setLoadingViewer(false)
+    }
+  }
+
   async function handleFile(file: File | undefined) {
     if (!file) return
-    setUploading(true)
+    setProgress(0)
     try {
       const { data, error } = await supabase.functions.invoke('r2-payment-proof-upload-url', {
         body: { orderId, photographerId: due.photographerId, fileName: file.name, contentType: file.type },
       })
       if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
-      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+      await uploadWithProgress(data.uploadUrl, file, setProgress)
 
       const { error: upsertError } = await supabase
         .from('order_payment_proofs')
@@ -131,9 +169,11 @@ function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue;
     } catch (err) {
       push({ type: 'error', title: 'No se pudo subir el comprobante', description: (err as Error).message })
     } finally {
-      setUploading(false)
+      setProgress(null)
     }
   }
+
+  const uploading = progress !== null
 
   return (
     <Card className="cursor-default hover:scale-100">
@@ -164,15 +204,40 @@ function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue;
 
       <div className="mt-4 border-t border-border pt-4">
         {hasProof ? (
-          <p className="flex items-center gap-2 text-sm font-semibold text-secondary">✓ Comprobante subido — puedes reemplazarlo si te equivocaste</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-secondary">✓ Comprobante subido — puedes verlo o reemplazarlo si te equivocaste</p>
         ) : (
           <p className="text-sm text-muted-foreground">Sube la captura de tu comprobante de transferencia para este fotógrafo.</p>
         )}
-        <label className="mt-2 flex h-11 w-full cursor-pointer items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90">
-          {uploading ? 'Subiendo…' : hasProof ? 'Reemplazar comprobante' : 'Subir comprobante'}
-          <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
-        </label>
+
+        {uploading && (
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-primary transition-all duration-150" style={{ width: `${progress}%` }} />
+          </div>
+        )}
+
+        <div className="mt-2 flex gap-2">
+          {hasProof && (
+            <Button variant="secondary" className="flex-1" loading={loadingViewer} onClick={openViewer}>
+              Ver comprobante
+            </Button>
+          )}
+          <label className="flex h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90">
+            {uploading ? `Subiendo… ${progress}%` : hasProof ? 'Reemplazar' : 'Subir comprobante'}
+            <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
+          </label>
+        </div>
       </div>
+
+      {viewerOpen && viewerUrl && (
+        <Lightbox
+          open
+          close={() => setViewerOpen(false)}
+          index={0}
+          slides={[{ src: viewerUrl }]}
+          plugins={[Zoom]}
+          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
+        />
+      )}
     </Card>
   )
 }
@@ -195,7 +260,16 @@ export function PaymentProofPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-3 py-6 font-flat md:px-8 md:py-10">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✓</span>
+      {/* Arriba de todo — antes solo se podía volver a "Mis compras" hasta
+          el final de la página, forzando a hacer scroll incluso cuando el
+          biker solo quería salir sin terminar de subir nada. */}
+      <Link to="/app/historial">
+        <Button variant="secondary" size="sm">
+          <IconCart className="h-4 w-4" /> Ir a Mis compras
+        </Button>
+      </Link>
+
+      <span className="mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✓</span>
       <h1 className="mt-4 text-2xl font-bold tracking-tight md:text-3xl">Completa tu pago por transferencia</h1>
       <p className="mt-2 text-muted-foreground">
         {data.dues.length > 1
@@ -220,11 +294,6 @@ export function PaymentProofPage() {
         ) : (
           <p className="text-sm text-muted-foreground">Puedes salir y volver a esta página cuando quieras para terminar de subir tus comprobantes.</p>
         )}
-        <Link to="/app/historial">
-          <Button size="lg" className="mt-2">
-            <IconCart className="h-4 w-4" /> Ir a Mis compras
-          </Button>
-        </Link>
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
+import { downloadFile } from '../../lib/download'
 import { getOrderStatusStyle, getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useBackButton } from '../../ui/shared/useBackButton'
@@ -38,6 +39,19 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
   const [uploading, setUploading] = useState(false)
   const [openingDelivered, setOpeningDelivered] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [downloadingDelivered, setDownloadingDelivered] = useState(false)
+
+  async function downloadDelivered() {
+    if (!lightboxUrl) return
+    setDownloadingDelivered(true)
+    try {
+      await downloadFile(lightboxUrl, photo.original_filename ?? `motoshots-${photo.id}.jpg`)
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
+    } finally {
+      setDownloadingDelivered(false)
+    }
+  }
 
   async function viewDelivered() {
     setOpeningDelivered(true)
@@ -151,14 +165,13 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
           render={{
             slideFooter: () => (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-5">
-                <a
-                  href={lightboxUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="pointer-events-auto rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+                <button
+                  onClick={downloadDelivered}
+                  disabled={downloadingDelivered}
+                  className="pointer-events-auto rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                  ⬇ Descargar
-                </a>
+                  {downloadingDelivered ? 'Descargando…' : '⬇ Descargar'}
+                </button>
               </div>
             ),
           }}
@@ -465,6 +478,7 @@ export function StudioOrderDetail() {
   const [savingNote, setSavingNote] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [openingProof, setOpeningProof] = useState(false)
+  const [proofUrl, setProofUrl] = useState<string | null>(null)
 
   async function viewPaymentProof() {
     if (!order) return
@@ -476,7 +490,7 @@ export function StudioOrderDetail() {
         push({ type: 'info', title: 'El biker todavía no sube su comprobante' })
         return
       }
-      window.open(data.viewUrl, '_blank', 'noreferrer')
+      setProofUrl(data.viewUrl)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
     } finally {
@@ -707,6 +721,37 @@ export function StudioOrderDetail() {
           <OrderTimeline order={order} />
         </aside>
       </div>
+
+      {proofUrl && (
+        <Lightbox
+          open
+          close={() => setProofUrl(null)}
+          index={0}
+          slides={[{ src: proofUrl }]}
+          plugins={[Zoom]}
+          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
+          render={
+            action?.next === 'en_preparacion'
+              ? {
+                  slideFooter: () => (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-5">
+                      <Button
+                        variant="dark"
+                        className="pointer-events-auto"
+                        onClick={() => {
+                          confirmAction()
+                          setProofUrl(null)
+                        }}
+                      >
+                        Confirmar pago recibido
+                      </Button>
+                    </div>
+                  ),
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   )
 }

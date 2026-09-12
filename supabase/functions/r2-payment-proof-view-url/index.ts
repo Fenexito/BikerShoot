@@ -1,6 +1,10 @@
-// Edge Function: URL firmada temporal (10 min) para que el FOTÓGRAFO vea
-// el comprobante de transferencia que el biker subió para uno de sus
-// pedidos. Solo el fotógrafo dueño de ese comprobante puede pedirlo.
+// Edge Function: URL firmada temporal (10 min) para ver el comprobante de
+// transferencia de un pedido — la usan TANTO el fotógrafo dueño de ese
+// comprobante COMO el biker que lo subió (para poder revisar lo que ya
+// mandó, o reemplazarlo si se equivocó). Como un pedido puede tener varios
+// fotógrafos, `photographerId` dice CUÁL comprobante se pide; si no se
+// manda, se asume que el que llama ES el fotógrafo (compatibilidad con el
+// caso de un solo fotógrafo, ya en uso desde el portal Studio).
 //
 // Secrets: los mismos que r2-raw-download-url (R2_ACCOUNT_ID,
 // R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ORIGINALS_BUCKET).
@@ -46,14 +50,19 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser()
   if (userError || !user) return json({ error: 'No autenticado' }, 401)
 
-  const { orderId } = await req.json()
+  const { orderId, photographerId } = await req.json()
   if (!orderId) return json({ error: 'Falta orderId' }, 400)
+
+  // Si no se especifica, se asume que quien llama ES el fotógrafo dueño
+  // del comprobante — mantiene funcionando sin cambios al portal Studio,
+  // que ya invoca esta función solo con `orderId`.
+  const targetPhotographerId = photographerId ?? user.id
 
   const { data: proof, error: proofError } = await supabase
     .from('order_payment_proofs')
     .select('proof_path, photographer_id')
     .eq('order_id', orderId)
-    .eq('photographer_id', user.id)
+    .eq('photographer_id', targetPhotographerId)
     .maybeSingle()
 
   // 200 con `viewUrl: null` en vez de un status de error — así el cliente
@@ -61,6 +70,17 @@ Deno.serve(async (req: Request) => {
   // Supabase Functions solo para distinguir "no autorizado" de "todavía no
   // sube el comprobante" (un caso normal y esperable, no una falla real).
   if (proofError || !proof) return json({ viewUrl: null })
+
+  // Autoriza a CUALQUIERA de los dos lados de este comprobante: el
+  // fotógrafo dueño, o el biker dueño del pedido (RLS ya se lo permitiría
+  // vía la policy de la tabla, pero acá se resuelve explícito porque
+  // necesitamos firmar la URL con las credenciales de R2, no con las del
+  // usuario).
+  const isPhotographerOwner = user.id === proof.photographer_id
+  if (!isPhotographerOwner) {
+    const { data: order, error: orderError } = await supabase.from('orders').select('id, biker_id').eq('id', orderId).single()
+    if (orderError || !order || order.biker_id !== user.id) return json({ viewUrl: null })
+  }
 
   const r2 = new AwsClient({
     accessKeyId: R2_ACCESS_KEY_ID,
