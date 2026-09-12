@@ -32,8 +32,11 @@ function urgencyClass(order: PhotographerOrderGroup) {
   return null
 }
 
-function byOrderNumber(a: PhotographerOrderGroup, b: PhotographerOrderGroup) {
-  return (a.orderNumber ?? 0) - (b.orderNumber ?? 0)
+// El más reciente arriba, el más antiguo abajo, dentro de cada categoría
+// (antes ordenaba por número de pedido ascendente — el más VIEJO quedaba
+// primero, al revés de lo esperado).
+function byMostRecent(a: PhotographerOrderGroup, b: PhotographerOrderGroup) {
+  return +new Date(b.createdAt) - +new Date(a.createdAt)
 }
 
 /** Coincide por biker, evento, o número de pedido — con o sin "#" y sin
@@ -185,9 +188,9 @@ export function StudioOrders() {
   const categories = useMemo((): OrderCategory[] => {
     const q = query.trim().toLowerCase()
     const matches = (o: PhotographerOrderGroup) => orderMatchesQuery(o, q)
-    const byStatus = (status: OrderItemStatus) => orders.filter((o) => o.status === status && matches(o)).sort(byOrderNumber)
+    const byStatus = (status: OrderItemStatus) => orders.filter((o) => o.status === status && matches(o)).sort(byMostRecent)
     return [
-      { key: 'urgente', label: '🔥 Urgentes', orders: orders.filter((o) => urgencyClass(o) !== null && matches(o)).sort(byOrderNumber), defaultOpen: true, tone: 'danger' },
+      { key: 'urgente', label: '🔥 Urgentes', orders: orders.filter((o) => urgencyClass(o) !== null && matches(o)).sort(byMostRecent), defaultOpen: true, tone: 'danger' },
       { key: 'pendiente_pago', label: 'Pendientes de pago', orders: byStatus('pendiente_pago'), defaultOpen: true },
       { key: 'en_preparacion', label: 'En preparación', orders: byStatus('en_preparacion'), defaultOpen: true },
       { key: 'entregado', label: 'Entregados', orders: byStatus('entregado'), defaultOpen: true },
