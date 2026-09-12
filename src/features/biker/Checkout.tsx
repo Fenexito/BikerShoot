@@ -1,16 +1,42 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useCartStore, type CartItem } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
+import { computeVolumePrice, type PricingTier } from './photographerPricing'
 import { Button } from '../../ui/flat/Button'
 import { Card } from '../../ui/flat/Card'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { IconInfo } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 
-const BUNDLE_THRESHOLD = 5
-const BUNDLE_DISCOUNT = 0.15
+// Q2 fijos por foto, siempre — cubre mantenimiento de la plataforma,
+// preparación/seguimiento del pedido y atención al cliente. Es aparte del
+// precio del fotógrafo (nunca lo reduce) y no cambia con el descuento por
+// volumen de cada fotógrafo (ver `computeVolumePrice`).
+const SERVICE_FEE_PER_PHOTO = 2
+
+function usePhotographerPricingTiers(photographerIds: string[]) {
+  const key = photographerIds.slice().sort().join(',')
+  return useQuery({
+    queryKey: ['photographer-pricing-tiers', key],
+    queryFn: async (): Promise<Record<string, PricingTier[]>> => {
+      const { data, error } = await supabase
+        .from('photographer_pricing_tiers')
+        .select('photographer_id, photo_count, total_price')
+        .in('photographer_id', photographerIds)
+      if (error) throw error
+      const map: Record<string, PricingTier[]> = {}
+      for (const row of data ?? []) {
+        ;(map[row.photographer_id] ??= []).push({ photo_count: row.photo_count, total_price: row.total_price })
+      }
+      return map
+    },
+    enabled: photographerIds.length > 0,
+  })
+}
 
 export function Checkout() {
   const items = useCartStore((s) => s.items)
@@ -22,22 +48,8 @@ export function Checkout() {
   const [method, setMethod] = useState<'tarjeta' | 'transferencia'>('tarjeta')
   const [placing, setPlacing] = useState(false)
 
-  const { subtotal, discount } = useMemo(() => {
-    const byEvent = new Map<string, number>()
-    for (const item of items) byEvent.set(item.eventId, (byEvent.get(item.eventId) ?? 0) + item.price)
-
-    let discountTotal = 0
-    const countByEvent = new Map<string, number>()
-    for (const item of items) countByEvent.set(item.eventId, (countByEvent.get(item.eventId) ?? 0) + 1)
-    for (const [eventId, count] of countByEvent) {
-      if (count >= BUNDLE_THRESHOLD) discountTotal += (byEvent.get(eventId) ?? 0) * BUNDLE_DISCOUNT
-    }
-
-    const subtotal = items.reduce((sum, i) => sum + i.price, 0)
-    return { subtotal, discount: discountTotal }
-  }, [items])
-
-  const total = subtotal - discount
+  const photographerIds = useMemo(() => Array.from(new Set(items.map((i) => i.photographerId))), [items])
+  const { data: tiersByPhotographer = {} } = usePhotographerPricingTiers(photographerIds)
 
   const photographerGroups = useMemo(() => {
     const map = new Map<string, { photographerName: string; items: CartItem[] }>()
@@ -46,13 +58,23 @@ export function Checkout() {
       g.items.push(item)
       map.set(item.photographerId, g)
     }
-    return Array.from(map.entries()).map(([photographerId, g]) => ({
-      photographerId,
-      photographerName: g.photographerName,
-      items: g.items,
-      subtotal: g.items.reduce((s, i) => s + i.price, 0),
-    }))
-  }, [items])
+    return Array.from(map.entries()).map(([photographerId, g]) => {
+      const faceSubtotal = g.items.reduce((s, i) => s + i.price, 0)
+      const volumeTotal = computeVolumePrice(tiersByPhotographer[photographerId] ?? [], g.items.length, faceSubtotal)
+      return {
+        photographerId,
+        photographerName: g.photographerName,
+        items: g.items,
+        faceSubtotal,
+        subtotal: volumeTotal,
+      }
+    })
+  }, [items, tiersByPhotographer])
+
+  const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price, 0), [items])
+  const discount = useMemo(() => photographerGroups.reduce((s, g) => s + (g.faceSubtotal - g.subtotal), 0), [photographerGroups])
+  const serviceFee = items.length * SERVICE_FEE_PER_PHOTO
+  const total = subtotal - discount + serviceFee
 
   async function placeOrder() {
     if (!user) return
@@ -77,6 +99,7 @@ export function Checkout() {
         photographer_id: item.photographerId,
         event_id: item.eventId,
         price: item.price,
+        service_fee: SERVICE_FEE_PER_PHOTO,
       })),
     )
 
@@ -167,6 +190,19 @@ export function Checkout() {
                 <span>-Q{discount.toFixed(2)}</span>
               </div>
             )}
+            <div className="mt-1 flex items-center justify-between text-sm">
+              <span className="group relative flex items-center gap-1 text-muted-foreground">
+                Tarifa de servicio
+                <span tabIndex={0} className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+                  <IconInfo className="h-3 w-3" />
+                </span>
+                <span className="pointer-events-none absolute bottom-full left-0 mb-2 w-56 rounded-xl bg-neutral-900 p-3 text-xs font-normal normal-case text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  Cubre el mantenimiento de la plataforma, la preparación y seguimiento de tu pedido, y la atención al cliente de
+                  MotoShots. No es un cobro del fotógrafo — él recibe el 100% de su precio.
+                </span>
+              </span>
+              <span>Q{serviceFee.toFixed(2)}</span>
+            </div>
             <div className="mt-3 flex justify-between border-t border-border pt-3 text-lg font-bold">
               <span>Total</span>
               <span>Q{total.toFixed(2)}</span>

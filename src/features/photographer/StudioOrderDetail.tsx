@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useOrderGroup, type PhotographerOrderGroup } from './useMyOrders'
+import { useOrderGroup, type PhotographerOrderGroup, type RawOrderItem } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
@@ -225,6 +225,177 @@ function ActionChecklist({ status }: { status: OrderItemStatus }) {
   )
 }
 
+/** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
+ * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
+ * la sección E del documento de precios. `cortesias_ampliadas` (extra
+ * nativo de Pro) suma +1 al tope combinado de cualquier franja. */
+function courtesyCaps(purchasedCount: number, expanded: boolean) {
+  const base = purchasedCount <= 2 ? { waivers: 0, extras: 1, combined: 1 } : purchasedCount <= 5 ? { waivers: 1, extras: 1, combined: 1 } : { waivers: 2, extras: 2, combined: 2 }
+  return expanded ? { ...base, combined: base.combined + 1 } : base
+}
+
+interface EventPhotoOption {
+  id: string
+  storage_path: string | null
+  preview_path: string | null
+  price: number
+  original_filename: string | null
+}
+
+function CourtesySection({
+  order,
+  photographerId,
+  expanded,
+}: {
+  order: PhotographerOrderGroup
+  photographerId: string
+  expanded: boolean
+}) {
+  const push = useToastStore((s) => s.push)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [eventPhotos, setEventPhotos] = useState<EventPhotoOption[]>([])
+
+  const purchased = order.items.filter((i) => !i.is_courtesy)
+  const courtesies = order.items.filter((i) => i.is_courtesy)
+  const caps = courtesyCaps(purchased.length, expanded)
+  const usedCombined = courtesies.length
+  const canWaive = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'waiver').length < caps.waivers
+  const canGiftExtra = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'extra').length < caps.extras
+
+  async function waive(item: RawOrderItem) {
+    setBusyId(item.id)
+    const { error } = await supabase
+      .from('order_items')
+      .update({ price: 0, service_fee: 0, is_courtesy: true, courtesy_type: 'waiver' })
+      .eq('id', item.id)
+    setBusyId(null)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo regalar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: 'Foto regalada' })
+    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
+  }
+
+  async function openPicker() {
+    setPickerOpen(true)
+    setPickerLoading(true)
+    const usedIds = new Set(order.items.map((i) => i.photo_id))
+    const { data, error } = await supabase
+      .from('photos')
+      .select('id, storage_path, preview_path, price, original_filename')
+      .eq('photographer_id', photographerId)
+      .eq('event_id', purchased[0]?.event_id ?? order.items[0]?.event_id)
+      .eq('featured', false)
+    setPickerLoading(false)
+    if (error) {
+      push({ type: 'error', title: 'No se pudieron cargar tus fotos', description: error.message })
+      return
+    }
+    setEventPhotos((data ?? []).filter((p) => !usedIds.has(p.id)))
+  }
+
+  async function giftExtra(photo: EventPhotoOption) {
+    setBusyId(photo.id)
+    const { error } = await supabase.from('order_items').insert({
+      order_id: order.orderId,
+      photo_id: photo.id,
+      photographer_id: photographerId,
+      event_id: purchased[0]?.event_id ?? order.items[0]?.event_id,
+      price: 0,
+      service_fee: 0,
+      is_courtesy: true,
+      courtesy_type: 'extra',
+      status: order.status === 'cancelado' ? 'pendiente_pago' : order.status,
+    })
+    setBusyId(null)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo agregar el regalo', description: error.message })
+      return
+    }
+    push({ type: 'success', title: 'Foto de regalo agregada al pedido' })
+    setPickerOpen(false)
+    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
+  }
+
+  if (order.status === 'cancelado') return null
+
+  return (
+    <div className="mt-10 rounded-3xl border border-border bg-card p-6 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight">Cortesías</h2>
+          <p className="text-sm text-muted-foreground">
+            Este pedido tiene {purchased.length} foto{purchased.length === 1 ? '' : 's'} compradas — puedes regalar hasta {caps.combined} en total
+            {expanded && ' (cortesías ampliadas activas)'}.
+          </p>
+        </div>
+        <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+          {usedCombined} de {caps.combined} usadas
+        </span>
+      </div>
+
+      {courtesies.length > 0 && (
+        <ul className="mt-4 flex flex-col gap-1.5 text-sm">
+          {courtesies.map((c) => (
+            <li key={c.id} className="flex items-center gap-2 text-muted-foreground">
+              <span className="text-emerald-500">✓</span>
+              {c.courtesy_type === 'waiver' ? 'Foto comprada, regalada (waiver)' : 'Foto extra de regalo'} — {c.photo?.original_filename ?? c.photo_id}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        {canWaive &&
+          purchased.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => waive(item)}
+              disabled={busyId === item.id}
+              className="rounded-full border border-border px-3.5 py-2 text-xs font-semibold transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+            >
+              Regalar «{item.photo?.original_filename ?? 'foto'}»
+            </button>
+          ))}
+        {canGiftExtra && (
+          <Button variant="secondary" size="sm" onClick={openPicker}>
+            + Agregar foto extra de regalo
+          </Button>
+        )}
+        {!canWaive && !canGiftExtra && <p className="text-sm text-muted-foreground">Ya usaste todas las cortesías disponibles en este pedido.</p>}
+      </div>
+
+      {pickerOpen && (
+        <div className="mt-5 border-t border-border pt-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Elige la foto a regalar</h3>
+            <button onClick={() => setPickerOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">
+              Cancelar
+            </button>
+          </div>
+          {pickerLoading && <p className="text-sm text-muted-foreground">Cargando tus fotos de este evento…</p>}
+          {!pickerLoading && eventPhotos.length === 0 && <p className="text-sm text-muted-foreground">No hay más fotos disponibles de este evento.</p>}
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {eventPhotos.map((photo) => (
+              <button
+                key={photo.id}
+                onClick={() => giftExtra(photo)}
+                disabled={busyId === photo.id}
+                className="group overflow-hidden rounded-2xl border border-border disabled:opacity-50"
+              >
+                <img src={previewUrl(photo)} alt="" className="aspect-square w-full object-cover transition-transform group-hover:scale-105" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function timeAgoFull(iso: string) {
   return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
@@ -382,7 +553,7 @@ export function StudioOrderDetail() {
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
               </p>
-              <p className="text-xl font-bold">Q{order.total}</p>
+              <p className="text-xl font-bold">Q{order.total.toFixed(2)}</p>
             </div>
             {order.paymentMethod === 'transferencia' && (
               <Button variant="secondary" size="sm" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
@@ -433,7 +604,7 @@ export function StudioOrderDetail() {
                 {sameUnitPrice ? (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{order.items.length} × Q{unitPrice}</span>
-                    <span className="font-semibold">Q{order.total}</span>
+                    <span className="font-semibold">Q{(order.items.length * unitPrice).toFixed(2)}</span>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1.5 text-sm">
@@ -445,9 +616,15 @@ export function StudioOrderDetail() {
                     ))}
                   </div>
                 )}
+                {order.serviceFeeTotal > 0 && (
+                  <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Tarifa de servicio MotoShots (incluida, se liquida después)</span>
+                    <span>Q{order.serviceFeeTotal.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-base font-bold">
-                  <span>Total</span>
-                  <span>Q{order.total}</span>
+                  <span>Total a recibir</span>
+                  <span>Q{order.total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -484,6 +661,8 @@ export function StudioOrderDetail() {
           </div>
         )}
       </div>
+
+      {user && <CourtesySection order={order} photographerId={user.id} expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false} />}
 
       <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_280px]">
         <section>

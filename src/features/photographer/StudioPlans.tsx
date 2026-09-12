@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { usePhotographerDetails, usePhotographerUsageBytes, useStoragePlans, type StoragePlanInfo } from './usePhotographerDetails'
+import {
+  usePhotographerDetails,
+  usePhotographerUsageBytes,
+  useStoragePlans,
+  useStorageAddons,
+  useFeatureAddons,
+  usePendingServiceFees,
+  type StoragePlanInfo,
+} from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/studio/Button'
@@ -22,7 +30,8 @@ const FAQ_ITEMS = [
   },
   {
     question: '¿Cobran comisión por cada venta?',
-    answer: 'No. El único costo es tu plan mensual de almacenamiento — el 100% de cada venta es tuyo.',
+    answer:
+      'No sobre tu precio — recibes el 100% de lo que publicas. Hay una tarifa de servicio fija de Q2 por foto que paga el biker (se suma a lo que ya te transfiere), y se liquida junto a tu factura de plan.',
   },
   {
     question: '¿Puedo cancelar en cualquier momento?',
@@ -62,19 +71,27 @@ function formatDate(iso: string) {
 const PLAN_COPY: Record<string, { tagline: string; features: string[] }> = {
   gratis: {
     tagline: 'Para conocer la plataforma con tu primer evento.',
-    features: ['~400 fotos aprox.', '1-2 eventos pequeños activos', 'Soporte por WhatsApp'],
+    features: ['~400 fotos aprox.', '1 evento activo a la vez'],
+  },
+  starter: {
+    tagline: 'Para el fotógrafo que recién empieza a cobrar por sus fotos.',
+    features: ['~2,000 fotos aprox.', 'Eventos activos ilimitados', 'Cupones de descuento propios'],
   },
   basico: {
     tagline: 'Para el fotógrafo que ya cubre rodadas con regularidad.',
-    features: ['~4,000 fotos aprox.', '2-4 eventos activos al mes', 'Soporte por WhatsApp'],
+    features: ['~5,000 fotos aprox.', 'Eventos activos ilimitados', 'Cupones y recordatorios automáticos'],
+  },
+  plus: {
+    tagline: 'Para quien ya vende seguido y quiere ver qué le funciona.',
+    features: ['~12,000 fotos aprox.', 'Analítica de ventas', 'Insignia verificado + prioridad de visibilidad'],
   },
   pro: {
     tagline: 'Para rodadas grandes con varios puntos de foto.',
-    features: ['~20,000 fotos aprox.', 'Eventos con muchos puntos', 'Soporte por WhatsApp prioritario'],
+    features: ['~30,000 fotos aprox.', 'Marca de agua personalizable', 'Soporte prioritario + cortesías ampliadas'],
   },
   estudio: {
     tagline: 'Para estudios con alto volumen de eventos simultáneos.',
-    features: ['~100,000 fotos aprox.', 'Eventos y puntos ilimitados', 'Soporte por WhatsApp prioritario'],
+    features: ['~60,000 fotos aprox.', 'Todo lo de Pro', 'Cuentas de equipo (próximamente)'],
   },
 }
 
@@ -170,16 +187,20 @@ export function StudioPlans() {
   const { data: details } = usePhotographerDetails(user?.id)
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: plans } = useStoragePlans()
+  const { data: storageAddons = [] } = useStorageAddons()
+  const { data: featureAddons = [] } = useFeatureAddons()
+  const { data: pendingFees = 0 } = usePendingServiceFees(user?.id)
   const push = useToastStore((s) => s.push)
   const [busy, setBusy] = useState(false)
+  const [addonBusy, setAddonBusy] = useState<string | null>(null)
 
   if (!details || !plans) {
     return (
       <div className={STUDIO_PAGE_WIDE}>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="mt-3 h-4 w-96" />
-        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-80 w-full rounded-3xl" />
           ))}
         </div>
@@ -256,6 +277,22 @@ export function StudioPlans() {
     queryClient.invalidateQueries({ queryKey: ['photographer_details', user!.id] })
   }
 
+  async function toggleAddon(kind: 'storage' | 'feature', addonId: string, label: string) {
+    const field = kind === 'storage' ? 'storage_addon_ids' : 'feature_addon_ids'
+    const current = kind === 'storage' ? details!.storage_addon_ids : details!.feature_addon_ids
+    const active = current.includes(addonId)
+    const next = active ? current.filter((id) => id !== addonId) : [...current, addonId]
+    setAddonBusy(addonId)
+    const { error } = await supabase.from('photographer_details').update({ [field]: next }).eq('profile_id', user!.id)
+    setAddonBusy(null)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo actualizar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: active ? `${label} desactivado` : `${label} activado` })
+    queryClient.invalidateQueries({ queryKey: ['photographer_details', user!.id] })
+  }
+
   return (
     <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Planes y facturación</h1>
@@ -269,6 +306,12 @@ export function StudioPlans() {
             <p className="mt-1 text-sm text-muted-foreground">
               Ciclo iniciado el {formatDate(details.plan_started_at)} · próxima renovación el {formatDate(details!.plan_renews_at)}
             </p>
+            {pendingFees > 0 && (
+              <p className="mt-2 text-sm">
+                <span className="font-semibold">Q{pendingFees.toFixed(2)}</span> en tarifas de servicio acumuladas — se suman a tu próxima
+                factura de plan.
+              </p>
+            )}
           </div>
           {pendingPlan && (
             <div className="flex items-center gap-3 rounded-full bg-background px-5 py-3">
@@ -283,7 +326,7 @@ export function StudioPlans() {
         </div>
       )}
 
-      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan, i) => (
           <div key={plan.id} className="animate-card-in" style={{ animationDelay: `${i * 60}ms` }}>
             <PlanCard
@@ -308,6 +351,60 @@ export function StudioPlans() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div className="mt-14">
+        <h2 className="font-studio text-2xl font-bold tracking-tight2">Espacio adicional</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Súmalo sobre tu plan actual si te falta un poco de espacio a mitad de mes — no reemplaza tu plan.</p>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {storageAddons.map((addon) => {
+            const active = details.storage_addon_ids.includes(addon.id)
+            return (
+              <div key={addon.id} className={cn('flex items-center justify-between gap-3 rounded-2xl border p-5', active ? 'border-foreground bg-foreground/5' : 'border-border bg-card')}>
+                <div>
+                  <p className="font-semibold">{addon.name}</p>
+                  <p className="text-sm text-muted-foreground">Q{addon.price_monthly_gtq}/mes</p>
+                </div>
+                <Button
+                  variant={active ? 'secondary' : 'dark'}
+                  size="sm"
+                  disabled={addonBusy === addon.id}
+                  onClick={() => toggleAddon('storage', addon.id, addon.name)}
+                >
+                  {active ? 'Quitar' : 'Agregar'}
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="mt-14">
+        <h2 className="font-studio text-2xl font-bold tracking-tight2">Extras</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Funciones nativas de un plan más alto, disponibles sueltas sobre el tuyo — compara contra subir de plan antes de acumular varios.
+        </p>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {featureAddons.map((addon) => {
+            const active = details.feature_addon_ids.includes(addon.id)
+            const isNative = !!currentPlan && !!addon.native_plan_id && plans.findIndex((p) => p.id === addon.native_plan_id) <= plans.findIndex((p) => p.id === currentPlan.id)
+            return (
+              <div key={addon.id} className={cn('flex items-center justify-between gap-3 rounded-2xl border p-5', active || isNative ? 'border-foreground bg-foreground/5' : 'border-border bg-card')}>
+                <div>
+                  <p className="font-semibold">{addon.name}</p>
+                  <p className="text-sm text-muted-foreground">{isNative ? 'Incluido en tu plan actual' : `Q${addon.price_monthly_gtq}/mes suelto`}</p>
+                </div>
+                {isNative ? (
+                  <span className="rounded-full bg-foreground px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-background">Incluido</span>
+                ) : (
+                  <Button variant={active ? 'secondary' : 'dark'} size="sm" disabled={addonBusy === addon.id} onClick={() => toggleAddon('feature', addon.id, addon.name)}>
+                    {active ? 'Quitar' : 'Agregar'}
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className="mx-auto mt-20 max-w-2xl">

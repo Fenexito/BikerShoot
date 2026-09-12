@@ -52,6 +52,7 @@ const PrivacyPage = lazy(() => import('./features/legal/PrivacyPage').then((m) =
 const TermsPage = lazy(() => import('./features/legal/TermsPage').then((m) => ({ default: m.TermsPage })))
 const CopyrightPage = lazy(() => import('./features/legal/CopyrightPage').then((m) => ({ default: m.CopyrightPage })))
 const SharedPhotoPage = lazy(() => import('./features/share/SharedPhotoPage').then((m) => ({ default: m.SharedPhotoPage })))
+const PricingPage = lazy(() => import('./features/pricing/PricingPage').then((m) => ({ default: m.PricingPage })))
 
 export default function App() {
   return (
@@ -76,7 +77,7 @@ export default function App() {
           <Route path="/eres-fotografo" element={<PlaceholderPage title="Soy fotógrafo" />} />
           <Route path="/fotografos" element={<PlaceholderPage title="Fotógrafos" />} />
           <Route path="/eventos" element={<PlaceholderPage title="Eventos" />} />
-          <Route path="/precios" element={<PlaceholderPage title="Precios" />} />
+          <Route path="/precios" element={<PricingPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />
           <Route path="/privacidad" element={<PrivacyPage />} />
           <Route path="/terminos" element={<TermsPage />} />

@@ -12,7 +12,7 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { cn } from '../../lib/cn'
-import { IconUser, IconSettings, IconBell, IconUsers, IconEye, IconEyeOff } from '../../ui/shared/icons'
+import { IconUser, IconSettings, IconBell, IconUsers, IconEye, IconEyeOff, IconCreditCard, IconPlus, IconTrash } from '../../ui/shared/icons'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import type { NotificationType } from '../notifications/useNotifications'
 
@@ -24,6 +24,7 @@ const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description
 
 const TABS = [
   { id: 'perfil', label: 'Perfil', icon: IconUser },
+  { id: 'precios', label: 'Precios', icon: IconCreditCard },
   { id: 'cuenta', label: 'Cuenta', icon: IconSettings },
   { id: 'notificaciones', label: 'Notificaciones', icon: IconBell },
   { id: 'equipo', label: 'Equipo', icon: IconUsers },
@@ -104,6 +105,130 @@ function EditableRow({
       ) : (
         <p className="mt-1 text-sm text-muted-foreground">{value || placeholder || '—'}</p>
       )}
+    </div>
+  )
+}
+
+interface PricingTierRow {
+  photo_count: number
+  total_price: number
+}
+
+/** Tabla libre "N fotos → Q total" que reemplaza el 15% genérico anterior
+ * — el fotógrafo define tantos escalones como quiera, no tienen que ser
+ * consecutivos. Más allá del último definido, el checkout del biker
+ * extrapola con el ritmo marginal del último salto (ver
+ * `computeVolumePrice` en el portal biker) — acá solo se editan los
+ * puntos, la extrapolación vive del lado de la búsqueda. */
+function PricingTiersEditor({ photographerId, basePrice }: { photographerId: string; basePrice: number | null }) {
+  const push = useToastStore((s) => s.push)
+  const [rows, setRows] = useState<PricingTierRow[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('photographer_pricing_tiers')
+      .select('photo_count, total_price')
+      .eq('photographer_id', photographerId)
+      .order('photo_count')
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (!error && data) setRows(data)
+        setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [photographerId])
+
+  function updateRow(index: number, patch: Partial<PricingTierRow>) {
+    setRows((rs) => rs.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  }
+
+  function addRow() {
+    const lastCount = rows.length > 0 ? rows[rows.length - 1].photo_count : 0
+    const lastPrice = rows.length > 0 ? rows[rows.length - 1].total_price : (basePrice ?? 0)
+    setRows((rs) => [...rs, { photo_count: lastCount + 1, total_price: Math.round((lastPrice + (basePrice ?? 10)) * 100) / 100 }])
+  }
+
+  function removeRow(index: number) {
+    setRows((rs) => rs.filter((_, i) => i !== index))
+  }
+
+  async function save() {
+    const counts = rows.map((r) => r.photo_count)
+    if (new Set(counts).size !== counts.length) {
+      push({ type: 'error', title: 'Hay cantidades de fotos repetidas', description: 'Cada escalón debe tener un número de fotos distinto.' })
+      return
+    }
+    setSaving(true)
+    const { error: deleteError } = await supabase.from('photographer_pricing_tiers').delete().eq('photographer_id', photographerId)
+    if (deleteError) {
+      setSaving(false)
+      push({ type: 'error', title: 'No se pudo guardar', description: deleteError.message })
+      return
+    }
+    if (rows.length > 0) {
+      const { error: insertError } = await supabase
+        .from('photographer_pricing_tiers')
+        .insert(rows.map((r) => ({ photographer_id: photographerId, photo_count: r.photo_count, total_price: r.total_price })))
+      if (insertError) {
+        setSaving(false)
+        push({ type: 'error', title: 'No se pudo guardar', description: insertError.message })
+        return
+      }
+    }
+    setSaving(false)
+    push({ type: 'success', title: 'Precios por volumen guardados' })
+  }
+
+  if (!loaded) return <p className="text-sm text-muted-foreground">Cargando…</p>
+
+  return (
+    <div>
+      {rows.length === 0 && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          Todavía no tienes una tabla propia — sin ella, cada foto se cobra a tu precio normal, sin ningún descuento por comprar
+          varias.
+        </p>
+      )}
+      <div className="flex flex-col gap-2.5">
+        {rows.map((row, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="flex flex-1 items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={row.photo_count}
+                onChange={(e) => updateRow(i, { photo_count: Number(e.target.value) })}
+                className={cn(inputClass, 'w-20')}
+              />
+              <span className="shrink-0 text-sm text-muted-foreground">foto(s) por Q</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={row.total_price}
+                onChange={(e) => updateRow(i, { total_price: Number(e.target.value) })}
+                className={cn(inputClass, 'w-28')}
+              />
+            </div>
+            <button onClick={() => removeRow(i)} aria-label="Quitar escalón" className="shrink-0 text-muted-foreground hover:text-red-500">
+              <IconTrash className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <button onClick={addRow} className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:underline">
+          <IconPlus className="h-4 w-4" /> Agregar escalón
+        </button>
+        <Button variant="dark" size="sm" onClick={save} loading={saving} className="ml-auto">
+          Guardar tabla
+        </Button>
+      </div>
     </div>
   )
 }
@@ -602,6 +727,15 @@ export function StudioSettings() {
 
               <PublicInfoSection draft={publicInfo} onSave={savePublicInfo} />
             </>
+          )}
+
+          {tab === 'precios' && (
+            <Section
+              title="Precios por volumen"
+              description="Define cuánto cobras por comprar varias fotos tuyas en un mismo pedido — se calcula sobre TODAS tus fotos en ese pedido, sin importar de qué evento o punto vengan."
+            >
+              {user && <PricingTiersEditor photographerId={user.id} basePrice={null} />}
+            </Section>
           )}
 
           {tab === 'cuenta' && (

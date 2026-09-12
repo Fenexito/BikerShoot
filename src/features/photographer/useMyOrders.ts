@@ -5,11 +5,16 @@ import type { OrderItemStatus } from '../../lib/orderStatus'
 
 export type { OrderItemStatus }
 
-interface RawOrderItem {
+export interface RawOrderItem {
   id: string
   order_id: string
   photo_id: string
+  event_id: string
+  photographer_id: string
   price: number
+  service_fee: number
+  is_courtesy: boolean
+  courtesy_type: 'waiver' | 'extra' | null
   status: OrderItemStatus
   created_at: string
   photographer_note: string | null
@@ -33,6 +38,7 @@ export interface PhotographerOrderGroup {
   createdAt: string
   status: OrderItemStatus
   total: number
+  serviceFeeTotal: number
   note: string | null
   paidAt: string | null
   deliveredAt: string | null
@@ -90,7 +96,13 @@ export function usePhotographerOrders(photographerId: string | undefined) {
       paymentMethod: items[0].order?.payment_method ?? 'tarjeta',
       createdAt: items[0].order?.created_at ?? items[0].created_at,
       status: deriveOrderStatus(items),
-      total: items.reduce((sum, i) => sum + i.price, 0),
+      // Lo que el biker de verdad transfiere a este fotógrafo — incluye la
+      // tarifa de servicio de cada foto (Q2, salvo cortesías), que el
+      // fotógrafo recibe junto con el resto pero le debe de vuelta a
+      // MotoShots en su próxima factura de plan (ver `service_fee` por
+      // item más abajo, y `usePendingServiceFees` para el saldo total).
+      total: items.reduce((sum, i) => sum + i.price + i.service_fee, 0),
+      serviceFeeTotal: items.reduce((sum, i) => sum + i.service_fee, 0),
       note: items.find((i) => i.photographer_note)?.photographer_note ?? null,
       paidAt: items.find((i) => i.paid_at)?.paid_at ?? null,
       deliveredAt: items.every((i) => i.delivered_at || i.status === 'cancelado')
