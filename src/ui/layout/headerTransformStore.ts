@@ -24,6 +24,14 @@ export interface HeaderTransformOptions {
    * en el resto de páginas. En escritorio (o si esto no aplica) se sigue
    * viendo la flecha de volver normal. */
   mobileBackSlotContent?: ReactNode | null
+  /** Con `mobileEnabled`, por defecto el header/menú inferior TODAVÍA se
+   * auto-ocultan al bajar en el scroll (pensado para Buscar fotos: más
+   * espacio para ver fotos). Una página como el detalle de un pedido, que
+   * es puro texto/información para leer mientras se hace scroll (no fotos
+   * para "navegar"), no quiere que NADA se oculte — pasa `true` acá para
+   * que ni el header ni el menú inferior se auto-oculten mientras esta
+   * página esté activa. */
+  suppressAutoHide?: boolean
   /** Segunda fila OPCIONAL que, cuando `extraActive` es true, hace que el
    * propio `<header>` (el pill) CREZCA de alto para mostrarla — no es un
    * panel flotante aparte, es el mismo header extendiéndose. Pensado para
@@ -54,6 +62,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   hideSearchTrigger: false,
   mobileEnabled: false,
   mobileBackSlotContent: null,
+  suppressAutoHide: false,
   extraContent: null,
   extraActive: false,
   setTransform: (content, active, options = {}) =>
@@ -63,6 +72,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
       hideSearchTrigger: options.hideSearchTrigger ?? false,
       mobileEnabled: options.mobileEnabled ?? false,
       mobileBackSlotContent: options.mobileBackSlotContent ?? null,
+      suppressAutoHide: options.suppressAutoHide ?? false,
       extraContent: options.extraContent ?? null,
       extraActive: options.extraActive ?? false,
     }),

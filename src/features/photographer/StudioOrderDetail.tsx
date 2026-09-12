@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
 import { downloadFile, buildDeliveredFilename, uploadFileWithProgress } from '../../lib/download'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
-import { getOrderStatusStyle, getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
+import { getOrderStatusStyle, getPhotographerStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { StatusPill } from '../../ui/shared/StatusPill'
@@ -26,10 +26,6 @@ import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { cn } from '../../lib/cn'
 
-/** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
- * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
- * la sección E del documento de precios. `cortesias_ampliadas` (extra
- * nativo de Pro) suma +1 al tope combinado de cualquier franja. */
 /** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
  * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
  * la sección E del documento de precios. `cortesias_ampliadas` (extra
@@ -341,7 +337,7 @@ function OrderPhotosSection({ order, photographerId, expanded, photographerLabel
   const scrolledPast = useScrolledPast(140)
   const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
   const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const statusStyleForHeader = getEffectiveStatusStyle(order.effectiveStatus)
+  const statusStyleForHeader = getPhotographerStatusStyle(order.effectiveStatus)
 
   useEffect(() => {
     function onScroll() {
@@ -364,17 +360,24 @@ function OrderPhotosSection({ order, photographerId, expanded, photographerLabel
   }, [order.orderId, viewMode])
 
   useHeaderTransform(
-    <div className="flex w-full min-w-0 items-center gap-3">
-      <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
-      <p className="min-w-0 flex-1 truncate text-base font-bold">
+    // En móvil, estado+código van en su propia fila y el punto activo en
+    // una fila debajo (con el texto tan chico, todo en una sola línea no
+    // se alcanzaba a leer). En escritorio se queda como una sola línea.
+    <div className="flex w-full min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex items-center gap-2 sm:contents">
+        <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
+        <span className="truncate text-xs text-muted-foreground sm:hidden">{formatOrderCode(order.orderNumber)}</span>
+      </div>
+      <p className="hidden min-w-0 flex-1 truncate text-base font-bold sm:block">
         {formatOrderCode(order.orderNumber)}
         {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
       </p>
+      {activePointLabel && <p className="truncate text-sm font-semibold sm:hidden">📍 {activePointLabel}</p>}
     </div>,
     scrolledPast,
     // `mobileEnabled` — sin esto, en móvil el header nunca se transformaba
     // Y encima se seguía ocultando solo al hacer scroll.
-    { mobileEnabled: true },
+    { mobileEnabled: true, suppressAutoHide: true },
   )
 
   const purchased = order.items.filter((i) => !i.is_courtesy)
@@ -824,7 +827,7 @@ export function StudioOrderDetail() {
   const stepIndex = TOP_STEP_INDEX[order.status]
   const action = NEXT_ACTION[order.status]
   const canCancel = order.status === 'pendiente_pago' || order.status === 'en_preparacion'
-  const statusStyle = getEffectiveStatusStyle(order.effectiveStatus)
+  const statusStyle = getPhotographerStatusStyle(order.effectiveStatus)
   const unitPrice = order.items[0]?.price ?? 0
   const sameUnitPrice = order.items.every((i) => i.price === unitPrice)
 
@@ -900,7 +903,9 @@ export function StudioOrderDetail() {
       <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
         {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
       </span>
-      {order.paymentMethod === 'transferencia' && (
+      {/* Solo si el biker YA subió algo — antes se veía siempre, aunque el
+          estado fuera "Subir Comprobante" (nada que ver todavía). */}
+      {order.paymentMethod === 'transferencia' && order.hasPaymentProof && (
         <Button variant="secondary" size="sm" onClick={viewPaymentProof}>
           Ver comprobante
         </Button>

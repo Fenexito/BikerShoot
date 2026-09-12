@@ -281,12 +281,20 @@ export function HistoryOrderDetail() {
 
   useHeaderTransform(
     order && overallStyle ? (
-      <div className="flex w-full min-w-0 items-center gap-3">
-        <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
-        <p className="min-w-0 flex-1 truncate text-base font-bold">
+      // En móvil, estado+código van en su propia fila y el nombre del
+      // fotógrafo activo en una fila debajo — con el texto tan chico, todo
+      // en una sola línea se perdía y no se alcanzaba a leer a quién se
+      // estaba viendo. En escritorio (`sm:`) se queda como una sola línea.
+      <div className="flex w-full min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex items-center gap-2 sm:contents">
+          <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
+          <span className="truncate text-xs text-muted-foreground sm:hidden">{formatOrderCode(order.order_number)}</span>
+        </div>
+        <p className="hidden min-w-0 flex-1 truncate text-base font-bold sm:block">
           {formatOrderCode(order.order_number)}
           {activePhotographerName && <span className="ml-2 text-sm font-normal text-muted-foreground">· {activePhotographerName}</span>}
         </p>
+        {activePhotographerName && <p className="truncate text-sm font-semibold sm:hidden">{activePhotographerName}</p>}
       </div>
     ) : null,
     scrolledPast,
@@ -294,7 +302,7 @@ export function HistoryOrderDetail() {
     // del auto-ocultado que trae consigo) solo aplicaba en escritorio; en
     // móvil nunca se activaba y además el header se seguía ocultando solo
     // al hacer scroll, aunque este ya mostrara el # de pedido y el estado.
-    { mobileEnabled: true },
+    { mobileEnabled: true, suppressAutoHide: true },
   )
 
   // Un solo visor para TODO el pedido — las flechas navegan entre todas
@@ -361,6 +369,50 @@ export function HistoryOrderDetail() {
       <div className="flex flex-col gap-6">
         {photographerGroups.map((group) => {
           const groupStyle = getEffectiveStatusStyle(group.effectiveStatus)
+          // Mismo patrón que el pedido visto por el fotógrafo: en
+          // escritorio, pago+comprobante+whatsapp viven junto al status a
+          // la derecha (una sola fila); en móvil no caben ahí, así que
+          // bajan a su propia fila debajo del nombre.
+          const paymentActions = (
+            <>
+              <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
+                {order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{group.totalToPay}
+              </span>
+              {/* Botón de comprobante propio de ESTE fotógrafo — un
+                  pedido con varios fotógrafos necesita uno por cada uno,
+                  no un solo botón genérico para todo el pedido. */}
+              {order.payment_method === 'transferencia' && (
+                <ProofButton
+                  orderId={order.id}
+                  photographerId={group.photographerId}
+                  photographerName={group.photographerName}
+                  bikerName={profile?.display_name ?? 'Biker'}
+                  amount={group.totalToPay}
+                  hasProof={proofPhotographerIds.has(group.photographerId)}
+                />
+              )}
+              {group.photographerPhone && (
+                <a
+                  href={buildWhatsAppLink(
+                    group.photographerPhone,
+                    `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+                  title="Escribir por WhatsApp"
+                  aria-label="Escribir por WhatsApp"
+                >
+                  <IconWhatsapp className="h-4 w-4" />
+                </a>
+              )}
+              {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
+                  bajar todas de un tirón en vez de una por una. */}
+              {group.effectiveStatus === 'entregado' && (
+                <DownloadAllButton items={group.items} photographerLabel={group.photographerName} orderNumber={order.order_number} />
+              )}
+            </>
+          )
           return (
             <div
               key={group.photographerId}
@@ -377,47 +429,13 @@ export function HistoryOrderDetail() {
                     <p className="truncate text-xs text-muted-foreground sm:text-sm">{formatOrderCode(order.order_number)} · {eventLabelFor(group.items)}</p>
                   </div>
                 </div>
-                <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="shrink-0 text-sm font-bold" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="hidden items-center gap-2 lg:flex">{paymentActions}</div>
+                  <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="shrink-0 text-sm font-bold" />
+                </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
-                  {order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{group.totalToPay}
-                </span>
-                {/* Botón de comprobante propio de ESTE fotógrafo — un
-                    pedido con varios fotógrafos necesita uno por cada
-                    uno, no un solo botón genérico para todo el pedido. */}
-                {order.payment_method === 'transferencia' && (
-                  <ProofButton
-                    orderId={order.id}
-                    photographerId={group.photographerId}
-                    photographerName={group.photographerName}
-                    bikerName={profile?.display_name ?? 'Biker'}
-                    amount={group.totalToPay}
-                    hasProof={proofPhotographerIds.has(group.photographerId)}
-                  />
-                )}
-                {group.photographerPhone && (
-                  <a
-                    href={buildWhatsAppLink(
-                      group.photographerPhone,
-                      `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-                    title="Escribir por WhatsApp"
-                    aria-label="Escribir por WhatsApp"
-                  >
-                    <IconWhatsapp className="h-4 w-4" />
-                  </a>
-                )}
-                {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
-                    bajar todas de un tirón en vez de una por una. */}
-                {group.effectiveStatus === 'entregado' && (
-                  <DownloadAllButton items={group.items} photographerLabel={group.photographerName} orderNumber={order.order_number} />
-                )}
-              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">{paymentActions}</div>
 
               {group.effectiveStatus !== 'cancelado' && (
                 <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-2 mt-6" />

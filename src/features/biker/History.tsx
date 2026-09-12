@@ -58,28 +58,28 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
       )}
       style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
     >
-      {/* Miniaturas — la altura se estira para llenar exactamente lo que
-          ocupe el texto de la derecha (sin espacio vacío arriba/abajo),
-          tope de `max-h-24` para que una fila con muchos fotógrafos
-          listados no infle las miniaturas de más. Visibles también en
-          móvil (antes se ocultaban ahí). */}
-      <div className="flex shrink-0 -space-x-4">
+      {/* Miniaturas — ANCHO fijo (nunca crece, así nunca empuja el texto),
+          alto estirado para llenar lo que ocupe el texto de la derecha
+          (tope `max-h-24` para que un pedido con varios fotógrafos
+          listados, y por lo tanto muy alto, no infle las miniaturas de
+          más). Visibles también en móvil (antes se ocultaban ahí). */}
+      <div className="flex shrink-0 -space-x-3">
         {previewItems.map((item) => (
           <img
             key={item.id}
             src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
             alt=""
-            className="aspect-square h-full max-h-24 rounded-xl border-2 border-card object-cover"
+            className="h-full w-12 max-h-24 shrink-0 rounded-xl border-2 border-card object-cover sm:w-16"
           />
         ))}
         {extraCount > 0 && (
-          <span className="flex aspect-square h-full max-h-24 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
+          <span className="flex h-full w-12 max-h-24 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground sm:w-16">
             +{extraCount}
           </span>
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center">
+      <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
         <div className="mb-0.5 flex flex-wrap items-center gap-2">
           <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
           <span className="text-xs text-muted-foreground">{formatOrderCode(order.order_number)}</span>

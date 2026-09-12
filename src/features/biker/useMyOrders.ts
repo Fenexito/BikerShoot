@@ -30,7 +30,12 @@ export interface MyOrderItem {
   status: OrderItemStatus
   photo: MyOrderItemPhoto | null
   event: { title: string } | null
-  photographer: { display_name: string; phone: string | null } | null
+  // El WhatsApp del FOTÓGRAFO vive en `photographer_details.whatsapp`, un
+  // campo separado de `profiles.phone` (ese es el teléfono del BIKER) —
+  // usar `phone` acá por error dejaba el botón de WhatsApp sin número casi
+  // siempre, ya que casi ningún fotógrafo llena ese campo (llenan el suyo
+  // propio, `whatsapp`, en su perfil de Studio).
+  photographer: { display_name: string; photographer_details: { whatsapp: string | null } | { whatsapp: string | null }[] | null } | null
 }
 
 export interface MyOrder {
@@ -84,10 +89,13 @@ export function groupOrderByPhotographer(order: MyOrder): MyOrderPhotographerGro
     list.push(item)
     byPhotographer.set(item.photographer_id, list)
   }
-  return Array.from(byPhotographer.entries()).map(([photographerId, items]) => ({
+  return Array.from(byPhotographer.entries()).map(([photographerId, items]) => {
+    const details = items[0].photographer?.photographer_details
+    const photographerPhone = (Array.isArray(details) ? details[0] : details)?.whatsapp ?? null
+    return {
     photographerId,
     photographerName: items[0].photographer?.display_name ?? 'Fotógrafo',
-    photographerPhone: items[0].photographer?.phone ?? null,
+    photographerPhone,
     items,
     subtotal: items.reduce((s, i) => s + i.price, 0),
     serviceFeeTotal: items.reduce((s, i) => s + i.service_fee, 0),
@@ -97,7 +105,8 @@ export function groupOrderByPhotographer(order: MyOrder): MyOrderPhotographerGro
       paymentMethod: order.payment_method,
       hasProof: proofPhotographerIds.has(photographerId),
     }),
-  }))
+    }
+  })
 }
 
 /** Status efectivo del pedido COMPLETO — el menos avanzado de todos sus
@@ -144,7 +153,7 @@ export function useMyOrders(bikerId: string | undefined) {
       const { data, error } = await supabase
         .from('orders')
         .select(
-          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name, phone)), order_payment_proofs(photographer_id)',
+          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name, photographer_details(whatsapp))), order_payment_proofs(photographer_id)',
         )
         .eq('biker_id', bikerId)
         .order('created_at', { ascending: false })

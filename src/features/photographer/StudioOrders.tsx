@@ -3,9 +3,6 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerOrders, type PhotographerOrderGroup } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
-import { supabase } from '../../lib/supabase'
-import { queryClient } from '../../lib/queryClient'
-import { useToastStore } from '../../ui/overlays/toastStore'
 import { getPhotographerStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
@@ -51,19 +48,10 @@ function orderMatchesQuery(o: PhotographerOrderGroup, q: string) {
   return qDigits.length > 0 && orderDigits.includes(qDigits)
 }
 
-export function OrderRow({
-  order,
-  profileName,
-  canSelect,
-  selected,
-  onToggleSelect,
-}: {
-  order: PhotographerOrderGroup
-  profileName?: string
-  canSelect: boolean
-  selected: boolean
-  onToggleSelect: () => void
-}) {
+/** Misma estructura EXACTA que la fila de "Mis compras" del biker (mismas
+ * clases, mismo orden de etiquetas y tamaños) — solo cambia qué nombre se
+ * muestra (acá el del comprador, no el del fotógrafo). */
+export function OrderRow({ order, profileName }: { order: PhotographerOrderGroup; profileName?: string }) {
   const urgent = urgencyClass(order)
   // Colores desde el punto de vista del fotógrafo — "Subir Comprobante" no
   // es su responsabilidad (no se resalta, azul informativo); "Confirmar
@@ -78,79 +66,64 @@ export function OrderRow({
   // sin tener que abrir cada pedido uno por uno.
   const showProgress = order.status === 'en_preparacion' && activeItems.length > 0
   // Mismo estilo que "Mis compras" del biker: hasta 3 miniaturas de
-  // referencia (fotos DEL PEDIDO, no del comprador) + "+N" si hay más.
+  // referencia (fotos DEL PEDIDO) + "+N" si hay más.
   const previewItems = order.items.slice(0, 3)
   const extraCount = order.items.length - previewItems.length
 
   return (
-    <div
+    <Link
+      to={`/studio/pedidos/${order.orderId}`}
       className={cn(
-        'flex items-stretch gap-x-4 gap-y-2 rounded-3xl border-l-4 border-y border-r border-border bg-card p-3 transition-all hover:shadow-sm sm:p-3.5',
+        'flex items-stretch gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-all hover:shadow-sm sm:gap-4 sm:p-3.5',
         borderColor,
       )}
     >
-      {canSelect && (
-        <button
-          onClick={onToggleSelect}
-          aria-label="Seleccionar pedido"
-          className={cn(
-            'flex h-6 w-6 shrink-0 items-center justify-center self-center rounded-full border-2 text-xs font-bold transition-colors',
-            selected ? 'border-foreground bg-foreground text-background' : 'border-border text-transparent hover:border-foreground/40',
-          )}
-        >
-          ✓
-        </button>
-      )}
-      <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 items-stretch gap-3 sm:gap-4">
-        {/* Miniaturas — la altura se estira para llenar lo que ocupe el
-            texto de la derecha, tope de `max-h-24`. */}
-        <div className="flex shrink-0 -space-x-4">
-          {previewItems.map((item) => (
-            <img
-              key={item.id}
-              src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
-              alt=""
-              className="aspect-square h-full max-h-24 rounded-xl border-2 border-card object-cover"
-            />
-          ))}
-          {extraCount > 0 && (
-            <span className="flex aspect-square h-full max-h-24 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
-              +{extraCount}
-            </span>
-          )}
-        </div>
+      {/* Miniaturas — ANCHO fijo (nunca crece, así nunca empuja el texto),
+          alto estirado para llenar lo que ocupe el texto de la derecha
+          (tope `max-h-24`). Mismas clases que "Mis compras" del biker. */}
+      <div className="flex shrink-0 -space-x-3">
+        {previewItems.map((item) => (
+          <img
+            key={item.id}
+            src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
+            alt=""
+            className="h-full w-12 max-h-24 shrink-0 rounded-xl border-2 border-card object-cover sm:w-16"
+          />
+        ))}
+        {extraCount > 0 && (
+          <span className="flex h-full w-12 max-h-24 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground sm:w-16">
+            +{extraCount}
+          </span>
+        )}
+      </div>
 
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold">{order.bikerName}</p>
-                <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
-              </div>
-              {/* El nombre del evento se oculta en móvil — ahí solo se
-                  conserva lo esencial (comprador, foto, estado, # de
-                  pedido, cantidad de fotos, fecha y total); en escritorio
-                  hay espacio de sobra para mostrarlo también. */}
-              <p className="truncate text-sm text-muted-foreground">
-                {formatOrderCode(order.orderNumber, profileName)} · <span className="hidden sm:inline">{order.eventTitle} · </span>{order.items.length} fotos
-              </p>
-              <p className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
-                {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </p>
-            </div>
-            <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
-          </div>
-          {showProgress && (
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
-              </div>
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length} entregadas</span>
-            </div>
-          )}
+      <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+        <div className="mb-0.5 flex flex-wrap items-center gap-2">
+          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+          <span className="text-xs text-muted-foreground">{formatOrderCode(order.orderNumber, profileName)}</span>
         </div>
-      </Link>
-    </div>
+        <p className="truncate font-bold">{order.bikerName}</p>
+        {/* El nombre del evento se oculta en móvil — ahí solo se conserva
+            lo esencial; en escritorio hay espacio de sobra para mostrarlo
+            también. */}
+        <p className="truncate text-sm text-muted-foreground">
+          <span className="hidden sm:inline">{order.eventTitle} · </span>{order.items.length} fotos
+        </p>
+        <p className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
+          {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+        </p>
+        {showProgress && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
+            </div>
+            <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length}</span>
+          </div>
+        )}
+      </div>
+
+      <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+    </Link>
   )
 }
 
@@ -163,15 +136,10 @@ interface OrderCategory {
 }
 
 /** Una categoría de pedidos (urgentes, o un estado) — colapsable, ordenada
- * por número de pedido, con paginación propia: primero 10, "ver más" trae
- * 15 a la vez. Se oculta sola si no tiene ningún pedido (ej. sin
- * cancelados, sin resultados de búsqueda en ese estado). */
-function CategorySection({ category, profileName, selectedIds, onToggleSelect }: {
-  category: OrderCategory
-  profileName?: string
-  selectedIds: Set<string>
-  onToggleSelect: (id: string) => void
-}) {
+ * por fecha, con paginación propia: primero 10, "ver más" trae 15 a la
+ * vez. Se oculta sola si no tiene ningún pedido (ej. sin cancelados, sin
+ * resultados de búsqueda en ese estado). */
+function CategorySection({ category, profileName }: { category: OrderCategory; profileName?: string }) {
   const [open, setOpen] = useState(category.defaultOpen)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE_FIRST)
 
@@ -193,13 +161,7 @@ function CategorySection({ category, profileName, selectedIds, onToggleSelect }:
         <div className="flex flex-col gap-3">
           {visible.map((order, i) => (
             <div key={order.orderId} className="animate-row-in" style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}>
-              <OrderRow
-                order={order}
-                profileName={profileName}
-                canSelect={order.status === 'pendiente_pago'}
-                selected={selectedIds.has(order.orderId)}
-                onToggleSelect={() => onToggleSelect(order.orderId)}
-              />
+              <OrderRow order={order} profileName={profileName} />
             </div>
           ))}
           {remaining > 0 && (
@@ -221,10 +183,7 @@ export function StudioOrders() {
   const { data: details } = usePhotographerDetails(user?.id)
   const orderCodeName = details?.order_nickname ?? profile?.display_name
   const { data: orders = [], isLoading } = usePhotographerOrders(user?.id)
-  const push = useToastStore((s) => s.push)
   const [query, setQuery] = useState('')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [confirming, setConfirming] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'todos' | 'entregado' | 'en_proceso' | 'urgente' | 'pendiente_pago' | 'en_preparacion' | 'cancelado'>('todos')
 
   // Ya no se filtra por un solo estado a la vez — todos los pedidos se ven
@@ -265,34 +224,6 @@ export function StudioOrders() {
     const urgent = orders.filter((o) => urgencyClass(o) !== null).length
     return { collected, pending, urgent }
   }, [orders])
-
-  function toggleSelect(orderId: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(orderId)) next.delete(orderId)
-      else next.add(orderId)
-      return next
-    })
-  }
-
-  async function bulkConfirmPayment() {
-    if (!user) return
-    setConfirming(true)
-    const ids = Array.from(selectedIds)
-    const { error } = await supabase
-      .from('order_items')
-      .update({ status: 'en_preparacion' })
-      .in('order_id', ids)
-      .eq('photographer_id', user.id)
-    setConfirming(false)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo confirmar', description: error.message })
-      return
-    }
-    push({ type: 'success', title: `${ids.length} pedido${ids.length > 1 ? 's' : ''} confirmado${ids.length > 1 ? 's' : ''}` })
-    setSelectedIds(new Set())
-    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
-  }
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
@@ -347,27 +278,9 @@ export function StudioOrders() {
 
       <div className="mt-6 flex flex-col gap-8 pb-20">
         {visibleCategories.map((category) => (
-          <CategorySection key={category.key} category={category} profileName={orderCodeName} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
+          <CategorySection key={category.key} category={category} profileName={orderCodeName} />
         ))}
       </div>
-
-      {selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 md:bottom-6">
-          <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-border bg-background px-5 py-3 shadow-lg">
-            <span className="text-sm font-semibold">{selectedIds.size} seleccionado{selectedIds.size > 1 ? 's' : ''}</span>
-            <button
-              onClick={bulkConfirmPayment}
-              disabled={confirming}
-              className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {confirming ? 'Confirmando…' : 'Confirmar pago recibido'}
-            </button>
-            <button onClick={() => setSelectedIds(new Set())} aria-label="Cancelar selección" className="ml-1 text-muted-foreground hover:text-foreground">
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

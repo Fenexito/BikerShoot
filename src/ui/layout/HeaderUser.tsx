@@ -66,6 +66,7 @@ export function HeaderUser() {
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
   const mobileBackSlotContent = useHeaderTransformStore((s) => s.mobileBackSlotContent)
+  const suppressAutoHide = useHeaderTransformStore((s) => s.suppressAutoHide)
   const extraContent = useHeaderTransformStore((s) => s.extraContent)
   const extraActive = useHeaderTransformStore((s) => s.extraActive)
   const transformed = transformActive && transformContent != null
@@ -81,8 +82,10 @@ export function HeaderUser() {
   // El auto-ocultado (bajar = esconder, subir = mostrar) aplica siempre,
   // también en páginas con `mobileEnabled` como Buscar fotos — el biker
   // quiere seguir viendo fotos sin el header/menú estorbando mientras
-  // sigue bajando, y recuperarlos apenas sube un poco.
-  const hidden = autoHidden
+  // sigue bajando, y recuperarlos apenas sube un poco. `suppressAutoHide`
+  // es la excepción: páginas de puro texto (ej. el detalle de un pedido)
+  // no quieren que el header desaparezca nunca mientras se hace scroll.
+  const hidden = suppressAutoHide ? false : autoHidden
 
   return (
     <>
@@ -309,7 +312,7 @@ export function HeaderUser() {
         ]}
         primary={{ to: '/app/buscar', label: 'Buscar', icon: <IconSearch className="h-full w-full" /> }}
         activeClassName="text-primary"
-        autoHide={mobileEnabled}
+        autoHide={mobileEnabled && !suppressAutoHide}
       />
     </>
   )

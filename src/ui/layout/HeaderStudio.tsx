@@ -42,7 +42,7 @@ export function HeaderStudio() {
 
   const avatarUrl = profile?.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : r2Url(profile.avatar_url)) : null
   const profileIncomplete = !!details && (!details.bio || !details.city || !details.whatsapp)
-  const hidden = useAutoHideHeader()
+  const autoHidden = useAutoHideHeader()
 
   // El header se "transforma": si la página actual registró contenido y
   // señaló que ya toca mostrarlo (ver useHeaderTransform — cada página decide
@@ -50,11 +50,15 @@ export function HeaderStudio() {
   // que hay a la derecha del botón atrás (logo, nav, notificaciones, perfil)
   // cede su lugar a las herramientas propias de esa página, con un
   // crossfade — el header nunca cambia de tamaño ni posición, solo lo que
-  // hay adentro. Solo aplica en escritorio (ver clases `hidden md:flex` más
-  // abajo en la capa transformada) — en móvil este mecanismo no existe.
+  // hay adentro. Por defecto solo aplica en escritorio — una página puede
+  // pedir `mobileEnabled` (ver headerTransformStore) para que también
+  // aplique en móvil, igual que en HeaderUser.
   const transformContent = useHeaderTransformStore((s) => s.content)
   const transformActive = useHeaderTransformStore((s) => s.active)
+  const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
+  const suppressAutoHide = useHeaderTransformStore((s) => s.suppressAutoHide)
   const transformed = transformActive && transformContent != null
+  const hidden = suppressAutoHide ? false : autoHidden
 
   return (
     <>
@@ -90,7 +94,10 @@ export function HeaderStudio() {
                 // desplazamiento del 100% se salía de esa forma y se veía
                 // como desbordamiento. La opacidad hace la mayor parte del
                 // trabajo de "ocultar", el desplazamiento es solo un toque.
-                transformed && 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0',
+                // Sin `mobileEnabled`, esto solo pasa desde `md:` — con
+                // `mobileEnabled` (ej. el detalle de un pedido) también en
+                // móvil, igual que en HeaderUser.
+                transformed && (mobileEnabled ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0'),
               )}
             >
               <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">
@@ -160,26 +167,33 @@ export function HeaderStudio() {
               </div>
             </div>
 
-            {/* Capa transformada: solo existe en el DOM a partir de md — en
-                móvil `hidden` la saca del todo, sin importar `transformed`.
-                La búsqueda global se queda disponible aquí también (a la
-                derecha, con forma de cuadro de búsqueda en vez de solo el
-                ícono) — así nunca desaparece, sin importar qué página esté
-                mostrando el header en ese momento. */}
+            {/* Capa transformada: por defecto solo existe en el DOM a partir
+                de md — en móvil `hidden` la saca del todo, salvo que la
+                página pida `mobileEnabled`, en cuyo caso está disponible
+                siempre (igual que en HeaderUser). La búsqueda global se
+                queda disponible aquí también (a la derecha, con forma de
+                cuadro de búsqueda) — así nunca desaparece, sin importar qué
+                página esté mostrando el header en ese momento. */}
             <div
               className={cn(
-                'absolute inset-0 hidden items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex',
+                'absolute inset-0 items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                mobileEnabled ? 'flex' : 'hidden md:flex',
                 transformed ? 'delay-100 translate-y-0 opacity-100' : 'pointer-events-none translate-y-2.5 opacity-0',
               )}
             >
-              <div className="min-w-0 flex-1">{transformContent}</div>
+              <div className="min-w-0 flex-1 overflow-hidden">{transformContent}</div>
               {/* Ancho fijo a propósito — igual al espacio que ocupan
                   buscar+notificaciones+perfil juntos en el estado normal
                   (40px+8px+40px+8px+40px = 176px), así el cambio se siente
-                  contenido en vez de brusco. */}
+                  contenido en vez de brusco. En móvil con `mobileEnabled` no
+                  cabe junto al contenido de la página (que ya necesita todo
+                  el ancho angosto disponible), así que se oculta ahí. */}
               <button
                 onClick={() => setSearchOpen(true)}
-                className="flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border"
+                className={cn(
+                  'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
+                  mobileEnabled && 'hidden sm:flex',
+                )}
               >
                 <IconSearch className="h-5 w-5 shrink-0" />
                 <span className="truncate">Buscar…</span>
@@ -200,6 +214,7 @@ export function HeaderStudio() {
         ]}
         primary={{ to: '/studio/eventos/new', label: 'Crear', icon: <IconPlus className="h-full w-full" /> }}
         activeClassName="text-accent"
+        autoHide={mobileEnabled && !suppressAutoHide}
       />
     </>
   )

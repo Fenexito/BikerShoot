@@ -82,13 +82,7 @@ export function StudioHome() {
           <div className="flex flex-col gap-3">
             {needsAttention.map((order, i) => (
               <div key={order.orderId} className="animate-row-in" style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}>
-                <OrderRow
-                  order={order}
-                  profileName={orderCodeName}
-                  canSelect={false}
-                  selected={false}
-                  onToggleSelect={() => {}}
-                />
+                <OrderRow order={order} profileName={orderCodeName} />
               </div>
             ))}
           </div>
