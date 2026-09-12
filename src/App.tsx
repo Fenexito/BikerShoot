@@ -27,6 +27,7 @@ const PhotographersList = lazy(() => import('./features/biker/PhotographersList'
 const PhotographerProfile = lazy(() => import('./features/biker/PhotographerProfile').then((m) => ({ default: m.PhotographerProfile })))
 const BikerCheckout = lazy(() => import('./features/biker/Checkout').then((m) => ({ default: m.Checkout })))
 const OrderSuccess = lazy(() => import('./features/biker/OrderSuccess').then((m) => ({ default: m.OrderSuccess })))
+const PaymentProofPage = lazy(() => import('./features/biker/PaymentProofPage').then((m) => ({ default: m.PaymentProofPage })))
 const BikerFavorites = lazy(() => import('./features/biker/Favorites').then((m) => ({ default: m.Favorites })))
 const BikerHistory = lazy(() => import('./features/biker/History').then((m) => ({ default: m.History })))
 const BikerHistoryOrderDetail = lazy(() => import('./features/biker/HistoryOrderDetail').then((m) => ({ default: m.HistoryOrderDetail })))
@@ -98,6 +99,7 @@ export default function App() {
           <Route path="/app/perfil" element={<RequireBiker><BikerProfilePage /></RequireBiker>} />
           <Route path="/app/checkout" element={<RequireBiker><BikerCheckout /></RequireBiker>} />
           <Route path="/app/pedido-confirmado" element={<RequireBiker><OrderSuccess /></RequireBiker>} />
+          <Route path="/app/checkout/pago/:orderId" element={<RequireBiker><PaymentProofPage /></RequireBiker>} />
 
           {/* Fotógrafo (requiere sesión de studio) */}
           <Route path="/studio/onboarding" element={<RequireStudio skipOnboardingCheck><StudioOnboarding /></RequireStudio>} />

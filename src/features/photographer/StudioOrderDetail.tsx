@@ -456,6 +456,25 @@ export function StudioOrderDetail() {
   const [note, setNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [openingProof, setOpeningProof] = useState(false)
+
+  async function viewPaymentProof() {
+    if (!order) return
+    setOpeningProof(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId: order.orderId } })
+      if (error) throw new Error(error.message)
+      if (!data?.viewUrl) {
+        push({ type: 'info', title: 'El biker todavía no sube su comprobante' })
+        return
+      }
+      window.open(data.viewUrl, '_blank', 'noreferrer')
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
+    } finally {
+      setOpeningProof(false)
+    }
+  }
 
   useEffect(() => {
     setNote(order?.note ?? '')
@@ -556,7 +575,7 @@ export function StudioOrderDetail() {
               <p className="text-xl font-bold">Q{order.total.toFixed(2)}</p>
             </div>
             {order.paymentMethod === 'transferencia' && (
-              <Button variant="secondary" size="sm" onClick={() => push({ type: 'info', title: 'Disponible en la fase de pagos' })}>
+              <Button variant="secondary" size="sm" onClick={viewPaymentProof} loading={openingProof}>
                 Ver comprobante
               </Button>
             )}

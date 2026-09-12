@@ -17,10 +17,12 @@ export interface PricingTier {
  * el fotógrafo definió) — así nunca se queda "sin tabla" sin importar
  * cuántas fotos compren.
  *
- * Sin ningún escalón definido, no hay descuento: precio de lista × cantidad. */
+ * Sin ningún escalón definido, no hay descuento: precio de lista × cantidad.
+ * Siempre redondea HACIA ARRIBA al quetzal — cobramos únicamente montos
+ * enteros, nunca centavos que nadie termina pagando de verdad. */
 export function computeVolumePrice(tiers: PricingTier[], count: number, faceValueSum: number): number {
   if (count <= 0) return 0
-  if (tiers.length === 0) return faceValueSum
+  if (tiers.length === 0) return Math.ceil(faceValueSum)
 
   const points = [{ photo_count: 0, total_price: 0 }, ...tiers].sort((a, b) => a.photo_count - b.photo_count)
 
@@ -40,10 +42,10 @@ export function computeVolumePrice(tiers: PricingTier[], count: number, faceValu
     }
   }
 
-  if (b.photo_count === a.photo_count) return a.total_price
+  if (b.photo_count === a.photo_count) return Math.ceil(a.total_price)
   const slope = (b.total_price - a.total_price) / (b.photo_count - a.photo_count)
   const total = a.total_price + (count - a.photo_count) * slope
-  return Math.max(0, Math.round(total * 100) / 100)
+  return Math.max(0, Math.ceil(total))
 }
 
 /** Escalones FIJOS de nuestra propia tarifa de servicio — a diferencia de
@@ -68,8 +70,9 @@ const SERVICE_FEE_TIERS: PricingTier[] = [
 const SERVICE_FEE_CAP = 10
 
 /** Tarifa de servicio total para `count` fotos de UN MISMO fotógrafo
- * dentro de un pedido — interpola entre los escalones definidos arriba y
- * se queda plana en el tope (Q10) más allá del último. */
+ * dentro de un pedido — interpola entre los escalones definidos arriba,
+ * se queda plana en el tope (Q10) más allá del último, y redondea hacia
+ * arriba al quetzal (mismo criterio que `computeVolumePrice`). */
 export function computeServiceFee(count: number): number {
   if (count <= 0) return 0
   const points = [{ photo_count: 0, total_price: 0 }, ...SERVICE_FEE_TIERS]
@@ -82,22 +85,43 @@ export function computeServiceFee(count: number): number {
       break
     }
   }
-  if (b.photo_count === a.photo_count) return a.total_price
+  if (b.photo_count === a.photo_count) return Math.min(SERVICE_FEE_CAP, Math.ceil(a.total_price))
   const slope = (b.total_price - a.total_price) / (b.photo_count - a.photo_count)
   const total = a.total_price + (count - a.photo_count) * slope
-  return Math.min(SERVICE_FEE_CAP, Math.max(0, Math.round(total * 100) / 100))
+  return Math.min(SERVICE_FEE_CAP, Math.max(0, Math.ceil(total)))
 }
 
-/** Reparte una tarifa de grupo (ver `computeServiceFee`) entre los
- * `count` order_items individuales de ese fotógrafo en el pedido — cada
- * fila necesita su propio valor para el saldo pendiente por liquidar, y
- * la suma debe cuadrar exacto con el total del grupo (el resto de
- * redondeo se lo lleva el último ítem). */
+/** Reparte un monto YA ENTERO entre varios ítems, en proporción a
+ * `weights` (ej. el precio de lista de cada foto, o 1 por foto si se
+ * quiere parejo) — método de "mayor resto": cada quien se lleva el
+ * entero hacia abajo de su parte proporcional, y el resto (siempre un
+ * número entero de quetzales, nunca centavos) se reparte de a uno,
+ * empezando por quien perdió más en el redondeo hacia abajo. La suma de
+ * lo repartido siempre cuadra exacto con `total`. */
+export function distributeAmount(total: number, weights: number[]): number[] {
+  const n = weights.length
+  if (n === 0) return []
+  const sumWeights = weights.reduce((s, w) => s + w, 0)
+  if (sumWeights <= 0) {
+    // Sin pesos reales (ej. precios en 0, como una cortesía) — reparte
+    // parejo entre todos.
+    return distributeAmount(total, weights.map(() => 1))
+  }
+  const raw = weights.map((w) => (total * w) / sumWeights)
+  const floors = raw.map((r) => Math.floor(r))
+  const distributed = floors.reduce((s, f) => s + f, 0)
+  const remainder = Math.round(total - distributed)
+  const order = raw
+    .map((r, i) => ({ i, frac: r - Math.floor(r) }))
+    .sort((x, y) => y.frac - x.frac)
+  const result = [...floors]
+  for (let k = 0; k < remainder; k++) result[order[k % n].i] += 1
+  return result
+}
+
+/** Reparte la tarifa de servicio de un grupo (ya entera, ver
+ * `computeServiceFee`) parejo entre sus `count` order_items — cada fila
+ * necesita su propio valor para el saldo pendiente por liquidar. */
 export function distributeServiceFee(groupTotal: number, count: number): number[] {
-  if (count <= 0) return []
-  const base = Math.floor((groupTotal / count) * 100) / 100
-  const fees = Array(count).fill(base)
-  const remainder = Math.round((groupTotal - base * count) * 100) / 100
-  fees[count - 1] = Math.round((fees[count - 1] + remainder) * 100) / 100
-  return fees
+  return distributeAmount(groupTotal, Array(count).fill(1))
 }

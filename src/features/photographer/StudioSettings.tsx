@@ -744,6 +744,16 @@ export function StudioSettings() {
                 <EditableRow label="Nickname" value={details?.order_nickname ?? ''} onSave={(v) => saveDetailsField('order_nickname', v)} placeholder={profile?.display_name ?? 'Ej. Mendz'} />
               </Section>
 
+              <Section
+                title="Datos bancarios"
+                description="El biker los ve al pagar por transferencia — asegúrate de que estén completos antes de recibir pedidos."
+              >
+                <EditableRow label="Banco" value={details?.bank_name ?? ''} onSave={(v) => saveDetailsField('bank_name', v)} placeholder="Ej. Banco Industrial" />
+                <EditableRow label="Nombre del titular" value={details?.bank_account_holder ?? ''} onSave={(v) => saveDetailsField('bank_account_holder', v)} placeholder={profile?.display_name ?? ''} />
+                <EditableRow label="Número de cuenta" value={details?.bank_account_number ?? ''} onSave={(v) => saveDetailsField('bank_account_number', v)} placeholder="Ej. 123-456789-0" />
+                <EditableRow label="Tipo de cuenta" value={details?.bank_account_type ?? ''} onSave={(v) => saveDetailsField('bank_account_type', v)} placeholder="Monetaria o Ahorro" />
+              </Section>
+
               <Section title="Datos personales">
                 <EditableRow label="Correo" value={user?.email ?? ''} type="email" onSave={saveEmail} description="Te enviaremos un enlace de confirmación al nuevo correo." />
 

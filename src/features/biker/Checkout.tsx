@@ -1,35 +1,42 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { useCartStore, type CartItem } from '../cart/cartStore'
+import { useCartStore } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
+import { useCartPricing } from './useCartPricing'
+import { distributeServiceFee } from './photographerPricing'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
-import { computeVolumePrice, computeServiceFee, distributeServiceFee, type PricingTier } from './photographerPricing'
 import { Button } from '../../ui/flat/Button'
 import { Card } from '../../ui/flat/Card'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { IconInfo } from '../../ui/shared/icons'
+import { confirmDialog } from '../../ui/overlays/confirmStore'
+import { IconInfo, IconTrash } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 
-function usePhotographerPricingTiers(photographerIds: string[]) {
-  const key = photographerIds.slice().sort().join(',')
-  return useQuery({
-    queryKey: ['photographer-pricing-tiers', key],
-    queryFn: async (): Promise<Record<string, PricingTier[]>> => {
-      const { data, error } = await supabase
-        .from('photographer_pricing_tiers')
-        .select('photographer_id, photo_count, total_price')
-        .in('photographer_id', photographerIds)
-      if (error) throw error
-      const map: Record<string, PricingTier[]> = {}
-      for (const row of data ?? []) {
-        ;(map[row.photographer_id] ??= []).push({ photo_count: row.photo_count, total_price: row.total_price })
-      }
-      return map
-    },
-    enabled: photographerIds.length > 0,
-  })
+/** Ícono de información SOLO — el hover/foco vive en este botón puntual,
+ * nunca en toda la fila que lo contiene (antes bastaba pasar el cursor
+ * por "Tarifa de servicio" entero para que apareciera el tooltip). */
+function InfoTooltip({ text, align = 'left' }: { text: string; align?: 'left' | 'right' }) {
+  return (
+    <span className="group/info relative inline-flex">
+      <button
+        type="button"
+        tabIndex={0}
+        aria-label="Más información"
+        className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-border hover:text-foreground"
+      >
+        <IconInfo className="h-3 w-3" />
+      </button>
+      <span
+        className={cn(
+          'pointer-events-none absolute bottom-full mb-2 w-52 rounded-xl bg-neutral-900 p-2.5 text-[11px] font-normal normal-case leading-snug text-white opacity-0 shadow-xl transition-opacity group-hover/info:opacity-100 group-focus-within/info:opacity-100',
+          align === 'left' ? 'left-0' : 'right-0',
+        )}
+      >
+        {text}
+      </span>
+    </span>
+  )
 }
 
 export function Checkout() {
@@ -39,42 +46,20 @@ export function Checkout() {
   const { user } = useAuth()
   const push = useToastStore((s) => s.push)
   const navigate = useNavigate()
-  const [method, setMethod] = useState<'tarjeta' | 'transferencia'>('tarjeta')
+  const [method, setMethod] = useState<'tarjeta' | 'transferencia'>('transferencia')
   const [placing, setPlacing] = useState(false)
 
-  const photographerIds = useMemo(() => Array.from(new Set(items.map((i) => i.photographerId))), [items])
-  const { data: tiersByPhotographer = {} } = usePhotographerPricingTiers(photographerIds)
+  const { photographerGroups, faceTotal, discount, serviceFeeTotal, grandTotal } = useCartPricing()
 
-  const photographerGroups = useMemo(() => {
-    const map = new Map<string, { photographerName: string; items: CartItem[] }>()
-    for (const item of items) {
-      const g = map.get(item.photographerId) ?? { photographerName: item.photographerName, items: [] }
-      g.items.push(item)
-      map.set(item.photographerId, g)
-    }
-    return Array.from(map.entries()).map(([photographerId, g]) => {
-      const faceSubtotal = g.items.reduce((s, i) => s + i.price, 0)
-      const volumeTotal = computeVolumePrice(tiersByPhotographer[photographerId] ?? [], g.items.length, faceSubtotal)
-      // La tarifa de servicio se calcula POR FOTÓGRAFO (misma cantidad que
-      // decide el descuento por volumen de arriba) — nunca sobre el pedido
-      // completo, para que un carrito con varios fotógrafos no dependa de
-      // cómo se reparte entre ellos (ver computeServiceFee).
-      const serviceFee = computeServiceFee(g.items.length)
-      return {
-        photographerId,
-        photographerName: g.photographerName,
-        items: g.items,
-        faceSubtotal,
-        subtotal: volumeTotal,
-        serviceFee,
-      }
+  async function handleRemove(photoId: string, label: string) {
+    const ok = await confirmDialog.ask({
+      title: '¿Quitar esta foto del carrito?',
+      description: label,
+      confirmLabel: 'Quitar',
+      tone: 'danger',
     })
-  }, [items, tiersByPhotographer])
-
-  const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price, 0), [items])
-  const discount = useMemo(() => photographerGroups.reduce((s, g) => s + (g.faceSubtotal - g.subtotal), 0), [photographerGroups])
-  const serviceFee = useMemo(() => photographerGroups.reduce((s, g) => s + g.serviceFee, 0), [photographerGroups])
-  const total = subtotal - discount + serviceFee
+    if (ok) remove(photoId)
+  }
 
   async function placeOrder() {
     if (!user) return
@@ -82,7 +67,7 @@ export function Checkout() {
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({ biker_id: user.id, payment_method: method, total })
+      .insert({ biker_id: user.id, payment_method: method, total: grandTotal })
       .select('id')
       .single()
 
@@ -118,7 +103,11 @@ export function Checkout() {
     }
 
     clear()
-    navigate('/app/pedido-confirmado', { state: { total, count: items.length } })
+    if (method === 'transferencia') {
+      navigate(`/app/checkout/pago/${order.id}`)
+    } else {
+      navigate('/app/pedido-confirmado', { state: { total: grandTotal, count: items.length } })
+    }
   }
 
   if (items.length === 0) {
@@ -135,38 +124,48 @@ export function Checkout() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-6 pb-24 font-flat md:px-8 md:py-10 lg:pb-10">
-      <h1 className="mb-8 text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
+    <div className="mx-auto max-w-6xl px-3 py-6 pb-28 font-flat md:px-8 md:py-10 lg:pb-10">
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Tu carrito</h1>
+      {photographerGroups.length > 1 && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Incluye fotos de {photographerGroups.length} fotógrafos distintos — cada uno se paga por separado.
+        </p>
+      )}
 
-      <div className="grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid min-w-0 gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
-          {photographerGroups.length > 1 && (
-            <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              🧾 Este pedido incluye fotos de <strong>{photographerGroups.length} fotógrafos distintos</strong> — cada uno se
-              muestra por separado con su propio subtotal.
-            </div>
-          )}
+          {/* Un solo aviso, arriba de toda la lista — antes se repetía
+              idéntico en cada foto individual, ocupando mucho espacio sin
+              decir nada nuevo la segunda vez en adelante. */}
+          <p className="rounded-xl bg-muted px-3.5 py-2.5 text-xs text-muted-foreground">
+            Todas tus fotos: resolución completa, JPEG alta calidad, descarga válida para siempre.
+          </p>
+
           {photographerGroups.map((group) => (
             <div key={group.photographerId} className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2 px-1">
                 <h3 className="font-bold">{group.photographerName}</h3>
-                <span className="text-sm text-muted-foreground">{group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal.toFixed(2)}</span>
+                <span className="text-sm text-muted-foreground">
+                  {group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal}
+                </span>
               </div>
               {group.items.map((item) => (
                 <div key={item.photoId} className="flex items-center gap-3 rounded-2xl bg-muted p-3 sm:gap-4">
                   <img src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })} alt="" className="h-16 w-14 shrink-0 rounded object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{item.eventTitle}</p>
-                    <p className="mt-0.5 text-xs leading-snug text-muted-foreground">Resolución completa · JPEG alta calidad · Descarga válida por siempre</p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <p className="font-bold">Q{item.price}</p>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <div className="text-right">
+                      {item.hasDiscount && <p className="text-xs text-muted-foreground line-through">Q{item.price}</p>}
+                      <p className="font-bold">Q{item.effectivePrice}</p>
+                    </div>
                     <button
-                      onClick={() => remove(item.photoId)}
-                      className="text-xs text-muted-foreground hover:text-red-600"
-                      aria-label="Quitar"
+                      onClick={() => handleRemove(item.photoId, `${item.eventTitle} — Q${item.effectivePrice}`)}
+                      aria-label="Quitar del carrito"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
                     >
-                      Quitar
+                      <IconTrash className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -183,80 +182,79 @@ export function Checkout() {
                 {photographerGroups.map((g) => (
                   <div key={g.photographerId} className="flex justify-between text-sm">
                     <span className="truncate text-muted-foreground">{g.photographerName} ({g.items.length})</span>
-                    <span className="shrink-0">Q{g.subtotal.toFixed(2)}</span>
+                    <span className="shrink-0 font-semibold">Q{g.totalToPay}</span>
                   </div>
                 ))}
               </div>
             )}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{items.length} fotos</span>
-              <span>Q{subtotal.toFixed(2)}</span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                {items.length} fotos
+                <InfoTooltip text="Cada fotógrafo se cobra y se paga por separado — el total de arriba ya refleja el precio real de cada foto, con su descuento por volumen aplicado si tiene varias." />
+              </span>
+              <span>Q{faceTotal}</span>
             </div>
             {discount > 0 && (
               <div className="mt-1 flex justify-between text-sm text-secondary">
                 <span>Descuento por volumen</span>
-                <span>-Q{discount.toFixed(2)}</span>
+                <span>-Q{discount}</span>
               </div>
             )}
             <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="group relative flex items-center gap-1 text-muted-foreground">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
                 Tarifa de servicio
-                <span tabIndex={0} className="flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
-                  <IconInfo className="h-3 w-3" />
-                </span>
-                <span className="pointer-events-none absolute bottom-full left-0 mb-2 w-56 rounded-xl bg-neutral-900 p-3 text-xs font-normal normal-case text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                  Cubre el mantenimiento de la plataforma, la preparación y seguimiento de tu pedido, y la atención al cliente de
-                  MotoShots. No es un cobro del fotógrafo — él recibe el 100% de su precio.
-                </span>
+                <InfoTooltip text="Mantenimiento de la plataforma, preparación/seguimiento de tu pedido y atención al cliente. No es un cobro del fotógrafo — él recibe el 100% de su precio." />
               </span>
-              <span>Q{serviceFee.toFixed(2)}</span>
+              <span>Q{serviceFeeTotal}</span>
             </div>
             <div className="mt-3 flex justify-between border-t border-border pt-3 text-lg font-bold">
               <span>Total</span>
-              <span>Q{total.toFixed(2)}</span>
+              <span>Q{grandTotal}</span>
             </div>
           </Card>
 
           <Card>
             <h2 className="mb-4 font-bold">Método de pago</h2>
             <div className="flex flex-col gap-2">
-              {(['tarjeta', 'transferencia'] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMethod(m)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-sm font-medium transition-colors',
-                    method === m ? 'border-primary bg-blue-50' : 'border-transparent bg-muted',
-                  )}
-                >
-                  <span className={cn('flex h-4 w-4 items-center justify-center rounded-full border-2', method === m ? 'border-primary' : 'border-border')}>
-                    {method === m && <span className="h-2 w-2 rounded-full bg-primary" />}
-                  </span>
-                  {m === 'tarjeta' ? '💳 Tarjeta de crédito/débito' : '🏦 Transferencia bancaria'}
-                </button>
-              ))}
+              <button
+                onClick={() => setMethod('transferencia')}
+                className={cn(
+                  'flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-sm font-medium transition-colors',
+                  method === 'transferencia' ? 'border-primary bg-blue-50' : 'border-transparent bg-muted',
+                )}
+              >
+                <span className={cn('flex h-4 w-4 items-center justify-center rounded-full border-2', method === 'transferencia' ? 'border-primary' : 'border-border')}>
+                  {method === 'transferencia' && <span className="h-2 w-2 rounded-full bg-primary" />}
+                </span>
+                🏦 Transferencia bancaria
+              </button>
+              <div className="flex cursor-not-allowed items-center gap-3 rounded-2xl border-2 border-transparent bg-muted px-4 py-3 text-left text-sm font-medium opacity-50">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-border" />
+                💳 Tarjeta de crédito/débito
+                <span className="ml-auto shrink-0 rounded-full bg-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Próximamente
+                </span>
+              </div>
             </div>
-            {method === 'transferencia' && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Después de confirmar, subes tu comprobante y el fotógrafo verifica el pago. (Disponible en la próxima fase)
-              </p>
-            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Después de confirmar, verás los datos bancarios de cada fotógrafo para transferir y subir tu comprobante.
+            </p>
           </Card>
 
           <Button size="lg" loading={placing} onClick={placeOrder}>
-            Confirmar y pagar Q{total.toFixed(2)}
+            Confirmar pedido — Q{grandTotal}
           </Button>
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 lg:hidden">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{items.length} fotos</p>
-            <p className="text-lg font-bold">Q{total.toFixed(2)}</p>
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-xs text-muted-foreground">{items.length} fotos</p>
+            <p className="text-lg font-bold">Q{grandTotal}</p>
           </div>
-          <Button loading={placing} onClick={placeOrder}>
-            Confirmar y pagar
+          <Button loading={placing} onClick={placeOrder} className="shrink-0">
+            Confirmar pedido
           </Button>
         </div>
       </div>

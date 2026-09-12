@@ -44,6 +44,10 @@ export interface PhotographerDetails {
   pending_plan_id: string | null
   storage_addon_ids: string[]
   feature_addon_ids: string[]
+  bank_name: string | null
+  bank_account_holder: string | null
+  bank_account_number: string | null
+  bank_account_type: string | null
 }
 
 export function usePhotographerDetails(userId: string | undefined) {

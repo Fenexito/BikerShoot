@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { useCartStore, type CartItem } from './cartStore'
+import { useCartStore } from './cartStore'
 import { useCartDrawerStore } from './cartDrawerStore'
+import { useCartPricing, type CartPricedItem } from '../biker/useCartPricing'
 import { getPortalRoot } from '../../ui/shared/portalRoot'
 import { useScrollLock } from '../../ui/shared/useScrollLock'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
@@ -20,7 +21,7 @@ export function CartDrawer() {
   const close = useCartDrawerStore((s) => s.closeDrawer)
   const items = useCartStore((s) => s.items)
   const remove = useCartStore((s) => s.remove)
-  const total = useCartStore((s) => s.total())
+  const { photographerGroups: pricedGroups, grandTotal } = useCartPricing()
 
   // El panel se queda MONTADO un instante más tras `open` volverse falso
   // (con la clase de salida en vez de desaparecer de golpe) — sin esto no
@@ -35,31 +36,26 @@ export function CartDrawer() {
     return () => clearTimeout(timeout)
   }, [open])
 
-  // Agrupado por fotógrafo (sin importar el evento) y, dentro de cada
-  // fotógrafo, por evento — así el biker ve de un vistazo cuánto lleva de
-  // cada quien, sin que fotos del mismo fotógrafo en eventos distintos
-  // queden mezcladas sin orden.
+  // Mismo agrupado que el checkout completo (por fotógrafo y, adentro, por
+  // evento) pero ya con el precio real de cada foto (descuento por volumen
+  // de ESE fotógrafo incluido) — usa `useCartPricing`, la misma fuente que
+  // usa Checkout.tsx, así los dos siempre muestran el mismo número.
   const groups = useMemo(() => {
-    const byPhotographer = new Map<string, { photographerName: string; byEvent: Map<string, { eventTitle: string; items: CartItem[] }> }>()
-    for (const item of items) {
-      let photographerGroup = byPhotographer.get(item.photographerId)
-      if (!photographerGroup) {
-        photographerGroup = { photographerName: item.photographerName, byEvent: new Map() }
-        byPhotographer.set(item.photographerId, photographerGroup)
+    return pricedGroups.map((g) => {
+      const byEvent = new Map<string, { eventTitle: string; items: CartPricedItem[] }>()
+      for (const item of g.items) {
+        const e = byEvent.get(item.eventId) ?? { eventTitle: item.eventTitle, items: [] }
+        e.items.push(item)
+        byEvent.set(item.eventId, e)
       }
-      let eventGroup = photographerGroup.byEvent.get(item.eventId)
-      if (!eventGroup) {
-        eventGroup = { eventTitle: item.eventTitle, items: [] }
-        photographerGroup.byEvent.set(item.eventId, eventGroup)
+      return {
+        photographerId: g.photographerId,
+        photographerName: g.photographerName,
+        totalToPay: g.totalToPay,
+        events: Array.from(byEvent.entries()).map(([eventId, e]) => ({ eventId, eventTitle: e.eventTitle, items: e.items })),
       }
-      eventGroup.items.push(item)
-    }
-    return Array.from(byPhotographer.entries()).map(([photographerId, g]) => ({
-      photographerId,
-      photographerName: g.photographerName,
-      events: Array.from(g.byEvent.entries()).map(([eventId, e]) => ({ eventId, eventTitle: e.eventTitle, items: e.items })),
-    }))
-  }, [items])
+    })
+  }, [pricedGroups])
 
   useScrollLock(rendered)
 
@@ -72,10 +68,10 @@ export function CartDrawer() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, close])
 
-  async function handleRemove(item: CartItem) {
+  async function handleRemove(item: CartPricedItem) {
     const ok = await confirmDialog.ask({
       title: '¿Quitar esta foto del carrito?',
-      description: `${item.eventTitle} — Q${item.price}`,
+      description: `${item.eventTitle} — Q${item.effectivePrice}`,
       confirmLabel: 'Quitar',
       tone: 'danger',
     })
@@ -113,7 +109,10 @@ export function CartDrawer() {
             <div className="flex flex-col gap-5">
               {groups.map((group) => (
                 <div key={group.photographerId}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.photographerName}</p>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.photographerName}</p>
+                    <p className="text-xs font-semibold text-foreground">Q{group.totalToPay}</p>
+                  </div>
                   <div className="flex flex-col gap-2.5">
                     {/* Una tarjeta por evento SIEMPRE (no solo cuando hay más
                         de uno) — adentro, filas compactas sin su propio
@@ -137,7 +136,10 @@ export function CartDrawer() {
                                   repetido no alcanza para saber cuál es
                                   cuál. */}
                               <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
-                              <p className="shrink-0 text-sm font-bold">Q{item.price}</p>
+                              <div className="shrink-0 text-right">
+                                {item.hasDiscount && <p className="text-[10px] text-muted-foreground line-through">Q{item.price}</p>}
+                                <p className="text-sm font-bold">Q{item.effectivePrice}</p>
+                              </div>
                               <button
                                 onClick={() => handleRemove(item)}
                                 aria-label="Quitar del carrito"
@@ -160,8 +162,8 @@ export function CartDrawer() {
         {items.length > 0 && (
           <div className="border-t border-border px-4 py-3.5 sm:px-5 sm:py-4">
             <div className="mb-3 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="text-lg font-bold">Q{total}</span>
+              <span className="text-muted-foreground">Total (con tarifa de servicio)</span>
+              <span className="text-lg font-bold">Q{grandTotal}</span>
             </div>
             <Link
               to="/app/checkout"
