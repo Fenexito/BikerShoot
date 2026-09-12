@@ -6,7 +6,8 @@ import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
-import { downloadFile, buildDeliveredFilename } from '../../lib/download'
+import { downloadFile, buildDeliveredFilename, uploadFileWithProgress } from '../../lib/download'
+import { buildWhatsAppLink } from '../../lib/whatsapp'
 import { getOrderStatusStyle, getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useBackButton } from '../../ui/shared/useBackButton'
@@ -72,7 +73,11 @@ function DeliverPhotoTile({
   const photo = item.photo as RawOrderItemPhoto
   const push = useToastStore((s) => s.push)
   const inputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
+  // Progreso REAL de subida (no solo "Subiendo…") — igual que el
+  // comprobante de pago, con la barra visible mientras dura.
+  const [progress, setProgress] = useState<number | null>(null)
+  const uploading = progress !== null
+  const [downloadingOwn, setDownloadingOwn] = useState(false)
 
   const delivered = !!photo.delivered_path
   const { data: deliveredUrl } = useDeliveredViewUrl(photo.id, delivered)
@@ -82,15 +87,14 @@ function DeliverPhotoTile({
 
   async function handleFile(file: File | undefined) {
     if (!file) return
-    setUploading(true)
+    setProgress(0)
     try {
       const { data, error } = await supabase.functions.invoke('r2-deliver-upload-url', {
         body: { photoId: photo.id, fileName: file.name, contentType: file.type },
       })
       if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
-      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+      await uploadFileWithProgress(data.uploadUrl, file, setProgress)
 
       const { error: updateError } = await supabase.from('photos').update({ delivered_path: data.deliveredPath, delivered_size_bytes: file.size }).eq('id', photo.id)
       if (updateError) throw updateError
@@ -108,7 +112,22 @@ function DeliverPhotoTile({
     } catch (err) {
       push({ type: 'error', title: 'No se pudo entregar la foto', description: (err as Error).message })
     } finally {
-      setUploading(false)
+      setProgress(null)
+    }
+  }
+
+  async function handleDownloadOwn(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (downloadingOwn) return
+    setDownloadingOwn(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: photo.id } })
+      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
+      await downloadFile(data.downloadUrl, photo.original_filename ?? `motoshots-${photo.id}.jpg`)
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
+    } finally {
+      setDownloadingOwn(false)
     }
   }
 
@@ -144,6 +163,11 @@ function DeliverPhotoTile({
             {photo.original_filename ?? 'Sin nombre registrado'}
           </p>
           {item.is_courtesy && <p className="text-xs text-emerald-600">🎁 Regalo</p>}
+          {uploading && (
+            <div className="mt-1 h-1.5 w-full max-w-[10rem] overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          )}
         </div>
         {!delivered && uploadLocked && (
           <span
@@ -160,15 +184,26 @@ function DeliverPhotoTile({
               disabled={uploading}
               className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-semibold transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
             >
-              {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
+              {uploading ? `Subiendo… ${progress}%` : 'Subir Archivo Final'}
             </button>
             <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
           </>
         )}
         {delivered && (
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white" title="Entregada">
-            ✓
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              onClick={handleDownloadOwn}
+              disabled={downloadingOwn}
+              aria-label="Descargar"
+              title="Descargar"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              <IconDownload className="h-3.5 w-3.5" />
+            </button>
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white" title="Entregada">
+              ✓
+            </span>
+          </div>
         )}
         {giftButton}
       </div>
@@ -191,14 +226,25 @@ function DeliverPhotoTile({
         </button>
 
         {giftButton && <div className="pointer-events-auto absolute right-2 top-2 z-[1]">{giftButton}</div>}
-        {/* Un check solo (sin texto ni fondo verde ocupando todo el ancho)
-            una vez entregada — antes decía "✓ Entregada — ver", redundante
-            con el hecho de que la miniatura ya se puede abrir con solo
-            hacer click. */}
+        {/* Esquina inferior derecha (mismo lugar que del lado del biker):
+            check verde de "lista" + botón chico de descarga individual —
+            el visor ya tiene su propio botón, esto es para bajar varias
+            sin abrir cada una. */}
         {delivered && (
-          <span className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm" title="Entregada">
-            ✓
-          </span>
+          <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
+            <button
+              onClick={handleDownloadOwn}
+              disabled={downloadingOwn}
+              aria-label="Descargar"
+              title="Descargar"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background disabled:opacity-50"
+            >
+              <IconDownload className="h-3.5 w-3.5" />
+            </button>
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm" title="Entregada">
+              ✓
+            </span>
+          </div>
         )}
 
         {!delivered && (
@@ -212,13 +258,22 @@ function DeliverPhotoTile({
                 >
                   🔒 Confirma el pago primero
                 </span>
+              ) : uploading ? (
+                <div className="rounded-full bg-background/95 px-3 py-1.5 shadow-sm">
+                  <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-foreground">
+                    <span>Subiendo…</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
               ) : (
                 <button
                   onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
-                  disabled={uploading}
                   className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-background"
                 >
-                  {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
+                  Subir Archivo Final
                 </button>
               )}
             </div>
@@ -786,13 +841,43 @@ export function StudioOrderDetail() {
   const distinctEventTitles = Array.from(new Set(order.items.map((i) => i.event?.title).filter(Boolean)))
   const eventLabel = distinctEventTitles.length === 1 ? distinctEventTitles[0] : `${distinctEventTitles.length} eventos`
 
+  // Pago + comprobante + whatsapp — en escritorio viven a la derecha junto
+  // al status (misma fila, todo lo "de un vistazo" del lado derecho); en
+  // móvil no caben ahí, así que bajan a su propia fila angosta debajo.
+  const paymentActions = (
+    <>
+      <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
+        {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
+      </span>
+      {order.paymentMethod === 'transferencia' && (
+        <Button variant="secondary" size="sm" onClick={viewPaymentProof} loading={openingProof}>
+          Ver comprobante
+        </Button>
+      )}
+      {order.bikerPhone && (
+        <a
+          href={buildWhatsAppLink(
+            order.bikerPhone,
+            `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de MotoShots 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
+          )}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+          title="Escribir por WhatsApp"
+          aria-label="Escribir por WhatsApp"
+        >
+          <IconWhatsapp className="h-4 w-4" />
+        </a>
+      )}
+    </>
+  )
+
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      {/* Cabecera compacta — antes cada dato (comprador, pago, whatsapp,
-          status) competía por su propio espacio en una fila ancha que en
-          móvil terminaba envolviendo en varias líneas desordenadas. Ahora
-          es: nombre+código arriba, status a la derecha (bien visible), y
-          una segunda fila angosta con pago/comprobante/whatsapp. */}
+      {/* Cabecera compacta — en escritorio, pago/comprobante/whatsapp viven
+          a la derecha junto al status (una sola fila con todo lo
+          importante); en móvil no caben ahí, así que bajan a su propia
+          fila debajo del nombre. */}
       <div className="rounded-3xl border border-border bg-card p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -802,33 +887,15 @@ export function StudioOrderDetail() {
               <p className="truncate text-xs text-muted-foreground sm:text-sm">{formatOrderCode(order.orderNumber, orderCodeName)} · {eventLabel}</p>
             </div>
           </div>
-          {/* Más notoria que antes: texto más grande y con más padding, en
-              vez de compartir el mismo tamaño chico que el resto de chips. */}
-          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-sm font-bold" />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden items-center gap-2 lg:flex">{paymentActions}</div>
+            {/* Más notoria que antes: texto más grande y con más padding, en
+                vez de compartir el mismo tamaño chico que el resto de chips. */}
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-sm font-bold" />
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
-            {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
-          </span>
-          {order.paymentMethod === 'transferencia' && (
-            <Button variant="secondary" size="sm" onClick={viewPaymentProof} loading={openingProof}>
-              Ver comprobante
-            </Button>
-          )}
-          {order.bikerPhone && (
-            <a
-              href={`https://wa.me/${order.bikerPhone.replace(/[^0-9]/g, '')}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-              title="Escribir por WhatsApp"
-              aria-label="Escribir por WhatsApp"
-            >
-              <IconWhatsapp className="h-4 w-4" />
-            </a>
-          )}
-        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">{paymentActions}</div>
 
         {order.status !== 'cancelado' && <OrderStepper steps={TOP_STEP_LABELS} currentIndex={stepIndex} className="mt-6" />}
 

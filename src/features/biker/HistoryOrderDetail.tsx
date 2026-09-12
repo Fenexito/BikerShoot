@@ -17,7 +17,8 @@ import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { supabase } from '../../lib/supabase'
-import { IconDownload, IconEye, IconEdit } from '../../ui/shared/icons'
+import { IconDownload, IconEye, IconEdit, IconWhatsapp } from '../../ui/shared/icons'
+import { buildWhatsAppLink } from '../../lib/whatsapp'
 
 // Con transferencia, el flujo pasa primero por "subir comprobante" — con
 // tarjeta ese paso no existe (no hay comprobante manual que subir), así
@@ -195,6 +196,39 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
   )
 }
 
+/** Descarga TODAS las fotos entregadas de un fotógrafo de una sola vez —
+ * solo aparece cuando ese fotógrafo ya completó su parte del pedido. Baja
+ * cada archivo en secuencia (con una pausa corta entre cada uno) en vez de
+ * simultáneo — los navegadores bloquean/preguntan permiso para varias
+ * descargas a la vez si llegan todas de golpe. Sigue existiendo la
+ * descarga individual por si el biker solo quiere una en particular. */
+function DownloadAllButton({ items, photographerLabel, orderNumber }: { items: MyOrderItem[]; photographerLabel: string; orderNumber: number | null }) {
+  const push = useToastStore((s) => s.push)
+  const [downloading, setDownloading] = useState(false)
+
+  async function handleDownloadAll() {
+    setDownloading(true)
+    try {
+      for (const item of items) {
+        if (!item.photo?.delivered_path) continue
+        const filename = buildDeliveredFilename(photographerLabel, orderNumber, item.position, item.photo.original_filename)
+        await downloadPurchasedPhoto(item.photo_id, filename)
+        await new Promise((r) => setTimeout(r, 400))
+      }
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar todo', description: (err as Error).message })
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Button variant="secondary" size="sm" loading={downloading} onClick={handleDownloadAll}>
+      <IconDownload className="h-4 w-4" /> Descargar todas
+    </Button>
+  )
+}
+
 export function HistoryOrderDetail() {
   const { id } = useParams()
   useBackButton('/app/historial')
@@ -244,7 +278,7 @@ export function HistoryOrderDetail() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-4xl px-3 py-6 font-flat md:px-8 md:py-10">
+      <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="mt-3 h-4 w-1/3" />
         <SkeletonGrid count={6} className="mt-8" />
@@ -255,7 +289,7 @@ export function HistoryOrderDetail() {
   if (!order) return <PlaceholderPage title="Pedido no encontrado" />
 
   return (
-    <div className="mx-auto max-w-4xl px-3 py-6 font-flat md:px-8 md:py-10">
+    <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card p-5 sm:p-6">
         <div>
           <p className="text-sm text-muted-foreground">
@@ -277,6 +311,21 @@ export function HistoryOrderDetail() {
                     {group.photographerName}
                   </Link>
                   <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="text-xs" />
+                  {group.photographerPhone && (
+                    <a
+                      href={buildWhatsAppLink(
+                        group.photographerPhone,
+                        `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+                      title="Escribir por WhatsApp"
+                      aria-label="Escribir por WhatsApp"
+                    >
+                      <IconWhatsapp className="h-3.5 w-3.5" />
+                    </a>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm text-muted-foreground">{group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal}</span>
@@ -293,11 +342,34 @@ export function HistoryOrderDetail() {
                       hasProof={proofPhotographerIds.has(group.photographerId)}
                     />
                   )}
+                  {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
+                      bajar todas de un tirón en vez de una por una. */}
+                  {group.effectiveStatus === 'entregado' && (
+                    <DownloadAllButton items={group.items} photographerLabel={group.photographerName} orderNumber={order.order_number} />
+                  )}
                 </div>
               </div>
 
               {group.effectiveStatus !== 'cancelado' && (
-                <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-6" />
+                <>
+                  <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-4" />
+                  {/* Barra de progreso de entrega — mismo espíritu que la de
+                      la lista de pedidos del fotógrafo, para que el biker
+                      también vea cuántas fotos van y cuántas faltan. */}
+                  {group.effectiveStatus === 'en_preparacion' && (
+                    <div className="mb-6 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-all"
+                          style={{ width: `${(group.items.filter((i) => i.status === 'entregado').length / group.items.length) * 100}%` }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                        {group.items.filter((i) => i.status === 'entregado').length}/{group.items.length} entregadas
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Agrupado por evento → punto (con horario) — el status ya
@@ -328,6 +400,7 @@ export function HistoryOrderDetail() {
                                   status={item.status}
                                   showStatusPill={false}
                                   justClosed={item.photo_id === justClosedId}
+                                  downloadFilename={buildDeliveredFilename(item.photographer?.display_name ?? 'MotoShots', order.order_number, item.position, item.photo?.original_filename)}
                                   onClick={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
                                 />
                               ))}

@@ -138,20 +138,6 @@ export function History() {
       })
   }, [orders, query, status, photographerId])
 
-  const summary = useMemo(() => {
-    const spent = orders.filter((o) => deriveOrderEffectiveStatus(o) !== 'cancelado').reduce((s, o) => s + o.total, 0)
-    const pending = orders
-      .filter((o) => {
-        const s = deriveOrderEffectiveStatus(o)
-        return s === 'pendiente_comprobante' || s === 'pendiente_confirmacion'
-      })
-      .reduce((s, o) => s + o.total, 0)
-    const inProgress = orders.filter((o) => {
-      const s = deriveOrderEffectiveStatus(o)
-      return s !== 'entregado' && s !== 'cancelado'
-    }).length
-    return { spent, pending, inProgress }
-  }, [orders])
 
   const activeFilterCount = photographerId ? 1 : 0
 
@@ -180,21 +166,6 @@ export function History() {
     <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Mis compras</h1>
       <p className="mb-6 text-muted-foreground">{orders.length} pedidos</p>
-
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Gastado (activo)</p>
-          <p className="mt-1 text-2xl font-bold">Q{summary.spent}</p>
-        </div>
-        <div className="hidden rounded-3xl border border-border bg-card p-5 sm:block">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pendiente por pagar</p>
-          <p className="mt-1 text-2xl font-bold">Q{summary.pending}</p>
-        </div>
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">En proceso</p>
-          <p className="mt-1 text-2xl font-bold">{summary.inProgress}</p>
-        </div>
-      </div>
 
       {/* Misma línea que Eventos: tabs + buscador + botón de Filtros — en
           móvil, tabs en su propia fila (scroll horizontal si hace falta) y

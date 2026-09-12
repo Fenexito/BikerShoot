@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { previewUrl } from '../../../lib/r2'
 import { downloadFile } from '../../../lib/download'
 import { StatusPill } from '../../../ui/shared/StatusPill'
 import { getOrderStatusStyle, getEffectiveStatusStyle, type OrderItemStatus, type EffectiveOrderStatus } from '../../../lib/orderStatus'
+import { IconDownload } from '../../../ui/shared/icons'
+import { useToastStore } from '../../../ui/overlays/toastStore'
 import { cn } from '../../../lib/cn'
 
 const PAID_STATUSES = new Set<OrderItemStatus>(['en_preparacion', 'entregado'])
@@ -55,6 +58,7 @@ export function PurchasedPhotoTile({
   showStatusPill = true,
   onClick,
   justClosed = false,
+  downloadFilename,
 }: {
   photoId: string
   photo: PurchasedPhoto | null
@@ -71,41 +75,70 @@ export function PurchasedPhotoTile({
    * — mismo resalte breve que usa Buscar, para no perderla entre las
    * demás del pedido. */
   justClosed?: boolean
+  /** Nombre real para la descarga individual (ej. "Fenexito-000007-001.jpg")
+   * — si no se pasa, cae a uno genérico. */
+  downloadFilename?: string
 }) {
+  const push = useToastStore((s) => s.push)
+  const [downloading, setDownloading] = useState(false)
   const delivered = !!photo?.delivered_path
   const { data: deliveredUrl } = useDeliveredViewUrl(photoId, delivered)
 
   const canDownload = PAID_STATUSES.has(status) && photo && (photo.delivered_path || !photo.preview_path)
-  const stillEditing = PAID_STATUSES.has(status) && photo?.preview_path && !photo.delivered_path
+  // "Todavía no está lista" cubre CUALQUIER estado antes de la entrega —
+  // sin comprobante, con comprobante pendiente de confirmar, o ya en
+  // preparación — no solo "en preparación sin entregar" como antes.
+  const stillEditing = status !== 'cancelado' && photo?.preview_path && !photo.delivered_path
   const pillStyle = effectiveStatus ? getEffectiveStatusStyle(effectiveStatus) : getOrderStatusStyle(status)
   const thumbnailSrc = delivered && deliveredUrl ? deliveredUrl : photo ? previewUrl(photo) : undefined
+
+  async function handleDownload(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!photo || downloading) return
+    setDownloading(true)
+    try {
+      await downloadPurchasedPhoto(photoId, downloadFilename ?? `motoshots-${photoId}.jpg`)
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted', justClosed && 'animate-photo-just-closed')}>
       {thumbnailSrc && (
         <button onClick={onClick} className="block h-full w-full" aria-label="Ver foto">
-          {/* En blanco y negro mientras el fotógrafo todavía la está
-              editando — una señal visual clara de "todavía no está lista",
-              sin necesidad de leer el texto. Las entregadas se ven a
-              full color, como cualquier foto normal. */}
+          {/* En blanco y negro mientras todavía no está lista (sin
+              comprobante, pendiente de confirmar, o en preparación) — una
+              señal visual clara sin necesidad de leer texto. Las
+              entregadas se ven a full color, como cualquier foto normal. */}
           <img src={thumbnailSrc} alt="" className={cn('h-full w-full object-cover', stillEditing && 'grayscale')} />
         </button>
       )}
       {showStatusPill && (
-        <span className="pointer-events-none absolute bottom-1.5 left-1.5 right-1.5 truncate rounded-full bg-black/60 px-2 py-1">
+        <span className="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[65%] truncate rounded-full bg-black/60 px-2 py-1">
           <StatusPill dot={pillStyle.dot} text="text-white" label={pillStyle.label} className="text-[10px]" />
         </span>
       )}
-      {/* Un check verde simple indica "lista" — ya no hay botón de
-          descarga en la miniatura (se descarga desde el visor, que ya
-          muestra el archivo final). */}
+      {/* Esquina inferior derecha: check verde de "lista" + un botón chico
+          de descarga individual — el visor ya tiene su propio botón de
+          descarga, esto es para bajar varias sin tener que abrir cada una. */}
       {canDownload && (
-        <span
-          className="pointer-events-none absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
-          title="Lista para descargar"
-        >
-          ✓
-        </span>
+        <div className="pointer-events-none absolute bottom-1.5 right-1.5 flex items-center gap-1">
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            aria-label="Descargar esta foto"
+            title="Descargar"
+            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-colors hover:bg-background disabled:opacity-50"
+          >
+            <IconDownload className="h-3.5 w-3.5" />
+          </button>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm" title="Lista para descargar">
+            ✓
+          </span>
+        </div>
       )}
       {stillEditing && (
         <span className="pointer-events-none absolute inset-x-1.5 top-1.5 rounded-full bg-black/70 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">

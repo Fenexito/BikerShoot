@@ -29,7 +29,7 @@ export interface MyOrderItem {
   status: OrderItemStatus
   photo: MyOrderItemPhoto | null
   event: { title: string } | null
-  photographer: { display_name: string } | null
+  photographer: { display_name: string; phone: string | null } | null
 }
 
 export interface MyOrder {
@@ -48,6 +48,7 @@ export interface MyOrder {
 export interface MyOrderPhotographerGroup {
   photographerId: string
   photographerName: string
+  photographerPhone: string | null
   items: MyOrderItem[]
   subtotal: number
   effectiveStatus: EffectiveOrderStatus
@@ -78,6 +79,7 @@ export function groupOrderByPhotographer(order: MyOrder): MyOrderPhotographerGro
   return Array.from(byPhotographer.entries()).map(([photographerId, items]) => ({
     photographerId,
     photographerName: items[0].photographer?.display_name ?? 'Fotógrafo',
+    photographerPhone: items[0].photographer?.phone ?? null,
     items,
     subtotal: items.reduce((s, i) => s + i.price, 0),
     effectiveStatus: deriveEffectiveStatus({
@@ -132,7 +134,7 @@ export function useMyOrders(bikerId: string | undefined) {
       const { data, error } = await supabase
         .from('orders')
         .select(
-          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name)), order_payment_proofs(photographer_id)',
+          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name, phone)), order_payment_proofs(photographer_id)',
         )
         .eq('biker_id', bikerId)
         .order('created_at', { ascending: false })
