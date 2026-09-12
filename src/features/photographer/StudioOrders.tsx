@@ -6,7 +6,7 @@ import { usePhotographerDetails } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
+import { getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { FilterBar } from '../../ui/shared/FilterBar'
@@ -62,7 +62,7 @@ export function OrderRow({
   onToggleSelect: () => void
 }) {
   const urgent = urgencyClass(order)
-  const statusStyle = getOrderStatusStyle(order.status)
+  const statusStyle = getEffectiveStatusStyle(order.effectiveStatus)
   const borderColor = statusStyle.dot.replace('bg-', 'border-')
 
   return (

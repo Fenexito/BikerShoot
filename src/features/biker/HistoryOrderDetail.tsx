@@ -1,18 +1,22 @@
-import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useMyOrders, deriveGroupStatus, type MyOrderItem } from './useMyOrders'
+import { useMyOrders, groupOrderByPhotographer } from './useMyOrders'
 import { PurchasedPhotoTile } from './components/PurchasedPhotoTile'
 import { Badge } from '../../ui/flat/Badge'
 import { Button } from '../../ui/flat/Button'
+import { StatusPill } from '../../ui/shared/StatusPill'
 import { OrderStepper } from '../../ui/studio/OrderStepper'
-import { getOrderStatusStyle, formatOrderCode } from '../../lib/orderStatus'
+import { getEffectiveStatusStyle, formatOrderCode, type EffectiveOrderStatus } from '../../lib/orderStatus'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
 
-const FLOW = ['pendiente_pago', 'en_preparacion', 'entregado'] as const
-const FLOW_LABELS = FLOW.map((s) => getOrderStatusStyle(s).label)
+// Con transferencia, el flujo pasa primero por "subir comprobante" — con
+// tarjeta ese paso no existe (no hay comprobante manual que subir), así
+// que el stepper de cada grupo usa uno u otro flujo según el método de
+// pago del pedido.
+const FLOW_TRANSFERENCIA: EffectiveOrderStatus[] = ['pendiente_comprobante', 'pendiente_confirmacion', 'en_preparacion', 'entregado']
+const FLOW_TARJETA: EffectiveOrderStatus[] = ['pendiente_confirmacion', 'en_preparacion', 'entregado']
 
 export function HistoryOrderDetail() {
   const { id } = useParams()
@@ -20,23 +24,9 @@ export function HistoryOrderDetail() {
   const { user } = useAuth()
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
   const order = orders.find((o) => o.id === id)
-
-  const photographerGroups = useMemo(() => {
-    if (!order) return []
-    const map = new Map<string, { photographerName: string; items: MyOrderItem[] }>()
-    for (const item of order.order_items) {
-      const g = map.get(item.photographer_id) ?? { photographerName: item.photographer?.display_name ?? 'Fotógrafo', items: [] }
-      g.items.push(item)
-      map.set(item.photographer_id, g)
-    }
-    return Array.from(map.entries()).map(([photographerId, g]) => ({
-      photographerId,
-      photographerName: g.photographerName,
-      items: g.items,
-      subtotal: g.items.reduce((s, i) => s + i.price, 0),
-      status: deriveGroupStatus(g.items),
-    }))
-  }, [order])
+  const photographerGroups = order ? groupOrderByPhotographer(order) : []
+  const flow = order?.payment_method === 'transferencia' ? FLOW_TRANSFERENCIA : FLOW_TARJETA
+  const flowLabels = flow.map((s) => getEffectiveStatusStyle(s).label)
 
   if (isLoading) {
     return (
@@ -76,26 +66,32 @@ export function HistoryOrderDetail() {
       </div>
 
       <div className="mt-8 flex flex-col gap-8">
-        {photographerGroups.map((group) => (
+        {photographerGroups.map((group) => {
+          const groupStyle = getEffectiveStatusStyle(group.effectiveStatus)
+          return (
           <div key={group.photographerId} className="rounded-3xl border border-border bg-card p-5 sm:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-              <Link to={`/app/fotografos/${group.photographerId}`} className="font-bold hover:underline">
-                {group.photographerName}
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link to={`/app/fotografos/${group.photographerId}`} className="font-bold hover:underline">
+                  {group.photographerName}
+                </Link>
+                <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="text-xs" />
+              </div>
               <span className="text-sm text-muted-foreground">{group.items.length} foto{group.items.length > 1 ? 's' : ''} · Q{group.subtotal}</span>
             </div>
 
-            {group.status !== 'cancelado' && (
-              <OrderStepper steps={FLOW_LABELS} currentIndex={FLOW.indexOf(group.status as (typeof FLOW)[number])} className="mb-6" />
+            {group.effectiveStatus !== 'cancelado' && (
+              <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-6" />
             )}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {group.items.map((item) => (
-                <PurchasedPhotoTile key={item.id} photoId={item.photo_id} photo={item.photo} status={item.status} />
+                <PurchasedPhotoTile key={item.id} photoId={item.photo_id} photo={item.photo} status={item.status} effectiveStatus={group.effectiveStatus} />
               ))}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

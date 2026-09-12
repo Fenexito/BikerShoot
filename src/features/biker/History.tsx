@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useMyOrders, deriveGroupStatus } from './useMyOrders'
+import { useMyOrders, deriveOrderEffectiveStatus, groupOrderByPhotographer } from './useMyOrders'
 import { PurchasedPhotoTile } from './components/PurchasedPhotoTile'
 import { Button } from '../../ui/flat/Button'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { FilterBar } from '../../ui/shared/FilterBar'
 import { StatusPill } from '../../ui/shared/StatusPill'
-import { getOrderStatusStyle, formatOrderCode } from '../../lib/orderStatus'
+import { getEffectiveStatusStyle, formatOrderCode } from '../../lib/orderStatus'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
 import { cn } from '../../lib/cn'
 
@@ -44,10 +44,10 @@ export function History() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return orders
-      .map((o) => ({ order: o, status: deriveGroupStatus(o.order_items) }))
+      .map((o) => ({ order: o, status: deriveOrderEffectiveStatus(o) }))
       .filter(({ status: s }) => {
         if (status === 'todos') return true
-        if (status === 'en_proceso') return s === 'en_preparacion' || s === 'pendiente_pago'
+        if (status === 'en_proceso') return s !== 'entregado' && s !== 'cancelado'
         return s === status
       })
       .filter(({ order }) => (photographerId ? order.order_items.some((i) => i.photographer_id === photographerId) : true))
@@ -60,11 +60,16 @@ export function History() {
   }, [orders, query, status, photographerId])
 
   const summary = useMemo(() => {
-    const spent = orders.filter((o) => deriveGroupStatus(o.order_items) !== 'cancelado').reduce((s, o) => s + o.total, 0)
-    const pending = orders.filter((o) => deriveGroupStatus(o.order_items) === 'pendiente_pago').reduce((s, o) => s + o.total, 0)
+    const spent = orders.filter((o) => deriveOrderEffectiveStatus(o) !== 'cancelado').reduce((s, o) => s + o.total, 0)
+    const pending = orders
+      .filter((o) => {
+        const s = deriveOrderEffectiveStatus(o)
+        return s === 'pendiente_comprobante' || s === 'pendiente_confirmacion'
+      })
+      .reduce((s, o) => s + o.total, 0)
     const inProgress = orders.filter((o) => {
-      const s = deriveGroupStatus(o.order_items)
-      return s === 'en_preparacion' || s === 'pendiente_pago'
+      const s = deriveOrderEffectiveStatus(o)
+      return s !== 'entregado' && s !== 'cancelado'
     }).length
     return { spent, pending, inProgress }
   }, [orders])
@@ -141,8 +146,15 @@ export function History() {
 
       <div className="flex flex-col gap-4">
         {filtered.map(({ order, status: s }, i) => {
-          const statusStyle = getOrderStatusStyle(s)
+          const statusStyle = getEffectiveStatusStyle(s)
           const firstItem = order.order_items[0]
+          // Con VARIOS fotógrafos en un mismo pedido, cada uno tiene su
+          // propio avance (pago, edición, entrega) — el biker necesita ver
+          // cuál ya terminó y cuál no, no solo un status genérico que
+          // esconde la diferencia.
+          const photographerGroups = groupOrderByPhotographer(order)
+          const multiPhotographer = photographerGroups.length > 1
+          const itemEffectiveStatus = new Map(photographerGroups.flatMap((g) => g.items.map((i) => [i.id, g.effectiveStatus] as const)))
           return (
             <Link
               key={order.id}
@@ -156,7 +168,7 @@ export function History() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold">{firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
+                    <p className="font-bold">{multiPhotographer ? `${photographerGroups.length} fotógrafos` : firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
                     <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -165,9 +177,30 @@ export function History() {
                 </div>
                 <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
               </div>
+
+              {multiPhotographer && (
+                <div className="mb-4 flex flex-col gap-1.5 rounded-2xl bg-muted/60 p-3">
+                  {photographerGroups.map((g) => {
+                    const gStyle = getEffectiveStatusStyle(g.effectiveStatus)
+                    return (
+                      <div key={g.photographerId} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate font-medium">{g.photographerName}</span>
+                        <StatusPill dot={gStyle.dot} text={gStyle.text} label={gStyle.label} className="text-xs shrink-0" />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {order.order_items.slice(0, 8).map((item) => (
-                  <PurchasedPhotoTile key={item.id} photoId={item.photo_id} photo={item.photo} status={item.status} />
+                  <PurchasedPhotoTile
+                    key={item.id}
+                    photoId={item.photo_id}
+                    photo={item.photo}
+                    status={item.status}
+                    effectiveStatus={itemEffectiveStatus.get(item.id)}
+                  />
                 ))}
               </div>
               {order.order_items.length > 8 && (

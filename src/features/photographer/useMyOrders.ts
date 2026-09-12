@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import type { OrderItemStatus } from '../../lib/orderStatus'
+import { deriveEffectiveStatus, type EffectiveOrderStatus, type OrderItemStatus } from '../../lib/orderStatus'
 
 export type { OrderItemStatus }
 
@@ -37,6 +37,12 @@ export interface PhotographerOrderGroup {
   paymentMethod: 'tarjeta' | 'transferencia'
   createdAt: string
   status: OrderItemStatus
+  /** Status enriquecido (ver `deriveEffectiveStatus`) — distingue "el biker
+   * todavía no sube su comprobante" de "ya lo subió, falta que yo
+   * confirme", ambos indistinguibles en `status` (los dos son
+   * 'pendiente_pago'). */
+  effectiveStatus: EffectiveOrderStatus
+  hasPaymentProof: boolean
   total: number
   serviceFeeTotal: number
   note: string | null
@@ -76,8 +82,21 @@ function deriveOrderStatus(items: { status: OrderItemStatus }[]): OrderItemStatu
   return 'en_preparacion'
 }
 
+function usePaymentProofOrderIds(photographerId: string | undefined) {
+  return useQuery({
+    queryKey: ['photographer-payment-proof-order-ids', photographerId],
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase.from('order_payment_proofs').select('order_id').eq('photographer_id', photographerId)
+      if (error) throw error
+      return new Set((data ?? []).map((r) => r.order_id))
+    },
+    enabled: !!photographerId,
+  })
+}
+
 export function usePhotographerOrders(photographerId: string | undefined) {
   const query = useRawOrderItems(photographerId)
+  const { data: proofOrderIds = new Set<string>() } = usePaymentProofOrderIds(photographerId)
 
   const groups = useMemo((): PhotographerOrderGroup[] => {
     const byOrder = new Map<string, RawOrderItem[]>()
@@ -86,16 +105,22 @@ export function usePhotographerOrders(photographerId: string | undefined) {
       list.push(item)
       byOrder.set(item.order_id, list)
     }
-    return Array.from(byOrder.entries()).map(([orderId, items]) => ({
+    return Array.from(byOrder.entries()).map(([orderId, items]) => {
+      const status = deriveOrderStatus(items)
+      const paymentMethod = items[0].order?.payment_method ?? 'tarjeta'
+      const hasPaymentProof = proofOrderIds.has(orderId)
+      return {
       orderId,
       orderNumber: items[0].order?.order_number ?? null,
       bikerId: items[0].order?.biker?.id ?? null,
       bikerName: items[0].order?.biker?.display_name ?? 'Biker',
       bikerPhone: items[0].order?.biker?.phone ?? null,
       eventTitle: items[0].event?.title ?? '',
-      paymentMethod: items[0].order?.payment_method ?? 'tarjeta',
+      paymentMethod,
       createdAt: items[0].order?.created_at ?? items[0].created_at,
-      status: deriveOrderStatus(items),
+      status,
+      effectiveStatus: deriveEffectiveStatus({ status, paymentMethod, hasProof: hasPaymentProof }),
+      hasPaymentProof,
       // Lo que el biker de verdad transfiere a este fotógrafo — incluye la
       // tarifa de servicio de cada foto (Q2, salvo cortesías), que el
       // fotógrafo recibe junto con el resto pero le debe de vuelta a
@@ -111,8 +136,9 @@ export function usePhotographerOrders(photographerId: string | undefined) {
       cancelledAt: items.find((i) => i.cancelled_at)?.cancelled_at ?? null,
       cancellationReason: items.find((i) => i.cancellation_reason)?.cancellation_reason ?? null,
       items,
-    }))
-  }, [query.data])
+    }
+    })
+  }, [query.data, proofOrderIds])
 
   return { ...query, data: groups }
 }

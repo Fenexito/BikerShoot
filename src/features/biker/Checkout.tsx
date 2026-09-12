@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
+import { Input } from '../../ui/flat/Input'
 import { useCartPricing, groupByEventAndPoint, formatPointSchedule } from './useCartPricing'
 import { distributeServiceFee } from './photographerPricing'
 import { supabase } from '../../lib/supabase'
@@ -43,11 +44,18 @@ export function Checkout() {
   const items = useCartStore((s) => s.items)
   const remove = useCartStore((s) => s.remove)
   const clear = useCartStore((s) => s.clear)
-  const { user } = useAuth()
+  const { user, profile, updateProfileLocal } = useAuth()
   const push = useToastStore((s) => s.push)
   const navigate = useNavigate()
   const [method, setMethod] = useState<'tarjeta' | 'transferencia'>('transferencia')
   const [placing, setPlacing] = useState(false)
+  // El teléfono es el único medio que tiene el fotógrafo para contactar al
+  // biker (botón de WhatsApp en su portal, ver StudioOrderDetail.tsx) — se
+  // precarga del perfil; si ya lo tenía, editar acá lo actualiza para
+  // SIEMPRE (mismo campo `profiles.phone` que usa todo el resto de la app),
+  // no solo para este pedido.
+  const [phone, setPhone] = useState(profile?.phone ?? '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   const { photographerGroups, faceTotal, discount, serviceFeeTotal, grandTotal } = useCartPricing()
 
@@ -63,7 +71,23 @@ export function Checkout() {
 
   async function placeOrder() {
     if (!user) return
+    const trimmedPhone = phone.trim()
+    if (!trimmedPhone) {
+      setPhoneError('Ingresa un teléfono para que el fotógrafo pueda contactarte')
+      return
+    }
+    setPhoneError(null)
     setPlacing(true)
+
+    if (trimmedPhone !== (profile?.phone ?? '')) {
+      const { error: phoneUpdateError } = await supabase.from('profiles').update({ phone: trimmedPhone }).eq('id', user.id)
+      if (phoneUpdateError) {
+        push({ type: 'error', title: 'No se pudo guardar tu teléfono', description: phoneUpdateError.message })
+        setPlacing(false)
+        return
+      }
+      updateProfileLocal({ phone: trimmedPhone })
+    }
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -273,6 +297,21 @@ export function Checkout() {
               <span>Total</span>
               <span>Q{grandTotal}</span>
             </div>
+          </Card>
+
+          <Card>
+            <h2 className="mb-1 font-bold">Teléfono de contacto</h2>
+            <p className="mb-4 text-xs text-muted-foreground">El fotógrafo lo usa para escribirte por WhatsApp sobre tu pedido.</p>
+            <Input
+              type="tel"
+              placeholder="Ej. 5555 5555"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value)
+                if (phoneError) setPhoneError(null)
+              }}
+              error={phoneError ?? undefined}
+            />
           </Card>
 
           <Card>

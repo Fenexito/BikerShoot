@@ -6,7 +6,7 @@ import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
-import { getOrderStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
+import { getOrderStatusStyle, getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { StatusPill } from '../../ui/shared/StatusPill'
@@ -188,6 +188,11 @@ const SECTION_COPY: Record<OrderItemStatus, string> = {
   entregado: 'Pedido completo — el biker ya tiene sus archivos finales. Puedes hacer clic en cualquier foto para ver exactamente lo que se le entregó.',
   cancelado: 'Este pedido fue cancelado — el biker ya no tiene acceso a estas fotos.',
 }
+// El biker todavía no sube su comprobante — distinto de "ya lo subió,
+// falta que yo lo revise" (mismo `status` de base, 'pendiente_pago', pero
+// una situación bien distinta para el fotógrafo).
+const PENDIENTE_COMPROBANTE_COPY =
+  'El biker todavía no sube su comprobante de transferencia — nada que confirmar todavía. Puedes preparar las entregas mientras tanto, pero espera a confirmar el pago antes de avisarle.'
 
 /** Guía de 3 pasos para el fotógrafo — qué toca hacer ahora mismo, no solo
  * en qué estado está el pedido. */
@@ -419,6 +424,9 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
         ]
       : [
           { label: 'Pedido creado (pendiente de pago)', at: order.createdAt, done: true },
+          ...(order.paymentMethod === 'transferencia'
+            ? [{ label: 'Comprobante subido', at: null, done: order.hasPaymentProof || order.status !== 'pendiente_pago' }]
+            : []),
           { label: 'Pago confirmado', at: order.paidAt, done: order.status !== 'pendiente_pago' },
           { label: 'Fotos en preparación', at: order.paidAt, done: order.status === 'en_preparacion' || order.status === 'entregado' },
           ...(partial ? [{ label: `Entrega parcial (${deliveredCount}/${activeItems.length})`, at: null, done: true }] : []),
@@ -494,7 +502,7 @@ export function StudioOrderDetail() {
   const stepIndex = TOP_STEP_INDEX[order.status]
   const action = NEXT_ACTION[order.status]
   const canCancel = order.status === 'pendiente_pago' || order.status === 'en_preparacion'
-  const statusStyle = getOrderStatusStyle(order.status)
+  const statusStyle = getEffectiveStatusStyle(order.effectiveStatus)
   const unitPrice = order.items[0]?.price ?? 0
   const sameUnitPrice = order.items.every((i) => i.price === unitPrice)
 
@@ -686,7 +694,9 @@ export function StudioOrderDetail() {
       <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_280px]">
         <section>
           <h2 className="mb-1 text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
-          <p className="mb-5 text-sm text-muted-foreground">{SECTION_COPY[order.status]}</p>
+          <p className="mb-5 text-sm text-muted-foreground">
+            {order.effectiveStatus === 'pendiente_comprobante' ? PENDIENTE_COMPROBANTE_COPY : SECTION_COPY[order.status]}
+          </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
           </div>
