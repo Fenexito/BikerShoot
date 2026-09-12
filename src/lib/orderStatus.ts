@@ -50,7 +50,11 @@ export type EffectiveOrderStatus =
   | 'cancelado'
 
 export const EFFECTIVE_STATUS_STYLE: Record<EffectiveOrderStatus, { label: string; dot: string; text: string }> = {
-  pendiente_comprobante: { label: 'Falta subir comprobante', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
+  // Rojo (no gris) — es un estado que de verdad frena el pedido si no se
+  // resuelve, a diferencia de "cancelado" (donde ya no hay nada pendiente
+  // por hacer). Etiqueta imperativa ("Subir Comprobante") en vez de
+  // describir lo que falta, para que se lea como una acción a tomar.
+  pendiente_comprobante: { label: 'Subir Comprobante', dot: 'bg-red-500', text: 'text-red-500' },
   pendiente_confirmacion: { label: 'Pago por confirmar', dot: 'bg-blue-500', text: 'text-blue-500' },
   en_preparacion: { label: 'En preparación', dot: 'bg-amber-500', text: 'text-amber-500' },
   entrega_parcial: { label: 'Entrega parcial', dot: 'bg-amber-500', text: 'text-amber-500' },

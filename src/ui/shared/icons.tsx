@@ -202,6 +202,16 @@ export function IconBookmark({ filled, ...props }: SVGProps<SVGSVGElement> & { f
   )
 }
 
+export function IconDownload(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3v12" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M4 19.5h16" />
+    </svg>
+  )
+}
+
 export function IconGift({ filled, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean }) {
   return (
     <svg {...base(props)} fill={filled ? 'currentColor' : 'none'} fillOpacity={filled ? 0.2 : undefined}>

@@ -6,7 +6,7 @@ import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
-import { downloadFile } from '../../lib/download'
+import { downloadFile, buildDeliveredFilename } from '../../lib/download'
 import { getOrderStatusStyle, getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { useBackButton } from '../../ui/shared/useBackButton'
@@ -20,12 +20,13 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconGift } from '../../ui/shared/icons'
+import { IconGift, IconWhatsapp, IconDownload } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
-import Lightbox from 'yet-another-react-lightbox'
-import Zoom from 'yet-another-react-lightbox/plugins/zoom'
-import 'yet-another-react-lightbox/styles.css'
 
+/** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
+ * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
+ * la sección E del documento de precios. `cortesias_ampliadas` (extra
+ * nativo de Pro) suma +1 al tope combinado de cualquier franja. */
 /** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
  * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
  * la sección E del documento de precios. `cortesias_ampliadas` (extra
@@ -35,25 +36,33 @@ function courtesyCaps(purchasedCount: number, expanded: boolean) {
   return expanded ? { ...base, combined: base.combined + 1 } : base
 }
 
-/** Miniatura de una foto del pedido — sube la entrega final, marca como
- * cortesía (regalo, ícono en la esquina), y abre el visor compartido (el
- * mismo de Buscar/Mis compras) al hacer click, en vez de una pestaña
+/** Miniatura de una foto del pedido — sube la entrega final, marca/desmarca
+ * como cortesía (regalo, ícono en la esquina), y abre el visor compartido
+ * (el mismo de Buscar/Mis compras) al hacer click, en vez de una pestaña
  * nueva. Una vez entregada, la miniatura muestra el archivo final (sin
  * marca de agua) igual que del lado del biker. */
 function DeliverPhotoTile({
   item,
   onOpen,
-  canGift,
+  canToggleGift,
   giftBusy,
   onGift,
   layout = 'grid',
+  justClosed = false,
 }: {
   item: RawOrderItem
   onOpen: () => void
-  canGift: boolean
+  /** Si el botón de regalo debe mostrarse Y ser clicable — ya calcula caps,
+   * si el pedido sigue "pendiente_pago" (una foto ya pagada no se puede
+   * regalar/des-regalar después de confirmar el pago), y si la foto ya fue
+   * entregada (ahí se oculta del todo). */
+  canToggleGift: boolean
   giftBusy: boolean
   onGift: () => void
   layout?: 'grid' | 'list'
+  /** true por un instante justo después de cerrar el visor sobre esta foto
+   * — mismo resalte breve que usa Buscar. */
+  justClosed?: boolean
 }) {
   const photo = item.photo as RawOrderItemPhoto
   const push = useToastStore((s) => s.push)
@@ -64,6 +73,7 @@ function DeliverPhotoTile({
   const { data: deliveredUrl } = useDeliveredViewUrl(photo.id, delivered)
   const hasPreview = !!(photo.preview_path || photo.storage_path)
   const thumbnailSrc = delivered && deliveredUrl ? deliveredUrl : hasPreview ? previewUrl(photo) : undefined
+  const isWaiver = item.is_courtesy && item.courtesy_type === 'waiver'
 
   async function handleFile(file: File | undefined) {
     if (!file) return
@@ -97,27 +107,30 @@ function DeliverPhotoTile({
     }
   }
 
-  const giftButton = (item.is_courtesy || canGift) && (
+  // Se oculta del todo (ni siquiera deshabilitado) una vez entregada — a
+  // esa altura ya no tiene sentido regalar o des-regalar el precio de algo
+  // que el biker ya recibió.
+  const giftButton = canToggleGift && (
     <button
       onClick={(e) => {
         e.stopPropagation()
-        if (!item.is_courtesy) onGift()
+        onGift()
       }}
-      disabled={giftBusy || item.is_courtesy}
-      aria-label={item.is_courtesy ? 'Ya es un regalo' : 'Regalar esta foto'}
-      title={item.is_courtesy ? 'Ya es un regalo para el biker' : 'Regalar esta foto (cortesía)'}
+      disabled={giftBusy}
+      aria-label={isWaiver ? 'Deshacer el regalo' : 'Regalar esta foto'}
+      title={isWaiver ? 'Deshacer el regalo — restaura el precio original' : 'Regalar esta foto (cortesía)'}
       className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors',
-        item.is_courtesy ? 'bg-emerald-500 text-white' : 'bg-white/95 text-foreground hover:bg-white disabled:opacity-50',
+        'flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors disabled:opacity-50',
+        isWaiver ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-white/95 text-foreground hover:bg-white',
       )}
     >
-      <IconGift className="h-4 w-4" filled={item.is_courtesy} />
+      <IconGift className="h-4 w-4" filled={isWaiver} />
     </button>
   )
 
   if (layout === 'list') {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2.5">
+      <div className={cn('flex items-center gap-3 rounded-2xl border border-border bg-card p-2.5', justClosed && 'animate-photo-just-closed')}>
         <button onClick={onOpen} className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted" disabled={!thumbnailSrc}>
           {thumbnailSrc && <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />}
         </button>
@@ -139,14 +152,18 @@ function DeliverPhotoTile({
             <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
           </>
         )}
-        {delivered && <span className="shrink-0 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-600">✓ Entregada</span>}
+        {delivered && (
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white" title="Entregada">
+            ✓
+          </span>
+        )}
         {giftButton}
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-accent/40 hover:shadow-sm">
+    <div className={cn('overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-accent/40 hover:shadow-sm', justClosed && 'animate-photo-just-closed')}>
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         <button onClick={onOpen} className="block h-full w-full cursor-pointer" disabled={!thumbnailSrc} aria-label="Ver foto" title={delivered ? 'Ver entrega final' : 'Ver con marca de agua'}>
           {thumbnailSrc ? (
@@ -161,25 +178,30 @@ function DeliverPhotoTile({
         </button>
 
         {giftButton && <div className="pointer-events-auto absolute right-2 top-2 z-[1]">{giftButton}</div>}
+        {/* Un check solo (sin texto ni fondo verde ocupando todo el ancho)
+            una vez entregada — antes decía "✓ Entregada — ver", redundante
+            con el hecho de que la miniatura ya se puede abrir con solo
+            hacer click. */}
+        {delivered && (
+          <span className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm" title="Entregada">
+            ✓
+          </span>
+        )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-        <div className="absolute inset-x-2 bottom-2">
-          {delivered ? (
-            <span className="flex items-center justify-center rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm">
-              ✓ Entregada — ver
-            </span>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
-              disabled={uploading}
-              className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-background"
-            >
-              {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
-            </button>
-          )}
-        </div>
         {!delivered && (
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
+          <>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
+            <div className="absolute inset-x-2 bottom-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+                disabled={uploading}
+                className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-background"
+              >
+                {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
+              </button>
+            </div>
+            <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
+          </>
         )}
       </div>
       <div className="p-3">
@@ -192,44 +214,73 @@ function DeliverPhotoTile({
   )
 }
 
-interface EventPhotoOption {
-  id: string
-  storage_path: string | null
-  preview_path: string | null
-  price: number
-  original_filename: string | null
+/** Agrupa las fotos del pedido por evento y luego por punto — un mismo
+ * biker puede comprarle al mismo fotógrafo fotos de eventos DISTINTOS en
+ * un solo pedido, así que no se puede asumir un solo evento para todo el
+ * pedido (por eso el encabezado ya no muestra un único "eventTitle"). */
+function groupItemsByEventoPunto(items: RawOrderItem[]) {
+  const byEvent = new Map<string, { eventTitle: string; items: RawOrderItem[] }>()
+  for (const item of items) {
+    const key = item.event?.title ?? ''
+    const e = byEvent.get(key) ?? { eventTitle: key, items: [] }
+    e.items.push(item)
+    byEvent.set(key, e)
+  }
+  return Array.from(byEvent.values()).map((e) => {
+    const byPoint = new Map<string, { label: string | null; items: RawOrderItem[] }>()
+    for (const item of e.items) {
+      const label = item.photo?.point?.label ?? null
+      const key = label ?? '__sin_punto__'
+      const p = byPoint.get(key) ?? { label, items: [] }
+      p.items.push(item)
+      byPoint.set(key, p)
+    }
+    return { eventTitle: e.eventTitle, points: Array.from(byPoint.values()) }
+  })
 }
 
 /** Sección completa de fotos del pedido — grid/lista intercambiables, con
  * las mismas acciones en ambas: ver (visor compartido), subir entrega
- * final, marcar como regalo, y agregar una foto extra de regalo (tarjeta
- * al final, reemplaza la vieja sección separada de "Cortesías"). */
+ * final, marcar/desmarcar como regalo, y agregar una foto extra de regalo
+ * (tarjeta al final, sube directo desde la galería en vez de elegir entre
+ * fotos ya existentes del evento). Agrupadas por evento → punto para
+ * pedidos que mezclan varios eventos del mismo fotógrafo. */
 function OrderPhotosSection({ order, photographerId, expanded }: { order: PhotographerOrderGroup; photographerId: string; expanded: boolean }) {
   const push = useToastStore((s) => s.push)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerLoading, setPickerLoading] = useState(false)
-  const [eventPhotos, setEventPhotos] = useState<EventPhotoOption[]>([])
+  const [uploadingExtra, setUploadingExtra] = useState(false)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [justClosedId, setJustClosedId] = useState<string | null>(null)
 
   const purchased = order.items.filter((i) => !i.is_courtesy)
   const courtesies = order.items.filter((i) => i.is_courtesy)
   const caps = courtesyCaps(purchased.length, expanded)
   const usedCombined = courtesies.length
-  const canWaive = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'waiver').length < caps.waivers
-  const canGiftExtra = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'extra').length < caps.extras
+  // Regalar (o des-regalar) el precio de una foto YA COMPRADA solo tiene
+  // sentido ANTES de confirmar el pago — después de eso el biker ya
+  // transfirió el monto acordado, así que cambiar el precio retroactivo no
+  // cuadra. El regalo EXTRA (una foto nueva, nunca cobrada) no tiene este
+  // problema y sigue disponible en cualquier momento (salvo cancelado).
+  const canWaive = order.status === 'pendiente_pago' && usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'waiver').length < caps.waivers
+  const canGiftExtra = order.status !== 'cancelado' && usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'extra').length < caps.extras
 
-  const allPhotos = order.items.map((item) => item.photo && toGridPhoto(item, order.eventTitle, order.bikerName)).filter((p): p is NonNullable<typeof p> => !!p)
+  const allPhotos = order.items.map((item) => item.photo && toGridPhoto(item, item.event?.title ?? '', order.bikerName)).filter((p): p is NonNullable<typeof p> => !!p)
   const openPhoto = openIndex != null ? allPhotos[openIndex] : null
   const openItem = openPhoto ? order.items.find((i) => i.photo_id === openPhoto.id) : null
+
+  function canToggleGift(item: RawOrderItem) {
+    if (item.status === 'entregado') return false
+    if (item.is_courtesy) return item.courtesy_type === 'waiver' && order.status === 'pendiente_pago'
+    return canWaive
+  }
 
   async function waive(item: RawOrderItem) {
     setBusyId(item.id)
     const { error } = await supabase
       .from('order_items')
-      .update({ price: 0, service_fee: 0, is_courtesy: true, courtesy_type: 'waiver' })
+      .update({ original_price: item.price, original_service_fee: item.service_fee, price: 0, service_fee: 0, is_courtesy: true, courtesy_type: 'waiver' })
       .eq('id', item.id)
     setBusyId(null)
     if (error) {
@@ -240,54 +291,97 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
     queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
   }
 
-  async function openPicker() {
-    setPickerOpen(true)
-    setPickerLoading(true)
-    const usedIds = new Set(order.items.map((i) => i.photo_id))
-    const { data, error } = await supabase
-      .from('photos')
-      .select('id, storage_path, preview_path, price, original_filename')
-      .eq('photographer_id', photographerId)
-      .eq('event_id', purchased[0]?.event_id ?? order.items[0]?.event_id)
-      .eq('featured', false)
-    setPickerLoading(false)
-    if (error) {
-      push({ type: 'error', title: 'No se pudieron cargar tus fotos', description: error.message })
-      return
-    }
-    setEventPhotos((data ?? []).filter((p) => !usedIds.has(p.id)))
-  }
-
-  async function giftExtra(photo: EventPhotoOption) {
-    setBusyId(photo.id)
-    const { error } = await supabase.from('order_items').insert({
-      order_id: order.orderId,
-      photo_id: photo.id,
-      photographer_id: photographerId,
-      event_id: purchased[0]?.event_id ?? order.items[0]?.event_id,
-      price: 0,
-      service_fee: 0,
-      is_courtesy: true,
-      courtesy_type: 'extra',
-      status: order.status === 'cancelado' ? 'pendiente_pago' : order.status,
-    })
+  async function unwaive(item: RawOrderItem) {
+    setBusyId(item.id)
+    const { error } = await supabase
+      .from('order_items')
+      .update({ price: item.original_price ?? item.price, service_fee: item.original_service_fee ?? item.service_fee, is_courtesy: false, courtesy_type: null, original_price: null, original_service_fee: null })
+      .eq('id', item.id)
     setBusyId(null)
     if (error) {
-      push({ type: 'error', title: 'No se pudo agregar el regalo', description: error.message })
+      push({ type: 'error', title: 'No se pudo deshacer el regalo', description: error.message })
       return
     }
-    push({ type: 'success', title: 'Foto de regalo agregada al pedido' })
-    setPickerOpen(false)
+    push({ type: 'success', title: 'Regalo deshecho — precio restaurado' })
     queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
   }
 
+  function toggleGift(item: RawOrderItem) {
+    if (item.is_courtesy) unwaive(item)
+    else waive(item)
+  }
+
+  // El regalo extra ahora se sube DIRECTO desde la galería del fotógrafo,
+  // como entrega final — ya no se elige entre fotos ya subidas al evento.
+  // Al biker le llega como una foto más de su pedido (con notificación).
+  async function handleGiftExtraFile(file: File | undefined) {
+    if (!file) return
+    setUploadingExtra(true)
+    try {
+      const eventId = purchased[0]?.event_id ?? order.items[0]?.event_id
+      const { data: photoRow, error: photoError } = await supabase
+        .from('photos')
+        .insert({ event_id: eventId, photographer_id: photographerId, storage_path: '', price: 0 })
+        .select('id')
+        .single()
+      if (photoError || !photoRow) throw new Error(photoError?.message ?? 'No se pudo crear la foto')
+
+      const { data, error } = await supabase.functions.invoke('r2-deliver-upload-url', {
+        body: { photoId: photoRow.id, fileName: file.name, contentType: file.type },
+      })
+      if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
+
+      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+
+      const { error: updatePhotoError } = await supabase
+        .from('photos')
+        .update({ delivered_path: data.deliveredPath, delivered_size_bytes: file.size, original_filename: file.name })
+        .eq('id', photoRow.id)
+      if (updatePhotoError) throw updatePhotoError
+
+      const nextPosition = order.items.reduce((max, i) => Math.max(max, i.position), -1) + 1
+      const { error: itemError } = await supabase.from('order_items').insert({
+        order_id: order.orderId,
+        photo_id: photoRow.id,
+        photographer_id: photographerId,
+        event_id: eventId,
+        price: 0,
+        service_fee: 0,
+        is_courtesy: true,
+        courtesy_type: 'extra',
+        status: 'entregado',
+        delivered_at: new Date().toISOString(),
+        position: nextPosition,
+      })
+      if (itemError) throw itemError
+
+      push({ type: 'success', title: 'Foto de regalo entregada', description: 'El biker la verá como parte de su pedido.' })
+      queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo agregar el regalo', description: (err as Error).message })
+    } finally {
+      setUploadingExtra(false)
+    }
+  }
+
+  function closeLightbox() {
+    if (openPhoto) {
+      const closedId = openPhoto.id
+      setJustClosedId(closedId)
+      setTimeout(() => setJustClosedId((cur) => (cur === closedId ? null : cur)), 1600)
+    }
+    setOpenIndex(null)
+  }
+
   async function handleDownloadOpen() {
-    if (!openPhoto) return
+    if (!openPhoto || !openItem) return
     setDownloading(true)
     try {
       const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: openPhoto.id } })
       if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
-      await downloadFile(data.downloadUrl, openPhoto.original_filename ?? `motoshots-${openPhoto.id}.jpg`)
+      const filename = buildDeliveredFilename(order.bikerName, order.orderNumber, openItem.position, openPhoto.original_filename)
+      await downloadFile(data.downloadUrl, filename)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
     } finally {
@@ -295,19 +389,28 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
     }
   }
 
-  const extraGiftTile =
-    order.status !== 'cancelado' && canGiftExtra ? (
-      <button
-        onClick={openPicker}
-        className={cn(
-          'flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-accent hover:text-accent',
-          viewMode === 'grid' ? 'aspect-[4/5]' : 'p-4',
-        )}
-      >
-        <IconGift className="h-6 w-6" />
-        <span className="text-xs font-semibold">+ Regalo extra</span>
-      </button>
-    ) : null
+  const eventGroups = groupItemsByEventoPunto(order.items)
+  const extraGiftInputId = `gift-extra-${order.orderId}`
+  const extraGiftTile = canGiftExtra ? (
+    <label
+      htmlFor={extraGiftInputId}
+      className={cn(
+        'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-accent hover:text-accent',
+        viewMode === 'grid' ? 'aspect-[4/5]' : 'p-4',
+      )}
+    >
+      <IconGift className="h-6 w-6" />
+      <span className="text-xs font-semibold">{uploadingExtra ? 'Subiendo…' : '+ Regalo extra'}</span>
+      <input
+        id={extraGiftInputId}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        disabled={uploadingExtra}
+        onChange={(e) => handleGiftExtraFile(e.target.files?.[0])}
+      />
+    </label>
+  ) : null
 
   return (
     <section>
@@ -332,84 +435,83 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
         {order.effectiveStatus === 'pendiente_comprobante' ? PENDIENTE_COMPROBANTE_COPY : SECTION_COPY[order.status]}
       </p>
 
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {order.items.map(
-            (item) =>
-              item.photo && (
-                <DeliverPhotoTile
-                  key={item.id}
-                  item={item}
-                  onOpen={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
-                  canGift={canWaive && !item.is_courtesy}
-                  giftBusy={busyId === item.id}
-                  onGift={() => waive(item)}
-                />
-              ),
-          )}
-          {extraGiftTile}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {order.items.map(
-            (item) =>
-              item.photo && (
-                <DeliverPhotoTile
-                  key={item.id}
-                  item={item}
-                  layout="list"
-                  onOpen={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
-                  canGift={canWaive && !item.is_courtesy}
-                  giftBusy={busyId === item.id}
-                  onGift={() => waive(item)}
-                />
-              ),
-          )}
-          {extraGiftTile}
-        </div>
-      )}
-
-      {pickerOpen && (
-        <div className="mt-5 rounded-3xl border border-border bg-card p-5 sm:p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Elige la foto a regalar</h3>
-            <button onClick={() => setPickerOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">
-              Cancelar
-            </button>
-          </div>
-          {pickerLoading && <p className="text-sm text-muted-foreground">Cargando tus fotos de este evento…</p>}
-          {!pickerLoading && eventPhotos.length === 0 && <p className="text-sm text-muted-foreground">No hay más fotos disponibles de este evento.</p>}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-            {eventPhotos.map((photo) => (
-              <button
-                key={photo.id}
-                onClick={() => giftExtra(photo)}
-                disabled={busyId === photo.id}
-                className="group overflow-hidden rounded-2xl border border-border disabled:opacity-50"
-              >
-                <img src={previewUrl(photo)} alt="" className="aspect-square w-full object-cover transition-transform group-hover:scale-105" />
-              </button>
+      <div className="flex flex-col gap-6">
+        {eventGroups.map((eventGroup) => (
+          <div key={eventGroup.eventTitle}>
+            {/* El título del evento solo se repite si hay más de uno en
+                este pedido — con uno solo (el caso normal) no aporta nada
+                verlo una y otra vez por cada punto. */}
+            {eventGroups.length > 1 && <p className="mb-2 text-sm font-semibold">{eventGroup.eventTitle}</p>}
+            {eventGroup.points.map((point) => (
+              <div key={point.label ?? '__sin_punto__'} className="mb-4 last:mb-0">
+                {point.label && <p className="mb-2 text-xs font-semibold text-muted-foreground">{point.label}</p>}
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {point.items.map(
+                      (item) =>
+                        item.photo && (
+                          <DeliverPhotoTile
+                            key={item.id}
+                            item={item}
+                            onOpen={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
+                            canToggleGift={canToggleGift(item)}
+                            giftBusy={busyId === item.id}
+                            onGift={() => toggleGift(item)}
+                            justClosed={item.photo_id === justClosedId}
+                          />
+                        ),
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {point.items.map(
+                      (item) =>
+                        item.photo && (
+                          <DeliverPhotoTile
+                            key={item.id}
+                            item={item}
+                            layout="list"
+                            onOpen={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
+                            canToggleGift={canToggleGift(item)}
+                            giftBusy={busyId === item.id}
+                            onGift={() => toggleGift(item)}
+                            justClosed={item.photo_id === justClosedId}
+                          />
+                        ),
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        ))}
+
+        {extraGiftTile && (
+          <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4' : 'flex flex-col gap-2'}>{extraGiftTile}</div>
+        )}
+      </div>
 
       {openPhoto && openIndex != null && (
         <PhotoLightbox
           photos={allPhotos}
           index={openIndex}
-          onClose={() => setOpenIndex(null)}
+          onClose={closeLightbox}
           onNavigate={setOpenIndex}
           mode="purchased"
           resolveSrc={(p) => (p.delivered_path ? queryClient.getQueryData<string | null>(['delivered-view-url', p.id]) ?? undefined : undefined)}
+          infoRows={[
+            { label: 'Comprador', value: order.bikerName },
+            { label: 'Evento', value: openItem?.event?.title ?? '' },
+            ...(openPhoto.pointLabel ? [{ label: 'Punto', value: openPhoto.pointLabel }] : []),
+          ]}
           cornerSlot={
             openItem?.photo?.delivered_path ? (
               <button
                 onClick={handleDownloadOpen}
                 disabled={downloading}
-                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {downloading ? 'Descargando…' : '⬇ Descargar'}
+                <IconDownload className="h-4 w-4" /> {downloading ? 'Descargando…' : 'Descargar'}
               </button>
             ) : undefined
           }
@@ -418,6 +520,7 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
     </section>
   )
 }
+
 
 // 4 pasos visibles (los status reales en la base de datos son solo 3) —
 // "Pedido creado" siempre existe y siempre está completo para cualquier
@@ -545,19 +648,22 @@ export function StudioOrderDetail() {
   const [savingNote, setSavingNote] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [openingProof, setOpeningProof] = useState(false)
-  const [proofUrl, setProofUrl] = useState<string | null>(null)
+  const [proof, setProof] = useState<{ viewUrl: string; uploadedAt: string } | null>(null)
 
   async function viewPaymentProof() {
     if (!order) return
     setOpeningProof(true)
     try {
-      const { data, error } = await supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId: order.orderId } })
+      const [{ data, error }, { data: row }] = await Promise.all([
+        supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId: order.orderId } }),
+        supabase.from('order_payment_proofs').select('uploaded_at').eq('order_id', order.orderId).eq('photographer_id', user!.id).maybeSingle(),
+      ])
       if (error) throw new Error(error.message)
       if (!data?.viewUrl) {
         push({ type: 'info', title: 'El biker todavía no sube su comprobante' })
         return
       }
-      setProofUrl(data.viewUrl)
+      setProof({ viewUrl: data.viewUrl, uploadedAt: row?.uploaded_at ?? '' })
     } catch (err) {
       push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
     } finally {
@@ -644,47 +750,58 @@ export function StudioOrderDetail() {
     queryClient.invalidateQueries({ queryKey: ['photographer-order-items', user.id] })
   }
 
+  // Un pedido puede tener fotos de eventos DISTINTOS del mismo fotógrafo
+  // (dos compras separadas que terminaron en el mismo pedido) — mostrar un
+  // solo "eventTitle" en el encabezado sería engañoso en ese caso, así que
+  // se muestra solo cuando de verdad hay uno.
+  const distinctEventTitles = Array.from(new Set(order.items.map((i) => i.event?.title).filter(Boolean)))
+  const eventLabel = distinctEventTitles.length === 1 ? distinctEventTitles[0] : `${distinctEventTitles.length} eventos`
+
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <div className="rounded-3xl border border-border bg-card p-6 sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <InitialsAvatar name={order.bikerName} className="h-16 w-16 bg-foreground text-lg text-background" />
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comprador</p>
-              <h1 className="text-2xl font-bold tracking-tight">{order.bikerName}</h1>
-              <p className="text-muted-foreground">{formatOrderCode(order.orderNumber, orderCodeName)} · {order.eventTitle}</p>
+      {/* Cabecera compacta — antes cada dato (comprador, pago, whatsapp,
+          status) competía por su propio espacio en una fila ancha que en
+          móvil terminaba envolviendo en varias líneas desordenadas. Ahora
+          es: nombre+código arriba, status a la derecha (bien visible), y
+          una segunda fila angosta con pago/comprobante/whatsapp. */}
+      <div className="rounded-3xl border border-border bg-card p-4 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <InitialsAvatar name={order.bikerName} className="h-12 w-12 shrink-0 bg-foreground text-base text-background sm:h-14 sm:w-14" />
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">{order.bikerName}</h1>
+              <p className="truncate text-xs text-muted-foreground sm:text-sm">{formatOrderCode(order.orderNumber, orderCodeName)} · {eventLabel}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="rounded-2xl bg-muted px-4 py-2.5 text-right">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {order.paymentMethod === 'tarjeta' ? 'Pago con tarjeta' : 'Transferencia bancaria'}
-              </p>
-              <p className="text-xl font-bold">Q{order.total.toFixed(2)}</p>
-            </div>
-            {order.paymentMethod === 'transferencia' && (
-              <Button variant="secondary" size="sm" onClick={viewPaymentProof} loading={openingProof}>
-                Ver comprobante
-              </Button>
-            )}
-            {order.bikerPhone && (
-              <a
-                href={`https://wa.me/${order.bikerPhone.replace(/[^0-9]/g, '')}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-                title="Escribir por WhatsApp"
-                aria-label="Escribir por WhatsApp"
-              >
-                💬
-              </a>
-            )}
-            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs" />
-          </div>
+          {/* Más notoria que antes: texto más grande y con más padding, en
+              vez de compartir el mismo tamaño chico que el resto de chips. */}
+          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-sm font-bold" />
         </div>
 
-        {order.status !== 'cancelado' && <OrderStepper steps={TOP_STEP_LABELS} currentIndex={stepIndex} className="mt-8" />}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
+            {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
+          </span>
+          {order.paymentMethod === 'transferencia' && (
+            <Button variant="secondary" size="sm" onClick={viewPaymentProof} loading={openingProof}>
+              Ver comprobante
+            </Button>
+          )}
+          {order.bikerPhone && (
+            <a
+              href={`https://wa.me/${order.bikerPhone.replace(/[^0-9]/g, '')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+              title="Escribir por WhatsApp"
+              aria-label="Escribir por WhatsApp"
+            >
+              <IconWhatsapp className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+
+        {order.status !== 'cancelado' && <OrderStepper steps={TOP_STEP_LABELS} currentIndex={stepIndex} className="mt-6" />}
 
         {order.status === 'cancelado' && order.cancellationReason && (
           <div className="mt-6 rounded-2xl border border-border bg-muted/40 p-4">
@@ -779,33 +896,50 @@ export function StudioOrderDetail() {
         </aside>
       </div>
 
-      {proofUrl && (
-        <Lightbox
-          open
-          close={() => setProofUrl(null)}
+      {proof && (
+        <PhotoLightbox
+          photos={[
+            {
+              id: 'proof',
+              event_id: '',
+              photographer_id: user?.id ?? '',
+              point_id: null,
+              storage_path: null,
+              preview_path: null,
+              raw_path: null,
+              delivered_path: null,
+              price: order.total,
+              moto_brand: null,
+              featured: false,
+              original_filename: null,
+              created_at: '',
+              eventTitle: '',
+              photographerName: orderCodeName ?? '',
+            },
+          ]}
           index={0}
-          slides={[{ src: proofUrl }]}
-          plugins={[Zoom]}
-          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
-          render={
-            action?.next === 'en_preparacion'
-              ? {
-                  slideFooter: () => (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-5">
-                      <Button
-                        variant="dark"
-                        className="pointer-events-auto"
-                        onClick={() => {
-                          confirmAction()
-                          setProofUrl(null)
-                        }}
-                      >
-                        Confirmar pago recibido
-                      </Button>
-                    </div>
-                  ),
-                }
-              : undefined
+          onClose={() => setProof(null)}
+          onNavigate={() => {}}
+          mode="purchased"
+          resolveSrc={() => proof.viewUrl}
+          infoRows={[
+            { label: 'Enviado a', value: orderCodeName ?? 'Ti' },
+            { label: 'Enviado por', value: order.bikerName },
+            ...(proof.uploadedAt ? [{ label: 'Fecha', value: new Date(proof.uploadedAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
+            { label: 'Monto', value: `Q${order.total.toFixed(2)}` },
+          ]}
+          cornerSlot={
+            action?.next === 'en_preparacion' ? (
+              <Button
+                variant="dark"
+                onClick={() => {
+                  confirmAction()
+                  setProof(null)
+                }}
+              >
+                Confirmar pago recibido
+              </Button>
+            ) : undefined
           }
         />
       )}

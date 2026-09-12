@@ -106,6 +106,10 @@ export function Checkout() {
     // sus propios order_items para que cada fila tenga su valor (necesario
     // para el saldo pendiente por liquidar), ajustando el redondeo en la
     // última para que la suma cuadre exacto con el total del grupo.
+    // `position` fija el orden real de la lista de fotos del pedido — sin
+    // esto, Postgres no garantiza el orden de las filas al leerlas de
+    // vuelta, y la lista podía "barajarse" sola entre un fetch y otro.
+    let position = 0
     const rowsToInsert = photographerGroups.flatMap((group) => {
       const perItemFee = distributeServiceFee(group.serviceFee, group.items.length)
       // `item.price` es el precio de LISTA (sin descuento) — lo que de
@@ -122,6 +126,7 @@ export function Checkout() {
         event_id: item.eventId,
         price: item.effectivePrice,
         service_fee: perItemFee[i],
+        position: position++,
       }))
     })
 
@@ -252,6 +257,13 @@ export function Checkout() {
         </div>
 
         <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+          {/* Arriba de todo en la columna derecha (antes al final, debajo
+              de Método de pago) — así no hay que bajar hasta el fondo de la
+              columna en escritorio para confirmar. */}
+          <Button size="lg" loading={placing} onClick={placeOrder}>
+            Confirmar pedido — Q{grandTotal}
+          </Button>
+
           <Card className="cursor-default hover:scale-100">
             <h2 className="mb-4 font-bold">Resumen</h2>
 
@@ -351,10 +363,6 @@ export function Checkout() {
               Después de confirmar, verás los datos bancarios de cada fotógrafo para transferir y subir tu comprobante.
             </p>
           </Card>
-
-          <Button size="lg" loading={placing} onClick={placeOrder}>
-            Confirmar pedido — Q{grandTotal}
-          </Button>
         </div>
       </div>
 

@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import Lightbox from 'yet-another-react-lightbox'
-import Zoom from 'yet-another-react-lightbox/plugins/zoom'
-import 'yet-another-react-lightbox/styles.css'
+import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Button } from '../../ui/flat/Button'
@@ -11,6 +9,7 @@ import { Card } from '../../ui/flat/Card'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { IconCart } from '../../ui/shared/icons'
+import { PhotoLightbox } from './components/PhotoLightbox'
 
 interface BankDetails {
   bank_name: string | null
@@ -76,11 +75,11 @@ function useOrderPaymentInfo(orderId: string | undefined) {
 function useExistingProofs(orderId: string | undefined) {
   return useQuery({
     queryKey: ['order-payment-proofs', orderId],
-    queryFn: async (): Promise<Record<string, string>> => {
-      const { data, error } = await supabase.from('order_payment_proofs').select('photographer_id, proof_path').eq('order_id', orderId)
+    queryFn: async (): Promise<Record<string, { proofPath: string; uploadedAt: string }>> => {
+      const { data, error } = await supabase.from('order_payment_proofs').select('photographer_id, proof_path, uploaded_at').eq('order_id', orderId)
       if (error) throw error
-      const map: Record<string, string> = {}
-      for (const row of data ?? []) map[row.photographer_id] = row.proof_path
+      const map: Record<string, { proofPath: string; uploadedAt: string }> = {}
+      for (const row of data ?? []) map[row.photographer_id] = { proofPath: row.proof_path, uploadedAt: row.uploaded_at }
       return map
     },
     enabled: !!orderId,
@@ -104,13 +103,13 @@ function uploadWithProgress(url: string, file: File, onProgress: (pct: number) =
   })
 }
 
-function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue; orderId: string; hasProof: boolean }) {
+function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: PhotographerDue; orderId: string; bikerName: string; proof: { proofPath: string; uploadedAt: string } | undefined }) {
   const push = useToastStore((s) => s.push)
   const [progress, setProgress] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
-  const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerUrl, setViewerUrl] = useState<string | null>(null)
   const [loadingViewer, setLoadingViewer] = useState(false)
+  const hasProof = !!proof
 
   const bankLines = due.bank
     ? [
@@ -140,7 +139,6 @@ function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue;
       })
       if (error || !data?.viewUrl) throw new Error(error?.message ?? 'No se pudo abrir tu comprobante')
       setViewerUrl(data.viewUrl)
-      setViewerOpen(true)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo abrir tu comprobante', description: (err as Error).message })
     } finally {
@@ -228,14 +226,38 @@ function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue;
         </div>
       </div>
 
-      {viewerOpen && viewerUrl && (
-        <Lightbox
-          open
-          close={() => setViewerOpen(false)}
+      {viewerUrl && (
+        <PhotoLightbox
+          photos={[
+            {
+              id: `proof-${due.photographerId}`,
+              event_id: '',
+              photographer_id: due.photographerId,
+              point_id: null,
+              storage_path: null,
+              preview_path: null,
+              raw_path: null,
+              delivered_path: null,
+              price: due.total,
+              moto_brand: null,
+              featured: false,
+              original_filename: null,
+              created_at: '',
+              eventTitle: '',
+              photographerName: due.photographerName,
+            },
+          ]}
           index={0}
-          slides={[{ src: viewerUrl }]}
-          plugins={[Zoom]}
-          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
+          onClose={() => setViewerUrl(null)}
+          onNavigate={() => {}}
+          mode="purchased"
+          resolveSrc={() => viewerUrl}
+          infoRows={[
+            { label: 'Enviado a', value: due.photographerName },
+            { label: 'Enviado por', value: bikerName },
+            ...(proof?.uploadedAt ? [{ label: 'Fecha', value: new Date(proof.uploadedAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
+            { label: 'Monto', value: `Q${due.total}` },
+          ]}
         />
       )}
     </Card>
@@ -244,6 +266,7 @@ function PhotographerDueCard({ due, orderId, hasProof }: { due: PhotographerDue;
 
 export function PaymentProofPage() {
   const { orderId } = useParams<{ orderId: string }>()
+  const { profile } = useAuth()
   const { data, isLoading } = useOrderPaymentInfo(orderId)
   const { data: proofs = {} } = useExistingProofs(orderId)
 
@@ -260,14 +283,21 @@ export function PaymentProofPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-3 py-6 font-flat md:px-8 md:py-10">
-      {/* Arriba de todo — antes solo se podía volver a "Mis compras" hasta
-          el final de la página, forzando a hacer scroll incluso cuando el
-          biker solo quería salir sin terminar de subir nada. */}
-      <Link to="/app/historial">
-        <Button variant="secondary" size="sm">
-          <IconCart className="h-4 w-4" /> Ir a Mis compras
-        </Button>
-      </Link>
+      {/* "Ir a Mis compras" siempre arriba a la izquierda; una vez que ya
+          subió todo, "Ver mi pedido" aparece al lado opuesto — el camino
+          más directo de vuelta al pedido en vez de la lista completa. */}
+      <div className="flex items-center justify-between gap-3">
+        <Link to="/app/historial">
+          <Button variant="secondary" size="sm">
+            <IconCart className="h-4 w-4" /> Ir a Mis compras
+          </Button>
+        </Link>
+        {allUploaded && orderId && (
+          <Link to={`/app/historial/${orderId}`}>
+            <Button size="sm">Ver mi pedido</Button>
+          </Link>
+        )}
+      </div>
 
       <span className="mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✓</span>
       <h1 className="mt-4 text-2xl font-bold tracking-tight md:text-3xl">Completa tu pago por transferencia</h1>
@@ -279,7 +309,7 @@ export function PaymentProofPage() {
 
       <div className="mt-6 flex flex-col gap-4">
         {data.dues.map((due) => (
-          <PhotographerDueCard key={due.photographerId} due={due} orderId={orderId!} hasProof={!!proofs[due.photographerId]} />
+          <PhotographerDueCard key={due.photographerId} due={due} orderId={orderId!} bikerName={profile?.display_name ?? 'Biker'} proof={proofs[due.photographerId]} />
         ))}
       </div>
 

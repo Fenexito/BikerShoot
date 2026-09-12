@@ -17,3 +17,18 @@ export async function downloadFile(url: string, filename: string) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000)
 }
+
+/** Nombre de archivo real para una entrega final — antes se guardaba/
+ * descargaba con un nombre genérico (`motoshots-<uuid>.jpg`), que no dice
+ * nada al biker ni al fotógrafo. Con esto: `Fenexito-000007-001.jpg`
+ * (fotógrafo-pedido-posición), fácil de ordenar y de identificar. */
+export function buildDeliveredFilename(photographerLabel: string, orderNumber: number | null | undefined, positionInOrder: number, originalFilename?: string | null) {
+  const safeName = photographerLabel
+    .normalize('NFD')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 20) || 'MotoShots'
+  const orderPart = String(orderNumber ?? 0).padStart(6, '0')
+  const photoPart = String(positionInOrder + 1).padStart(3, '0')
+  const ext = originalFilename?.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  return `${safeName}-${orderPart}-${photoPart}.${ext}`
+}

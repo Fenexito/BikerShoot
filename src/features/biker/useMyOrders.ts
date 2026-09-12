@@ -23,6 +23,9 @@ export interface MyOrderItem {
   photo_id: string
   photographer_id: string
   price: number
+  position: number
+  is_courtesy: boolean
+  courtesy_type: 'waiver' | 'extra' | null
   status: OrderItemStatus
   photo: MyOrderItemPhoto | null
   event: { title: string } | null
@@ -133,6 +136,7 @@ export function useMyOrders(bikerId: string | undefined) {
         )
         .eq('biker_id', bikerId)
         .order('created_at', { ascending: false })
+        .order('position', { referencedTable: 'order_items' })
       if (error) throw error
       return (data as unknown as MyOrder[]) ?? []
     },

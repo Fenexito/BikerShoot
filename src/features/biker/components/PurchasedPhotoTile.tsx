@@ -6,6 +6,8 @@ import { downloadFile } from '../../../lib/download'
 import { StatusPill } from '../../../ui/shared/StatusPill'
 import { getOrderStatusStyle, getEffectiveStatusStyle, type OrderItemStatus, type EffectiveOrderStatus } from '../../../lib/orderStatus'
 import { useToastStore } from '../../../ui/overlays/toastStore'
+import { IconDownload } from '../../../ui/shared/icons'
+import { cn } from '../../../lib/cn'
 
 const PAID_STATUSES = new Set<OrderItemStatus>(['en_preparacion', 'entregado'])
 
@@ -55,6 +57,8 @@ export function PurchasedPhotoTile({
   effectiveStatus,
   showStatusPill = true,
   onClick,
+  justClosed = false,
+  downloadFilename,
 }: {
   photoId: string
   photo: PurchasedPhoto | null
@@ -67,6 +71,13 @@ export function PurchasedPhotoTile({
    * información nueva. */
   showStatusPill?: boolean
   onClick?: () => void
+  /** true por un instante justo después de cerrar el visor sobre esta foto
+   * — mismo resalte breve que usa Buscar, para no perderla entre las
+   * demás del pedido. */
+  justClosed?: boolean
+  /** Nombre de archivo real para la descarga (ej. "Fenexito-000007-001.jpg")
+   * — si no se pasa, cae a un nombre genérico. */
+  downloadFilename?: string
 }) {
   const push = useToastStore((s) => s.push)
   const [downloading, setDownloading] = useState(false)
@@ -83,7 +94,7 @@ export function PurchasedPhotoTile({
     }
     setDownloading(true)
     try {
-      await downloadPurchasedPhoto(photoId, `motoshots-${photoId}.jpg`)
+      await downloadPurchasedPhoto(photoId, downloadFilename ?? `motoshots-${photoId}.jpg`)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
     } finally {
@@ -97,7 +108,7 @@ export function PurchasedPhotoTile({
   const thumbnailSrc = delivered && deliveredUrl ? deliveredUrl : photo ? previewUrl(photo) : undefined
 
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted">
+    <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted', justClosed && 'animate-photo-just-closed')}>
       {thumbnailSrc && (
         <button onClick={onClick} className="block h-full w-full" aria-label="Ver foto">
           <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />
@@ -112,9 +123,9 @@ export function PurchasedPhotoTile({
         <button
           onClick={download}
           disabled={downloading}
-          className="absolute inset-x-1.5 top-1.5 flex items-center justify-center rounded-full bg-black/70 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/85"
+          className="absolute inset-x-1.5 top-1.5 flex items-center justify-center gap-1 rounded-full bg-black/70 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/85"
         >
-          {downloading ? 'Descargando…' : '⬇ Descargar original'}
+          <IconDownload className="h-3.5 w-3.5" /> {downloading ? 'Descargando…' : 'Descargar original'}
         </button>
       )}
       {stillEditing && (

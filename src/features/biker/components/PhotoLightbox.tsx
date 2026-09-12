@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { previewUrl } from '../../../lib/r2'
@@ -39,6 +39,11 @@ interface PhotoLightboxProps {
    * foto (ej. el archivo final ya entregado, que vive en el bucket
    * privado), puede resolverla acá y el visor la usa en su lugar. */
   resolveSrc?: (photo: GridPhoto) => string | undefined
+  /** Reemplaza POR COMPLETO el cuadro de info de la esquina superior
+   * izquierda (por defecto Fotógrafo/Evento/Punto) — para contextos que no
+   * son "una foto de un evento" (ej. un comprobante de pago: a quién se
+   * envió, quién lo envió, fecha, monto). */
+  infoRows?: { label: string; value: string; href?: string }[]
 }
 
 const SWIPE_UP_CLOSE_THRESHOLD = 110
@@ -52,7 +57,7 @@ const ZOOM_MAX = 4
  * overlays chicos que NO le quitan espacio real a la imagen — a diferencia
  * de la versión anterior (filas reales de header/footer), que sí achicaba
  * la foto para hacerle lugar. */
-export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot, resolveSrc }: PhotoLightboxProps) {
+export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot, resolveSrc, infoRows }: PhotoLightboxProps) {
   const purchased = mode === 'purchased'
   const photo = photos[index]
   const imgSrc = resolveSrc?.(photo) ?? previewUrl(photo)
@@ -283,16 +288,33 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
           etiqueta más larga, así todas quedan en la misma línea vertical. */}
       <div className="pointer-events-none absolute left-4 top-4 z-10 sm:left-6 sm:top-6">
         <div className="pointer-events-auto grid max-w-[55vw] grid-cols-[auto_1fr] items-baseline gap-x-1.5 gap-y-0.5 rounded-xl bg-black/40 px-2.5 py-2 text-[11px] text-white backdrop-blur-sm sm:max-w-xs sm:gap-y-1 sm:rounded-2xl sm:px-3.5 sm:py-2.5 sm:text-sm">
-          <span className="text-white/50">Fotógrafo:</span>
-          <Link to={`/app/fotografos/${photo.photographer_id}`} className="min-w-0 truncate font-medium hover:underline">
-            {photo.photographerName}
-          </Link>
-          <span className="text-white/50">Evento:</span>
-          <span className="min-w-0 truncate font-medium">{photo.eventTitle}</span>
-          {photo.pointLabel && (
+          {infoRows ? (
+            infoRows.map((row) => (
+              <Fragment key={row.label}>
+                <span className="text-white/50">{row.label}:</span>
+                {row.href ? (
+                  <Link to={row.href} className="min-w-0 truncate font-medium hover:underline">
+                    {row.value}
+                  </Link>
+                ) : (
+                  <span className="min-w-0 truncate font-medium">{row.value}</span>
+                )}
+              </Fragment>
+            ))
+          ) : (
             <>
-              <span className="text-white/50">Punto:</span>
-              <span className="min-w-0 truncate font-medium">{photo.pointLabel}</span>
+              <span className="text-white/50">Fotógrafo:</span>
+              <Link to={`/app/fotografos/${photo.photographer_id}`} className="min-w-0 truncate font-medium hover:underline">
+                {photo.photographerName}
+              </Link>
+              <span className="text-white/50">Evento:</span>
+              <span className="min-w-0 truncate font-medium">{photo.eventTitle}</span>
+              {photo.pointLabel && (
+                <>
+                  <span className="text-white/50">Punto:</span>
+                  <span className="min-w-0 truncate font-medium">{photo.pointLabel}</span>
+                </>
+              )}
             </>
           )}
         </div>

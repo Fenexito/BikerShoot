@@ -28,6 +28,14 @@ export interface RawOrderItem {
   service_fee: number
   is_courtesy: boolean
   courtesy_type: 'waiver' | 'extra' | null
+  /** Orden real de aparición dentro del pedido — sin esto Postgres no
+   * garantiza el orden de las filas, así que la lista podía "barajarse"
+   * sola entre un fetch y otro (ver migración 0041). */
+  position: number
+  /** Precio/tarifa antes de regalar la foto (waiver) — permite deshacer el
+   * regalo y restaurar el precio real, en vez de perderlo para siempre. */
+  original_price: number | null
+  original_service_fee: number | null
   status: OrderItemStatus
   created_at: string
   photographer_note: string | null
@@ -103,6 +111,7 @@ function useRawOrderItems(photographerId: string | undefined) {
         .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured, created_at, point:event_points(label, time_start, time_end)), event:events(title), order:orders(order_number, payment_method, created_at, biker:profiles(id, display_name, phone))')
         .eq('photographer_id', photographerId)
         .order('created_at', { ascending: false })
+        .order('position')
       if (error) throw error
       return (data as unknown as RawOrderItem[]) ?? []
     },
