@@ -2,8 +2,21 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { deriveEffectiveStatus, type EffectiveOrderStatus, type OrderItemStatus } from '../../lib/orderStatus'
+import type { GridPhoto } from '../biker/components/PhotoGrid'
 
 export type { OrderItemStatus }
+
+export interface RawOrderItemPhoto {
+  id: string
+  storage_path: string | null
+  preview_path: string | null
+  delivered_path: string | null
+  raw_path: string | null
+  original_filename: string | null
+  featured: boolean
+  created_at: string
+  point: { label: string; time_start: string; time_end: string } | null
+}
 
 export interface RawOrderItem {
   id: string
@@ -22,9 +35,37 @@ export interface RawOrderItem {
   paid_at: string | null
   delivered_at: string | null
   cancelled_at: string | null
-  photo: { id: string; storage_path: string | null; preview_path: string | null; delivered_path: string | null; raw_path: string | null; original_filename: string | null; featured: boolean } | null
+  photo: RawOrderItemPhoto | null
   event: { title: string } | null
   order: { order_number: number; payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { id: string; display_name: string; phone: string | null } | null } | null
+}
+
+/** Adapta un item de pedido (lado fotógrafo) a la forma que espera el
+ * visor compartido (mismo `PhotoLightbox` que usa Buscar y Mis compras) —
+ * el biker ya no es quien decide qué visor usar el fotógrafo, es el MISMO
+ * componente en los tres lugares. */
+export function toGridPhoto(item: RawOrderItem, eventTitle: string, photographerName: string): GridPhoto | null {
+  if (!item.photo) return null
+  return {
+    id: item.photo.id,
+    event_id: item.event_id,
+    photographer_id: item.photographer_id,
+    point_id: null,
+    storage_path: item.photo.storage_path,
+    preview_path: item.photo.preview_path,
+    raw_path: item.photo.raw_path,
+    delivered_path: item.photo.delivered_path,
+    price: item.price,
+    moto_brand: null,
+    featured: item.photo.featured,
+    original_filename: item.photo.original_filename,
+    created_at: item.photo.created_at,
+    eventTitle,
+    photographerName,
+    pointLabel: item.photo.point?.label,
+    pointTimeStart: item.photo.point?.time_start,
+    pointTimeEnd: item.photo.point?.time_end,
+  }
 }
 
 export interface PhotographerOrderGroup {
@@ -59,7 +100,7 @@ function useRawOrderItems(photographerId: string | undefined) {
     queryFn: async (): Promise<RawOrderItem[]> => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured), event:events(title), order:orders(order_number, payment_method, created_at, biker:profiles(id, display_name, phone))')
+        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured, created_at, point:event_points(label, time_start, time_end)), event:events(title), order:orders(order_number, payment_method, created_at, biker:profiles(id, display_name, phone))')
         .eq('photographer_id', photographerId)
         .order('created_at', { ascending: false })
       if (error) throw error

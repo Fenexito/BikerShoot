@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useOrderGroup, type PhotographerOrderGroup, type RawOrderItem } from './useMyOrders'
+import { useOrderGroup, toGridPhoto, type PhotographerOrderGroup, type RawOrderItem, type RawOrderItemPhoto } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
@@ -18,53 +18,52 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
+import { PhotoLightbox } from '../biker/components/PhotoLightbox'
+import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
+import { IconGift } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 import Lightbox from 'yet-another-react-lightbox'
 import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import 'yet-another-react-lightbox/styles.css'
 
-interface DeliverablePhoto {
-  id: string
-  storage_path: string | null
-  preview_path: string | null
-  delivered_path: string | null
-  raw_path: string | null
-  original_filename: string | null
-  featured: boolean
+/** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
+ * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
+ * la sección E del documento de precios. `cortesias_ampliadas` (extra
+ * nativo de Pro) suma +1 al tope combinado de cualquier franja. */
+function courtesyCaps(purchasedCount: number, expanded: boolean) {
+  const base = purchasedCount <= 2 ? { waivers: 0, extras: 1, combined: 1 } : purchasedCount <= 5 ? { waivers: 1, extras: 1, combined: 1 } : { waivers: 2, extras: 2, combined: 2 }
+  return expanded ? { ...base, combined: base.combined + 1 } : base
 }
 
-function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; orderItemId: string }) {
+/** Miniatura de una foto del pedido — sube la entrega final, marca como
+ * cortesía (regalo, ícono en la esquina), y abre el visor compartido (el
+ * mismo de Buscar/Mis compras) al hacer click, en vez de una pestaña
+ * nueva. Una vez entregada, la miniatura muestra el archivo final (sin
+ * marca de agua) igual que del lado del biker. */
+function DeliverPhotoTile({
+  item,
+  onOpen,
+  canGift,
+  giftBusy,
+  onGift,
+  layout = 'grid',
+}: {
+  item: RawOrderItem
+  onOpen: () => void
+  canGift: boolean
+  giftBusy: boolean
+  onGift: () => void
+  layout?: 'grid' | 'list'
+}) {
+  const photo = item.photo as RawOrderItemPhoto
   const push = useToastStore((s) => s.push)
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [openingDelivered, setOpeningDelivered] = useState(false)
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
-  const [downloadingDelivered, setDownloadingDelivered] = useState(false)
 
-  async function downloadDelivered() {
-    if (!lightboxUrl) return
-    setDownloadingDelivered(true)
-    try {
-      await downloadFile(lightboxUrl, photo.original_filename ?? `motoshots-${photo.id}.jpg`)
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
-    } finally {
-      setDownloadingDelivered(false)
-    }
-  }
-
-  async function viewDelivered() {
-    setOpeningDelivered(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: photo.id } })
-      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
-      setLightboxUrl(data.downloadUrl)
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo abrir la entrega', description: (err as Error).message })
-    } finally {
-      setOpeningDelivered(false)
-    }
-  }
+  const delivered = !!photo.delivered_path
+  const { data: deliveredUrl } = useDeliveredViewUrl(photo.id, delivered)
+  const hasPreview = !!(photo.preview_path || photo.storage_path)
+  const thumbnailSrc = delivered && deliveredUrl ? deliveredUrl : hasPreview ? previewUrl(photo) : undefined
 
   async function handleFile(file: File | undefined) {
     if (!file) return
@@ -87,7 +86,7 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
       await supabase
         .from('order_items')
         .update({ status: 'entregado' satisfies OrderItemStatus, delivered_at: new Date().toISOString() })
-        .eq('id', orderItemId)
+        .eq('id', item.id)
 
       push({ type: 'success', title: 'Foto entregada' })
       queryClient.invalidateQueries({ queryKey: ['photographer-order-items'] })
@@ -98,36 +97,71 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
     }
   }
 
-  const hasPreview = !!(photo.preview_path || photo.storage_path)
-  const delivered = !!photo.delivered_path
-  const clickable = delivered || hasPreview
+  const giftButton = (item.is_courtesy || canGift) && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        if (!item.is_courtesy) onGift()
+      }}
+      disabled={giftBusy || item.is_courtesy}
+      aria-label={item.is_courtesy ? 'Ya es un regalo' : 'Regalar esta foto'}
+      title={item.is_courtesy ? 'Ya es un regalo para el biker' : 'Regalar esta foto (cortesía)'}
+      className={cn(
+        'flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors',
+        item.is_courtesy ? 'bg-emerald-500 text-white' : 'bg-white/95 text-foreground hover:bg-white disabled:opacity-50',
+      )}
+    >
+      <IconGift className="h-4 w-4" filled={item.is_courtesy} />
+    </button>
+  )
 
-  function handleTileClick() {
-    if (delivered) viewDelivered()
-    else if (hasPreview) window.open(previewUrl(photo), '_blank')
+  if (layout === 'list') {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2.5">
+        <button onClick={onOpen} className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted" disabled={!thumbnailSrc}>
+          {thumbnailSrc && <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium" title={photo.original_filename ?? undefined}>
+            {photo.original_filename ?? 'Sin nombre registrado'}
+          </p>
+          {item.is_courtesy && <p className="text-xs text-emerald-600">🎁 Regalo</p>}
+        </div>
+        {!delivered && (
+          <>
+            <button
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-semibold transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+            >
+              {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
+            </button>
+            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+          </>
+        )}
+        {delivered && <span className="shrink-0 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-600">✓ Entregada</span>}
+        {giftButton}
+      </div>
+    )
   }
 
   return (
     <div className="overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-accent/40 hover:shadow-sm">
-      <div
-        onClick={handleTileClick}
-        className={cn('relative aspect-[4/5] overflow-hidden bg-muted', clickable && 'cursor-pointer')}
-        title={delivered ? 'Ver entrega final' : hasPreview ? 'Ver con marca de agua' : undefined}
-      >
-        {hasPreview ? (
-          <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-muted-foreground">
-            Vista previa liberada
-            <br />
-            (espacio de almacenamiento)
-          </div>
-        )}
-        {openingDelivered && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold text-white">
-            Abriendo…
-          </div>
-        )}
+      <div className="relative aspect-[4/5] overflow-hidden bg-muted">
+        <button onClick={onOpen} className="block h-full w-full cursor-pointer" disabled={!thumbnailSrc} aria-label="Ver foto" title={delivered ? 'Ver entrega final' : 'Ver con marca de agua'}>
+          {thumbnailSrc ? (
+            <img src={thumbnailSrc} alt="" className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-muted-foreground">
+              Vista previa liberada
+              <br />
+              (espacio de almacenamiento)
+            </div>
+          )}
+        </button>
+
+        {giftButton && <div className="pointer-events-auto absolute right-2 top-2 z-[1]">{giftButton}</div>}
+
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute inset-x-2 bottom-2">
           {delivered ? (
@@ -138,9 +172,9 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
             <button
               onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
               disabled={uploading}
-              className="flex w-full items-center justify-center rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-white"
+              className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-background"
             >
-              {uploading ? 'Subiendo…' : 'Subir entrega final'}
+              {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
             </button>
           )}
         </div>
@@ -151,33 +185,237 @@ function DeliverPhotoTile({ photo, orderItemId }: { photo: DeliverablePhoto; ord
       <div className="p-3">
         <p className="truncate text-xs text-muted-foreground" title={photo.original_filename ?? undefined}>
           {photo.original_filename ?? 'Sin nombre registrado'}
+          {item.is_courtesy && <span className="ml-1.5 text-emerald-600">🎁 Regalo</span>}
         </p>
       </div>
+    </div>
+  )
+}
 
-      {lightboxUrl && (
-        <Lightbox
-          open
-          close={() => setLightboxUrl(null)}
-          index={0}
-          slides={[{ src: lightboxUrl }]}
-          plugins={[Zoom]}
-          zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4 }}
-          render={{
-            slideFooter: () => (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-5">
-                <button
-                  onClick={downloadDelivered}
-                  disabled={downloadingDelivered}
-                  className="pointer-events-auto rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {downloadingDelivered ? 'Descargando…' : '⬇ Descargar'}
-                </button>
-              </div>
-            ),
-          }}
+interface EventPhotoOption {
+  id: string
+  storage_path: string | null
+  preview_path: string | null
+  price: number
+  original_filename: string | null
+}
+
+/** Sección completa de fotos del pedido — grid/lista intercambiables, con
+ * las mismas acciones en ambas: ver (visor compartido), subir entrega
+ * final, marcar como regalo, y agregar una foto extra de regalo (tarjeta
+ * al final, reemplaza la vieja sección separada de "Cortesías"). */
+function OrderPhotosSection({ order, photographerId, expanded }: { order: PhotographerOrderGroup; photographerId: string; expanded: boolean }) {
+  const push = useToastStore((s) => s.push)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [eventPhotos, setEventPhotos] = useState<EventPhotoOption[]>([])
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [downloading, setDownloading] = useState(false)
+
+  const purchased = order.items.filter((i) => !i.is_courtesy)
+  const courtesies = order.items.filter((i) => i.is_courtesy)
+  const caps = courtesyCaps(purchased.length, expanded)
+  const usedCombined = courtesies.length
+  const canWaive = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'waiver').length < caps.waivers
+  const canGiftExtra = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'extra').length < caps.extras
+
+  const allPhotos = order.items.map((item) => item.photo && toGridPhoto(item, order.eventTitle, order.bikerName)).filter((p): p is NonNullable<typeof p> => !!p)
+  const openPhoto = openIndex != null ? allPhotos[openIndex] : null
+  const openItem = openPhoto ? order.items.find((i) => i.photo_id === openPhoto.id) : null
+
+  async function waive(item: RawOrderItem) {
+    setBusyId(item.id)
+    const { error } = await supabase
+      .from('order_items')
+      .update({ price: 0, service_fee: 0, is_courtesy: true, courtesy_type: 'waiver' })
+      .eq('id', item.id)
+    setBusyId(null)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo regalar', description: error.message })
+      return
+    }
+    push({ type: 'success', title: 'Foto regalada' })
+    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
+  }
+
+  async function openPicker() {
+    setPickerOpen(true)
+    setPickerLoading(true)
+    const usedIds = new Set(order.items.map((i) => i.photo_id))
+    const { data, error } = await supabase
+      .from('photos')
+      .select('id, storage_path, preview_path, price, original_filename')
+      .eq('photographer_id', photographerId)
+      .eq('event_id', purchased[0]?.event_id ?? order.items[0]?.event_id)
+      .eq('featured', false)
+    setPickerLoading(false)
+    if (error) {
+      push({ type: 'error', title: 'No se pudieron cargar tus fotos', description: error.message })
+      return
+    }
+    setEventPhotos((data ?? []).filter((p) => !usedIds.has(p.id)))
+  }
+
+  async function giftExtra(photo: EventPhotoOption) {
+    setBusyId(photo.id)
+    const { error } = await supabase.from('order_items').insert({
+      order_id: order.orderId,
+      photo_id: photo.id,
+      photographer_id: photographerId,
+      event_id: purchased[0]?.event_id ?? order.items[0]?.event_id,
+      price: 0,
+      service_fee: 0,
+      is_courtesy: true,
+      courtesy_type: 'extra',
+      status: order.status === 'cancelado' ? 'pendiente_pago' : order.status,
+    })
+    setBusyId(null)
+    if (error) {
+      push({ type: 'error', title: 'No se pudo agregar el regalo', description: error.message })
+      return
+    }
+    push({ type: 'success', title: 'Foto de regalo agregada al pedido' })
+    setPickerOpen(false)
+    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
+  }
+
+  async function handleDownloadOpen() {
+    if (!openPhoto) return
+    setDownloading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: openPhoto.id } })
+      if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
+      await downloadFile(data.downloadUrl, openPhoto.original_filename ?? `motoshots-${openPhoto.id}.jpg`)
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const extraGiftTile =
+    order.status !== 'cancelado' && canGiftExtra ? (
+      <button
+        onClick={openPicker}
+        className={cn(
+          'flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-accent hover:text-accent',
+          viewMode === 'grid' ? 'aspect-[4/5]' : 'p-4',
+        )}
+      >
+        <IconGift className="h-6 w-6" />
+        <span className="text-xs font-semibold">+ Regalo extra</span>
+      </button>
+    ) : null
+
+  return (
+    <section>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
+        <div className="flex gap-1 rounded-full bg-muted p-1">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+          >
+            Grid
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+          >
+            Lista
+          </button>
+        </div>
+      </div>
+      <p className="mb-5 text-sm text-muted-foreground">
+        {order.effectiveStatus === 'pendiente_comprobante' ? PENDIENTE_COMPROBANTE_COPY : SECTION_COPY[order.status]}
+      </p>
+
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {order.items.map(
+            (item) =>
+              item.photo && (
+                <DeliverPhotoTile
+                  key={item.id}
+                  item={item}
+                  onOpen={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
+                  canGift={canWaive && !item.is_courtesy}
+                  giftBusy={busyId === item.id}
+                  onGift={() => waive(item)}
+                />
+              ),
+          )}
+          {extraGiftTile}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {order.items.map(
+            (item) =>
+              item.photo && (
+                <DeliverPhotoTile
+                  key={item.id}
+                  item={item}
+                  layout="list"
+                  onOpen={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
+                  canGift={canWaive && !item.is_courtesy}
+                  giftBusy={busyId === item.id}
+                  onGift={() => waive(item)}
+                />
+              ),
+          )}
+          {extraGiftTile}
+        </div>
+      )}
+
+      {pickerOpen && (
+        <div className="mt-5 rounded-3xl border border-border bg-card p-5 sm:p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Elige la foto a regalar</h3>
+            <button onClick={() => setPickerOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">
+              Cancelar
+            </button>
+          </div>
+          {pickerLoading && <p className="text-sm text-muted-foreground">Cargando tus fotos de este evento…</p>}
+          {!pickerLoading && eventPhotos.length === 0 && <p className="text-sm text-muted-foreground">No hay más fotos disponibles de este evento.</p>}
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {eventPhotos.map((photo) => (
+              <button
+                key={photo.id}
+                onClick={() => giftExtra(photo)}
+                disabled={busyId === photo.id}
+                className="group overflow-hidden rounded-2xl border border-border disabled:opacity-50"
+              >
+                <img src={previewUrl(photo)} alt="" className="aspect-square w-full object-cover transition-transform group-hover:scale-105" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {openPhoto && openIndex != null && (
+        <PhotoLightbox
+          photos={allPhotos}
+          index={openIndex}
+          onClose={() => setOpenIndex(null)}
+          onNavigate={setOpenIndex}
+          mode="purchased"
+          resolveSrc={(p) => (p.delivered_path ? queryClient.getQueryData<string | null>(['delivered-view-url', p.id]) ?? undefined : undefined)}
+          cornerSlot={
+            openItem?.photo?.delivered_path ? (
+              <button
+                onClick={handleDownloadOpen}
+                disabled={downloading}
+                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {downloading ? 'Descargando…' : '⬇ Descargar'}
+              </button>
+            ) : undefined
+          }
         />
       )}
-    </div>
+    </section>
   )
 }
 
@@ -239,177 +477,6 @@ function ActionChecklist({ status }: { status: OrderItemStatus }) {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-/** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
- * fotos REALES compró el biker (no cuenta las cortesías ya dadas) — ver
- * la sección E del documento de precios. `cortesias_ampliadas` (extra
- * nativo de Pro) suma +1 al tope combinado de cualquier franja. */
-function courtesyCaps(purchasedCount: number, expanded: boolean) {
-  const base = purchasedCount <= 2 ? { waivers: 0, extras: 1, combined: 1 } : purchasedCount <= 5 ? { waivers: 1, extras: 1, combined: 1 } : { waivers: 2, extras: 2, combined: 2 }
-  return expanded ? { ...base, combined: base.combined + 1 } : base
-}
-
-interface EventPhotoOption {
-  id: string
-  storage_path: string | null
-  preview_path: string | null
-  price: number
-  original_filename: string | null
-}
-
-function CourtesySection({
-  order,
-  photographerId,
-  expanded,
-}: {
-  order: PhotographerOrderGroup
-  photographerId: string
-  expanded: boolean
-}) {
-  const push = useToastStore((s) => s.push)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerLoading, setPickerLoading] = useState(false)
-  const [eventPhotos, setEventPhotos] = useState<EventPhotoOption[]>([])
-
-  const purchased = order.items.filter((i) => !i.is_courtesy)
-  const courtesies = order.items.filter((i) => i.is_courtesy)
-  const caps = courtesyCaps(purchased.length, expanded)
-  const usedCombined = courtesies.length
-  const canWaive = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'waiver').length < caps.waivers
-  const canGiftExtra = usedCombined < caps.combined && courtesies.filter((c) => c.courtesy_type === 'extra').length < caps.extras
-
-  async function waive(item: RawOrderItem) {
-    setBusyId(item.id)
-    const { error } = await supabase
-      .from('order_items')
-      .update({ price: 0, service_fee: 0, is_courtesy: true, courtesy_type: 'waiver' })
-      .eq('id', item.id)
-    setBusyId(null)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo regalar', description: error.message })
-      return
-    }
-    push({ type: 'success', title: 'Foto regalada' })
-    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
-  }
-
-  async function openPicker() {
-    setPickerOpen(true)
-    setPickerLoading(true)
-    const usedIds = new Set(order.items.map((i) => i.photo_id))
-    const { data, error } = await supabase
-      .from('photos')
-      .select('id, storage_path, preview_path, price, original_filename')
-      .eq('photographer_id', photographerId)
-      .eq('event_id', purchased[0]?.event_id ?? order.items[0]?.event_id)
-      .eq('featured', false)
-    setPickerLoading(false)
-    if (error) {
-      push({ type: 'error', title: 'No se pudieron cargar tus fotos', description: error.message })
-      return
-    }
-    setEventPhotos((data ?? []).filter((p) => !usedIds.has(p.id)))
-  }
-
-  async function giftExtra(photo: EventPhotoOption) {
-    setBusyId(photo.id)
-    const { error } = await supabase.from('order_items').insert({
-      order_id: order.orderId,
-      photo_id: photo.id,
-      photographer_id: photographerId,
-      event_id: purchased[0]?.event_id ?? order.items[0]?.event_id,
-      price: 0,
-      service_fee: 0,
-      is_courtesy: true,
-      courtesy_type: 'extra',
-      status: order.status === 'cancelado' ? 'pendiente_pago' : order.status,
-    })
-    setBusyId(null)
-    if (error) {
-      push({ type: 'error', title: 'No se pudo agregar el regalo', description: error.message })
-      return
-    }
-    push({ type: 'success', title: 'Foto de regalo agregada al pedido' })
-    setPickerOpen(false)
-    queryClient.invalidateQueries({ queryKey: ['photographer-order-items', photographerId] })
-  }
-
-  if (order.status === 'cancelado') return null
-
-  return (
-    <div className="mt-10 rounded-3xl border border-border bg-card p-6 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight">Cortesías</h2>
-          <p className="text-sm text-muted-foreground">
-            Este pedido tiene {purchased.length} foto{purchased.length === 1 ? '' : 's'} compradas — puedes regalar hasta {caps.combined} en total
-            {expanded && ' (cortesías ampliadas activas)'}.
-          </p>
-        </div>
-        <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-          {usedCombined} de {caps.combined} usadas
-        </span>
-      </div>
-
-      {courtesies.length > 0 && (
-        <ul className="mt-4 flex flex-col gap-1.5 text-sm">
-          {courtesies.map((c) => (
-            <li key={c.id} className="flex items-center gap-2 text-muted-foreground">
-              <span className="text-emerald-500">✓</span>
-              {c.courtesy_type === 'waiver' ? 'Foto comprada, regalada (waiver)' : 'Foto extra de regalo'} — {c.photo?.original_filename ?? c.photo_id}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="mt-5 flex flex-wrap gap-3">
-        {canWaive &&
-          purchased.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => waive(item)}
-              disabled={busyId === item.id}
-              className="rounded-full border border-border px-3.5 py-2 text-xs font-semibold transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
-            >
-              Regalar «{item.photo?.original_filename ?? 'foto'}»
-            </button>
-          ))}
-        {canGiftExtra && (
-          <Button variant="secondary" size="sm" onClick={openPicker}>
-            + Agregar foto extra de regalo
-          </Button>
-        )}
-        {!canWaive && !canGiftExtra && <p className="text-sm text-muted-foreground">Ya usaste todas las cortesías disponibles en este pedido.</p>}
-      </div>
-
-      {pickerOpen && (
-        <div className="mt-5 border-t border-border pt-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Elige la foto a regalar</h3>
-            <button onClick={() => setPickerOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">
-              Cancelar
-            </button>
-          </div>
-          {pickerLoading && <p className="text-sm text-muted-foreground">Cargando tus fotos de este evento…</p>}
-          {!pickerLoading && eventPhotos.length === 0 && <p className="text-sm text-muted-foreground">No hay más fotos disponibles de este evento.</p>}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-            {eventPhotos.map((photo) => (
-              <button
-                key={photo.id}
-                onClick={() => giftExtra(photo)}
-                disabled={busyId === photo.id}
-                className="group overflow-hidden rounded-2xl border border-border disabled:opacity-50"
-              >
-                <img src={previewUrl(photo)} alt="" className="aspect-square w-full object-cover transition-transform group-hover:scale-105" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -703,18 +770,8 @@ export function StudioOrderDetail() {
         )}
       </div>
 
-      {user && <CourtesySection order={order} photographerId={user.id} expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false} />}
-
       <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_280px]">
-        <section>
-          <h2 className="mb-1 text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
-          <p className="mb-5 text-sm text-muted-foreground">
-            {order.effectiveStatus === 'pendiente_comprobante' ? PENDIENTE_COMPROBANTE_COPY : SECTION_COPY[order.status]}
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {order.items.map((item) => item.photo && <DeliverPhotoTile key={item.id} photo={item.photo} orderItemId={item.id} />)}
-          </div>
-        </section>
+        {user && <OrderPhotosSection order={order} photographerId={user.id} expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false} />}
 
         <aside className="rounded-3xl border border-border bg-card p-6 lg:sticky lg:top-24 lg:self-start">
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Línea de tiempo</h3>

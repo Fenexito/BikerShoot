@@ -34,6 +34,11 @@ interface PhotoLightboxProps {
    * vía `cornerSlot`. */
   mode?: 'shop' | 'purchased'
   cornerSlot?: React.ReactNode
+  /** Por defecto se usa `previewUrl(photo)` (el preview público, con marca
+   * de agua) — cuando el caller ya tiene una URL firmada mejor para esta
+   * foto (ej. el archivo final ya entregado, que vive en el bucket
+   * privado), puede resolverla acá y el visor la usa en su lugar. */
+  resolveSrc?: (photo: GridPhoto) => string | undefined
 }
 
 const SWIPE_UP_CLOSE_THRESHOLD = 110
@@ -47,9 +52,10 @@ const ZOOM_MAX = 4
  * overlays chicos que NO le quitan espacio real a la imagen — a diferencia
  * de la versión anterior (filas reales de header/footer), que sí achicaba
  * la foto para hacerle lugar. */
-export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot }: PhotoLightboxProps) {
+export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchParams, mode = 'shop', cornerSlot, resolveSrc }: PhotoLightboxProps) {
   const purchased = mode === 'purchased'
   const photo = photos[index]
+  const imgSrc = resolveSrc?.(photo) ?? previewUrl(photo)
   const imgRef = useRef<HTMLImageElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
@@ -245,7 +251,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
         <div key={photo.id} className="animate-lightbox-slide" style={{ '--slide-dir': slideDir } as React.CSSProperties}>
           <img
             ref={imgRef}
-            src={previewUrl(photo)}
+            src={imgSrc}
             alt={photo.eventTitle}
             className="max-h-[calc(100vh-3rem)] max-w-[calc(100vw-3rem)] select-none object-contain transition-transform duration-150 sm:max-h-[calc(100vh-6rem)] sm:max-w-[calc(100vw-6rem)]"
             style={{ transform: `scale(${zoom}) translate(${dragX}px, ${dragY}px)` }}

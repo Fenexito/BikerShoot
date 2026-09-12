@@ -202,6 +202,18 @@ export function IconBookmark({ filled, ...props }: SVGProps<SVGSVGElement> & { f
   )
 }
 
+export function IconGift({ filled, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean }) {
+  return (
+    <svg {...base(props)} fill={filled ? 'currentColor' : 'none'} fillOpacity={filled ? 0.2 : undefined}>
+      <rect x="3" y="8.5" width="18" height="4" rx="1" />
+      <path d="M5 12.5h14V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7.5z" />
+      <path d="M12 8.5V21" />
+      <path d="M12 8.5c0-2 -1.5-4 -3.5-4S6 6 6 7.25 7.5 8.5 9 8.5h3z" />
+      <path d="M12 8.5c0-2 1.5-4 3.5-4S18 6 18 7.25 16.5 8.5 15 8.5h-3z" />
+    </svg>
+  )
+}
+
 export function IconCart({ filled, ...props }: SVGProps<SVGSVGElement> & { filled?: boolean }) {
   return (
     <svg {...base(props)}>

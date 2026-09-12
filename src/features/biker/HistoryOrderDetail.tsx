@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, groupOrderByPhotographer, toGridPhoto, type MyOrderItem } from './useMyOrders'
 import { PurchasedPhotoTile, downloadPurchasedPhoto } from './components/PurchasedPhotoTile'
 import { PhotoLightbox } from './components/PhotoLightbox'
+import { queryClient } from '../../lib/queryClient'
 import { Badge } from '../../ui/flat/Badge'
 import { Button } from '../../ui/flat/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
@@ -186,6 +187,7 @@ export function HistoryOrderDetail() {
           onClose={() => setOpenIndex(null)}
           onNavigate={setOpenIndex}
           mode="purchased"
+          resolveSrc={(p) => (p.delivered_path ? queryClient.getQueryData<string | null>(['delivered-view-url', p.id]) ?? undefined : undefined)}
           cornerSlot={
             canDownloadOpen ? (
               <button
