@@ -52,7 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loadProfile(userId: string) {
     setProfileLoading(true)
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      // Un 504 momentáneo de Supabase (proyecto "despertando", picos de
+      // carga) no debería tratarse igual que "este usuario no tiene
+      // perfil" — sin este reintento, esa falla transitoria dejaba
+      // `profile: null` y los guards de ruta podían negar acceso a un
+      // usuario real solo porque la primera consulta llegó en mal momento.
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      if (error) {
+        await new Promise((r) => setTimeout(r, 1200))
+        ;({ data, error } = await supabase.from('profiles').select('*').eq('id', userId).single())
+      }
       if (error) {
         console.error('No se pudo cargar el perfil', error)
         setProfile(null)

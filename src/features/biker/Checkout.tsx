@@ -141,7 +141,11 @@ export function Checkout() {
     }
   }
 
-  if (items.length === 0) {
+  // `placing` sigue en true durante todo el tramo entre "vaciar el carrito"
+  // y el `navigate()` de salida (éxito) — sin este chequeo, el carrito
+  // vacío por un instante disparaba esta pantalla de "vacío" ANTES de que
+  // React Router terminara de navegar a la página de pago/confirmación.
+  if (items.length === 0 && !placing) {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center gap-3 px-4 py-16 text-center font-flat md:py-24">
         <span className="text-5xl">🛒</span>
@@ -248,7 +252,7 @@ export function Checkout() {
         </div>
 
         <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
-          <Card>
+          <Card className="cursor-default hover:scale-100">
             <h2 className="mb-4 font-bold">Resumen</h2>
 
             {/* Con 2+ fotógrafos, primero el precio de LISTA de cada uno
@@ -288,8 +292,14 @@ export function Checkout() {
                 precio de las fotos. */}
             <div className="mt-1 flex items-center justify-between text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                Tarifa de servicio {photographerGroups.length > 1 && '(todos los fotógrafos)'}
-                <InfoTooltip text="Mantenimiento de la plataforma, preparación/seguimiento de tu pedido y atención al cliente. No es un cobro del fotógrafo — él recibe el 100% de su precio." />
+                Tarifa de servicio
+                <InfoTooltip
+                  text={
+                    photographerGroups.length > 1
+                      ? 'Mantenimiento de la plataforma, preparación/seguimiento de tu pedido y atención al cliente. Incluye la tarifa de TODOS los fotógrafos de este pedido. No es un cobro del fotógrafo — cada uno recibe el 100% de su precio.'
+                      : 'Mantenimiento de la plataforma, preparación/seguimiento de tu pedido y atención al cliente. No es un cobro del fotógrafo — él recibe el 100% de su precio.'
+                  }
+                />
               </span>
               <span>Q{serviceFeeTotal}</span>
             </div>
@@ -299,7 +309,7 @@ export function Checkout() {
             </div>
           </Card>
 
-          <Card>
+          <Card className="cursor-default hover:scale-100">
             <h2 className="mb-1 font-bold">Teléfono de contacto</h2>
             <p className="mb-4 text-xs text-muted-foreground">El fotógrafo lo usa para escribirte por WhatsApp sobre tu pedido.</p>
             <Input
@@ -314,7 +324,7 @@ export function Checkout() {
             />
           </Card>
 
-          <Card>
+          <Card className="cursor-default hover:scale-100">
             <h2 className="mb-4 font-bold">Método de pago</h2>
             <div className="flex flex-col gap-2">
               <button
@@ -350,9 +360,13 @@ export function Checkout() {
 
       {/* `pl-10` (en vez de los `px-4` parejos de antes): el botón redondo de
           "Reportar bug" flota fijo en la misma esquina inferior izquierda,
-          por encima de este footer (z-40 contra z-30) — sin este espacio
-          extra, su píldora colapsada tapaba el conteo de fotos/precio. */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-background/95 py-3 pl-10 pr-4 backdrop-blur md:bottom-0 lg:hidden">
+          por encima de este footer (z-40 contra z-20) — sin este espacio
+          extra, su píldora colapsada tapaba el conteo de fotos/precio.
+          `z-20` (antes z-30, igual que MobileBottomNav) — con el mismo
+          z-index, el orden de pintado hacía que este footer quedara ENCIMA
+          del botón central de "Buscar" que sobresale del menú inferior; el
+          menú (y su botón elevado) siempre deben ganar visualmente. */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-border bg-background/95 py-3 pl-10 pr-4 backdrop-blur md:bottom-0 lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-xs text-muted-foreground">{items.length} fotos</p>

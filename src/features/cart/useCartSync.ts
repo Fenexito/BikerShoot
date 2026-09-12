@@ -66,6 +66,41 @@ async function withRetry(fn: () => PromiseLike<{ error: unknown }>): Promise<{ e
   return fn()
 }
 
+/** IDs de fotos agregadas localmente que TODAVÍA no se confirman
+ * sincronizadas con el servidor — persistido en localStorage (no solo en
+ * memoria) para sobrevivir un refresh de página.
+ *
+ * Por qué existe: antes, `initialSync` solo volvía a "subir" items locales
+ * la primerísima vez que este navegador sincronizaba (`migratedKey`) — de
+ * ahí en adelante, si un `upsert` fallaba (como el 504 que se vio, o el
+ * error real de "columna point_label no encontrada" mientras la migración
+ * 0040 no se había corrido), esa foto quedaba en el store local pero NUNCA
+ * llegaba al servidor. Al recargar la página, `initialSync` traía el
+ * carrito del SERVIDOR (que no tenía esa foto) y sobrescribía el store
+ * local con eso — la foto agregada "desaparecía" del carrito.
+ *
+ * Con este set persistido, `initialSync` sabe distinguir "esta foto no
+ * está en el servidor porque el push falló y hay que reintentar" de "esta
+ * foto no está en el servidor porque se borró desde OTRO dispositivo" (que
+ * NUNCA estuvo en este set) — solo la primera se vuelve a empujar al
+ * recargar. */
+function readPendingIds(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function writePendingIds(key: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(key, JSON.stringify(Array.from(ids)))
+  } catch {
+    // Sin persistencia de "pendientes" en el peor caso, pero no rompe nada.
+  }
+}
+
 /** Sincroniza el carrito (zustand + localStorage, `cartStore.ts`) con la
  * tabla `cart_items` en Supabase — antes el carrito vivía SOLO en el
  * dispositivo, así que abrir sesión desde el celular y desde la
@@ -87,16 +122,12 @@ export function useCartSync(userId: string | undefined) {
     let active = true
 
     // Solo la PRIMERA vez que este navegador sincroniza este usuario tiene
-    // sentido "subir" lo que ya había en el store local (ej. agregado antes
-    // de iniciar sesión) — de ahí en adelante, el servidor manda. Sin este
-    // límite, un dispositivo que se pierde una eliminación hecha en OTRO
-    // (por estar cerrado o sin conexión en ese momento) la "revivía" al
-    // reconectarse: su copia local todavía tenía la foto que el servidor ya
-    // no tenía, y ese sobrante se interpretaba como "algo nuevo que subir",
-    // resucitando la foto en el servidor (y de ahí, en todos los
-    // dispositivos) en vez de simplemente adoptar lo que el servidor ya
-    // sabe que es verdad.
+    // sentido "subir" TODO lo que ya había en el store local sin filtrar
+    // (ej. agregado antes de iniciar sesión) — de ahí en adelante, el
+    // reintento de pendientes (ver `pendingKey` arriba) se encarga de
+    // cualquier foto que se agregue después y falle al sincronizar.
     const migratedKey = `motoshots_cart_migrated_${uid}`
+    const pendingKey = `motoshots_cart_pending_${uid}`
 
     async function initialSync() {
       const { data, error } = await supabase.from('cart_items').select('*').eq('profile_id', uid)
@@ -118,12 +149,34 @@ export function useCartSync(userId: string | undefined) {
           for (const i of localOnly) remoteIdsRef.current.add(i.photoId)
           const { error: upsertError } = await supabase.from('cart_items').upsert(localOnly.map((i) => toRow(uid, i)))
           if (!upsertError) finalItems = serverItems.concat(localOnly)
+          else writePendingIds(pendingKey, new Set(localOnly.map((i) => i.photoId)))
         }
         try {
           localStorage.setItem(migratedKey, '1')
         } catch {
           // No pasa nada grave si no se puede recordar — en el peor caso
           // se repite esta migración una vez más la próxima vez.
+        }
+      } else {
+        // Reintento de pendientes: fotos que este MISMO dispositivo agregó
+        // en una sesión anterior y que nunca confirmó sincronizadas (el
+        // `upsert` falló y no hubo otra oportunidad hasta ahora). No se
+        // toca nada que no esté en este set — una foto ausente del
+        // servidor que NUNCA estuvo pendiente se asume borrada a propósito
+        // desde otro dispositivo, no se resucita.
+        const pendingIds = readPendingIds(pendingKey)
+        const stillPending = useCartStore
+          .getState()
+          .items.filter((i) => pendingIds.has(i.photoId) && !remoteIdsRef.current.has(i.photoId))
+        if (stillPending.length) {
+          for (const i of stillPending) remoteIdsRef.current.add(i.photoId)
+          const { error: upsertError } = await withRetry(() => supabase.from('cart_items').upsert(stillPending.map((i) => toRow(uid, i))))
+          if (!upsertError) {
+            finalItems = serverItems.concat(stillPending)
+            const next = new Set(pendingIds)
+            for (const i of stillPending) next.delete(i.photoId)
+            writePendingIds(pendingKey, next)
+          }
         }
       }
 
@@ -170,12 +223,33 @@ export function useCartSync(userId: string | undefined) {
 
       if (added.length) {
         for (const i of added) remoteIdsRef.current.add(i.photoId)
+        // Se marca "pendiente" ANTES de intentar el upsert (no después de
+        // que falle) — así, si el usuario recarga la página en el medio
+        // (antes de que el reintento resuelva), el próximo `initialSync`
+        // igual sabe que esta foto necesita reintentarse.
+        const pending = readPendingIds(pendingKey)
+        for (const i of added) pending.add(i.photoId)
+        writePendingIds(pendingKey, pending)
+
         withRetry(() => supabase.from('cart_items').upsert(added.map((i) => toRow(uid, i)))).then(({ error }) => {
-          if (error) console.error('No se pudo sincronizar el carrito (agregar):', error)
+          if (error) {
+            console.error('No se pudo sincronizar el carrito (agregar):', error)
+            return
+          }
+          const next = readPendingIds(pendingKey)
+          for (const i of added) next.delete(i.photoId)
+          writePendingIds(pendingKey, next)
         })
       }
       if (removedIds.length) {
         for (const id of removedIds) remoteIdsRef.current.delete(id)
+        // Si se quita una foto que todavía estaba "pendiente" (nunca llegó
+        // a sincronizar), ya no hace falta reintentar subirla — el usuario
+        // decidió que no la quiere.
+        const pending = readPendingIds(pendingKey)
+        for (const id of removedIds) pending.delete(id)
+        writePendingIds(pendingKey, pending)
+
         withRetry(() => supabase.from('cart_items').delete().eq('profile_id', uid).in('photo_id', removedIds)).then(({ error }) => {
           if (error) console.error('No se pudo sincronizar el carrito (quitar):', error)
         })

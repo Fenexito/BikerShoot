@@ -111,32 +111,34 @@ export function CartDrawer() {
                     <p className="text-xs font-semibold text-foreground">Q{group.subtotal}</p>
                   </div>
                   <div className="flex flex-col gap-2.5">
-                    {/* Una tarjeta por evento SIEMPRE (no solo cuando hay más
-                        de uno) — adentro, un bloque por punto (con su
-                        horario) y dentro de cada punto, filas compactas en
-                        grid de 2 columnas para no gastar tanto alto vertical
-                        con carritos grandes. */}
+                    {/* El overlay SIEMPRE es lista (nunca grid, ni en
+                        escritorio ni en móvil) — es una vista rápida, no el
+                        checkout completo, así que el espacio se prioriza
+                        para leer nombre+precio de un vistazo, no para ver
+                        miniaturas grandes. Padding mínimo entre filas, pero
+                        el texto se mantiene a un tamaño legible (no se
+                        redujo tanto como para verse apretado). */}
                     {group.events.map((event) => (
-                      <div key={event.eventId} className="rounded-2xl border border-border bg-muted/30 p-2.5">
-                        <p className="mb-1.5 truncate px-1 text-xs font-medium text-muted-foreground">{event.eventTitle}</p>
-                        <div className="flex flex-col gap-2">
+                      <div key={event.eventId} className="rounded-2xl border border-border bg-muted/30 p-2">
+                        <p className="mb-1 truncate px-1 text-xs font-medium text-muted-foreground">{event.eventTitle}</p>
+                        <div className="flex flex-col gap-1">
                           {event.points.map((point) => {
                             const schedule = formatPointSchedule(point.pointTimeStart, point.pointTimeEnd)
                             return (
                               <div key={point.key}>
                                 {point.pointLabel && (
-                                  <p className="mb-1 truncate px-1 text-[11px] font-semibold text-foreground">
+                                  <p className="truncate px-1 text-[11px] font-semibold text-foreground">
                                     {point.pointLabel}
                                     {schedule && <span className="ml-1.5 font-normal text-muted-foreground">{schedule}</span>}
                                   </p>
                                 )}
-                                <div className="grid grid-cols-2 gap-1.5">
+                                <div className="flex flex-col divide-y divide-border">
                                   {point.items.map((item) => (
-                                    <div key={item.photoId} className="flex items-center gap-1.5 rounded-lg bg-background p-1.5">
+                                    <div key={item.photoId} className="flex items-center gap-2 py-1.5 first:pt-1 last:pb-0.5">
                                       <img
                                         src={previewUrl({ storage_path: item.storagePath, preview_path: item.previewPath })}
                                         alt=""
-                                        className="h-8 w-8 shrink-0 rounded object-cover"
+                                        className="h-9 w-9 shrink-0 rounded-lg object-cover"
                                       />
                                       {/* El nombre del archivo (no el evento,
                                           que ya se lee arriba) es lo que
@@ -145,14 +147,14 @@ export function CartDrawer() {
                                           lo mismo, así que solo el precio
                                           repetido no alcanza para saber cuál
                                           es cuál. */}
-                                      <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
-                                      <p className="shrink-0 text-xs font-bold">Q{item.effectivePrice}</p>
+                                      <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
+                                      <p className="shrink-0 text-sm font-bold">Q{item.effectivePrice}</p>
                                       <button
                                         onClick={() => handleRemove(item)}
                                         aria-label="Quitar del carrito"
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
+                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
                                       >
-                                        <IconTrash className="h-3 w-3" />
+                                        <IconTrash className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   ))}
