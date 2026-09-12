@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useMyOrders, groupOrderByPhotographer, toGridPhoto, type MyOrderItem } from './useMyOrders'
+import { useMyOrders, groupOrderByPhotographer, deriveOrderEffectiveStatus, toGridPhoto, type MyOrderItem } from './useMyOrders'
 import { PurchasedPhotoTile, downloadPurchasedPhoto } from './components/PurchasedPhotoTile'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { queryClient } from '../../lib/queryClient'
@@ -16,9 +16,15 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
+import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { supabase } from '../../lib/supabase'
 import { IconDownload, IconEye, IconEdit, IconWhatsapp } from '../../ui/shared/icons'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
+
+// Misma línea (168px) que usa el header pegajoso de la vista de evento del
+// fotógrafo, para decidir qué sección "cuenta" como la que se está viendo.
+const STICKY_BAR_LINE = 168
 
 // Con transferencia, el flujo pasa primero por "subir comprobante" — con
 // tarjeta ese paso no existe (no hay comprobante manual que subir), así
@@ -240,6 +246,49 @@ export function HistoryOrderDetail() {
   const flow = order?.payment_method === 'transferencia' ? FLOW_TRANSFERENCIA : FLOW_TARJETA
   const flowLabels = flow.map((s) => getEffectiveStatusStyle(s).label)
   const proofPhotographerIds = new Set(order?.order_payment_proofs.map((p) => p.photographer_id) ?? [])
+  const overallStatus = order ? deriveOrderEffectiveStatus(order) : null
+  const overallStyle = overallStatus ? getEffectiveStatusStyle(overallStatus) : null
+
+  // Header interactivo — al hacer scroll aparece con el # de pedido y el
+  // estado general, y muestra el nombre del fotógrafo cuya sección está
+  // cruzando la línea justo debajo del header (mismo mecanismo que el
+  // header pegajoso de la vista de evento del fotógrafo, ahí con el punto).
+  const scrolledPast = useScrolledPast(140)
+  const [activePhotographerName, setActivePhotographerName] = useState<string | null>(null)
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  useEffect(() => {
+    function onScroll() {
+      let current: string | null = null
+      for (const group of photographerGroups) {
+        const el = groupRefs.current[group.photographerId]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top <= STICKY_BAR_LINE && rect.bottom >= STICKY_BAR_LINE) {
+          current = group.photographerName
+          break
+        }
+      }
+      setActivePhotographerName(current)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photographerGroups.length, order?.id])
+
+  useHeaderTransform(
+    order && overallStyle ? (
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex" />
+        <p className="min-w-0 flex-1 truncate text-base font-bold">
+          {formatOrderCode(order.order_number)}
+          {activePhotographerName && <span className="ml-2 text-sm font-normal text-muted-foreground">· {activePhotographerName}</span>}
+        </p>
+      </div>
+    ) : null,
+    scrolledPast,
+  )
 
   // Un solo visor para TODO el pedido — las flechas navegan entre todas
   // las fotos compradas aquí (sin importar de qué fotógrafo/evento/punto
@@ -304,7 +353,11 @@ export function HistoryOrderDetail() {
         {photographerGroups.map((group) => {
           const groupStyle = getEffectiveStatusStyle(group.effectiveStatus)
           return (
-            <div key={group.photographerId} className="rounded-3xl border border-border bg-card p-5 sm:p-6">
+            <div
+              key={group.photographerId}
+              ref={(el) => { groupRefs.current[group.photographerId] = el }}
+              className="rounded-3xl border border-border bg-card p-5 sm:p-6"
+            >
               <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Link to={`/app/fotografos/${group.photographerId}`} className="font-bold hover:underline">

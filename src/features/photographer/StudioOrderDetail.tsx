@@ -22,6 +22,8 @@ import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
 import { IconGift, IconWhatsapp, IconDownload } from '../../ui/shared/icons'
+import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
+import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { cn } from '../../lib/cn'
 
 /** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
@@ -333,6 +335,45 @@ function OrderPhotosSection({ order, photographerId, expanded, photographerLabel
   const [downloading, setDownloading] = useState(false)
   const [justClosedId, setJustClosedId] = useState<string | null>(null)
 
+  // Header interactivo — al hacer scroll aparece con el # de pedido y el
+  // estado, y muestra el nombre del punto cuya sección cruza la línea
+  // justo debajo del header (mismo mecanismo que la vista de evento).
+  const scrolledPast = useScrolledPast(140)
+  const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
+  const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const statusStyleForHeader = getEffectiveStatusStyle(order.effectiveStatus)
+
+  useEffect(() => {
+    function onScroll() {
+      let current: string | null = null
+      for (const key of Object.keys(pointRefs.current)) {
+        const el = pointRefs.current[key]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top <= 168 && rect.bottom >= 168) {
+          current = key === '__sin_punto__' ? null : key
+          break
+        }
+      }
+      setActivePointLabel(current)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.orderId, viewMode])
+
+  useHeaderTransform(
+    <div className="flex w-full min-w-0 items-center gap-3">
+      <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex" />
+      <p className="min-w-0 flex-1 truncate text-base font-bold">
+        {formatOrderCode(order.orderNumber)}
+        {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
+      </p>
+    </div>,
+    scrolledPast,
+  )
+
   const purchased = order.items.filter((i) => !i.is_courtesy)
   const courtesies = order.items.filter((i) => i.is_courtesy)
   const caps = courtesyCaps(purchased.length, expanded)
@@ -525,7 +566,11 @@ function OrderPhotosSection({ order, photographerId, expanded, photographerLabel
                 verlo una y otra vez por cada punto. */}
             {eventGroups.length > 1 && <p className="mb-2 text-sm font-semibold">{eventGroup.eventTitle}</p>}
             {eventGroup.points.map((point) => (
-              <div key={point.label ?? '__sin_punto__'} className="mb-4 last:mb-0">
+              <div
+                key={point.label ?? '__sin_punto__'}
+                ref={(el) => { pointRefs.current[point.label ?? '__sin_punto__'] = el }}
+                className="mb-4 last:mb-0"
+              >
                 {point.label && <p className="mb-2 text-xs font-semibold text-muted-foreground">{point.label}</p>}
                 {viewMode === 'grid' ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
