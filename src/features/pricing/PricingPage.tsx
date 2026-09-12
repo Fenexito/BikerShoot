@@ -16,7 +16,7 @@ const PLAN_TAGLINES: Record<string, string> = {
 const FAQ = [
   {
     q: '¿Cobran comisión por cada venta?',
-    a: 'No sobre tu precio — recibes el 100% de lo que publicas. Hay una tarifa de servicio fija de Q2 por foto que paga el biker (aparte de tu precio), y se liquida junto a tu factura de plan mensual.',
+    a: 'No sobre tu precio — recibes el 100% de lo que publicas. Hay una tarifa de servicio que paga el biker (aparte de tu precio): Q2 por una sola foto, y baja proporcionalmente en pedidos con más fotos tuyas, con un tope de Q10 sin importar cuántas compre. Se liquida junto a tu factura de plan mensual.',
   },
   {
     q: '¿Puedo poner mi propio descuento por comprar varias fotos?',

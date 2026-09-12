@@ -192,7 +192,10 @@ export function StoragePlansAdmin() {
       </div>
 
       <h2 className="mb-4 mt-14 text-xl font-bold tracking-tight">Tarifas de servicio pendientes de liquidar</h2>
-      <p className="mb-4 text-sm text-muted-foreground">Q2 por foto vendida (no cortesía), acumulado hasta que se factura junto al plan de cada fotógrafo.</p>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Q2 por una foto, bajando proporcionalmente en pedidos con más fotos del mismo fotógrafo (tope Q10) — no aplica a
+        cortesías. Acumulado hasta que se factura junto al plan de cada fotógrafo.
+      </p>
       {feesLoading && <SkeletonRows count={3} />}
       {!feesLoading && pendingFees.length === 0 && <p className="text-muted-foreground">No hay tarifas pendientes.</p>}
       <div className="flex flex-col gap-3">

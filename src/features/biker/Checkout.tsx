@@ -5,18 +5,12 @@ import { useCartStore, type CartItem } from '../cart/cartStore'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { previewUrl } from '../../lib/r2'
-import { computeVolumePrice, type PricingTier } from './photographerPricing'
+import { computeVolumePrice, computeServiceFee, distributeServiceFee, type PricingTier } from './photographerPricing'
 import { Button } from '../../ui/flat/Button'
 import { Card } from '../../ui/flat/Card'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { IconInfo } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
-
-// Q2 fijos por foto, siempre — cubre mantenimiento de la plataforma,
-// preparación/seguimiento del pedido y atención al cliente. Es aparte del
-// precio del fotógrafo (nunca lo reduce) y no cambia con el descuento por
-// volumen de cada fotógrafo (ver `computeVolumePrice`).
-const SERVICE_FEE_PER_PHOTO = 2
 
 function usePhotographerPricingTiers(photographerIds: string[]) {
   const key = photographerIds.slice().sort().join(',')
@@ -61,19 +55,25 @@ export function Checkout() {
     return Array.from(map.entries()).map(([photographerId, g]) => {
       const faceSubtotal = g.items.reduce((s, i) => s + i.price, 0)
       const volumeTotal = computeVolumePrice(tiersByPhotographer[photographerId] ?? [], g.items.length, faceSubtotal)
+      // La tarifa de servicio se calcula POR FOTÓGRAFO (misma cantidad que
+      // decide el descuento por volumen de arriba) — nunca sobre el pedido
+      // completo, para que un carrito con varios fotógrafos no dependa de
+      // cómo se reparte entre ellos (ver computeServiceFee).
+      const serviceFee = computeServiceFee(g.items.length)
       return {
         photographerId,
         photographerName: g.photographerName,
         items: g.items,
         faceSubtotal,
         subtotal: volumeTotal,
+        serviceFee,
       }
     })
   }, [items, tiersByPhotographer])
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price, 0), [items])
   const discount = useMemo(() => photographerGroups.reduce((s, g) => s + (g.faceSubtotal - g.subtotal), 0), [photographerGroups])
-  const serviceFee = items.length * SERVICE_FEE_PER_PHOTO
+  const serviceFee = useMemo(() => photographerGroups.reduce((s, g) => s + g.serviceFee, 0), [photographerGroups])
   const total = subtotal - discount + serviceFee
 
   async function placeOrder() {
@@ -92,16 +92,24 @@ export function Checkout() {
       return
     }
 
-    const { error: itemsError } = await supabase.from('order_items').insert(
-      items.map((item) => ({
+    // Cada fotógrafo tiene una sola tarifa de servicio TOTAL (ver
+    // `photographerGroups`), no un monto fijo por foto — se reparte entre
+    // sus propios order_items para que cada fila tenga su valor (necesario
+    // para el saldo pendiente por liquidar), ajustando el redondeo en la
+    // última para que la suma cuadre exacto con el total del grupo.
+    const rowsToInsert = photographerGroups.flatMap((group) => {
+      const perItemFee = distributeServiceFee(group.serviceFee, group.items.length)
+      return group.items.map((item, i) => ({
         order_id: order.id,
         photo_id: item.photoId,
         photographer_id: item.photographerId,
         event_id: item.eventId,
         price: item.price,
-        service_fee: SERVICE_FEE_PER_PHOTO,
-      })),
-    )
+        service_fee: perItemFee[i],
+      }))
+    })
+
+    const { error: itemsError } = await supabase.from('order_items').insert(rowsToInsert)
 
     if (itemsError) {
       push({ type: 'error', title: 'El pedido se creó, pero fallaron los detalles', description: itemsError.message })
