@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, deriveGroupStatus, type MyOrderItem } from './useMyOrders'
 import { PurchasedPhotoTile } from './components/PurchasedPhotoTile'
 import { Badge } from '../../ui/flat/Badge'
+import { Button } from '../../ui/flat/Button'
 import { OrderStepper } from '../../ui/studio/OrderStepper'
 import { getOrderStatusStyle, formatOrderCode } from '../../lib/orderStatus'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
@@ -58,7 +59,20 @@ export function HistoryOrderDetail() {
           </p>
           <p className="text-2xl font-bold">Q{order.total}</p>
         </div>
-        <Badge tone="secondary">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge tone="secondary">{order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}</Badge>
+          {/* Si el biker se sale de /app/checkout/pago/:id sin terminar de
+              subir sus comprobantes, antes no había ninguna forma de
+              volver — este es el camino de regreso, siempre disponible
+              desde el pedido mismo, no solo justo después de comprar. */}
+          {order.payment_method === 'transferencia' && (
+            <Link to={`/app/checkout/pago/${order.id}`}>
+              <Button variant="secondary" size="sm">
+                Subir comprobantes de pago
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="mt-8 flex flex-col gap-8">

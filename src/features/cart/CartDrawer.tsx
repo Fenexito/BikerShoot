@@ -21,7 +21,11 @@ export function CartDrawer() {
   const close = useCartDrawerStore((s) => s.closeDrawer)
   const items = useCartStore((s) => s.items)
   const remove = useCartStore((s) => s.remove)
-  const { photographerGroups: pricedGroups, grandTotal } = useCartPricing()
+  // El overlay muestra precios SIN la tarifa de servicio a propósito —
+  // mismo criterio que el mini-carrito de Uber Eats/PedidosYa: la tarifa
+  // se revela hasta el checkout completo, no aquí.
+  const { photographerGroups: pricedGroups, faceTotal, discount } = useCartPricing()
+  const subtotal = faceTotal - discount
 
   // El panel se queda MONTADO un instante más tras `open` volverse falso
   // (con la clase de salida en vez de desaparecer de golpe) — sin esto no
@@ -51,7 +55,7 @@ export function CartDrawer() {
       return {
         photographerId: g.photographerId,
         photographerName: g.photographerName,
-        totalToPay: g.totalToPay,
+        subtotal: g.subtotal,
         events: Array.from(byEvent.entries()).map(([eventId, e]) => ({ eventId, eventTitle: e.eventTitle, items: e.items })),
       }
     })
@@ -111,7 +115,7 @@ export function CartDrawer() {
                 <div key={group.photographerId}>
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.photographerName}</p>
-                    <p className="text-xs font-semibold text-foreground">Q{group.totalToPay}</p>
+                    <p className="text-xs font-semibold text-foreground">Q{group.subtotal}</p>
                   </div>
                   <div className="flex flex-col gap-2.5">
                     {/* Una tarjeta por evento SIEMPRE (no solo cuando hay más
@@ -161,10 +165,11 @@ export function CartDrawer() {
 
         {items.length > 0 && (
           <div className="border-t border-border px-4 py-3.5 sm:px-5 sm:py-4">
-            <div className="mb-3 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Total (con tarifa de servicio)</span>
-              <span className="text-lg font-bold">Q{grandTotal}</span>
+            <div className="mb-1 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-lg font-bold">Q{subtotal}</span>
             </div>
+            <p className="mb-3 text-xs text-muted-foreground">+ tarifa de servicio, calculada en el checkout</p>
             <Link
               to="/app/checkout"
               onClick={close}

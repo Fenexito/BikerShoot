@@ -84,12 +84,19 @@ export function Checkout() {
     // última para que la suma cuadre exacto con el total del grupo.
     const rowsToInsert = photographerGroups.flatMap((group) => {
       const perItemFee = distributeServiceFee(group.serviceFee, group.items.length)
+      // `item.price` es el precio de LISTA (sin descuento) — lo que de
+      // verdad se cobra por esta foto es `effectivePrice` (ya con el
+      // descuento por volumen de este fotógrafo repartido). Guardar
+      // `price` aquí fue un bug real: el checkout mostraba el total
+      // correcto en pantalla, pero el pedido guardado sumaba el precio de
+      // lista completo — el fotógrafo y la página de comprobante de pago
+      // terminaban pidiendo de más.
       return group.items.map((item, i) => ({
         order_id: order.id,
         photo_id: item.photoId,
         photographer_id: item.photographerId,
         event_id: item.eventId,
-        price: item.price,
+        price: item.effectivePrice,
         service_fee: perItemFee[i],
       }))
     })
@@ -177,20 +184,29 @@ export function Checkout() {
         <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
           <Card>
             <h2 className="mb-4 font-bold">Resumen</h2>
+
+            {/* Con 2+ fotógrafos, primero el precio de LISTA de cada uno
+                (sin descuento todavía) — así el "Subtotal" de abajo no
+                aparece de la nada: el biker ya vio de dónde sale cada
+                parte antes de llegar a la suma total. Con un solo
+                fotógrafo esto se omite (sería el mismo número dos veces
+                seguidas, sin aportar nada). */}
             {photographerGroups.length > 1 && (
               <div className="mb-3 flex flex-col gap-1.5 border-b border-border pb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Precio de lista por fotógrafo</p>
                 {photographerGroups.map((g) => (
                   <div key={g.photographerId} className="flex justify-between text-sm">
                     <span className="truncate text-muted-foreground">{g.photographerName} ({g.items.length})</span>
-                    <span className="shrink-0 font-semibold">Q{g.totalToPay}</span>
+                    <span className="shrink-0">Q{g.faceSubtotal}</span>
                   </div>
                 ))}
               </div>
             )}
+
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                {items.length} fotos
-                <InfoTooltip text="Cada fotógrafo se cobra y se paga por separado — el total de arriba ya refleja el precio real de cada foto, con su descuento por volumen aplicado si tiene varias." />
+                Subtotal ({items.length} foto{items.length > 1 ? 's' : ''})
+                <InfoTooltip text="El precio de lista de tus fotos, antes de cualquier descuento por volumen." />
               </span>
               <span>Q{faceTotal}</span>
             </div>
@@ -200,9 +216,13 @@ export function Checkout() {
                 <span>-Q{discount}</span>
               </div>
             )}
+            {/* La tarifa de servicio va al final, justo antes del total —
+                mismo lugar donde Uber Eats/PedidosYa muestran la suya,
+                después de cualquier descuento, nunca mezclada con el
+                precio de las fotos. */}
             <div className="mt-1 flex items-center justify-between text-sm">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                Tarifa de servicio
+                Tarifa de servicio {photographerGroups.length > 1 && '(todos los fotógrafos)'}
                 <InfoTooltip text="Mantenimiento de la plataforma, preparación/seguimiento de tu pedido y atención al cliente. No es un cobro del fotógrafo — él recibe el 100% de su precio." />
               </span>
               <span>Q{serviceFeeTotal}</span>
