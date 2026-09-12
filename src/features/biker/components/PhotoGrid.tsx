@@ -5,11 +5,10 @@ import { Skeleton, SkeletonGrid } from '../../../ui/shared/Skeleton'
 import { useScrollFocusStore } from '../../../ui/shared/scrollFocusStore'
 import { cn } from '../../../lib/cn'
 
-// Suficiente para que cualquier `scrollIntoView({behavior:'smooth'})` haya
-// terminado con margen — no hay un evento nativo confiable multiplataforma
-// para "el scroll suave ya terminó", así que se libera la supresión del
-// auto-ocultado (ver `scrollFocusStore`) con un simple temporizador.
-const SCROLL_FOCUS_SUPPRESS_MS = 900
+// Techo de seguridad por si el usuario nunca vuelve a scrollear (ver más
+// abajo) — normalmente la supresión se libera antes, en cuanto el usuario
+// retoma el scroll por su cuenta.
+const SCROLL_FOCUS_SUPPRESS_MS = 4000
 
 const BATCH_SIZE = 36
 
@@ -100,10 +99,31 @@ export function PhotoGrid({ photos, onOpenPhoto, layout = 'grid', isLoading = fa
       // auto-ocultado del header/menú inferior (ver `useAutoHideHeader`) —
       // que aparecieran/desaparecieran A MITAD de esta animación competía
       // visualmente con ella, y la foto terminaba perdiendo el centrado.
-      // Se suprime ese auto-ocultado mientras dura este scroll puntual.
+      // Se suprime ese auto-ocultado mientras dura este scroll puntual, Y
+      // se mantiene suprimido después de que termine — el usuario recién
+      // cerró el visor y podría querer ajustar filtros de inmediato, así
+      // que el header/menú se quedan visibles hasta que el usuario
+      // retoma el scroll POR SU CUENTA (no el que dispara este
+      // `scrollIntoView` automático). `wheel`/`touchstart` son gestos
+      // reales del usuario; el scroll programático nunca los dispara.
       useScrollFocusStore.getState().suppress()
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setTimeout(() => useScrollFocusStore.getState().release(), SCROLL_FOCUS_SUPPRESS_MS)
+
+      const opts = { passive: true } as const
+      function cleanup() {
+        window.removeEventListener('wheel', release)
+        window.removeEventListener('touchstart', release)
+        clearTimeout(fallback)
+      }
+      function release() {
+        useScrollFocusStore.getState().release()
+        cleanup()
+      }
+      window.addEventListener('wheel', release, opts)
+      window.addEventListener('touchstart', release, opts)
+      const fallback = setTimeout(release, SCROLL_FOCUS_SUPPRESS_MS)
+
+      return cleanup
     }
   }, [highlightedId, visibleCount])
 
