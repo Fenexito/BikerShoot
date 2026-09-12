@@ -70,6 +70,24 @@ export function getEffectiveStatusStyle(status: string) {
   return EFFECTIVE_STATUS_STYLE[status as EffectiveOrderStatus] ?? EFFECTIVE_STATUS_STYLE.en_preparacion
 }
 
+/** Mismo status, pero coloreado desde el punto de vista del FOTÓGRAFO —
+ * el color debe reflejar de quién es la responsabilidad de actuar, y esa
+ * respuesta es la opuesta según el portal:
+ * - "Subir Comprobante" (el biker no lo ha subido) NO depende del
+ *   fotógrafo — para él es solo informativo, no una alarma (azul, no
+ *   rojo). Tampoco amerita resaltar la fila con un borde de color.
+ * - "Pago por confirmar" (el biker ya subió su comprobante) SÍ depende
+ *   del fotógrafo — ahí es él quien tiene una acción pendiente, así que
+ *   se vuelve la urgencia real (rojo).
+ * El resto de estados se quedan igual que `EFFECTIVE_STATUS_STYLE`. */
+export function getPhotographerStatusStyle(status: string): { label: string; dot: string; text: string; highlight: boolean } {
+  if (status === 'pendiente_comprobante') return { label: 'Subir Comprobante', dot: 'bg-blue-500', text: 'text-blue-500', highlight: false }
+  if (status === 'pendiente_confirmacion') return { label: 'Confirmar Pago', dot: 'bg-red-500', text: 'text-red-500', highlight: true }
+  if (status === 'cancelado') return { ...EFFECTIVE_STATUS_STYLE.cancelado, highlight: false }
+  const style = getEffectiveStatusStyle(status)
+  return { ...style, highlight: true }
+}
+
 /** Deriva el status efectivo de UN grupo fotógrafo→pedido. `hasProof` es
  * irrelevante para tarjeta (ese método no pasa por comprobante manual) —
  * ahí "pendiente_pago" en la base ya significa "pago con tarjeta sin

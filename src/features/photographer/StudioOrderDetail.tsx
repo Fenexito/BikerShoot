@@ -49,6 +49,7 @@ function DeliverPhotoTile({
   onGift,
   layout = 'grid',
   justClosed = false,
+  uploadLocked,
 }: {
   item: RawOrderItem
   onOpen: () => void
@@ -63,6 +64,10 @@ function DeliverPhotoTile({
   /** true por un instante justo después de cerrar el visor sobre esta foto
    * — mismo resalte breve que usa Buscar. */
   justClosed?: boolean
+  /** true mientras el pedido sigue "pendiente_pago" — no se puede subir
+   * una entrega final antes de que el biker suba su comprobante Y el
+   * fotógrafo confirme el pago recibido. */
+  uploadLocked: boolean
 }) {
   const photo = item.photo as RawOrderItemPhoto
   const push = useToastStore((s) => s.push)
@@ -140,7 +145,15 @@ function DeliverPhotoTile({
           </p>
           {item.is_courtesy && <p className="text-xs text-emerald-600">🎁 Regalo</p>}
         </div>
-        {!delivered && (
+        {!delivered && uploadLocked && (
+          <span
+            className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"
+            title="El biker debe subir su comprobante y tú confirmar el pago antes de poder entregar"
+          >
+            🔒 Confirma el pago primero
+          </span>
+        )}
+        {!delivered && !uploadLocked && (
           <>
             <button
               onClick={() => inputRef.current?.click()}
@@ -192,15 +205,26 @@ function DeliverPhotoTile({
           <>
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
             <div className="absolute inset-x-2 bottom-2">
-              <button
-                onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
-                disabled={uploading}
-                className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-background"
-              >
-                {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
-              </button>
+              {uploadLocked ? (
+                <span
+                  className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm"
+                  title="El biker debe subir su comprobante y tú confirmar el pago antes de poder entregar"
+                >
+                  🔒 Confirma el pago primero
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+                  disabled={uploading}
+                  className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:bg-background"
+                >
+                  {uploading ? 'Subiendo…' : 'Subir Archivo Final'}
+                </button>
+              )}
             </div>
-            <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
+            {!uploadLocked && (
+              <input ref={inputRef} type="file" accept="image/*" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => handleFile(e.target.files?.[0])} />
+            )}
           </>
         )}
       </div>
@@ -245,7 +269,7 @@ function groupItemsByEventoPunto(items: RawOrderItem[]) {
  * (tarjeta al final, sube directo desde la galería en vez de elegir entre
  * fotos ya existentes del evento). Agrupadas por evento → punto para
  * pedidos que mezclan varios eventos del mismo fotógrafo. */
-function OrderPhotosSection({ order, photographerId, expanded }: { order: PhotographerOrderGroup; photographerId: string; expanded: boolean }) {
+function OrderPhotosSection({ order, photographerId, expanded, photographerLabel }: { order: PhotographerOrderGroup; photographerId: string; expanded: boolean; photographerLabel: string }) {
   const push = useToastStore((s) => s.push)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -380,7 +404,10 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
     try {
       const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: openPhoto.id } })
       if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
-      const filename = buildDeliveredFilename(order.bikerName, order.orderNumber, openItem.position, openPhoto.original_filename)
+      // El nombre del archivo usa el nombre/apodo del FOTÓGRAFO — no el del
+      // biker — para que sea el MISMO archivo (mismo nombre) sin importar
+      // desde qué portal se descargue esta foto.
+      const filename = buildDeliveredFilename(photographerLabel, order.orderNumber, openItem.position, openPhoto.original_filename)
       await downloadFile(data.downloadUrl, filename)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
@@ -458,6 +485,7 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
                             giftBusy={busyId === item.id}
                             onGift={() => toggleGift(item)}
                             justClosed={item.photo_id === justClosedId}
+                            uploadLocked={order.status === 'pendiente_pago'}
                           />
                         ),
                     )}
@@ -476,6 +504,7 @@ function OrderPhotosSection({ order, photographerId, expanded }: { order: Photog
                             giftBusy={busyId === item.id}
                             onGift={() => toggleGift(item)}
                             justClosed={item.photo_id === justClosedId}
+                            uploadLocked={order.status === 'pendiente_pago'}
                           />
                         ),
                     )}
@@ -888,7 +917,17 @@ export function StudioOrderDetail() {
       </div>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_280px]">
-        {user && <OrderPhotosSection order={order} photographerId={user.id} expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false} />}
+        {/* `profile?.display_name` (no el apodo de pedidos) — el biker solo
+            conoce el nombre de perfil del fotógrafo, así que el archivo
+            debe llamarse igual sin importar desde qué portal se descargue. */}
+        {user && (
+          <OrderPhotosSection
+            order={order}
+            photographerId={user.id}
+            expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false}
+            photographerLabel={profile?.display_name ?? 'MotoShots'}
+          />
+        )}
 
         <aside className="rounded-3xl border border-border bg-card p-6 lg:sticky lg:top-24 lg:self-start">
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Línea de tiempo</h3>

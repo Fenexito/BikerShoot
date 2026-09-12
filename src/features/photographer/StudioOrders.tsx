@@ -6,7 +6,7 @@ import { usePhotographerDetails } from './usePhotographerDetails'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { useToastStore } from '../../ui/overlays/toastStore'
-import { getEffectiveStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
+import { getPhotographerStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { FilterBar } from '../../ui/shared/FilterBar'
@@ -65,8 +65,18 @@ export function OrderRow({
   onToggleSelect: () => void
 }) {
   const urgent = urgencyClass(order)
-  const statusStyle = getEffectiveStatusStyle(order.effectiveStatus)
-  const borderColor = statusStyle.dot.replace('bg-', 'border-')
+  // Colores desde el punto de vista del fotógrafo — "Subir Comprobante" no
+  // es su responsabilidad (no se resalta, azul informativo); "Confirmar
+  // Pago" sí lo es (rojo, se resalta). Ver getPhotographerStatusStyle.
+  const statusStyle = getPhotographerStatusStyle(order.effectiveStatus)
+  const borderColor = statusStyle.highlight ? statusStyle.dot.replace('bg-', 'border-') : undefined
+
+  const activeItems = order.items.filter((i) => i.status !== 'cancelado')
+  const deliveredCount = activeItems.filter((i) => i.status === 'entregado').length
+  // Barra de progreso de entrega — solo mientras el pedido está en
+  // preparación, para que el fotógrafo vea de un vistazo cuánto le falta
+  // sin tener que abrir cada pedido uno por uno.
+  const showProgress = order.status === 'en_preparacion' && activeItems.length > 0
 
   return (
     <div
@@ -87,23 +97,37 @@ export function OrderRow({
           ✓
         </button>
       )}
-      <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 items-center gap-4">
-        <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold">{order.bikerName}</p>
-            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+      <Link to={`/studio/pedidos/${order.orderId}`} className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex min-w-0 items-center gap-4">
+          <InitialsAvatar name={order.bikerName} className="h-11 w-11 shrink-0 bg-foreground text-sm text-background" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold">{order.bikerName}</p>
+              <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+            </div>
+            {/* El nombre del evento se oculta en móvil — ahí solo se
+                conserva lo esencial (comprador, foto, estado, # de pedido,
+                cantidad de fotos, fecha y total); en escritorio hay
+                espacio de sobra para mostrarlo también. */}
+            <p className="truncate text-sm text-muted-foreground">
+              {formatOrderCode(order.orderNumber, profileName)} · <span className="hidden sm:inline">{order.eventTitle} · </span>{order.items.length} fotos
+            </p>
           </div>
-          <p className="truncate text-sm text-muted-foreground">
-            {formatOrderCode(order.orderNumber, profileName)} · {order.eventTitle} · {order.items.length} fotos
-          </p>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            <span className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
+              {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
+            </span>
+            <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          <span className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
-            {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
-          </span>
-          <span className="rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
-        </div>
+        {showProgress && (
+          <div className="flex items-center gap-2 pl-[3.25rem]">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
+            </div>
+            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length} entregadas</span>
+          </div>
+        )}
       </Link>
     </div>
   )

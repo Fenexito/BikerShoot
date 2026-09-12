@@ -32,6 +32,11 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
   const firstItem = order.order_items[0]
   const photographerGroups = groupOrderByPhotographer(order)
   const multiPhotographer = photographerGroups.length > 1
+  // Varios eventos pueden colarse en un mismo pedido de dos formas: varios
+  // fotógrafos (cada uno de su propio evento) o UN fotógrafo que vendió de
+  // dos eventos distintos — en cualquiera de los dos casos, mostrar "el"
+  // nombre del evento sería engañoso, así que se oculta.
+  const distinctEventTitles = new Set(order.order_items.map((i) => i.event?.title).filter(Boolean))
   // Un par de miniaturas nada más, como referencia visual del pedido — no
   // hace falta más para reconocerlo de un vistazo.
   const previewItems = order.order_items.slice(0, 3)
@@ -61,12 +66,28 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate font-bold">{multiPhotographer ? `${photographerGroups.length} fotógrafos` : firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
+        <div className="mb-0.5 flex flex-wrap items-center gap-2">
           <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+          <span className="text-xs text-muted-foreground">{formatOrderCode(order.order_number)}</span>
         </div>
+        {/* Con varios fotógrafos, en vez de un título genérico "N
+            fotógrafos", se listan sus nombres uno por uno (como si el
+            pedido tuviera varios "títulos") junto a cuántas fotos le tocan
+            a cada uno. */}
+        {multiPhotographer ? (
+          <div className="flex flex-col gap-0.5">
+            {photographerGroups.map((g) => (
+              <p key={g.photographerId} className="truncate text-sm font-bold">
+                {g.photographerName} <span className="font-normal text-muted-foreground">({g.items.length} foto{g.items.length > 1 ? 's' : ''})</span>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="truncate font-bold">{firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
+        )}
         <p className="truncate text-sm text-muted-foreground">
-          {formatOrderCode(order.order_number)} · {firstItem?.event?.title ?? ''} · {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''}
+          {distinctEventTitles.size === 1 && <>{Array.from(distinctEventTitles)[0]} · </>}
+          {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''}
         </p>
         <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
       </div>

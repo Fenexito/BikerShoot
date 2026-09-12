@@ -1,12 +1,9 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
-import { previewUrl, r2Url } from '../../../lib/r2'
+import { previewUrl } from '../../../lib/r2'
 import { downloadFile } from '../../../lib/download'
 import { StatusPill } from '../../../ui/shared/StatusPill'
 import { getOrderStatusStyle, getEffectiveStatusStyle, type OrderItemStatus, type EffectiveOrderStatus } from '../../../lib/orderStatus'
-import { useToastStore } from '../../../ui/overlays/toastStore'
-import { IconDownload } from '../../../ui/shared/icons'
 import { cn } from '../../../lib/cn'
 
 const PAID_STATUSES = new Set<OrderItemStatus>(['en_preparacion', 'entregado'])
@@ -58,7 +55,6 @@ export function PurchasedPhotoTile({
   showStatusPill = true,
   onClick,
   justClosed = false,
-  downloadFilename,
 }: {
   photoId: string
   photo: PurchasedPhoto | null
@@ -75,32 +71,9 @@ export function PurchasedPhotoTile({
    * — mismo resalte breve que usa Buscar, para no perderla entre las
    * demás del pedido. */
   justClosed?: boolean
-  /** Nombre de archivo real para la descarga (ej. "Fenexito-000007-001.jpg")
-   * — si no se pasa, cae a un nombre genérico. */
-  downloadFilename?: string
 }) {
-  const push = useToastStore((s) => s.push)
-  const [downloading, setDownloading] = useState(false)
-
   const delivered = !!photo?.delivered_path
   const { data: deliveredUrl } = useDeliveredViewUrl(photoId, delivered)
-
-  async function download(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (!photo) return
-    if (!photo.preview_path) {
-      window.open(r2Url(photo.storage_path ?? ''), '_blank')
-      return
-    }
-    setDownloading(true)
-    try {
-      await downloadPurchasedPhoto(photoId, downloadFilename ?? `motoshots-${photoId}.jpg`)
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
-    } finally {
-      setDownloading(false)
-    }
-  }
 
   const canDownload = PAID_STATUSES.has(status) && photo && (photo.delivered_path || !photo.preview_path)
   const stillEditing = PAID_STATUSES.has(status) && photo?.preview_path && !photo.delivered_path
@@ -111,7 +84,11 @@ export function PurchasedPhotoTile({
     <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted', justClosed && 'animate-photo-just-closed')}>
       {thumbnailSrc && (
         <button onClick={onClick} className="block h-full w-full" aria-label="Ver foto">
-          <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />
+          {/* En blanco y negro mientras el fotógrafo todavía la está
+              editando — una señal visual clara de "todavía no está lista",
+              sin necesidad de leer el texto. Las entregadas se ven a
+              full color, como cualquier foto normal. */}
+          <img src={thumbnailSrc} alt="" className={cn('h-full w-full object-cover', stillEditing && 'grayscale')} />
         </button>
       )}
       {showStatusPill && (
@@ -119,18 +96,20 @@ export function PurchasedPhotoTile({
           <StatusPill dot={pillStyle.dot} text="text-white" label={pillStyle.label} className="text-[10px]" />
         </span>
       )}
+      {/* Un check verde simple indica "lista" — ya no hay botón de
+          descarga en la miniatura (se descarga desde el visor, que ya
+          muestra el archivo final). */}
       {canDownload && (
-        <button
-          onClick={download}
-          disabled={downloading}
-          className="absolute inset-x-1.5 top-1.5 flex items-center justify-center gap-1 rounded-full bg-black/70 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black/85"
+        <span
+          className="pointer-events-none absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
+          title="Lista para descargar"
         >
-          <IconDownload className="h-3.5 w-3.5" /> {downloading ? 'Descargando…' : 'Descargar original'}
-        </button>
+          ✓
+        </span>
       )}
       {stillEditing && (
         <span className="pointer-events-none absolute inset-x-1.5 top-1.5 rounded-full bg-black/70 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-white">
-          El fotógrafo está editando tu foto
+          En proceso
         </span>
       )}
     </div>

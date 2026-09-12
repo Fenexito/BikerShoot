@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, groupOrderByPhotographer, toGridPhoto, type MyOrderItem } from './useMyOrders'
@@ -17,7 +17,7 @@ import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { supabase } from '../../lib/supabase'
-import { IconDownload } from '../../ui/shared/icons'
+import { IconDownload, IconEye, IconEdit } from '../../ui/shared/icons'
 
 // Con transferencia, el flujo pasa primero por "subir comprobante" — con
 // tarjeta ese paso no existe (no hay comprobante manual que subir), así
@@ -52,11 +52,13 @@ function groupItemsByEventoPunto(items: MyOrderItem[]) {
   })
 }
 
-/** Botón de comprobante por fotógrafo — "Subir" si todavía no hay uno para
- * ese fotógrafo, o "Ver"/"Editar" (mismo visor compartido de la app) si ya
- * lo subió. Antes había un solo botón genérico "Subir comprobantes de
- * pago" que no distinguía nada de esto ni servía para revisar lo ya
- * subido. */
+/** Botón de comprobante por fotógrafo — mientras no hay ninguno, un botón
+ * NEGRO bien visible ("Subir Comprobante": es lo único que bloquea todo
+ * el pedido, no debería pasar desapercibido). Una vez subido, se
+ * convierte en un menú "Comprobantes" con Ver (abre el visor compartido)
+ * y Editar (reemplaza el archivo ahí mismo, sin salir de esta página —
+ * antes "Editar" navegaba a la página de carga solo para volver a subir
+ * el mismo archivo). */
 function ProofButton({ orderId, photographerId, photographerName, bikerName, amount, hasProof }: {
   orderId: string
   photographerId: string
@@ -66,10 +68,23 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
   hasProof: boolean
 }) {
   const push = useToastStore((s) => s.push)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [replacing, setReplacing] = useState(false)
   const [proof, setProof] = useState<{ viewUrl: string; uploadedAt: string } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [menuOpen])
 
   async function openViewer() {
+    setMenuOpen(false)
     setLoading(true)
     try {
       const [{ data, error }, { data: row }] = await Promise.all([
@@ -85,21 +100,62 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
     }
   }
 
+  async function handleReplace(file: File | undefined) {
+    setMenuOpen(false)
+    if (!file) return
+    setReplacing(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('r2-payment-proof-upload-url', {
+        body: { orderId, photographerId, fileName: file.name, contentType: file.type },
+      })
+      if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
+      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
+      const { error: upsertError } = await supabase
+        .from('order_payment_proofs')
+        .upsert({ order_id: orderId, photographer_id: photographerId, proof_path: data.proofPath }, { onConflict: 'order_id,photographer_id' })
+      if (upsertError) throw upsertError
+      push({ type: 'success', title: 'Comprobante actualizado' })
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
+    } catch (err) {
+      push({ type: 'error', title: 'No se pudo actualizar el comprobante', description: (err as Error).message })
+    } finally {
+      setReplacing(false)
+    }
+  }
+
   if (!hasProof) {
+    // Negro resaltado (variant="dark") a propósito — es el único bloqueo
+    // real para que el pedido avance, así que no debería mimetizarse con
+    // el resto de botones secundarios de la página.
     return (
       <Link to={`/app/checkout/pago/${orderId}`}>
-        <Button variant="secondary" size="sm">Subir comprobante</Button>
+        <Button variant="dark" size="sm">Subir Comprobante</Button>
       </Link>
     )
   }
 
   return (
     <>
-      <div className="flex gap-2">
-        <Button variant="secondary" size="sm" loading={loading} onClick={openViewer}>Ver comprobante</Button>
-        <Link to={`/app/checkout/pago/${orderId}`}>
-          <Button variant="secondary" size="sm">Editar</Button>
-        </Link>
+      <div ref={menuRef} className="relative">
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          disabled={replacing}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-50"
+        >
+          {replacing ? 'Actualizando…' : 'Comprobantes'} <span className="text-xs text-muted-foreground">▾</span>
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-full z-50 mt-2 w-52 origin-top overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl animate-menu-in">
+            <button onClick={openViewer} disabled={loading} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
+              <IconEye className="h-4 w-4 shrink-0" /> Ver comprobante
+            </button>
+            <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
+              <IconEdit className="h-4 w-4 shrink-0" /> Editar comprobante
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReplace(e.target.files?.[0])} />
+            </label>
+          </div>
+        )}
       </div>
       {proof && (
         <PhotoLightbox
