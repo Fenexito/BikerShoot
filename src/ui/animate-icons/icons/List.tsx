@@ -7,95 +7,116 @@ import {
   type IconProps,
 } from '../icon'
 
-type BotProps = IconProps<keyof typeof animations>;
+type ListProps = IconProps<keyof typeof animations>;
 
 const animations = {
   default: {
-    path1: {},
     rect: {},
-    path2: {},
-    path3: {},
-    path4: {
+    path1: {
       initial: {
-        x: 0,
-        y: 0,
+        pathLength: 1,
+        opacity: 1,
+        scale: 1,
       },
       animate: {
-        x: [0, -1.5, 1.5, 0],
-        y: [0, 1.5, 1.5, 0],
+        pathLength: [0, 1],
+        opacity: [0, 1],
+        scale: [1.1, 1],
         transition: {
+          duration: 0.4,
           ease: 'easeInOut',
-          duration: 1.3,
+        },
+      },
+    },
+    path2: {
+      initial: {
+        pathLength: 1,
+        opacity: 1,
+        scale: 1,
+      },
+      animate: {
+        pathLength: [0, 1],
+        opacity: [0, 1],
+        scale: [1.1, 1],
+        transition: {
+          duration: 0.4,
+          ease: 'easeInOut',
+          delay: 0.2,
+        },
+      },
+    },
+    path3: {
+      initial: {
+        pathLength: 1,
+        opacity: 1,
+        scale: 1,
+      },
+      animate: {
+        pathLength: [0, 1],
+        opacity: [0, 1],
+        scale: [1.1, 1],
+        transition: {
+          duration: 0.4,
+          ease: 'easeInOut',
+          delay: 0.4,
+        },
+      },
+    },
+    path4: {
+      initial: {
+        pathLength: 1,
+        opacity: 1,
+        scale: 1,
+      },
+      animate: {
+        pathLength: [0, 1],
+        opacity: [0, 1],
+        scale: [1.1, 1],
+        transition: {
+          duration: 0.4,
+          ease: 'easeInOut',
+          delay: 0.6,
         },
       },
     },
     path5: {
       initial: {
-        x: 0,
-        y: 0,
+        pathLength: 1,
+        opacity: 1,
+        scale: 1,
       },
       animate: {
-        x: [0, -1.5, 1.5, 0],
-        y: [0, 1.5, 1.5, 0],
+        pathLength: [0, 1],
+        opacity: [0, 1],
+        scale: [1.1, 1],
         transition: {
+          duration: 0.4,
           ease: 'easeInOut',
-          duration: 1.3,
+          delay: 0.8,
         },
       },
     },
-  } satisfies Record<string, Variants>,
-  blink: {
-    path1: {},
-    rect: {},
-    path2: {},
-    path3: {},
-    path4: {
+    path6: {
       initial: {
-        scaleY: 1,
+        pathLength: 1,
+        opacity: 1,
+        scale: 1,
       },
       animate: {
-        scaleY: [1, 0.5, 1],
+        pathLength: [0, 1],
+        opacity: [0, 1],
+        scale: [1.1, 1],
         transition: {
+          duration: 0.4,
           ease: 'easeInOut',
-          duration: 0.6,
+          delay: 1,
         },
       },
     },
-    path5: {
-      initial: {
-        scaleY: 1,
-      },
-      animate: {
-        scaleY: [1, 0.5, 1],
-        transition: {
-          ease: 'easeInOut',
-          duration: 0.6,
-        },
-      },
-    },
-  } satisfies Record<string, Variants>,
-  wink: {
-    path1: {},
-    rect: {},
-    path2: {},
-    path3: {},
-    path4: {
-      initial: {
-        scaleY: 1,
-      },
-      animate: {
-        scaleY: [1, 0.5, 1],
-        transition: {
-          ease: 'easeInOut',
-          duration: 0.6,
-        },
-      },
-    },
-    path5: {},
   } satisfies Record<string, Variants>,
 } as const;
 
-function IconComponent({ size, ...props }: BotProps) {
+function IconComponent({ size, ...props }: ListProps) {
   const { controls } = useAnimateIconContext();
   const variants = getVariants(animations);
 
@@ -113,42 +134,38 @@ function IconComponent({ size, ...props }: BotProps) {
       {...props}
     >
       <motion.path
-        d="M12 8V4H8"
+        d="M3 5h.01"
         variants={variants.path1}
         initial="initial"
         animate={controls}
       />
-      <motion.rect
-        width={16}
-        height={12}
-        x={4}
-        y={8}
-        rx={2}
-        variants={variants.rect}
-        initial="initial"
-        animate={controls}
-      />
       <motion.path
-        d="M2 14h2"
+        d="M8 5h13"
         variants={variants.path2}
         initial="initial"
         animate={controls}
       />
       <motion.path
-        d="M20 14h2"
+        d="M3 12h.01"
         variants={variants.path3}
         initial="initial"
         animate={controls}
       />
       <motion.path
-        d="M15 13v2"
+        d="M8 12h13"
         variants={variants.path4}
         initial="initial"
         animate={controls}
       />
       <motion.path
-        d="M9 13v2"
+        d="M3 19h.01"
         variants={variants.path5}
+        initial="initial"
+        animate={controls}
+      />
+      <motion.path
+        d="M8 19h13"
+        variants={variants.path6}
         initial="initial"
         animate={controls}
       />
@@ -156,14 +173,14 @@ function IconComponent({ size, ...props }: BotProps) {
   );
 }
 
-function Bot(props: BotProps) {
+function List(props: ListProps) {
   return <IconWrapper icon={IconComponent} {...props} />;
 }
 
 export {
   animations,
-  Bot,
-  Bot as BotIcon,
-  type BotProps,
-  type BotProps as BotIconProps,
+  List,
+  List as ListIcon,
+  type ListProps,
+  type ListProps as ListIconProps,
 };
