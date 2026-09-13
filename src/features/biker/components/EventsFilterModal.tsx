@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { useScrollLock } from '../../../ui/shared/useScrollLock'
 import { DarkSelectField, type DarkSelectOption } from '../../../ui/shared/DarkSelectField'
-import { IconClose } from '../../../ui/shared/icons'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { X } from '../../../ui/animate-icons/icons/X'
 import { cn } from '../../../lib/cn'
 
 const SORTS: DarkSelectOption[] = [
@@ -82,9 +83,11 @@ export function EventsFilterModal({
       <div className="relative z-10 w-full max-w-2xl animate-menu-in rounded-3xl border border-white/10 bg-neutral-900 p-6 text-white shadow-2xl sm:p-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold">Filtros</h2>
-          <button onClick={onClose} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
-            <IconClose className="h-4 w-4" />
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button onClick={onClose} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+              <X size={16} />
+            </button>
+          </AnimateIcon>
         </div>
 
         <div className="flex flex-col gap-2">

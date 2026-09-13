@@ -4,13 +4,14 @@ import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
 import { useAuth } from '../../features/auth/AuthContext'
 import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
-import { IconUser, IconArchive, IconCreditCard, IconImages, IconCart, IconPlus } from '../shared/icons'
+import { IconArchive, IconCreditCard, IconImages, IconCart } from '../shared/icons'
 import { AnimateIcon } from '../animate-icons/icon'
 import { Search } from '../animate-icons/icons/Search'
 import { UserRound } from '../animate-icons/icons/UserRound'
 import { Settings } from '../animate-icons/icons/Settings'
 import { Sparkles } from '../animate-icons/icons/Sparkles'
 import { LogOut } from '../animate-icons/icons/LogOut'
+import { CirclePlus } from '../animate-icons/icons/CirclePlus'
 import { GlobalSearchModal } from '../../features/photographer/components/GlobalSearchModal'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
@@ -125,7 +126,7 @@ export function HeaderStudio() {
                 ))}
               </nav>
               <div className="ml-auto flex shrink-0 items-center gap-2">
-                <AnimateIcon animateOnHover asChild>
+                <AnimateIcon animateOnHover animateOnTap asChild>
                   <button
                     onClick={() => setSearchOpen(true)}
                     aria-label="Buscar en todo el sitio"
@@ -202,7 +203,7 @@ export function HeaderStudio() {
                   página como el detalle de un pedido lo oculta del todo con
                   `hideSearchTrigger` — ahí no aporta nada buscar. */}
               {!hideSearchTrigger && (
-                <AnimateIcon animateOnHover asChild>
+                <AnimateIcon animateOnHover animateOnTap asChild>
                   <button
                     onClick={() => setSearchOpen(true)}
                     className={cn(
@@ -227,9 +228,9 @@ export function HeaderStudio() {
           { to: '/studio/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
           { to: '/studio/pedidos', label: 'Pedidos', icon: <IconCart className="h-full w-full" /> },
           { to: '/studio/almacenamiento', label: 'Espacio', icon: <IconArchive className="h-full w-full" /> },
-          { to: '/studio/perfil', label: 'Perfil', icon: <IconUser className="h-full w-full" /> },
+          { to: '/studio/perfil', label: 'Perfil', icon: <UserRound className="h-full w-full" /> },
         ]}
-        primary={{ to: '/studio/eventos/new', label: 'Crear', icon: <IconPlus className="h-full w-full" /> }}
+        primary={{ to: '/studio/eventos/new', label: 'Crear', icon: <CirclePlus className="h-full w-full" /> }}
         activeClassName="text-accent"
         autoHide={mobileEnabled && !suppressAutoHide}
       />

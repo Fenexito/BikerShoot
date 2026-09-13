@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTypedConfirmStore } from './typedConfirmStore'
 import { getPortalRoot } from '../shared/portalRoot'
+import { AnimateIcon } from '../animate-icons/icon'
+import { X } from '../animate-icons/icons/X'
+import { Trash } from '../animate-icons/icons/Trash'
 import { cn } from '../../lib/cn'
 
 const CLOSE_DURATION = 150
@@ -95,19 +98,23 @@ export function TypedConfirmDialog() {
         )}
 
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={() => close(false)}
-            className="rounded-full px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {request.cancelLabel ?? 'Cancelar'}
-          </button>
-          <button
-            onClick={() => close(true)}
-            disabled={!matches}
-            className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:pointer-events-none disabled:opacity-40"
-          >
-            {request.confirmLabel ?? 'Eliminar'}
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => close(false)}
+              className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X size={14} /> {request.cancelLabel ?? 'Cancelar'}
+            </button>
+          </AnimateIcon>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => close(true)}
+              disabled={!matches}
+              className="flex items-center gap-1.5 rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <Trash size={14} /> {request.confirmLabel ?? 'Eliminar'}
+            </button>
+          </AnimateIcon>
         </div>
       </div>
     </div>,

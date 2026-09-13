@@ -207,7 +207,7 @@ export function BikerSearchModal({ open, onClose }: { open: boolean; onClose: ()
             placeholder="Tus pedidos, eventos, fotógrafos, rutas…"
             className="w-full bg-transparent text-base outline-none placeholder:text-white/40"
           />
-          <AnimateIcon animateOnHover asChild>
+          <AnimateIcon animateOnHover animateOnTap asChild>
             <button onClick={onClose} aria-label="Cerrar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
               <X size={16} />
             </button>

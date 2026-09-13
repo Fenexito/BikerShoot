@@ -47,7 +47,7 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
 
   return (
     <div ref={rootRef} className="relative">
-      <AnimateIcon animateOnHover asChild>
+      <AnimateIcon animateOnHover animateOnTap asChild>
         <button
           onClick={(e) => {
             e.preventDefault()
@@ -82,13 +82,13 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
               'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/10',
               item.tone === 'danger' ? 'text-red-400' : item.tone === 'success' ? 'text-emerald-400' : 'text-white/90',
             )
-            // Envuelto en `AnimateIcon animateOnHover asChild` — la fila
+            // Envuelto en `AnimateIcon animateOnHover animateOnTap asChild` — la fila
             // COMPLETA (no solo el ícono) dispara el hover, para cualquier
             // ícono animado que un caller pase en `item.icon` (uno estático
             // simplemente lo ignora, sin efecto ni error).
             if (item.href) {
               return (
-                <AnimateIcon key={item.label} animateOnHover asChild>
+                <AnimateIcon key={item.label} animateOnHover animateOnTap asChild>
                   <a href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={itemClass}>
                     {content}
                   </a>
@@ -96,13 +96,13 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
               )
             }
             return item.to ? (
-              <AnimateIcon key={item.label} animateOnHover asChild>
+              <AnimateIcon key={item.label} animateOnHover animateOnTap asChild>
                 <Link to={item.to} onClick={() => setOpen(false)} className={itemClass}>
                   {content}
                 </Link>
               </AnimateIcon>
             ) : (
-              <AnimateIcon key={item.label} animateOnHover asChild>
+              <AnimateIcon key={item.label} animateOnHover animateOnTap asChild>
                 <button
                   onClick={(e) => {
                     e.preventDefault()

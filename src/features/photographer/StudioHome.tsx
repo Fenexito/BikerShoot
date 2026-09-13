@@ -13,6 +13,8 @@ import { Button } from '../../ui/studio/Button'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { OrderRow } from './StudioOrders'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 
 function usePhotoCount(photographerId: string | undefined) {
   return useQuery({
@@ -92,9 +94,13 @@ export function StudioHome() {
       <section className="mt-14">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-studio text-xl font-bold tracking-tight2">Tus eventos</h2>
-          <Link to="/studio/eventos/new">
-            <Button variant="dark">+ Crear evento</Button>
-          </Link>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <Link to="/studio/eventos/new">
+              <Button variant="dark" className="gap-1.5">
+                <CirclePlus size={16} /> Crear evento
+              </Button>
+            </Link>
+          </AnimateIcon>
         </div>
         {events.length === 0 ? (
           <p className="rounded-2xl border border-border px-4 py-6 text-center text-muted-foreground">

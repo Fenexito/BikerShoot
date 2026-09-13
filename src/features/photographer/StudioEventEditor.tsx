@@ -17,7 +17,14 @@ import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
-import { IconInfo, IconMap, IconImages } from '../../ui/shared/icons'
+import type { ComponentType } from 'react'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Info } from '../../ui/animate-icons/icons/Info'
+import { Route } from '../../ui/animate-icons/icons/Route'
+import { Images } from '../../ui/animate-icons/icons/Images'
+import { Check } from '../../ui/animate-icons/icons/Check'
+import { X } from '../../ui/animate-icons/icons/X'
+import { ClipboardCheck } from '../../ui/animate-icons/icons/ClipboardCheck'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { cn } from '../../lib/cn'
 import type { EventStatus } from '../../types/db'
@@ -733,10 +740,10 @@ export function StudioEventEditor() {
   }
 
   const isRodada = category === 'Rodada'
-  const TABS: { id: TabId; label: string; icon: typeof IconInfo }[] = [
-    { id: 'info', label: 'Información', icon: IconInfo },
-    { id: 'cobertura', label: isRodada ? 'Ruta' : 'Punto', icon: IconMap },
-    { id: 'imagenes', label: 'Imágenes', icon: IconImages },
+  const TABS: { id: TabId; label: string; icon: ComponentType<{ size?: number; className?: string }> }[] = [
+    { id: 'info', label: 'Información', icon: Info },
+    { id: 'cobertura', label: isRodada ? 'Ruta' : 'Punto', icon: Route },
+    { id: 'imagenes', label: 'Imágenes', icon: Images },
   ]
 
   return (
@@ -752,19 +759,20 @@ export function StudioEventEditor() {
             iguales y centradas, en vez de una fila con scroll horizontal. */}
         <nav className="-mb-px grid grid-cols-3 gap-1 border-b border-border lg:mb-0 lg:flex lg:flex-col lg:gap-1 lg:border-b-0">
           {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'flex min-w-0 items-center justify-center gap-1.5 border-b-2 pb-3 text-xs font-medium transition-colors sm:text-sm lg:justify-start lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
-                tab === t.id
-                  ? 'border-foreground font-bold text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <t.icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t.label}</span>
-            </button>
+            <AnimateIcon key={t.id} animateOnHover animateOnTap asChild>
+              <button
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'flex min-w-0 items-center justify-center gap-1.5 border-b-2 pb-3 text-xs font-medium transition-colors sm:text-sm lg:justify-start lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                  tab === t.id
+                    ? 'border-foreground font-bold text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <t.icon size={16} className="shrink-0" />
+                <span className="truncate">{t.label}</span>
+              </button>
+            </AnimateIcon>
           ))}
         </nav>
 
@@ -966,8 +974,16 @@ export function StudioEventEditor() {
       </div>
 
       <div className="sticky bottom-0 z-20 mt-10 flex justify-end gap-3 border-t border-border bg-background px-6 py-4 -mx-6 md:-mx-16 md:px-16">
-        <Button variant="secondary" onClick={() => attemptNavigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>Cancelar</Button>
-        <Button variant="dark" onClick={save} loading={saving}>{isNew ? 'Crear evento' : 'Guardar cambios'}</Button>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Button variant="secondary" className="gap-1.5" onClick={() => attemptNavigate(isNew ? '/studio/eventos' : `/studio/eventos/${id}`)}>
+            <X size={16} /> Cancelar
+          </Button>
+        </AnimateIcon>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Button variant="dark" className="gap-1.5" onClick={save} loading={saving}>
+            <Check size={16} /> {isNew ? 'Crear evento' : 'Guardar cambios'}
+          </Button>
+        </AnimateIcon>
       </div>
 
       {leaveHref && (
@@ -977,36 +993,44 @@ export function StudioEventEditor() {
             <h2 className="text-lg font-bold">Tienes cambios sin guardar</h2>
             <p className="mt-2 text-sm text-muted-foreground">¿Qué quieres hacer antes de salir?</p>
             <div className="mt-6 flex flex-col gap-2">
-              <Button
-                variant="dark"
-                onClick={() => {
-                  setLeaveHref(null)
-                  save()
-                }}
-              >
-                Guardar evento
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  const href = leaveHref
-                  setLeaveHref(null)
-                  navigate(href)
-                }}
-              >
-                Guardar como borrador y salir
-              </Button>
-              <button
-                onClick={() => {
-                  if (draftKey) localStorage.removeItem(draftKey)
-                  const href = leaveHref
-                  setLeaveHref(null)
-                  navigate(href)
-                }}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Salir sin guardar
-              </button>
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <Button
+                  variant="dark"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setLeaveHref(null)
+                    save()
+                  }}
+                >
+                  <Check size={16} /> Guardar evento
+                </Button>
+              </AnimateIcon>
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <Button
+                  variant="secondary"
+                  className="gap-1.5"
+                  onClick={() => {
+                    const href = leaveHref
+                    setLeaveHref(null)
+                    navigate(href)
+                  }}
+                >
+                  <ClipboardCheck size={16} /> Guardar como borrador y salir
+                </Button>
+              </AnimateIcon>
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <button
+                  onClick={() => {
+                    if (draftKey) localStorage.removeItem(draftKey)
+                    const href = leaveHref
+                    setLeaveHref(null)
+                    navigate(href)
+                  }}
+                  className="flex items-center justify-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X size={14} /> Salir sin guardar
+                </button>
+              </AnimateIcon>
             </div>
           </div>
         </div>

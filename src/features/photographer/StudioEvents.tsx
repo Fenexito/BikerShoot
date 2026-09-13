@@ -7,6 +7,8 @@ import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { FilterBar } from '../../ui/shared/FilterBar'
 import { SkeletonGrid } from '../../ui/shared/Skeleton'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 
 type EventStatusFilter = 'todos' | 'activo' | 'pausado' | 'cerrado'
 
@@ -49,9 +51,13 @@ export function StudioEvents() {
           <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Tus eventos</h1>
           <p className="mt-2 text-muted-foreground">{events?.length ?? 0} eventos publicados</p>
         </div>
-        <Link to="/studio/eventos/new">
-          <Button variant="dark">+ Crear evento</Button>
-        </Link>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Link to="/studio/eventos/new">
+            <Button variant="dark" className="gap-1.5">
+              <CirclePlus size={16} /> Crear evento
+            </Button>
+          </Link>
+        </AnimateIcon>
       </div>
 
       {events && events.length > 0 && (

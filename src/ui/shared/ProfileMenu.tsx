@@ -104,7 +104,7 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, the
                 // `link.icon` dispara su animación con el hover de toda la
                 // fila; uno estático lo ignora sin problema.
                 return link.to ? (
-                  <AnimateIcon key={link.label} animateOnHover asChild>
+                  <AnimateIcon key={link.label} animateOnHover animateOnTap asChild>
                     <Link
                       to={link.to}
                       onClick={() => setOpen(false)}
@@ -115,7 +115,7 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, the
                     </Link>
                   </AnimateIcon>
                 ) : (
-                  <AnimateIcon key={link.label} animateOnHover asChild>
+                  <AnimateIcon key={link.label} animateOnHover animateOnTap asChild>
                     <button
                       onClick={() => {
                         setOpen(false)

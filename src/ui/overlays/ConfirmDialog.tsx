@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom'
 import { useConfirmStore } from './confirmStore'
 import { cn } from '../../lib/cn'
 import { getPortalRoot } from '../shared/portalRoot'
+import { AnimateIcon } from '../animate-icons/icon'
+import { X } from '../animate-icons/icons/X'
+import { Check } from '../animate-icons/icons/Check'
+import { Trash } from '../animate-icons/icons/Trash'
 
 const CLOSE_DURATION = 150
 
@@ -66,21 +70,25 @@ export function ConfirmDialog() {
         {request.description && <p className="mt-2 text-sm text-muted-foreground">{request.description}</p>}
 
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={() => close(false)}
-            className="rounded-full px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {request.cancelLabel ?? 'Cancelar'}
-          </button>
-          <button
-            onClick={() => close(true)}
-            className={cn(
-              'rounded-full px-5 py-2.5 text-sm font-semibold transition-all',
-              danger ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-foreground text-background hover:opacity-90',
-            )}
-          >
-            {request.confirmLabel ?? 'Confirmar'}
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => close(false)}
+              className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X size={14} /> {request.cancelLabel ?? 'Cancelar'}
+            </button>
+          </AnimateIcon>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => close(true)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold transition-all',
+                danger ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-foreground text-background hover:opacity-90',
+              )}
+            >
+              {danger ? <Trash size={14} /> : <Check size={14} />} {request.confirmLabel ?? 'Confirmar'}
+            </button>
+          </AnimateIcon>
         </div>
       </div>
     </div>,

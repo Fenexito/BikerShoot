@@ -93,7 +93,7 @@ export function CartDrawer() {
             Tu carrito
             {items.length > 0 && <span className="text-sm font-normal text-muted-foreground">({items.length})</span>}
           </h2>
-          <AnimateIcon animateOnHover asChild>
+          <AnimateIcon animateOnHover animateOnTap asChild>
             <button onClick={close} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-border">
               <X size={16} />
             </button>
@@ -154,7 +154,7 @@ export function CartDrawer() {
                                           es cuál. */}
                                       <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
                                       <p className="shrink-0 text-sm font-bold">Q{item.effectivePrice}</p>
-                                      <AnimateIcon animateOnHover asChild>
+                                      <AnimateIcon animateOnHover animateOnTap asChild>
                                         <button
                                           onClick={() => handleRemove(item)}
                                           aria-label="Quitar del carrito"

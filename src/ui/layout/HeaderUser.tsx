@@ -7,7 +7,7 @@ import { useCartDrawerStore } from '../../features/cart/cartDrawerStore'
 import { useCartSync } from '../../features/cart/useCartSync'
 import { CartDrawer } from '../../features/cart/CartDrawer'
 import { r2Url } from '../../lib/r2'
-import { IconCart, IconUser, IconImages, IconReceipt } from '../shared/icons'
+import { IconCart, IconImages, IconReceipt } from '../shared/icons'
 import { AnimateIcon } from '../animate-icons/icon'
 import { Search } from '../animate-icons/icons/Search'
 import { Heart } from '../animate-icons/icons/Heart'
@@ -180,7 +180,7 @@ export function HeaderUser() {
                 ))}
               </nav>
               <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
-                <AnimateIcon animateOnHover asChild>
+                <AnimateIcon animateOnHover animateOnTap asChild>
                   <button
                     onClick={() => setSearchOpen(true)}
                     aria-label="Buscar en tus pedidos, eventos, fotógrafos y rutas"
@@ -190,7 +190,7 @@ export function HeaderUser() {
                     <Search size={20} />
                   </button>
                 </AnimateIcon>
-                <AnimateIcon animateOnHover asChild>
+                <AnimateIcon animateOnHover animateOnTap asChild>
                   <Link
                     to="/app/favoritos"
                     aria-label="Favoritos"
@@ -276,7 +276,7 @@ export function HeaderUser() {
                   viviera adentro quedaría recortado apenas se abriera. */}
               {actionsSlot}
               {!hideSearchTrigger && (
-                <AnimateIcon animateOnHover asChild>
+                <AnimateIcon animateOnHover animateOnTap asChild>
                   <button
                     onClick={() => setSearchOpen(true)}
                     className={cn(
@@ -343,7 +343,7 @@ export function HeaderUser() {
           { to: '/app/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
           { to: '/app/historial', label: 'Pedidos', icon: <IconReceipt className="h-full w-full" /> },
           { to: '/app/checkout', label: 'Carrito', icon: <IconCart className="h-full w-full" />, badge: itemCount },
-          { to: '/app/perfil', label: 'Perfil', icon: <IconUser className="h-full w-full" /> },
+          { to: '/app/perfil', label: 'Perfil', icon: <UserRound className="h-full w-full" /> },
         ]}
         primary={{ to: '/app/buscar', label: 'Buscar', icon: <Search className="h-full w-full" /> }}
         activeClassName="text-primary"

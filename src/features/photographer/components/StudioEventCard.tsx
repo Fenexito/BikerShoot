@@ -7,6 +7,10 @@ import { Badge } from '../../../ui/studio/Badge'
 import { StatusPill } from '../../../ui/shared/StatusPill'
 import { EventCoverMedia } from '../../../ui/shared/EventCoverMedia'
 import { useToastStore } from '../../../ui/overlays/toastStore'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { Play } from '../../../ui/animate-icons/icons/Play'
+import { Pause } from '../../../ui/animate-icons/icons/Pause'
+import { Edit } from '../../../ui/animate-icons/icons/Edit'
 import type { MyEvent } from '../useMyEvents'
 import type { EventStatus } from '../../../types/db'
 import { cn } from '../../../lib/cn'
@@ -70,26 +74,35 @@ export function StudioEventCard({ event, photographerId }: { event: MyEvent; pho
       </Link>
       <div className="grid grid-cols-2 gap-2 border-t border-border p-5 pt-4">
         {event.status === 'pausado' ? (
-          <button
-            onClick={(e) => toggleStatus(e, 'activo')}
-            className="rounded-full bg-emerald-600 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-emerald-500"
-          >
-            Publicar
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={(e) => toggleStatus(e, 'activo')}
+              className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-600 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+            >
+              <Play size={14} />
+              Publicar
+            </button>
+          </AnimateIcon>
         ) : (
-          <button
-            onClick={(e) => toggleStatus(e, 'pausado')}
-            className="rounded-full bg-blue-600 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-blue-500"
-          >
-            Pausar
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={(e) => toggleStatus(e, 'pausado')}
+              className="flex items-center justify-center gap-1.5 rounded-full bg-blue-600 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-blue-500"
+            >
+              <Pause size={14} />
+              Pausar
+            </button>
+          </AnimateIcon>
         )}
-        <Link
-          to={`/studio/eventos/${event.id}/editar`}
-          className={cn('rounded-full bg-foreground py-2 text-center text-xs font-bold text-background transition-opacity hover:opacity-80')}
-        >
-          Editar
-        </Link>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Link
+            to={`/studio/eventos/${event.id}/editar`}
+            className={cn('flex items-center justify-center gap-1.5 rounded-full bg-foreground py-2 text-center text-xs font-bold text-background transition-opacity hover:opacity-80')}
+          >
+            <Edit size={14} />
+            Editar
+          </Link>
+        </AnimateIcon>
       </div>
     </div>
   )

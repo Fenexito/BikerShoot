@@ -100,7 +100,7 @@ export function NotificationsMenu() {
 
   return (
     <div ref={rootRef} className="relative">
-      <AnimateIcon animateOnHover asChild>
+      <AnimateIcon animateOnHover animateOnTap asChild>
         <button
           onClick={() => setOpen((o) => !o)}
           aria-label="Notificaciones"

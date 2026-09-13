@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { AnimateIcon } from '../animate-icons/icon'
+import { Clock } from '../animate-icons/icons/Clock'
 import { cn } from '../../lib/cn'
 
 const TIMES: string[] = []
@@ -58,17 +60,19 @@ export function TimePicker({ label, value, onChange, className, after, min, max 
   return (
     <div ref={rootRef} className={cn('relative flex flex-col gap-1.5', className)}>
       {label && <span className="text-sm font-medium text-foreground">{label}</span>}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'flex h-12 w-full items-center justify-between gap-2 rounded-full border-2 bg-muted px-4 text-left text-sm text-foreground outline-none transition-colors duration-200',
-          open ? 'border-primary bg-background' : 'border-transparent hover:bg-border/60',
-        )}
-      >
-        <span>{value || '--:--'}</span>
-        <span className="shrink-0 text-sm">🕒</span>
-      </button>
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className={cn(
+            'flex h-12 w-full items-center justify-between gap-2 rounded-full border-2 bg-muted px-4 text-left text-sm text-foreground outline-none transition-colors duration-200',
+            open ? 'border-primary bg-background' : 'border-transparent hover:bg-border/60',
+          )}
+        >
+          <span>{value || '--:--'}</span>
+          <Clock size={16} className="shrink-0" />
+        </button>
+      </AnimateIcon>
 
       {open && (
         <div

@@ -21,7 +21,9 @@ import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { supabase } from '../../lib/supabase'
-import { IconDownload, IconEye, IconEdit, IconWhatsapp } from '../../ui/shared/icons'
+import { IconDownload, IconEye, IconEdit } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
 
@@ -375,7 +377,7 @@ export function HistoryOrderDetail() {
           ? [
               {
                 label: 'WhatsApp',
-                icon: <IconWhatsapp className="h-4 w-4" />,
+                icon: <Whatsapp size={16} />,
                 tone: 'success' as const,
                 href: buildWhatsAppLink(
                   activeGroup.photographerPhone,
@@ -509,19 +511,21 @@ export function HistoryOrderDetail() {
                 />
               )}
               {group.photographerPhone && (
-                <a
-                  href={buildWhatsAppLink(
-                    group.photographerPhone,
-                    `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-                  title="Escribir por WhatsApp"
-                  aria-label="Escribir por WhatsApp"
-                >
-                  <IconWhatsapp className="h-4 w-4" />
-                </a>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <a
+                    href={buildWhatsAppLink(
+                      group.photographerPhone,
+                      `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+                    title="Escribir por WhatsApp"
+                    aria-label="Escribir por WhatsApp"
+                  >
+                    <Whatsapp size={16} />
+                  </a>
+                </AnimateIcon>
               )}
               {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
                   bajar todas de un tirón en vez de una por una. */}

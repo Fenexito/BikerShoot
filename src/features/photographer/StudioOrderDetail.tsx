@@ -21,7 +21,9 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconGift, IconWhatsapp, IconDownload, IconEye } from '../../ui/shared/icons'
+import { IconGift, IconDownload, IconEye } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
@@ -829,7 +831,7 @@ export function StudioOrderDetail() {
           ? [
               {
                 label: 'WhatsApp',
-                icon: <IconWhatsapp className="h-4 w-4" />,
+                icon: <Whatsapp size={16} />,
                 tone: 'success' as const,
                 href: buildWhatsAppLink(
                   order.bikerPhone,
@@ -964,19 +966,21 @@ export function StudioOrderDetail() {
         </Button>
       )}
       {order.bikerPhone && (
-        <a
-          href={buildWhatsAppLink(
-            order.bikerPhone,
-            `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de MotoShots 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
-          )}
-          target="_blank"
-          rel="noreferrer"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-          title="Escribir por WhatsApp"
-          aria-label="Escribir por WhatsApp"
-        >
-          <IconWhatsapp className="h-4 w-4" />
-        </a>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <a
+            href={buildWhatsAppLink(
+              order.bikerPhone,
+              `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de MotoShots 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
+            )}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
+            title="Escribir por WhatsApp"
+            aria-label="Escribir por WhatsApp"
+          >
+            <Whatsapp size={16} />
+          </a>
+        </AnimateIcon>
       )}
     </>
   )

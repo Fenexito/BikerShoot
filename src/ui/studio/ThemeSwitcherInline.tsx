@@ -38,7 +38,7 @@ export function ThemeSwitcherInline() {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-white/70">Tema</span>
           <div className="flex gap-1 rounded-full bg-white/10 p-1">
-            <AnimateIcon animateOnHover asChild>
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button
                 onClick={(e) => {
                   if (effective === 'light') return
@@ -54,7 +54,7 @@ export function ThemeSwitcherInline() {
                 <Sun size={16} />
               </button>
             </AnimateIcon>
-            <AnimateIcon animateOnHover asChild>
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button
                 onClick={(e) => {
                   if (effective === 'dark') return

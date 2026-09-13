@@ -8,6 +8,14 @@ import { BellRing } from '../../ui/animate-icons/icons/BellRing'
 import { Bot } from '../../ui/animate-icons/icons/Bot'
 import { Check } from '../../ui/animate-icons/icons/Check'
 import { ChevronDown } from '../../ui/animate-icons/icons/ChevronDown'
+import { Clock } from '../../ui/animate-icons/icons/Clock'
+import { Edit } from '../../ui/animate-icons/icons/Edit'
+import { Info } from '../../ui/animate-icons/icons/Info'
+import { Images } from '../../ui/animate-icons/icons/Images'
+import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
+import { Instagram } from '../../ui/animate-icons/icons/Instagram'
+import { Facebook } from '../../ui/animate-icons/icons/Facebook'
+import { Tiktok } from '../../ui/animate-icons/icons/Tiktok'
 import { ChevronLeft } from '../../ui/animate-icons/icons/ChevronLeft'
 import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 import { CircleX } from '../../ui/animate-icons/icons/CircleX'
@@ -55,6 +63,14 @@ import { X } from '../../ui/animate-icons/icons/X'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ITEMS: { Icon: ComponentType<IconProps<any>>; name: string; use: string }[] = [
   { Icon: Bell, name: 'Bell', use: 'Notificaciones' },
+  { Icon: Clock, name: 'Clock', use: 'Horas de inicio/fin' },
+  { Icon: Edit, name: 'Edit', use: '(propio) Editar — lápiz' },
+  { Icon: Info, name: 'Info', use: '(propio) Información' },
+  { Icon: Images, name: 'Images', use: '(propio) Imágenes' },
+  { Icon: Whatsapp, name: 'Whatsapp', use: '(propio) WhatsApp' },
+  { Icon: Instagram, name: 'Instagram', use: '(propio) Instagram' },
+  { Icon: Facebook, name: 'Facebook', use: '(propio) Facebook' },
+  { Icon: Tiktok, name: 'Tiktok', use: '(propio) TikTok' },
   { Icon: BellRing, name: 'BellRing', use: 'Notificación recibida' },
   { Icon: Bot, name: 'Bot', use: '(futuro) Asistente/bot' },
   { Icon: Check, name: 'Check', use: 'Confirmaciones' },

@@ -8,7 +8,7 @@ import { ChevronLeft } from '../animate-icons/icons/ChevronLeft'
  * página que necesita "volver" y una que no. Sin círculo/fondo alrededor,
  * solo el ícono, tal como se pidió.
  *
- * `AnimateIcon animateOnHover asChild` envuelve el `<button>`/`<Link>`
+ * `AnimateIcon animateOnHover animateOnTap asChild` envuelve el `<button>`/`<Link>`
  * completo (no el ícono suelto) — el hover que dispara la animación es el
  * de toda el área clicable, no solo el trazo chico de la flecha. */
 export function HeaderBackSlot() {
@@ -18,7 +18,7 @@ export function HeaderBackSlot() {
   return (
     <div className="flex h-9 w-9 shrink-0 items-center justify-center">
       {target === 'back' ? (
-        <AnimateIcon animateOnHover asChild>
+        <AnimateIcon animateOnHover animateOnTap asChild>
           <button
             onClick={() => navigate(-1)}
             aria-label="Volver"
@@ -28,7 +28,7 @@ export function HeaderBackSlot() {
           </button>
         </AnimateIcon>
       ) : target ? (
-        <AnimateIcon animateOnHover asChild>
+        <AnimateIcon animateOnHover animateOnTap asChild>
           <Link
             to={target}
             aria-label="Volver"

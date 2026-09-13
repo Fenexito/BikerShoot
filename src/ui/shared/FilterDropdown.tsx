@@ -2,7 +2,9 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../lib/cn'
 import { getPortalRoot } from './portalRoot'
-import { IconChevronDown, IconClose } from './icons'
+import { AnimateIcon } from '../animate-icons/icon'
+import { ChevronDown } from '../animate-icons/icons/ChevronDown'
+import { X } from '../animate-icons/icons/X'
 
 export interface FilterDropdownOption {
   value: string
@@ -96,30 +98,32 @@ export function FilterDropdown({ label, values, onChange, options, className, va
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          'shrink-0',
-          variant === 'text'
-            ? cn(
-                'flex items-center gap-1 whitespace-nowrap rounded-full px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
-                values.length > 0 && 'font-semibold !text-primary',
-                disabled && 'cursor-not-allowed opacity-40',
-              )
-            : cn(
-                'flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors',
-                values.length > 0 ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground hover:bg-muted',
-                disabled && 'cursor-not-allowed opacity-40',
-              ),
-          className,
-        )}
-      >
-        <span className={cn(variant === 'pill' && 'max-w-[9rem] truncate')}>{label}</span>
-        <IconChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
-      </button>
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <button
+          ref={triggerRef}
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen((o) => !o)}
+          className={cn(
+            'shrink-0',
+            variant === 'text'
+              ? cn(
+                  'flex items-center gap-1 whitespace-nowrap rounded-full px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
+                  values.length > 0 && 'font-semibold !text-primary',
+                  disabled && 'cursor-not-allowed opacity-40',
+                )
+              : cn(
+                  'flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors',
+                  values.length > 0 ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground hover:bg-muted',
+                  disabled && 'cursor-not-allowed opacity-40',
+                ),
+            className,
+          )}
+        >
+          <span className={cn(variant === 'pill' && 'max-w-[9rem] truncate')}>{label}</span>
+          <ChevronDown size={14} className={cn('shrink-0 transition-transform', open && 'rotate-180')} />
+        </button>
+      </AnimateIcon>
       {open &&
         !disabled &&
         createPortal(
@@ -131,9 +135,11 @@ export function FilterDropdown({ label, values, onChange, options, className, va
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
               {values.length > 0 && (
-                <button type="button" onClick={() => onChange([])} aria-label="Limpiar" className="text-red-500 hover:text-red-600">
-                  <IconClose className="h-3.5 w-3.5" />
-                </button>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <button type="button" onClick={() => onChange([])} aria-label="Limpiar" className="text-red-500 hover:text-red-600">
+                    <X size={14} />
+                  </button>
+                </AnimateIcon>
               )}
             </div>
             {/* La lista es el único elemento que scrollea (el encabezado de

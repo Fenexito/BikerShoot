@@ -125,7 +125,7 @@ function AccordionRow({
             >
               ✓
             </button>
-            <AnimateIcon animateOnHover asChild>
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -836,7 +836,7 @@ export function StudioEventView() {
               thumbnail no caben cómodos aquí, y pausar/publicar se mueve
               dentro del menú. */}
           <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:hidden">
-            <AnimateIcon animateOnHover asChild>
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button onClick={() => navigate('/studio/eventos')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
                 <ChevronLeft size={20} strokeWidth={2.5} />
               </button>
@@ -1004,7 +1004,7 @@ export function StudioEventView() {
             >
               Asignar hora
             </button>
-            <AnimateIcon animateOnHover asChild>
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button
                 onClick={bulkDelete}
                 className="flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"

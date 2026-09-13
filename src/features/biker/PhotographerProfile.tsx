@@ -10,7 +10,9 @@ import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import { Button } from '../../ui/flat/Button'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
-import { IconVerified, IconWhatsapp } from '../../ui/shared/icons'
+import { IconVerified } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
@@ -115,12 +117,14 @@ export function PhotographerProfile() {
             />
           </div>
           {photographer.whatsapp ? (
-            <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
-              <Button size="lg" style={{ backgroundColor: '#25D366' }}>
-                <IconWhatsapp className="h-5 w-5" />
-                Contactar por WhatsApp
-              </Button>
-            </a>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
+                <Button size="lg" style={{ backgroundColor: '#25D366' }}>
+                  <Whatsapp size={20} />
+                  Contactar por WhatsApp
+                </Button>
+              </a>
+            </AnimateIcon>
           ) : (
             <Button size="lg" disabled>Sin contacto</Button>
           )}

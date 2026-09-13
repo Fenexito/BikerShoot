@@ -353,7 +353,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
         <span className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-sm sm:text-sm">
           {index + 1} / {photos.length}
         </span>
-        <AnimateIcon animateOnHover asChild>
+        <AnimateIcon animateOnHover animateOnTap asChild>
           <button onClick={requestClose} aria-label="Cerrar" className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60">
             <X size={16} />
           </button>
