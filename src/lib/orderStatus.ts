@@ -52,10 +52,11 @@ export type EffectiveOrderStatus =
 export const EFFECTIVE_STATUS_STYLE: Record<EffectiveOrderStatus, { label: string; dot: string; text: string }> = {
   // Rojo (no gris) — es un estado que de verdad frena el pedido si no se
   // resuelve, a diferencia de "cancelado" (donde ya no hay nada pendiente
-  // por hacer). Etiqueta imperativa ("Subir Comprobante") en vez de
-  // describir lo que falta, para que se lea como una acción a tomar.
-  pendiente_comprobante: { label: 'Subir Comprobante', dot: 'bg-red-500', text: 'text-red-500' },
-  pendiente_confirmacion: { label: 'Pago por confirmar', dot: 'bg-blue-500', text: 'text-blue-500' },
+  // por hacer). Etiquetas cortas y neutrales (leíbles tanto por el biker,
+  // a quien le toca actuar, como por el fotógrafo, para quien es solo
+  // informativo) — ambas caen dentro de la categoría "Pendientes".
+  pendiente_comprobante: { label: 'Falta Comprobante', dot: 'bg-red-500', text: 'text-red-500' },
+  pendiente_confirmacion: { label: 'Por Confirmar', dot: 'bg-blue-500', text: 'text-blue-500' },
   en_preparacion: { label: 'En preparación', dot: 'bg-amber-500', text: 'text-amber-500' },
   entrega_parcial: { label: 'Entrega parcial', dot: 'bg-amber-500', text: 'text-amber-500' },
   entregado: { label: 'Entregado', dot: 'bg-emerald-500', text: 'text-emerald-500' },
@@ -81,7 +82,7 @@ export function getEffectiveStatusStyle(status: string) {
  *   se vuelve la urgencia real (rojo).
  * El resto de estados se quedan igual que `EFFECTIVE_STATUS_STYLE`. */
 export function getPhotographerStatusStyle(status: string): { label: string; dot: string; text: string; highlight: boolean } {
-  if (status === 'pendiente_comprobante') return { label: 'Subir Comprobante', dot: 'bg-blue-500', text: 'text-blue-500', highlight: false }
+  if (status === 'pendiente_comprobante') return { label: 'Falta Comprobante', dot: 'bg-blue-500', text: 'text-blue-500', highlight: false }
   if (status === 'pendiente_confirmacion') return { label: 'Confirmar Pago', dot: 'bg-red-500', text: 'text-red-500', highlight: true }
   if (status === 'cancelado') return { ...EFFECTIVE_STATUS_STYLE.cancelado, highlight: false }
   const style = getEffectiveStatusStyle(status)

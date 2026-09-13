@@ -10,15 +10,21 @@ import { FilterBar } from '../../ui/shared/FilterBar'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { getEffectiveStatusStyle, formatOrderCode } from '../../lib/orderStatus'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
-import { IconFilter } from '../../ui/shared/icons'
+import { IconFilter, IconSearch } from '../../ui/shared/icons'
 import { cn } from '../../lib/cn'
 
-type StatusFilter = 'todos' | 'entregado' | 'en_proceso' | 'cancelado'
+type StatusFilter = 'todos' | 'pendiente' | 'en_proceso' | 'entregado' | 'cancelado'
 
+// Mismo orden y mismos nombres que las categorías del portal del
+// fotógrafo (Todos/Urgentes solo ahí/Pendientes/En Proceso/
+// Entregados-o-Completados/Cancelados) — el biker no tiene "Urgentes" (esa
+// urgencia es solo responsabilidad del fotógrafo), y "Completados" es el
+// nombre que le corresponde a este lado en vez de "Entregados".
 const STATUS_TABS = [
   { value: 'todos', label: 'Todos' },
-  { value: 'entregado', label: 'Completados' },
+  { value: 'pendiente', label: 'Pendientes' },
   { value: 'en_proceso', label: 'En proceso' },
+  { value: 'entregado', label: 'Completados' },
   { value: 'cancelado', label: 'Cancelados' },
 ]
 
@@ -148,7 +154,8 @@ export function History() {
       .map((o) => ({ order: o, status: deriveOrderEffectiveStatus(o) }))
       .filter(({ status: s }) => {
         if (status === 'todos') return true
-        if (status === 'en_proceso') return s !== 'entregado' && s !== 'cancelado'
+        if (status === 'pendiente') return s === 'pendiente_comprobante' || s === 'pendiente_confirmacion'
+        if (status === 'en_proceso') return s === 'en_preparacion' || s === 'entrega_parcial'
         return s === status
       })
       .filter(({ order }) => (photographerId ? order.order_items.some((i) => i.photographer_id === photographerId) : true))
@@ -189,32 +196,44 @@ export function History() {
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Mis compras</h1>
       <p className="mb-6 text-muted-foreground">{orders.length} pedidos</p>
 
-      {/* Misma línea que Eventos: tabs + buscador + botón de Filtros — en
-          móvil, tabs en su propia fila (scroll horizontal si hace falta) y
-          buscador+filtros en la siguiente, en vez del select suelto de
-          fotógrafo que vivía aparte antes. */}
-      <div className="mb-6 flex w-full min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+      {/* Tabs en su propia fila arriba (justificadas a todo el ancho en
+          móvil, ver FilterBar) — buscador + botón de Filtros SIEMPRE en la
+          misma fila debajo, incluso en móvil (antes quedaban en dos filas
+          separadas ahí): el buscador toma 3/4 del ancho y Filtros el 1/4
+          restante, en vez de apilarse. */}
+      <div className="mb-6 flex w-full min-w-0 flex-col gap-3">
         <FilterBar
-          className="!border-none min-w-0 flex-1 !pb-0"
+          className="!border-none !pb-0"
+          hideSearch
           searchValue={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Buscar por evento, fotógrafo o # de pedido…"
           tabs={STATUS_TABS}
           tabValue={status}
           onTabChange={(v) => setStatus(v as StatusFilter)}
         />
-        {photographers.length > 1 && (
-          <button
-            onClick={() => setFiltersOpen((v) => !v)}
-            className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
-          >
-            <IconFilter className="h-4 w-4" />
-            <span className="hidden lg:inline">Filtros</span>
-            {activeFilterCount > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{activeFilterCount}</span>
-            )}
-          </button>
-        )}
+        <div className="flex w-full items-center gap-2">
+          <div className={cn('flex min-w-0 items-center gap-2 rounded-full bg-muted px-4 py-2', photographers.length > 1 ? 'flex-[3]' : 'flex-1')}>
+            <IconSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por evento, fotógrafo o # de pedido…"
+              className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          {photographers.length > 1 && (
+            <button
+              onClick={() => setFiltersOpen((v) => !v)}
+              className="flex flex-1 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+            >
+              <IconFilter className="h-4 w-4 shrink-0" />
+              <span className="hidden lg:inline">Filtros</span>
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{activeFilterCount}</span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {filtersOpen && photographers.length > 1 && (

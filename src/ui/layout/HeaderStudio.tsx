@@ -78,28 +78,25 @@ export function HeaderStudio() {
                 ahí), y en escritorio se desvanece cuando `transformed`. */}
             <div
               className={cn(
-                // `opacity-100 translate-y-0` sin prefijo son la base SIEMPRE
-                // vigente en móvil — el desvanecimiento por `transformed`
-                // (abajo) solo se activa desde `md:` en adelante. Antes esta
-                // clase no tenía el prefijo `md:` y el desvanecimiento
-                // aplicaba también en móvil, donde la capa transformada
-                // nunca existe (`hidden md:flex` más abajo) — el resultado
-                // era un header que, al reaparecer tras auto-ocultarse en la
-                // página del evento (la única con `active` en true en
-                // móvil), se veía completamente vacío (sin título, buscar ni
-                // notificaciones), solo la flecha de atrás (que vive fuera
-                // de este bloque).
-                'absolute inset-0 flex translate-y-0 items-center gap-4 opacity-100 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-                // Desplazamiento corto a propósito (no translate-y-full): el
-                // header solo tiene ~12px de aire arriba/abajo de esta franja
-                // antes de toparse con su propio borde redondeado — un
-                // desplazamiento del 100% se salía de esa forma y se veía
-                // como desbordamiento. La opacidad hace la mayor parte del
-                // trabajo de "ocultar", el desplazamiento es solo un toque.
-                // Sin `mobileEnabled`, esto solo pasa desde `md:` — con
-                // `mobileEnabled` (ej. el detalle de un pedido) también en
-                // móvil, igual que en HeaderUser.
-                transformed && (mobileEnabled ? 'pointer-events-none -translate-y-2.5 opacity-0' : 'md:pointer-events-none md:-translate-y-2.5 md:opacity-0'),
+                'absolute inset-0 flex items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                // OJO: cada rama de este ternario reemplaza el set COMPLETO
+                // de clases de opacidad/traslado (nunca las agrega encima de
+                // una base fija) — `cn` aquí es un simple `clsx`, SIN el
+                // merge de `tailwind-merge`, así que dos utilidades que
+                // apunten a la misma propiedad en el MISMO breakpoint (ej.
+                // `opacity-100` y `opacity-0` sueltos, sin prefijo `md:` en
+                // ninguna) quedan AMBAS en el string de clases a la vez, y
+                // cuál "gana" depende del orden interno en el que Tailwind
+                // generó el CSS, no del orden en que aparecen aquí — eso
+                // exactamente causaba que en móvil (`mobileEnabled`, sin
+                // prefijo `md:` de por medio) se vieran las dos capas
+                // (normal y transformada) superpuestas al mismo tiempo.
+                // Mismo patrón ya corregido en HeaderUser.tsx.
+                transformed
+                  ? mobileEnabled
+                    ? 'pointer-events-none -translate-y-2.5 opacity-0'
+                    : 'translate-y-0 opacity-100 md:pointer-events-none md:-translate-y-2.5 md:opacity-0'
+                  : 'translate-y-0 opacity-100',
               )}
             >
               <Link to="/studio" className="shrink-0 font-studio text-lg font-bold tracking-tight2">

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type PublicEvent, type PublicEventPoint } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
 import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { IconGridSmall, IconGridLarge, IconClose, IconChevronDown } from '../../ui/shared/icons'
+import { IconGridSmall, IconGridLarge, IconClose, IconChevronDown, IconMap } from '../../ui/shared/icons'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
@@ -528,6 +528,16 @@ export function Search() {
         <p className="mt-1 text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{results.length}</span> fotos disponibles ahora mismo
         </p>
+        {/* "Mapa" se quitó del nav principal del header (Pedidos ocupó su
+            lugar) — este es su acceso directo, aquí donde tiene más sentido
+            (buscar una rodada por dónde pasó, en vez de un link genérico
+            en el nav). */}
+        <Link
+          to="/app/mapa"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+        >
+          <IconMap className="h-4 w-4" /> Ver mapa de rutas
+        </Link>
       </div>
 
       {/* El centinela vive justo debajo del hero — el header interactivo se

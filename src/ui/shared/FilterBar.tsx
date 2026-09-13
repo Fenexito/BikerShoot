@@ -42,11 +42,13 @@ interface FilterBarProps {
  * cuando el biker también la necesitó): no usa ningún color de acento
  * fijo, solo tokens semánticos (`border-foreground`, `bg-muted`, etc.) que
  * ya cambian solos según el tema del portal activo.
- * En móvil, segmento + pestañas viven en su PROPIA fila que scrollea
- * horizontalmente (igual que la pestaña de Configuración en angosto) en
- * vez de envolver línea por línea. El buscador baja a su propia fila
- * completa en móvil, y solo se junta a la derecha de esa fila desde `sm:`
- * en adelante donde ya cabe cómodo. */
+ * En móvil, las pestañas se JUSTIFICAN a todo el ancho disponible (cada una
+ * toma una porción igual de la fila, como un segmented control) en vez de
+ * quedar apretadas a la izquierda con un hueco vacío a la derecha — desde
+ * `sm:` en adelante (donde ya suele sobrar espacio) vuelven al ancho
+ * automático + subrayado de la vista de escritorio. El buscador baja a su
+ * propia fila completa en móvil, y solo se junta a la derecha de esa fila
+ * desde `sm:` en adelante donde ya cabe cómodo. */
 export function FilterBar({
   segments,
   segmentValue,
@@ -62,7 +64,7 @@ export function FilterBar({
 }: FilterBarProps) {
   return (
     <div className={cn('flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center', className)}>
-      <div className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto">
+      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4 sm:overflow-x-auto">
         {segments && segments.length > 0 && (
           <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted p-1">
             {segments.map((s) => (
@@ -82,15 +84,21 @@ export function FilterBar({
 
         {segments && segments.length > 0 && tabs.length > 0 && <div className="h-6 w-px shrink-0 bg-border" />}
 
+        {/* Justificadas a todo el ancho en móvil (cada botón toma una
+            porción igual de la fila, sin hueco vacío a la derecha) — desde
+            `sm:` en adelante vuelven al ancho automático + subrayado de
+            siempre, ya con espacio de sobra. */}
         {tabs.length > 0 && (
-          <nav className="flex shrink-0 items-center gap-3 sm:gap-5">
+          <nav className="flex flex-1 items-stretch gap-1 sm:flex-none sm:shrink-0 sm:items-center sm:gap-5">
             {tabs.map((t) => (
               <button
                 key={t.value}
                 onClick={() => onTabChange(t.value)}
                 className={cn(
-                  'shrink-0 whitespace-nowrap border-b-2 pb-0.5 text-xs font-medium transition-colors sm:text-sm',
-                  tabValue === t.value ? 'border-foreground font-bold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+                  'min-w-0 flex-1 truncate rounded-full px-2 py-1.5 text-center text-xs font-semibold transition-colors sm:flex-none sm:w-auto sm:rounded-none sm:border-b-2 sm:px-0 sm:py-0 sm:pb-0.5 sm:text-left sm:text-sm sm:font-medium',
+                  tabValue === t.value
+                    ? 'bg-foreground text-background sm:border-foreground sm:bg-transparent sm:font-bold sm:text-foreground'
+                    : 'text-muted-foreground hover:text-foreground sm:border-transparent',
                 )}
               >
                 {t.label}

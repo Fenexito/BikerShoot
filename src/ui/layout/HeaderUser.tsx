@@ -7,7 +7,7 @@ import { useCartDrawerStore } from '../../features/cart/cartDrawerStore'
 import { useCartSync } from '../../features/cart/useCartSync'
 import { CartDrawer } from '../../features/cart/CartDrawer'
 import { r2Url } from '../../lib/r2'
-import { IconBookmark, IconCart, IconUser, IconLogOut, IconSearch, IconSparkles, IconHome, IconImages } from '../shared/icons'
+import { IconBookmark, IconCart, IconUser, IconLogOut, IconSearch, IconSparkles, IconImages, IconSettings, IconReceipt } from '../shared/icons'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
@@ -19,11 +19,13 @@ import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { BikerSearchModal } from '../../features/biker/components/BikerSearchModal'
 import { cn } from '../../lib/cn'
 
-// "Mis compras" ya NO vive aquí — vive únicamente en el menú de perfil
-// (ver `sections` de `ProfileMenu` más abajo).
+// "Mapa" se quitó de aquí — ahora vive como acceso directo dentro de
+// Buscar fotos (ver Search.tsx). "Pedidos" ocupa su lugar, para que el nav
+// del biker tenga la misma relación de accesos que el del fotógrafo
+// (Eventos/Pedidos en ambos portales).
 const NAV_ITEMS = [
   { to: '/app/buscar', label: 'Buscar fotos' },
-  { to: '/app/mapa', label: 'Mapa' },
+  { to: '/app/historial', label: 'Pedidos' },
   { to: '/app/eventos', label: 'Eventos' },
   { to: '/app/fotografos', label: 'Fotógrafos' },
 ]
@@ -226,6 +228,13 @@ export function HeaderUser() {
                         { to: '/app/favoritos', label: 'Favoritos', icon: <IconBookmark className="h-4 w-4" /> },
                       ],
                       [
+                        // Mismo lugar/patrón que en el menú del fotógrafo —
+                        // acá vive en la misma página que "Mi perfil"
+                        // (BikerProfilePage ya combina perfil+cuenta+
+                        // notificaciones bajo el título "Configuración"),
+                        // pero antes no había NINGÚN acceso a ella con ese
+                        // nombre desde este menú.
+                        { to: '/app/perfil', label: 'Configuración', icon: <IconSettings className="h-4 w-4" /> },
                         { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
                         { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
                       ],
@@ -315,8 +324,11 @@ export function HeaderUser() {
 
       <MobileBottomNav
         items={[
-          { to: '/app', label: 'Inicio', icon: <IconHome className="h-full w-full" />, end: true },
+          // "Inicio" se quitó (Eventos ocupa su lugar) y "Pedidos" ocupa el
+          // lugar donde antes vivía Eventos — misma relación de accesos que
+          // el menú inferior del fotógrafo (Eventos/Pedidos/Espacio/Perfil).
           { to: '/app/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
+          { to: '/app/historial', label: 'Pedidos', icon: <IconReceipt className="h-full w-full" /> },
           { to: '/app/checkout', label: 'Carrito', icon: <IconCart className="h-full w-full" />, badge: itemCount },
           { to: '/app/perfil', label: 'Perfil', icon: <IconUser className="h-full w-full" /> },
         ]}

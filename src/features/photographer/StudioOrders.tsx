@@ -195,7 +195,7 @@ export function StudioOrders() {
     const byStatus = (status: OrderItemStatus) => orders.filter((o) => o.status === status && matches(o)).sort(byMostRecent)
     return [
       { key: 'urgente', label: '🔥 Urgentes', orders: orders.filter((o) => urgencyClass(o) !== null && matches(o)).sort(byMostRecent), defaultOpen: true, tone: 'danger' },
-      { key: 'pendiente_pago', label: 'Pendientes de pago', orders: byStatus('pendiente_pago'), defaultOpen: true },
+      { key: 'pendiente_pago', label: 'Pendientes', orders: byStatus('pendiente_pago'), defaultOpen: true },
       { key: 'en_preparacion', label: 'En preparación', orders: byStatus('en_preparacion'), defaultOpen: true },
       { key: 'entregado', label: 'Entregados', orders: byStatus('entregado'), defaultOpen: true },
       { key: 'cancelado', label: 'Cancelados', orders: byStatus('cancelado'), defaultOpen: false },
@@ -212,7 +212,7 @@ export function StudioOrders() {
   // qué categorías se muestran abajo (no solo saltan a ellas con scroll).
   const visibleCategories = useMemo(() => {
     if (statusFilter === 'todos') return categories
-    if (statusFilter === 'en_proceso') return categories.filter((c) => c.key === 'pendiente_pago' || c.key === 'en_preparacion')
+    if (statusFilter === 'en_proceso') return categories.filter((c) => c.key === 'en_preparacion')
     return categories.filter((c) => c.key === statusFilter)
   }, [categories, statusFilter])
 
@@ -256,6 +256,7 @@ export function StudioOrders() {
           tabs={[
             { value: 'todos', label: 'Todos' },
             { value: 'urgente', label: 'Urgentes' },
+            { value: 'pendiente_pago', label: 'Pendientes' },
             { value: 'en_proceso', label: 'En proceso' },
             { value: 'entregado', label: 'Entregados' },
             { value: 'cancelado', label: 'Cancelados' },

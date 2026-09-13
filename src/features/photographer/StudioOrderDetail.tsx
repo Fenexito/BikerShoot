@@ -541,9 +541,15 @@ function OrderPhotosSection({
                 verlo una y otra vez por cada punto. */}
             {eventGroups.length > 1 && <p className="mb-2 text-sm font-semibold">{eventGroup.eventTitle}</p>}
             {eventGroup.points.map((point) => (
+              // La clave del ref incluye el evento — un pedido con VARIOS
+              // eventos del mismo fotógrafo puede repetir el mismo nombre de
+              // punto (ej. "Curva 1") en cada uno; usar solo el label como
+              // clave hacía que el registro de un punto pisara al del otro
+              // evento con el mismo nombre, y la detección de scroll solo
+              // podía "ver" uno de los dos.
               <div
-                key={point.label ?? '__sin_punto__'}
-                ref={(el) => { pointRefs.current[point.label ?? '__sin_punto__'] = el }}
+                key={`${eventGroup.eventTitle}|||${point.label ?? ''}`}
+                ref={(el) => { pointRefs.current[`${eventGroup.eventTitle}|||${point.label ?? ''}`] = el }}
                 className="mb-4 last:mb-0"
               >
                 {point.label && <p className="mb-2 text-xs font-semibold text-muted-foreground">{point.label}</p>}
@@ -771,7 +777,8 @@ export function StudioOrderDetail() {
         if (!el) continue
         const rect = el.getBoundingClientRect()
         if (rect.top <= 168 && rect.bottom >= 168) {
-          current = key === '__sin_punto__' ? null : key
+          const label = key.split('|||')[1]
+          current = label ? label : null
           break
         }
       }

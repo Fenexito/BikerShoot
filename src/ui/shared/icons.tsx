@@ -234,6 +234,21 @@ export function IconCart({ filled, ...props }: SVGProps<SVGSVGElement> & { fille
   )
 }
 
+// Recibo/lista de pedidos — distinto de IconCart (que en el portal del
+// biker ya representa el carrito de COMPRA activo, no sus pedidos pasados;
+// usar el mismo ícono para ambos en el menú inferior los volvía
+// indistinguibles de un vistazo).
+export function IconReceipt(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 2h12v19.5a.5.5 0 0 1-.8.4l-1.7-1.3-1.7 1.3a.5.5 0 0 1-.6 0l-1.7-1.3-1.7 1.3a.5.5 0 0 1-.6 0l-1.7-1.3-1.7 1.3a.5.5 0 0 1-.8-.4V2Z" />
+      <line x1="8.5" y1="7" x2="15.5" y2="7" />
+      <line x1="8.5" y1="11" x2="15.5" y2="11" />
+      <line x1="8.5" y1="15" x2="12.5" y2="15" />
+    </svg>
+  )
+}
+
 export function IconMenu(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>
