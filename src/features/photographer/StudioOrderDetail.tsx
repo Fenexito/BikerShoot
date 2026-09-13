@@ -21,7 +21,8 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconDownload, IconEye } from '../../ui/shared/icons'
+import { IconDownload } from '../../ui/shared/icons'
+import { Eye } from '../../ui/animate-icons/icons/Eye'
 import { Gift } from '../../ui/animate-icons/icons/Gift'
 import { Lock } from '../../ui/animate-icons/icons/Lock'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
@@ -831,7 +832,7 @@ export function StudioOrderDetail() {
   const actionMenuItems: ActionMenuItem[] = order
     ? [
         ...(order.paymentMethod === 'transferencia' && order.hasPaymentProof
-          ? [{ label: 'Ver comprobante', icon: <IconEye className="h-4 w-4" />, onClick: viewPaymentProof }]
+          ? [{ label: 'Ver comprobante', icon: <Eye size={16} />, onClick: viewPaymentProof }]
           : []),
         ...(order.bikerPhone
           ? [
@@ -967,9 +968,12 @@ export function StudioOrderDetail() {
       {/* Solo si el biker YA subió algo — antes se veía siempre, aunque el
           estado fuera "Subir Comprobante" (nada que ver todavía). */}
       {order.paymentMethod === 'transferencia' && order.hasPaymentProof && (
-        <Button variant="secondary" size="sm" onClick={viewPaymentProof}>
-          Ver comprobante
-        </Button>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Button variant="secondary" size="sm" onClick={viewPaymentProof} className="gap-1.5">
+            <Eye size={16} />
+            Ver comprobante
+          </Button>
+        </AnimateIcon>
       )}
       {order.bikerPhone && (
         <AnimateIcon animateOnHover animateOnTap asChild>

@@ -106,11 +106,9 @@ export function OrderRow({ order, profileName }: { order: PhotographerOrderGroup
         {/* El nombre del evento se oculta en móvil — ahí solo se conserva
             lo esencial; en escritorio hay espacio de sobra para mostrarlo
             también. */}
-        <p className="truncate text-sm text-muted-foreground">
-          <span className="hidden sm:inline">{order.eventTitle} · </span>{order.items.length} fotos
-        </p>
-        <p className={cn('text-xs', urgent ?? 'text-muted-foreground')}>
-          {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+        <p className={cn('truncate text-sm', urgent ?? 'text-muted-foreground')}>
+          <span className="hidden sm:inline">{order.eventTitle} · </span>
+          {order.items.length} fotos - {new Date(order.createdAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
         </p>
         {showProgress && (
           <div className="mt-1.5 flex items-center gap-2">

@@ -109,9 +109,9 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
         )}
         <p className="truncate text-sm text-muted-foreground">
           {distinctEventTitles.size === 1 && <>{Array.from(distinctEventTitles)[0]} · </>}
-          {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''}
+          {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''} -{' '}
+          {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
         </p>
-        <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
         {showProgress && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">

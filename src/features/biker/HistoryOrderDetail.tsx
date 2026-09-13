@@ -21,8 +21,9 @@ import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { supabase } from '../../lib/supabase'
-import { IconEye, IconEdit } from '../../ui/shared/icons'
 import { Download } from '../../ui/animate-icons/icons/Download'
+import { Eye } from '../../ui/animate-icons/icons/Eye'
+import { Edit } from '../../ui/animate-icons/icons/Edit'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
 import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
@@ -161,13 +162,17 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
         </button>
         {menuOpen && (
           <div className="absolute right-0 top-full z-50 mt-2 w-52 origin-top overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl animate-menu-in">
-            <button onClick={openViewer} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
-              <IconEye className="h-4 w-4 shrink-0" /> Ver comprobante
-            </button>
-            <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
-              <IconEdit className="h-4 w-4 shrink-0" /> Editar comprobante
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReplace(e.target.files?.[0])} />
-            </label>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button onClick={openViewer} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
+                <Eye size={16} className="shrink-0" /> Ver comprobante
+              </button>
+            </AnimateIcon>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
+                <Edit size={16} className="shrink-0" /> Editar comprobante
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReplace(e.target.files?.[0])} />
+              </label>
+            </AnimateIcon>
           </div>
         )}
       </div>
@@ -372,8 +377,8 @@ export function HistoryOrderDetail() {
     ? [
         ...(order?.payment_method === 'transferencia' && proofPhotographerIds.has(activeGroup.photographerId)
           ? [
-              { label: 'Ver comprobante', icon: <IconEye className="h-4 w-4" />, onClick: () => openHeaderProofViewer(activeGroup.photographerId, activeGroup.photographerName) },
-              { label: 'Editar comprobante', icon: <IconEdit className="h-4 w-4" />, onClick: () => proofInputRef.current?.click() },
+              { label: 'Ver comprobante', icon: <Eye size={16} />, onClick: () => openHeaderProofViewer(activeGroup.photographerId, activeGroup.photographerName) },
+              { label: 'Editar comprobante', icon: <Edit size={16} />, onClick: () => proofInputRef.current?.click() },
             ]
           : []),
         ...(activeGroup.photographerPhone

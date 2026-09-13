@@ -9,6 +9,8 @@ import { Card } from '../../ui/flat/Card'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { IconCart } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Upload } from '../../ui/animate-icons/icons/Upload'
 import { PhotoLightbox } from './components/PhotoLightbox'
 
 interface BankDetails {
@@ -219,10 +221,13 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
               Ver comprobante
             </Button>
           )}
-          <label className="flex h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90">
-            {uploading ? `Subiendo… ${progress}%` : hasProof ? 'Reemplazar' : 'Subir comprobante'}
-            <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
-          </label>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <label className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90">
+              {!uploading && <Upload size={16} />}
+              {uploading ? `Subiendo… ${progress}%` : hasProof ? 'Reemplazar' : 'Subir comprobante'}
+              <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
+            </label>
+          </AnimateIcon>
         </div>
       </div>
 
