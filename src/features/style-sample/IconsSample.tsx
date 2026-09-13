@@ -1,5 +1,8 @@
-import type { ComponentType } from 'react'
+import { useState, type ComponentType } from 'react'
+import { cn } from '../../lib/cn'
 import type { IconProps } from '../../ui/animate-icons/icon'
+import { ThemeTogglerButton } from '../../ui/animate-components/ThemeTogglerButton'
+import type { ThemeSelection } from '../../ui/animate-components/theme-toggler-primitive'
 import { Bell } from '../../ui/animate-icons/icons/Bell'
 import { BellRing } from '../../ui/animate-icons/icons/BellRing'
 import { Bot } from '../../ui/animate-icons/icons/Bot'
@@ -106,19 +109,60 @@ const ITEMS: { Icon: ComponentType<IconProps<any>>; name: string; use: string }[
  * Animate UI antes de usarlos en páginas reales. Se agrega un ítem por cada
  * ícono nuevo que se porte. */
 export function IconsSample() {
-  return (
-    <div className="mx-auto max-w-6xl px-6 py-16 font-sans text-white" style={{ background: '#0a0a0a', minHeight: '100vh' }}>
-      <h1 className="text-2xl font-bold">Animate UI Icons — muestra</h1>
-      <p className="mt-2 text-white/60">Pasa el mouse (o toca) cada ícono para ver su animación. {ITEMS.length} portados.</p>
+  // Estado LOCAL solo para esta página de muestra — el ThemeTogglerButton
+  // real recibe `theme`/`setTheme` por props (ver ThemeTogglerButton.tsx),
+  // así que en una página real vendría de `useFlatTheme`/`useStudioTheme` en
+  // vez de este `useState`. Arranca en 'dark' para calzar con el fondo
+  // oscuro que esta página ya tenía por defecto.
+  //
+  // OJO: el fondo/texto de ESTA página se pintan a mano con `dark ? ... :
+  // ...` (no con el prefijo `dark:` de Tailwind) porque el `darkMode` de
+  // este proyecto está configurado como `['class', '.theme-studio.dark']`
+  // (ver tailwind.config) — el `dark:` de Tailwind solo se activa dentro
+  // del portal Studio, no con una clase `dark` genérica en `<html>` como
+  // esta página de muestra (que vive fuera de PortalLayout). El resto de
+  // la app usa tokens semánticos (`bg-background`, etc.) resueltos por
+  // variables CSS, no por `dark:`.
+  const [theme, setTheme] = useState<ThemeSelection>('dark')
+  const dark = theme === 'dark'
 
-      <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
-        {ITEMS.map(({ Icon, name, use }) => (
-          <div key={name} className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 p-5 text-center transition-colors hover:border-white/30">
-            <Icon size={28} animateOnHover />
-            <span className="text-xs font-semibold">{name}</span>
-            <span className="text-[11px] text-white/50">{use}</span>
+  return (
+    <div className={cn('min-h-screen font-sans transition-colors duration-500', dark ? 'bg-[#0a0a0a] text-white' : 'bg-white text-neutral-900')}>
+      <div className="mx-auto max-w-6xl px-6 py-16">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Animate UI Icons — muestra</h1>
+            <p className={cn('mt-2', dark ? 'text-white/60' : 'text-neutral-500')}>
+              Pasa el mouse (o toca) cada ícono para ver su animación. {ITEMS.length} portados.
+            </p>
           </div>
-        ))}
+          <div className="flex flex-col items-center gap-2">
+            {/* `onImmediateChange` es lo que de verdad sincroniza el fondo
+                de ESTA página con el barrido — se dispara en el mismo
+                instante síncrono que la animación, antes de que termine
+                (a diferencia de `setTheme`, que se llama recién AL
+                terminar). Sin esto, el fondo cambiaría de golpe después
+                del barrido en vez de ser lo que el barrido revela. */}
+            <ThemeTogglerButton theme={theme} setTheme={setTheme} onImmediateChange={setTheme} size="lg" />
+            <span className={cn('text-[11px]', dark ? 'text-white/50' : 'text-neutral-500')}>ThemeTogglerButton</span>
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
+          {ITEMS.map(({ Icon, name, use }) => (
+            <div
+              key={name}
+              className={cn(
+                'flex flex-col items-center gap-2 rounded-2xl border p-5 text-center transition-colors',
+                dark ? 'border-white/10 hover:border-white/30' : 'border-neutral-200 hover:border-neutral-400',
+              )}
+            >
+              <Icon size={28} animateOnHover />
+              <span className="text-xs font-semibold">{name}</span>
+              <span className={cn('text-[11px]', dark ? 'text-white/50' : 'text-neutral-500')}>{use}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
