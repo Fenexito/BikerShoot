@@ -17,6 +17,7 @@ import { ChevronLeft } from '../../../ui/animate-icons/icons/ChevronLeft'
 import { ChevronRight } from '../../../ui/animate-icons/icons/ChevronRight'
 import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { X } from '../../../ui/animate-icons/icons/X'
+import { Check } from '../../../ui/animate-icons/icons/Check'
 import { cn } from '../../../lib/cn'
 import type { GridPhoto } from './PhotoGrid'
 
@@ -340,6 +341,18 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
           )}
         </div>
       </div>
+
+      {/* Etiqueta superior centrada — solo para fotos de un pedido
+          (`mode="purchased"`) que ya tienen su entrega final subida; las
+          que aún están en preparación no muestran nada acá, para no
+          prometer algo que todavía no está listo. */}
+      {purchased && photo.delivered_path && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 sm:top-6">
+          <span className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm sm:text-xs">
+            <Check size={14} /> Completada
+          </span>
+        </div>
+      )}
 
       {/* Esquina superior derecha: contador + cerrar — nunca se
           superponen, cada uno es su propio elemento en la misma fila. */}

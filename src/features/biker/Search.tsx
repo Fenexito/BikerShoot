@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { usePublicEvents, useApprovedPhotographers, useSearchPhotos, type PublicEvent, type PublicEventPoint } from './usePublicData'
 import { useRoutes } from '../shared/useRoutes'
@@ -37,9 +37,6 @@ const TILE_SIZE_MIN = 130
 const TILE_SIZE_MIN_MOBILE = 70
 const TILE_SIZE_MAX = 270
 const TILE_SIZE_DEFAULT = 220
-// Pasos grandes a propósito: cada movimiento del control debe sentirse
-// como un cambio de tamaño real, no un ajuste casi imperceptible.
-const TILE_SIZE_STEP = 20
 const TILE_SIZE_KEY = 'motogram_biker_photo_tile_size'
 
 const MOBILE_EXPAND_IDLE_MS = 5000
@@ -190,6 +187,55 @@ export function Search() {
   // fila. En escritorio no hace falta (ese criterio sigue siendo por
   // tamaño de miniatura, no por columnas).
   const columns = isNarrow && gridWidth > 0 ? Math.max(1, Math.floor((gridWidth + GRID_GAP_MOBILE) / (tileSize + GRID_GAP_MOBILE))) : null
+
+  // La barra de zoom antes recorría tileSizeMin..TILE_SIZE_MAX en pasos fijos
+  // de píxeles (`TILE_SIZE_STEP`), pero el layout real (CSS grid
+  // `auto-fill`) solo cambia visualmente cuando el número de COLUMNAS
+  // cambia — con el ancho real de un celular típico, varios de esos pasos
+  // de píxeles no producían ningún acercamiento visible (7-8 movimientos de
+  // la barra para solo 3-5 tamaños distintos en pantalla, confirmado en
+  // vivo). `zoomLevels` calcula, para el ancho REAL del contenedor, la
+  // lista de tamaños que sí producen una columna distinta cada uno — así
+  // la barra tiene EXACTAMENTE tantas paradas como zooms reales existen.
+  const zoomLevels = useMemo(() => {
+    if (gridWidth <= 0) return [tileSizeMin, TILE_SIZE_MAX]
+    const maxCols = Math.max(1, Math.floor((gridWidth + GRID_GAP_MOBILE) / (tileSizeMin + GRID_GAP_MOBILE)))
+    const minCols = Math.max(1, Math.floor((gridWidth + GRID_GAP_MOBILE) / (TILE_SIZE_MAX + GRID_GAP_MOBILE)))
+    const sizes: number[] = []
+    for (let cols = maxCols; cols >= minCols; cols--) {
+      const size = Math.floor((gridWidth - (cols - 1) * GRID_GAP_MOBILE) / cols)
+      sizes.push(Math.min(TILE_SIZE_MAX, Math.max(tileSizeMin, size)))
+    }
+    const unique = Array.from(new Set(sizes))
+    return unique.length > 1 ? unique : [tileSizeMin, TILE_SIZE_MAX]
+  }, [gridWidth, tileSizeMin])
+
+  // Índice del nivel actual — el más cercano al tileSize guardado/elegido,
+  // así un valor viejo en localStorage (de antes de este cambio) sigue
+  // cayendo en la parada más parecida en vez de romper la barra.
+  const zoomIndex = useMemo(() => {
+    let best = 0
+    let bestDiff = Infinity
+    zoomLevels.forEach((v, i) => {
+      const diff = Math.abs(v - tileSize)
+      if (diff < bestDiff) {
+        bestDiff = diff
+        best = i
+      }
+    })
+    return best
+  }, [zoomLevels, tileSize])
+  // En móvil la barra queda más ancha/fácil de tocar dándole el DOBLE de
+  // paradas que zooms reales existen (2 movimientos de dedo por cada
+  // acercamiento) — en escritorio es 1 a 1, ya con mouse/trackpad la
+  // precisión no es un problema.
+  const zoomTicksPerLevel = isNarrow ? 2 : 1
+  const zoomSliderMax = (zoomLevels.length - 1) * zoomTicksPerLevel
+
+  function changeZoomIndex(nextIndex: number) {
+    const clamped = Math.max(0, Math.min(zoomLevels.length - 1, nextIndex))
+    changeTileSize(zoomLevels[clamped])
+  }
 
   // Si la pantalla cambia de angosta a ancha (o al revés, ej. al rotar el
   // teléfono) y el valor guardado queda por debajo del nuevo mínimo, se
@@ -592,7 +638,7 @@ export function Search() {
           <div className="flex items-center gap-2 sm:gap-3">
             <AnimateIcon animateOnHover animateOnTap asChild>
               <button
-                onClick={() => changeTileSize(Math.max(tileSizeMin, tileSize - TILE_SIZE_STEP))}
+                onClick={() => changeZoomIndex(zoomIndex - 1)}
                 aria-label="Fotos más chicas"
                 className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
               >
@@ -601,17 +647,17 @@ export function Search() {
             </AnimateIcon>
             <input
               type="range"
-              min={tileSizeMin}
-              max={TILE_SIZE_MAX}
-              step={TILE_SIZE_STEP}
-              value={tileSize}
-              onChange={(e) => changeTileSize(Number(e.target.value))}
+              min={0}
+              max={zoomSliderMax}
+              step={1}
+              value={zoomIndex * zoomTicksPerLevel}
+              onChange={(e) => changeZoomIndex(Math.round(Number(e.target.value) / zoomTicksPerLevel))}
               aria-label="Tamaño de las fotos"
-              className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-muted accent-primary sm:w-32"
+              className="h-1.5 w-28 cursor-pointer appearance-none rounded-full bg-muted accent-primary sm:w-32"
             />
             <AnimateIcon animateOnHover animateOnTap asChild>
               <button
-                onClick={() => changeTileSize(Math.min(TILE_SIZE_MAX, tileSize + TILE_SIZE_STEP))}
+                onClick={() => changeZoomIndex(zoomIndex + 1)}
                 aria-label="Fotos más grandes"
                 className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
               >

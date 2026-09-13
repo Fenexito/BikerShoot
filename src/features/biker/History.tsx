@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, deriveOrderEffectiveStatus, groupOrderByPhotographer, type MyOrder } from './useMyOrders'
 import type { EffectiveOrderStatus } from '../../lib/orderStatus'
 import { previewUrl } from '../../lib/r2'
+import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { Button } from '../../ui/flat/Button'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { FilterBar } from '../../ui/shared/FilterBar'
@@ -49,6 +50,13 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
   // por un "+N" con la cantidad restante (no una miniatura más).
   const previewItems = order.order_items.slice(0, 3)
   const extraCount = order.order_items.length - previewItems.length
+  // Galería tipo acordeón (misma que usa el fotógrafo en la vista de
+  // evento) — hasta 8 fotos, ya no hace falta el "+N" porque el fan-out
+  // de la galería sí deja "hojear" varias en vez de solo sugerir cuántas
+  // faltan.
+  const galleryItems = order.order_items.slice(0, 8).map((item) => ({
+    image: previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null }),
+  }))
   // La barra de progreso del pedido en la LISTA se basa en el TOTAL de
   // fotos compradas (sin importar de cuántos fotógrafos distintos son) —
   // así el biker entiende de un vistazo en qué momento se completa TODO
@@ -61,68 +69,94 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
     <Link
       to={`/app/historial/${order.id}`}
       className={cn(
-        'animate-[fade-in-up_.3s_ease-out_backwards] flex items-stretch gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-colors hover:border-primary/30 sm:gap-4 sm:p-3.5',
+        'animate-[fade-in-up_.3s_ease-out_backwards] flex flex-col gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-colors hover:border-primary/30 sm:flex-row sm:items-stretch sm:gap-4 sm:p-3.5',
         statusStyle.dot.replace('bg-', 'border-l-'),
       )}
       style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
     >
-      {/* Miniaturas — ANCHO fijo (nunca crece, así nunca empuja el texto),
-          alto estirado para llenar lo que ocupe el texto de la derecha
-          (tope `max-h-24` para que un pedido con varios fotógrafos
-          listados, y por lo tanto muy alto, no infle las miniaturas de
-          más). Visibles también en móvil (antes se ocultaban ahí). */}
-      <div className="flex shrink-0 -space-x-3">
+      {/* Miniaturas de escritorio — ANCHO fijo (nunca crece, así nunca
+          empuja el texto), alto estirado para llenar lo que ocupe el texto
+          de la derecha. Solo en escritorio: la galería de acordeón de abajo
+          (probada en vivo) no se ve bien en la vista web, ahí se queda este
+          stack de siempre. */}
+      <div className="hidden shrink-0 -space-x-3 sm:flex">
         {previewItems.map((item) => (
           <img
             key={item.id}
             src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
             alt=""
-            className="h-full w-12 max-h-24 shrink-0 rounded-xl border-2 border-card object-cover sm:w-16"
+            className="h-full max-h-24 w-16 shrink-0 rounded-xl border-2 border-card object-cover"
           />
         ))}
         {extraCount > 0 && (
-          <span className="flex h-full w-12 max-h-24 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground sm:w-16">
+          <span className="flex h-full max-h-24 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
             +{extraCount}
           </span>
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
-        <div className="mb-0.5 flex flex-wrap items-center gap-2">
-          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
-          <span className="text-xs text-muted-foreground">{formatOrderCode(order.order_number)}</span>
-        </div>
-        {/* Con varios fotógrafos, en vez de un título genérico "N
-            fotógrafos", se listan sus nombres uno por uno (como si el
-            pedido tuviera varios "títulos") junto a cuántas fotos le tocan
-            a cada uno. */}
-        {multiPhotographer ? (
-          <div className="flex flex-col gap-0.5">
-            {photographerGroups.map((g) => (
-              <p key={g.photographerId} className="truncate text-sm font-bold">
-                {g.photographerName} <span className="font-normal text-muted-foreground">({g.items.length} foto{g.items.length > 1 ? 's' : ''})</span>
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p className="truncate font-bold">{firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
-        )}
-        <p className="truncate text-sm text-muted-foreground">
-          {distinctEventTitles.size === 1 && <>{Array.from(distinctEventTitles)[0]} · </>}
-          {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''} -{' '}
-          {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
-        </p>
-        {showProgress && (
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
-            </div>
-            <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length}</span>
-          </div>
-        )}
+      {/* Galería tipo acordeón — solo en móvil (mismo componente que usa el
+          fotógrafo en la vista de evento). Altura chica a propósito (110px
+          contra los 260px del fotógrafo): a tamaño completo empujaba el
+          texto del pedido demasiado abajo en una lista donde hay muchas
+          filas. */}
+      <div className="sm:hidden">
+        <AccordionGallery
+          items={galleryItems}
+          height={110}
+          radius={14}
+          expandRatio={0.35}
+          tilt={4}
+          parallax={0.25}
+          accentColor="rgb(37 99 235)"
+          overlayColor="#000000"
+          showLabels={false}
+          defaultIndex={0}
+        />
       </div>
 
-      <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+      {/* `sm:contents` en escritorio: estos dos hijos vuelven a ser
+          hermanos directos de las miniaturas de arriba, restaurando la fila
+          original. En móvil es un flex normal (texto + precio) debajo de la
+          galería. */}
+      <div className="flex items-stretch gap-3 sm:contents">
+        <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+          <div className="mb-0.5 flex flex-wrap items-center gap-2">
+            <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
+            <span className="text-xs text-muted-foreground">{formatOrderCode(order.order_number)}</span>
+          </div>
+          {/* Con varios fotógrafos, en vez de un título genérico "N
+              fotógrafos", se listan sus nombres uno por uno (como si el
+              pedido tuviera varios "títulos") junto a cuántas fotos le tocan
+              a cada uno. */}
+          {multiPhotographer ? (
+            <div className="flex flex-col gap-0.5">
+              {photographerGroups.map((g) => (
+                <p key={g.photographerId} className="truncate text-sm font-bold">
+                  {g.photographerName} <span className="font-normal text-muted-foreground">({g.items.length} foto{g.items.length > 1 ? 's' : ''})</span>
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="truncate font-bold">{firstItem?.photographer?.display_name ?? 'Fotógrafo'}</p>
+          )}
+          <p className="truncate text-sm text-muted-foreground">
+            {distinctEventTitles.size === 1 && <>{Array.from(distinctEventTitles)[0]} · </>}
+            {order.order_items.length} foto{order.order_items.length > 1 ? 's' : ''} -{' '}
+            {new Date(order.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </p>
+          {showProgress && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(deliveredCount / activeItems.length) * 100}%` }} />
+              </div>
+              <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{deliveredCount}/{activeItems.length}</span>
+            </div>
+          )}
+        </div>
+
+        <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
+      </div>
     </Link>
   )
 }

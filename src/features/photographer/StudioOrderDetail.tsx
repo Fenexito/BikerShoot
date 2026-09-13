@@ -87,7 +87,11 @@ function DeliverPhotoTile({
   const delivered = !!photo.delivered_path
   const { data: deliveredUrl } = useDeliveredViewUrl(photo.id, delivered)
   const hasPreview = !!(photo.preview_path || photo.storage_path)
-  const thumbnailSrc = delivered && deliveredUrl ? deliveredUrl : hasPreview ? previewUrl(photo) : undefined
+  // Igual que del lado del biker: entregada, la miniatura NUNCA debería
+  // caer de vuelta al preview con marca de agua mientras se resuelve la
+  // URL firmada de la final — se muestra un loader hasta que esté lista.
+  const thumbnailSrc = delivered ? deliveredUrl : hasPreview ? previewUrl(photo) : undefined
+  const showLoadingTile = delivered && !deliveredUrl
   const isWaiver = item.is_courtesy && item.courtesy_type === 'waiver'
 
   async function handleFile(file: File | undefined) {
@@ -162,8 +166,12 @@ function DeliverPhotoTile({
   if (layout === 'list') {
     return (
       <div className={cn('flex items-center gap-3 rounded-2xl border border-border bg-card p-2.5', justClosed && 'animate-photo-just-closed')}>
-        <button onClick={onOpen} className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted" disabled={!thumbnailSrc}>
-          {thumbnailSrc && <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />}
+        <button onClick={onOpen} className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted" disabled={!thumbnailSrc && !showLoadingTile}>
+          {showLoadingTile ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+          ) : (
+            thumbnailSrc && <img src={thumbnailSrc} alt="" className="h-full w-full object-cover" />
+          )}
         </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium" title={photo.original_filename ?? undefined}>
@@ -220,8 +228,12 @@ function DeliverPhotoTile({
   return (
     <div className={cn('overflow-hidden rounded-3xl border border-border bg-card transition-all hover:border-accent/40 hover:shadow-sm', justClosed && 'animate-photo-just-closed')}>
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-        <button onClick={onOpen} className="block h-full w-full cursor-pointer" disabled={!thumbnailSrc} aria-label="Ver foto" title={delivered ? 'Ver entrega final' : 'Ver con marca de agua'}>
-          {thumbnailSrc ? (
+        <button onClick={onOpen} className="block h-full w-full cursor-pointer" disabled={!thumbnailSrc && !showLoadingTile} aria-label="Ver foto" title={delivered ? 'Ver entrega final' : 'Ver con marca de agua'}>
+          {showLoadingTile ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+            </div>
+          ) : thumbnailSrc ? (
             <img src={thumbnailSrc} alt="" className="h-full w-full object-cover transition-transform duration-500 hover:scale-105" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-muted-foreground">
@@ -372,6 +384,11 @@ function OrderPhotosSection({
   const allPhotos = order.items.map((item) => item.photo && toGridPhoto(item, item.event?.title ?? '', order.bikerName)).filter((p): p is NonNullable<typeof p> => !!p)
   const openPhoto = openIndex != null ? allPhotos[openIndex] : null
   const openItem = openPhoto ? order.items.find((i) => i.photo_id === openPhoto.id) : null
+  // Mismo criterio que DeliverPhotoTile: si ya fue entregada, el visor no
+  // debe caer de vuelta al preview con marca de agua mientras se resuelve
+  // la URL firmada de la final.
+  const openPhotoDelivered = !!openPhoto?.delivered_path
+  const { data: openPhotoDeliveredUrl } = useDeliveredViewUrl(openPhoto?.id ?? '', openPhotoDelivered)
 
   function canToggleGift(item: RawOrderItem) {
     if (item.status === 'entregado') return false
@@ -618,6 +635,7 @@ function OrderPhotosSection({
           onClose={closeLightbox}
           onNavigate={setOpenIndex}
           mode="purchased"
+          loading={openPhotoDelivered && !openPhotoDeliveredUrl}
           resolveSrc={(p) => (p.delivered_path ? queryClient.getQueryData<string | null>(['delivered-view-url', p.id]) ?? undefined : undefined)}
           infoRows={[
             { label: 'Comprador', value: order.bikerName },

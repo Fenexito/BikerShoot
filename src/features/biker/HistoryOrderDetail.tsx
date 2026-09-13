@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, groupOrderByPhotographer, deriveOrderEffectiveStatus, deriveGroupStatus, toGridPhoto, type MyOrderItem, type MyOrderPhotographerGroup } from './useMyOrders'
-import { PurchasedPhotoTile, downloadPurchasedPhoto } from './components/PurchasedPhotoTile'
+import { PurchasedPhotoTile, downloadPurchasedPhoto, useDeliveredViewUrl } from './components/PurchasedPhotoTile'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { queryClient } from '../../lib/queryClient'
 import { buildDeliveredFilename } from '../../lib/download'
@@ -22,6 +22,7 @@ import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { supabase } from '../../lib/supabase'
 import { Download } from '../../ui/animate-icons/icons/Download'
+import { Upload } from '../../ui/animate-icons/icons/Upload'
 import { Eye } from '../../ui/animate-icons/icons/Eye'
 import { Edit } from '../../ui/animate-icons/icons/Edit'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
@@ -73,13 +74,18 @@ function groupItemsByEventoPunto(items: MyOrderItem[]) {
  * y Editar (reemplaza el archivo ahí mismo, sin salir de esta página —
  * antes "Editar" navegaba a la página de carga solo para volver a subir
  * el mismo archivo). */
-function ProofButton({ orderId, photographerId, photographerName, bikerName, amount, hasProof }: {
+function ProofButton({ orderId, photographerId, photographerName, bikerName, amount, hasProof, canEdit }: {
   orderId: string
   photographerId: string
   photographerName: string
   bikerName: string
   amount: number
   hasProof: boolean
+  /** Una vez que el fotógrafo confirma el pago (el pedido pasa de
+   * "pendiente_pago" a "en_preparacion"), el comprobante deja de poder
+   * editarse — ya cumplió su propósito y cambiarlo después solo generaría
+   * confusión sobre qué fue lo que realmente se confirmó. */
+  canEdit: boolean
 }) {
   const push = useToastStore((s) => s.push)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -144,9 +150,29 @@ function ProofButton({ orderId, photographerId, photographerName, bikerName, amo
     // real para que el pedido avance, así que no debería mimetizarse con
     // el resto de botones secundarios de la página.
     return (
-      <Link to={`/app/checkout/pago/${orderId}`}>
-        <Button variant="dark" size="sm">Subir Comprobante</Button>
-      </Link>
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <Link to={`/app/checkout/pago/${orderId}`}>
+          <Button variant="dark" size="sm" className="gap-1.5">
+            <Upload size={16} /> Subir Comprobante
+          </Button>
+        </Link>
+      </AnimateIcon>
+    )
+  }
+
+  // Una vez confirmado el pago, ya no hay nada que "reemplazar" — el
+  // desplegable con 2 opciones deja de tener sentido, así que el botón se
+  // convierte en un simple "Ver comprobante" directo.
+  if (!canEdit) {
+    return (
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <button
+          onClick={openViewer}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-muted"
+        >
+          <Eye size={16} /> Ver comprobante
+        </button>
+      </AnimateIcon>
     )
   }
 
@@ -378,7 +404,11 @@ export function HistoryOrderDetail() {
         ...(order?.payment_method === 'transferencia' && proofPhotographerIds.has(activeGroup.photographerId)
           ? [
               { label: 'Ver comprobante', icon: <Eye size={16} />, onClick: () => openHeaderProofViewer(activeGroup.photographerId, activeGroup.photographerName) },
-              { label: 'Editar comprobante', icon: <Edit size={16} />, onClick: () => proofInputRef.current?.click() },
+              // El comprobante deja de poder editarse en cuanto el fotógrafo
+              // confirma el pago (el pedido sale de "pendiente_pago") — ya
+              // cumplió su propósito, cambiarlo después solo confundiría
+              // sobre qué fue lo que realmente se confirmó.
+              ...(canCancelGroup(activeGroup) ? [{ label: 'Editar comprobante', icon: <Edit size={16} />, onClick: () => proofInputRef.current?.click() }] : []),
             ]
           : []),
         ...(activeGroup.photographerPhone
@@ -434,6 +464,12 @@ export function HistoryOrderDetail() {
   const openPhoto = openIndex != null ? allPhotos[openIndex] : null
   const openItem = openPhoto ? order?.order_items.find((i) => i.photo_id === openPhoto.id) : null
   const canDownloadOpen = openItem && (openItem.status === 'en_preparacion' || openItem.status === 'entregado') && openItem.photo?.delivered_path
+  // Mismo criterio que PurchasedPhotoTile: si la foto ya fue entregada, el
+  // visor NUNCA debe caer de vuelta al preview con marca de agua mientras
+  // se resuelve la URL firmada de la final — se ve el loader hasta que esté
+  // lista, igual que en el visor del comprobante.
+  const openPhotoDelivered = !!openPhoto?.delivered_path
+  const { data: openPhotoDeliveredUrl } = useDeliveredViewUrl(openPhoto?.id ?? '', openPhotoDelivered)
 
   function closeLightbox() {
     if (openPhoto) {
@@ -516,6 +552,7 @@ export function HistoryOrderDetail() {
                   bikerName={profile?.display_name ?? 'Biker'}
                   amount={group.totalToPay}
                   hasProof={proofPhotographerIds.has(group.photographerId)}
+                  canEdit={canCancelGroup(group)}
                 />
               )}
               {group.photographerPhone && (
@@ -614,14 +651,16 @@ export function HistoryOrderDetail() {
               {/* Antes "Cancelar Pedido" solo vivía escondido dentro del
                   menú "···" — mientras falta el comprobante (única ventana
                   en la que cancelar sigue siendo unilateral, ver
-                  `canCancelGroup`) se repite acá abajo, siempre visible,
-                  para que no dependa de que el biker encuentre el menú. */}
+                  `canCancelGroup`) se repite acá abajo, siempre visible, sin
+                  depender de que el biker encuentre el menú. Un botón
+                  regular (no de ancho completo) abajo a la derecha de ESTE
+                  fotógrafo — cancelar es por fotógrafo, no todo el pedido. */}
               {canCancelGroup(group) && (
-                <div className="mt-6 border-t border-border pt-4">
+                <div className="mt-4 flex justify-end">
                   <AnimateIcon animateOnHover animateOnTap asChild>
                     <button
                       onClick={() => cancelGroup(group)}
-                      className="flex w-full items-center justify-center gap-2 rounded-full border border-red-200 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      className="flex items-center gap-1.5 rounded-full border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
                     >
                       <Trash size={16} /> Cancelar pedido
                     </button>
@@ -640,6 +679,7 @@ export function HistoryOrderDetail() {
           onClose={closeLightbox}
           onNavigate={setOpenIndex}
           mode="purchased"
+          loading={openPhotoDelivered && !openPhotoDeliveredUrl}
           resolveSrc={(p) => (p.delivered_path ? queryClient.getQueryData<string | null>(['delivered-view-url', p.id]) ?? undefined : undefined)}
           cornerSlot={
             canDownloadOpen ? (

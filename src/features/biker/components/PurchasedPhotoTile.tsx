@@ -92,7 +92,13 @@ export function PurchasedPhotoTile({
   // preparación — no solo "en preparación sin entregar" como antes.
   const stillEditing = status !== 'cancelado' && photo?.preview_path && !photo.delivered_path
   const pillStyle = effectiveStatus ? getEffectiveStatusStyle(effectiveStatus) : getOrderStatusStyle(status)
-  const thumbnailSrc = delivered && deliveredUrl ? deliveredUrl : photo ? previewUrl(photo) : undefined
+  // Antes, mientras se resolvía la URL firmada de la entrega final, caía de
+  // vuelta al preview con marca de agua — el biker veía la de baja calidad
+  // un par de segundos y luego "saltaba" a la final. Ya entregada, la baja
+  // calidad ya no debería verse NUNCA: se muestra un loader hasta que la
+  // final está lista (ver `showLoadingTile` abajo).
+  const thumbnailSrc = delivered ? deliveredUrl : photo ? previewUrl(photo) : undefined
+  const showLoadingTile = delivered && !deliveredUrl
 
   async function handleDownload(e: React.MouseEvent) {
     e.stopPropagation()
@@ -109,14 +115,20 @@ export function PurchasedPhotoTile({
 
   return (
     <div className={cn('group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted', justClosed && 'animate-photo-just-closed')}>
-      {thumbnailSrc && (
-        <button onClick={onClick} className="block h-full w-full" aria-label="Ver foto">
-          {/* En blanco y negro mientras todavía no está lista (sin
-              comprobante, pendiente de confirmar, o en preparación) — una
-              señal visual clara sin necesidad de leer texto. Las
-              entregadas se ven a full color, como cualquier foto normal. */}
-          <img src={thumbnailSrc} alt="" className={cn('h-full w-full object-cover', stillEditing && 'grayscale')} />
+      {showLoadingTile ? (
+        <button onClick={onClick} className="flex h-full w-full items-center justify-center" aria-label="Ver foto">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
         </button>
+      ) : (
+        thumbnailSrc && (
+          <button onClick={onClick} className="block h-full w-full" aria-label="Ver foto">
+            {/* En blanco y negro mientras todavía no está lista (sin
+                comprobante, pendiente de confirmar, o en preparación) — una
+                señal visual clara sin necesidad de leer texto. Las
+                entregadas se ven a full color, como cualquier foto normal. */}
+            <img src={thumbnailSrc} alt="" className={cn('h-full w-full object-cover', stillEditing && 'grayscale')} />
+          </button>
+        )
       )}
       {showStatusPill && (
         <span className="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[65%] truncate rounded-full bg-black/60 px-2 py-1">
