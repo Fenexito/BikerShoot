@@ -10,7 +10,9 @@ import { FilterBar } from '../../ui/shared/FilterBar'
 import { StatusPill } from '../../ui/shared/StatusPill'
 import { getEffectiveStatusStyle, formatOrderCode } from '../../lib/orderStatus'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
-import { IconFilter, IconSearch } from '../../ui/shared/icons'
+import { IconSearch } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { SlidersHorizontal } from '../../ui/animate-icons/icons/SlidersHorizontal'
 import { cn } from '../../lib/cn'
 
 type StatusFilter = 'todos' | 'pendiente' | 'en_proceso' | 'entregado' | 'cancelado'
@@ -222,16 +224,18 @@ export function History() {
             />
           </div>
           {photographers.length > 1 && (
-            <button
-              onClick={() => setFiltersOpen((v) => !v)}
-              className="flex flex-1 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted"
-            >
-              <IconFilter className="h-4 w-4 shrink-0" />
-              <span className="hidden lg:inline">Filtros</span>
-              {activeFilterCount > 0 && (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{activeFilterCount}</span>
-              )}
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={() => setFiltersOpen((v) => !v)}
+                className="flex flex-1 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+              >
+                <SlidersHorizontal size={16} className="shrink-0" />
+                <span className="hidden lg:inline">Filtros</span>
+                {activeFilterCount > 0 && (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{activeFilterCount}</span>
+                )}
+              </button>
+            </AnimateIcon>
           )}
         </div>
       </div>

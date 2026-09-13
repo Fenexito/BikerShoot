@@ -5,7 +5,9 @@ import { previewUrl } from '../../../lib/r2'
 import { downloadFile } from '../../../lib/download'
 import { StatusPill } from '../../../ui/shared/StatusPill'
 import { getOrderStatusStyle, getEffectiveStatusStyle, type OrderItemStatus, type EffectiveOrderStatus } from '../../../lib/orderStatus'
-import { IconDownload } from '../../../ui/shared/icons'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { Download } from '../../../ui/animate-icons/icons/Download'
+import { Check } from '../../../ui/animate-icons/icons/Check'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { cn } from '../../../lib/cn'
 
@@ -129,17 +131,19 @@ export function PurchasedPhotoTile({
           {/* Negro sólido a propósito, sin importar el tema — mismo
               criterio que el verde fijo de WhatsApp: un botón de acción
               siempre reconocible, no uno que se camufle con el fondo. */}
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            aria-label="Descargar esta foto"
-            title="Descargar"
-            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            <IconDownload className="h-3.5 w-3.5" />
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              aria-label="Descargar esta foto"
+              title="Descargar"
+              className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              <Download size={14} />
+            </button>
+          </AnimateIcon>
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm" title="Lista para descargar">
-            ✓
+            <Check size={14} />
           </span>
         </div>
       )}

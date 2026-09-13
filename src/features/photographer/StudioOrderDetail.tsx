@@ -21,7 +21,9 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconGift, IconDownload, IconEye } from '../../ui/shared/icons'
+import { IconDownload, IconEye } from '../../ui/shared/icons'
+import { Gift } from '../../ui/animate-icons/icons/Gift'
+import { Lock } from '../../ui/animate-icons/icons/Lock'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
 import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
@@ -137,21 +139,23 @@ function DeliverPhotoTile({
   // esa altura ya no tiene sentido regalar o des-regalar el precio de algo
   // que el biker ya recibió.
   const giftButton = canToggleGift && (
-    <button
-      onClick={(e) => {
-        e.stopPropagation()
-        onGift()
-      }}
-      disabled={giftBusy}
-      aria-label={isWaiver ? 'Deshacer el regalo' : 'Regalar esta foto'}
-      title={isWaiver ? 'Deshacer el regalo — restaura el precio original' : 'Regalar esta foto (cortesía)'}
-      className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors disabled:opacity-50',
-        isWaiver ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-card/95 text-foreground border border-border hover:bg-card',
-      )}
-    >
-      <IconGift className="h-4 w-4" filled={isWaiver} />
-    </button>
+    <AnimateIcon animateOnHover animateOnTap asChild>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onGift()
+        }}
+        disabled={giftBusy}
+        aria-label={isWaiver ? 'Deshacer el regalo' : 'Regalar esta foto'}
+        title={isWaiver ? 'Deshacer el regalo — restaura el precio original' : 'Regalar esta foto (cortesía)'}
+        className={cn(
+          'flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors disabled:opacity-50',
+          isWaiver ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-card/95 text-foreground border border-border hover:bg-card',
+        )}
+      >
+        <Gift size={16} filled={isWaiver} />
+      </button>
+    </AnimateIcon>
   )
 
   if (layout === 'list') {
@@ -173,10 +177,10 @@ function DeliverPhotoTile({
         </div>
         {!delivered && uploadLocked && (
           <span
-            className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"
             title="El biker debe subir su comprobante y tú confirmar el pago antes de poder entregar"
           >
-            🔒 Confirma el pago primero
+            <Lock size={14} /> Confirma el pago primero
           </span>
         )}
         {!delivered && !uploadLocked && (
@@ -255,10 +259,10 @@ function DeliverPhotoTile({
             <div className="absolute inset-x-2 bottom-2">
               {uploadLocked ? (
                 <span
-                  className="flex w-full items-center justify-center rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-full bg-background/95 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm"
                   title="El biker debe subir su comprobante y tú confirmar el pago antes de poder entregar"
                 >
-                  🔒 Confirma el pago primero
+                  <Lock size={12} /> Confirma el pago primero
                 </span>
               ) : uploading ? (
                 <div className="rounded-full bg-background/95 px-3 py-1.5 shadow-sm">
@@ -493,6 +497,7 @@ function OrderPhotosSection({
   const eventGroups = groupItemsByEventoPunto(order.items)
   const extraGiftInputId = `gift-extra-${order.orderId}`
   const extraGiftTile = canGiftExtra ? (
+    <AnimateIcon animateOnHover animateOnTap asChild>
     <label
       htmlFor={extraGiftInputId}
       className={cn(
@@ -500,7 +505,7 @@ function OrderPhotosSection({
         viewMode === 'grid' ? 'aspect-[4/5]' : 'p-4',
       )}
     >
-      <IconGift className="h-6 w-6" />
+      <Gift size={24} />
       <span className="text-xs font-semibold">{uploadingExtra ? 'Subiendo…' : '+ Regalo extra'}</span>
       <input
         id={extraGiftInputId}
@@ -511,6 +516,7 @@ function OrderPhotosSection({
         onChange={(e) => handleGiftExtraFile(e.target.files?.[0])}
       />
     </label>
+    </AnimateIcon>
   ) : null
 
   return (

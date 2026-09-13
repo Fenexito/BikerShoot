@@ -18,12 +18,16 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconEdit } from '../../ui/shared/icons'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { Play } from '../../ui/animate-icons/icons/Play'
 import { Pause } from '../../ui/animate-icons/icons/Pause'
 import { ChevronLeft } from '../../ui/animate-icons/icons/ChevronLeft'
+import { ChevronDown } from '../../ui/animate-icons/icons/ChevronDown'
+import { Edit } from '../../ui/animate-icons/icons/Edit'
+import { LayoutDashboard } from '../../ui/animate-icons/icons/LayoutDashboard'
+import { List } from '../../ui/animate-icons/icons/List'
+import { Upload } from '../../ui/animate-icons/icons/Upload'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
@@ -53,9 +57,11 @@ function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: s
       {photo.delivered_path && (
         <span className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Vendida</span>
       )}
-      <button onClick={() => onDelete(photo.id)} className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-accent">
-        Eliminar
-      </button>
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <button onClick={() => onDelete(photo.id)} className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-accent">
+          <Trash size={14} /> Eliminar
+        </button>
+      </AnimateIcon>
     </div>
   )
 }
@@ -196,18 +202,26 @@ function PhotoGallery({
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground sm:hidden">Subir y eliminar fotos está disponible en escritorio</p>
         <div className="hidden gap-1 rounded-full bg-muted p-1 sm:flex">
-          <button
-            onClick={() => setView('grid')}
-            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-          >
-            Grid
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-          >
-            Lista
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => setView('grid')}
+              aria-label="Vista de cuadrícula"
+              title="Grid"
+              className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+            >
+              <LayoutDashboard size={16} />
+            </button>
+          </AnimateIcon>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => setView('list')}
+              aria-label="Vista de lista"
+              title="Lista"
+              className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+            >
+              <List size={16} />
+            </button>
+          </AnimateIcon>
         </div>
       </div>
 
@@ -239,12 +253,15 @@ function PhotoGallery({
           por no quedar más fotos. */}
       <div ref={loadMoreZoneRef}>
         {visibleCount < photos.length && (
-          <button
-            onClick={handleLoadMore}
-            className="mt-4 w-full rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Ver más fotos ({photos.length - visibleCount} más)
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={handleLoadMore}
+              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-border py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronDown size={14} />
+              Ver más fotos ({photos.length - visibleCount} más)
+            </button>
+          </AnimateIcon>
         )}
       </div>
     </div>
@@ -364,32 +381,37 @@ function PointCard({ point, photos, eventId, photographerId, price, watermarkPat
 
   return (
     <div ref={registerRef} className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
-      <button onClick={toggleExpanded} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
-        <PointStack photos={photos} />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-studio text-lg font-bold tracking-tight2">{point.label}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {point.time_start.slice(0, 5)} – {point.time_end.slice(0, 5)} · {photos.length} fotos
-            {sold > 0 && ` · ${sold} vendidas`}
-          </p>
-        </div>
-        <span
-          className={cn(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm transition-transform duration-200',
-            expanded && 'rotate-180',
-          )}
-        >
-          ↓
-        </span>
-      </button>
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <button onClick={toggleExpanded} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
+          <PointStack photos={photos} />
+          <div className="min-w-0 flex-1">
+            <h2 className="font-studio text-lg font-bold tracking-tight2">{point.label}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {point.time_start.slice(0, 5)} – {point.time_end.slice(0, 5)} · {photos.length} fotos
+              {sold > 0 && ` · ${sold} vendidas`}
+            </p>
+          </div>
+          <span
+            className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-transform duration-200',
+              expanded && 'rotate-180',
+            )}
+          >
+            <ChevronDown size={16} />
+          </span>
+        </button>
+      </AnimateIcon>
 
       {expanded && (
         <div className="border-t border-border p-5">
           <div className="mb-4 hidden items-center justify-between sm:flex">
             <SelectMenu ids={photos.map((p) => p.id)} selectedIds={selectedIds} onSelectMany={onSelectMany} onDeselectMany={onDeselectMany} />
-            <Button variant="ghost" size="sm" onClick={() => setUploadOpen((o) => !o)}>
-              {uploadOpen ? 'Cerrar' : '+ Subir fotos a este punto'}
-            </Button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setUploadOpen((o) => !o)}>
+                <Upload size={14} />
+                {uploadOpen ? 'Cerrar' : 'Subir fotos a este punto'}
+              </Button>
+            </AnimateIcon>
           </div>
 
           {uploadOpen && (
@@ -741,23 +763,27 @@ export function StudioEventView() {
           {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
         </p>
         {event.status === 'pausado' ? (
-          <button
-            onClick={() => toggleStatus('activo')}
-            className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
-          >
-            Publicar
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => toggleStatus('activo')}
+              className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+            >
+              <Play size={14} /> Publicar
+            </button>
+          </AnimateIcon>
         ) : (
-          <button
-            onClick={() => toggleStatus('pausado')}
-            className="shrink-0 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-500"
-          >
-            Pausar
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => toggleStatus('pausado')}
+              className="flex shrink-0 items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-500"
+            >
+              <Pause size={14} /> Pausar
+            </button>
+          </AnimateIcon>
         )}
         <ActionMenu
           items={[
-            { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
+            { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <Edit size={16} /> },
             { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
           ]}
         />
@@ -851,7 +877,7 @@ export function StudioEventView() {
                 event.status === 'pausado'
                   ? { onClick: () => toggleStatus('activo'), label: 'Publicar evento', icon: <Play size={16} /> }
                   : { onClick: () => toggleStatus('pausado'), label: 'Pausar evento', icon: <Pause size={16} /> },
-                { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
+                { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <Edit size={16} /> },
                 { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
               ]}
             />
@@ -892,23 +918,27 @@ export function StudioEventView() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {event.status === 'pausado' ? (
-                  <button
-                    onClick={() => toggleStatus('activo')}
-                    className={cn('rounded-full bg-emerald-600 font-bold text-white transition-colors hover:bg-emerald-500', scrolled ? 'px-3 py-2 text-[11px]' : 'px-5 py-2.5 text-xs')}
-                  >
-                    Publicar
-                  </button>
+                  <AnimateIcon animateOnHover animateOnTap asChild>
+                    <button
+                      onClick={() => toggleStatus('activo')}
+                      className={cn('flex items-center gap-1.5 rounded-full bg-emerald-600 font-bold text-white transition-colors hover:bg-emerald-500', scrolled ? 'px-3 py-2 text-[11px]' : 'px-5 py-2.5 text-xs')}
+                    >
+                      <Play size={14} /> Publicar
+                    </button>
+                  </AnimateIcon>
                 ) : (
-                  <button
-                    onClick={() => toggleStatus('pausado')}
-                    className={cn('rounded-full bg-blue-600 font-bold text-white transition-colors hover:bg-blue-500', scrolled ? 'px-3 py-2 text-[11px]' : 'px-5 py-2.5 text-xs')}
-                  >
-                    Pausar
-                  </button>
+                  <AnimateIcon animateOnHover animateOnTap asChild>
+                    <button
+                      onClick={() => toggleStatus('pausado')}
+                      className={cn('flex items-center gap-1.5 rounded-full bg-blue-600 font-bold text-white transition-colors hover:bg-blue-500', scrolled ? 'px-3 py-2 text-[11px]' : 'px-5 py-2.5 text-xs')}
+                    >
+                      <Pause size={14} /> Pausar
+                    </button>
+                  </AnimateIcon>
                 )}
                 <ActionMenu
                   items={[
-                    { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
+                    { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <Edit size={16} /> },
                     { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
                   ]}
                 />

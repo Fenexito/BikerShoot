@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import { Check } from '../animate-icons/icons/Check'
 import { cn } from '../../lib/cn'
 
 // Adaptado del componente Stepper de reactbits.dev (solo la parte visual del
@@ -39,16 +40,7 @@ export function OrderStepper({ steps, currentIndex, className }: OrderStepperPro
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-foreground text-[11px] font-bold sm:h-9 sm:w-9 sm:text-xs"
               >
                 {status === 'complete' ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5 sm:h-4 sm:w-4">
-                    <motion.path
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ delay: 0.1, duration: 0.3, ease: 'easeOut' }}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                  <Check animate size={14} strokeWidth={2.5} className="sm:h-4 sm:w-4" />
                 ) : (
                   i + 1
                 )}

@@ -12,7 +12,14 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { cn } from '../../lib/cn'
-import { IconUser, IconSettings, IconBell, IconUsers, IconEye, IconEyeOff, IconCreditCard, IconPlus, IconTrash } from '../../ui/shared/icons'
+import { IconUsers, IconEye, IconEyeOff } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { UserRound } from '../../ui/animate-icons/icons/UserRound'
+import { CreditCard } from '../../ui/animate-icons/icons/CreditCard'
+import { Settings } from '../../ui/animate-icons/icons/Settings'
+import { Bell } from '../../ui/animate-icons/icons/Bell'
+import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
+import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import type { NotificationType } from '../notifications/useNotifications'
 
@@ -23,10 +30,10 @@ const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description
 ]
 
 const TABS = [
-  { id: 'perfil', label: 'Perfil', icon: IconUser },
-  { id: 'precios', label: 'Precios', icon: IconCreditCard },
-  { id: 'cuenta', label: 'Cuenta', icon: IconSettings },
-  { id: 'notificaciones', label: 'Notificaciones', icon: IconBell },
+  { id: 'perfil', label: 'Perfil', icon: UserRound },
+  { id: 'precios', label: 'Precios', icon: CreditCard },
+  { id: 'cuenta', label: 'Cuenta', icon: Settings },
+  { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   { id: 'equipo', label: 'Equipo', icon: IconUsers },
 ] as const
 type TabId = (typeof TABS)[number]['id']
@@ -215,16 +222,20 @@ function PricingTiersEditor({ photographerId, basePrice }: { photographerId: str
                 className={cn(inputClass, 'w-28')}
               />
             </div>
-            <button onClick={() => removeRow(i)} aria-label="Quitar escalón" className="shrink-0 text-muted-foreground hover:text-red-500">
-              <IconTrash className="h-4 w-4" />
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button onClick={() => removeRow(i)} aria-label="Quitar escalón" className="shrink-0 text-muted-foreground hover:text-red-500">
+                <Trash size={16} />
+              </button>
+            </AnimateIcon>
           </div>
         ))}
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <button onClick={addRow} className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:underline">
-          <IconPlus className="h-4 w-4" /> Agregar escalón
-        </button>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <button onClick={addRow} className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:underline">
+            <CirclePlus size={16} /> Agregar escalón
+          </button>
+        </AnimateIcon>
         <Button variant="dark" size="sm" onClick={save} loading={saving} className="ml-auto">
           Guardar tabla
         </Button>
@@ -637,19 +648,20 @@ export function StudioSettings() {
             lista vertical a la izquierda, la activa marcada con un borde. */}
         <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
           {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
-                tab === t.id
-                  ? 'border-foreground font-bold text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <t.icon className="h-4 w-4 shrink-0" />
-              {t.label}
-            </button>
+            <AnimateIcon key={t.id} animateOnHover animateOnTap asChild>
+              <button
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
+                  tab === t.id
+                    ? 'border-foreground font-bold text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <t.icon className="h-4 w-4 shrink-0" />
+                {t.label}
+              </button>
+            </AnimateIcon>
           ))}
         </nav>
 

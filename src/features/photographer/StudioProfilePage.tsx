@@ -10,7 +10,12 @@ import { Button } from '../../ui/studio/Button'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
 import { SocialLinks } from '../../ui/shared/SocialLinks'
-import { IconVerified, IconCreditCard, IconSettings, IconLogOut } from '../../ui/shared/icons'
+import { IconVerified } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { CreditCard } from '../../ui/animate-icons/icons/CreditCard'
+import { Settings } from '../../ui/animate-icons/icons/Settings'
+import { LogOut } from '../../ui/animate-icons/icons/LogOut'
+import { Edit } from '../../ui/animate-icons/icons/Edit'
 import { ThemeToggle } from '../../ui/studio/ThemeToggle'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import DriftWall from '../../ui/reactbits/DriftWall'
@@ -132,9 +137,13 @@ export function StudioProfilePage() {
             />
           </div>
 
-          <Link to="/studio/ajustes" className="hidden sm:inline-flex">
-            <Button variant="dark">Editar perfil</Button>
-          </Link>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <Link to="/studio/ajustes" className="hidden sm:inline-flex">
+              <Button variant="dark" className="gap-1.5">
+                <Edit size={16} /> Editar perfil
+              </Button>
+            </Link>
+          </AnimateIcon>
         </div>
 
         {!details?.approved && (
@@ -251,30 +260,36 @@ export function StudioProfilePage() {
         </div>
 
         <div className="mt-10 grid grid-cols-2 gap-3 border-t border-border pt-8 md:hidden">
-          <Link
-            to="/studio/planes"
-            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-accent/40"
-          >
-            <IconCreditCard className="h-5 w-5" />
-            Planes y facturación
-          </Link>
-          <Link
-            to="/studio/ajustes"
-            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-accent/40"
-          >
-            <IconSettings className="h-5 w-5" />
-            Configuración
-          </Link>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <Link
+              to="/studio/planes"
+              className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-accent/40"
+            >
+              <CreditCard size={20} />
+              Planes y facturación
+            </Link>
+          </AnimateIcon>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <Link
+              to="/studio/ajustes"
+              className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-xs font-medium transition-colors hover:border-accent/40"
+            >
+              <Settings size={20} />
+              Configuración
+            </Link>
+          </AnimateIcon>
         </div>
         <div className="mt-4 flex items-center justify-between md:hidden">
-          <button
-            onClick={handleSignOut}
-            disabled={signingOut}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground disabled:opacity-50"
-          >
-            <IconLogOut className="h-4 w-4" />
-            {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground disabled:opacity-50"
+            >
+              <LogOut size={16} />
+              {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
+            </button>
+          </AnimateIcon>
           <ThemeToggle />
         </div>
       </div>

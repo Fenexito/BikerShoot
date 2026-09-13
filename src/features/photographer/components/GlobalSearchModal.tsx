@@ -10,7 +10,11 @@ import { formatOrderCode } from '../../../lib/orderStatus'
 import { EVENT_STATUS_STYLE } from '../../../lib/eventStatus'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { InitialsAvatar } from '../../../ui/shared/InitialsAvatar'
-import { IconImages, IconCart, IconUser, IconArchive, IconCreditCard, IconSettings, IconPlus } from '../../../ui/shared/icons'
+import { IconImages, IconCart, IconUser } from '../../../ui/shared/icons'
+import { Archive } from '../../../ui/animate-icons/icons/Archive'
+import { CreditCard } from '../../../ui/animate-icons/icons/CreditCard'
+import { Settings } from '../../../ui/animate-icons/icons/Settings'
+import { CirclePlus } from '../../../ui/animate-icons/icons/CirclePlus'
 import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { Search } from '../../../ui/animate-icons/icons/Search'
 import { X } from '../../../ui/animate-icons/icons/X'
@@ -65,12 +69,12 @@ function saveRecent(result: SearchResult) {
 
 const STATIC_PAGES: { id: string; title: string; subtitle: string; to: string; icon: React.ReactNode }[] = [
   { id: 'p-eventos', title: 'Eventos', subtitle: 'Ver todos tus eventos', to: '/studio/eventos', icon: <IconImages className="h-4 w-4" /> },
-  { id: 'p-crear-evento', title: 'Crear evento', subtitle: 'Publicar un nuevo evento', to: '/studio/eventos/new', icon: <IconPlus className="h-4 w-4" /> },
+  { id: 'p-crear-evento', title: 'Crear evento', subtitle: 'Publicar un nuevo evento', to: '/studio/eventos/new', icon: <CirclePlus size={16} /> },
   { id: 'p-pedidos', title: 'Pedidos', subtitle: 'Ver pedidos de bikers', to: '/studio/pedidos', icon: <IconCart className="h-4 w-4" /> },
-  { id: 'p-almacenamiento', title: 'Almacenamiento', subtitle: 'Administrar espacio y limpieza', to: '/studio/almacenamiento', icon: <IconArchive className="h-4 w-4" /> },
-  { id: 'p-planes', title: 'Planes', subtitle: 'Planes y facturación', to: '/studio/planes', icon: <IconCreditCard className="h-4 w-4" /> },
+  { id: 'p-almacenamiento', title: 'Almacenamiento', subtitle: 'Administrar espacio y limpieza', to: '/studio/almacenamiento', icon: <Archive size={16} /> },
+  { id: 'p-planes', title: 'Planes', subtitle: 'Planes y facturación', to: '/studio/planes', icon: <CreditCard size={16} /> },
   { id: 'p-perfil', title: 'Mi perfil', subtitle: 'Editar tu perfil público', to: '/studio/perfil', icon: <IconUser className="h-4 w-4" /> },
-  { id: 'p-ajustes', title: 'Configuración', subtitle: 'Ajustes de tu cuenta', to: '/studio/ajustes', icon: <IconSettings className="h-4 w-4" /> },
+  { id: 'p-ajustes', title: 'Configuración', subtitle: 'Ajustes de tu cuenta', to: '/studio/ajustes', icon: <Settings size={16} /> },
   { id: 'p-editar-avatar', title: 'Editar foto de perfil', subtitle: 'Configuración → Perfil', to: '/studio/ajustes', icon: <IconUser className="h-4 w-4" /> },
   { id: 'p-editar-portada', title: 'Editar portada', subtitle: 'Configuración → Perfil', to: '/studio/ajustes', icon: <IconImages className="h-4 w-4" /> },
   { id: 'p-editar-logo', title: 'Editar logo del estudio', subtitle: 'Configuración → Perfil', to: '/studio/ajustes', icon: <IconImages className="h-4 w-4" /> },

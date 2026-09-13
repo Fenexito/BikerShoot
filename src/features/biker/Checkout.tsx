@@ -11,7 +11,9 @@ import { Button } from '../../ui/flat/Button'
 import { Card } from '../../ui/flat/Card'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
-import { IconInfo, IconTrash } from '../../ui/shared/icons'
+import { IconInfo } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { cn } from '../../lib/cn'
 
 /** Ícono de información SOLO — el hover/foco vive en este botón puntual,
@@ -235,13 +237,15 @@ export function Checkout() {
                                   {item.hasDiscount && <p className="text-[10px] text-muted-foreground line-through sm:text-xs">Q{item.price}</p>}
                                   <p className="text-sm font-bold">Q{item.effectivePrice}</p>
                                 </div>
-                                <button
-                                  onClick={() => handleRemove(item.photoId, `${item.eventTitle} — Q${item.effectivePrice}`)}
-                                  aria-label="Quitar del carrito"
-                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <IconTrash className="h-4 w-4" />
-                                </button>
+                                <AnimateIcon animateOnHover animateOnTap asChild>
+                                  <button
+                                    onClick={() => handleRemove(item.photoId, `${item.eventTitle} — Q${item.effectivePrice}`)}
+                                    aria-label="Quitar del carrito"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash size={16} />
+                                  </button>
+                                </AnimateIcon>
                               </div>
                             </div>
                           ))}

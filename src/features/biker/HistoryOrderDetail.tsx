@@ -21,7 +21,8 @@ import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { supabase } from '../../lib/supabase'
-import { IconDownload, IconEye, IconEdit } from '../../ui/shared/icons'
+import { IconEye, IconEdit } from '../../ui/shared/icons'
+import { Download } from '../../ui/animate-icons/icons/Download'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
 import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
@@ -236,9 +237,11 @@ function DownloadAllButton({ items, photographerLabel, orderNumber }: { items: M
   }
 
   return (
-    <Button variant="secondary" size="sm" loading={downloading} onClick={handleDownloadAll}>
-      <IconDownload className="h-4 w-4" /> Descargar todas
-    </Button>
+    <AnimateIcon animateOnHover animateOnTap asChild>
+      <Button variant="secondary" size="sm" className="gap-1.5" loading={downloading} onClick={handleDownloadAll}>
+        <Download size={16} /> Descargar todas
+      </Button>
+    </AnimateIcon>
   )
 }
 
@@ -617,13 +620,15 @@ export function HistoryOrderDetail() {
           resolveSrc={(p) => (p.delivered_path ? queryClient.getQueryData<string | null>(['delivered-view-url', p.id]) ?? undefined : undefined)}
           cornerSlot={
             canDownloadOpen ? (
-              <button
-                onClick={handleDownloadOpen}
-                disabled={downloading}
-                className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                <IconDownload className="h-4 w-4" /> {downloading ? 'Descargando…' : 'Descargar'}
-              </button>
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <button
+                  onClick={handleDownloadOpen}
+                  disabled={downloading}
+                  className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <Download size={16} /> {downloading ? 'Descargando…' : 'Descargar'}
+                </button>
+              </AnimateIcon>
             ) : undefined
           }
         />

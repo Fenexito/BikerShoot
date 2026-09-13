@@ -16,6 +16,12 @@ import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Instagram } from '../../ui/animate-icons/icons/Instagram'
 import { Facebook } from '../../ui/animate-icons/icons/Facebook'
 import { Tiktok } from '../../ui/animate-icons/icons/Tiktok'
+import { Gift } from '../../ui/animate-icons/icons/Gift'
+import { CreditCard } from '../../ui/animate-icons/icons/CreditCard'
+import { Archive } from '../../ui/animate-icons/icons/Archive'
+import { ChevronUp } from '../../ui/animate-icons/icons/ChevronUp'
+import { ArrowUp } from '../../ui/animate-icons/icons/ArrowUp'
+import { Cart } from '../../ui/animate-icons/icons/Cart'
 import { ChevronLeft } from '../../ui/animate-icons/icons/ChevronLeft'
 import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 import { CircleX } from '../../ui/animate-icons/icons/CircleX'
@@ -71,6 +77,12 @@ const ITEMS: { Icon: ComponentType<IconProps<any>>; name: string; use: string }[
   { Icon: Instagram, name: 'Instagram', use: '(propio) Instagram' },
   { Icon: Facebook, name: 'Facebook', use: '(propio) Facebook' },
   { Icon: Tiktok, name: 'Tiktok', use: '(propio) TikTok' },
+  { Icon: Gift, name: 'Gift', use: '(propio) Regalo' },
+  { Icon: CreditCard, name: 'CreditCard', use: '(propio) Planes y facturación' },
+  { Icon: Archive, name: 'Archive', use: '(propio) Almacenamiento' },
+  { Icon: ChevronUp, name: 'ChevronUp', use: 'Expandir punto' },
+  { Icon: ArrowUp, name: 'ArrowUp', use: 'Ir al inicio' },
+  { Icon: Cart, name: 'Cart', use: '(propio) Carrito' },
   { Icon: BellRing, name: 'BellRing', use: 'Notificación recibida' },
   { Icon: Bot, name: 'Bot', use: '(futuro) Asistente/bot' },
   { Icon: Check, name: 'Check', use: 'Confirmaciones' },

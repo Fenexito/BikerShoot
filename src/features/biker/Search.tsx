@@ -6,7 +6,11 @@ import { PhotoGrid, type GridPhoto } from './components/PhotoGrid'
 import { PhotoLightbox } from './components/PhotoLightbox'
 import { FilterDropdown, type FilterDropdownOption } from '../../ui/shared/FilterDropdown'
 import { TimeRangeSlider } from '../../ui/shared/TimeRangeSlider'
-import { IconGridSmall, IconGridLarge, IconClose, IconChevronDown, IconMap } from '../../ui/shared/icons'
+import { IconClose, IconChevronDown } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Compass } from '../../ui/animate-icons/icons/Compass'
+import { Maximize } from '../../ui/animate-icons/icons/Maximize'
+import { Minimize } from '../../ui/animate-icons/icons/Minimize'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrollPastElement } from '../../ui/shared/useScrollPastElement'
@@ -532,12 +536,14 @@ export function Search() {
             lugar) — este es su acceso directo, aquí donde tiene más sentido
             (buscar una rodada por dónde pasó, en vez de un link genérico
             en el nav). */}
-        <Link
-          to="/app/mapa"
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
-        >
-          <IconMap className="h-4 w-4" /> Ver mapa de rutas
-        </Link>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Link
+            to="/app/mapa"
+            className="mt-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+          >
+            <Compass size={16} /> Ver mapa de rutas
+          </Link>
+        </AnimateIcon>
       </div>
 
       {/* El centinela vive justo debajo del hero — el header interactivo se
@@ -584,13 +590,15 @@ export function Search() {
             <span className="font-semibold text-foreground">{results.length}</span> fotos encontradas
           </p>
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => changeTileSize(Math.max(tileSizeMin, tileSize - TILE_SIZE_STEP))}
-              aria-label="Fotos más chicas"
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <IconGridSmall className="h-4 w-4" />
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={() => changeTileSize(Math.max(tileSizeMin, tileSize - TILE_SIZE_STEP))}
+                aria-label="Fotos más chicas"
+                className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Minimize size={16} />
+              </button>
+            </AnimateIcon>
             <input
               type="range"
               min={tileSizeMin}
@@ -601,13 +609,15 @@ export function Search() {
               aria-label="Tamaño de las fotos"
               className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-muted accent-primary sm:w-32"
             />
-            <button
-              onClick={() => changeTileSize(Math.min(TILE_SIZE_MAX, tileSize + TILE_SIZE_STEP))}
-              aria-label="Fotos más grandes"
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <IconGridLarge className="h-4 w-4" />
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={() => changeTileSize(Math.min(TILE_SIZE_MAX, tileSize + TILE_SIZE_STEP))}
+                aria-label="Fotos más grandes"
+                className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Maximize size={16} />
+              </button>
+            </AnimateIcon>
           </div>
         </div>
 

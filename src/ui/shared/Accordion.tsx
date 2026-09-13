@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { AnimateIcon } from '../animate-icons/icon'
+import { Plus } from '../animate-icons/icons/Plus'
 import { cn } from '../../lib/cn'
 
 export interface AccordionItem {
@@ -15,20 +17,22 @@ export function Accordion({ items, defaultOpen = 0 }: { items: AccordionItem[]; 
         const isOpen = openIndex === i
         return (
           <div key={item.question} className="overflow-hidden rounded-3xl bg-muted">
-            <button
-              onClick={() => setOpenIndex(isOpen ? null : i)}
-              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left font-semibold"
-            >
-              {item.question}
-              <span
-                className={cn(
-                  'shrink-0 text-lg text-muted-foreground transition-transform duration-200',
-                  isOpen && 'rotate-45',
-                )}
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={() => setOpenIndex(isOpen ? null : i)}
+                className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left font-semibold"
               >
-                +
-              </span>
-            </button>
+                {item.question}
+                <span
+                  className={cn(
+                    'flex shrink-0 items-center justify-center text-muted-foreground transition-transform duration-200',
+                    isOpen && 'rotate-45',
+                  )}
+                >
+                  <Plus size={18} />
+                </span>
+              </button>
+            </AnimateIcon>
             <div
               className={cn(
                 'grid transition-all duration-200 ease-out',

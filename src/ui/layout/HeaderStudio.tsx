@@ -4,7 +4,9 @@ import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
 import { useAuth } from '../../features/auth/AuthContext'
 import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
-import { IconArchive, IconCreditCard, IconImages, IconCart } from '../shared/icons'
+import { IconImages, IconCart } from '../shared/icons'
+import { Archive } from '../animate-icons/icons/Archive'
+import { CreditCard } from '../animate-icons/icons/CreditCard'
 import { AnimateIcon } from '../animate-icons/icon'
 import { Search } from '../animate-icons/icons/Search'
 import { UserRound } from '../animate-icons/icons/UserRound'
@@ -161,8 +163,8 @@ export function HeaderStudio() {
                     sections={[
                       [
                         { to: '/studio/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },
-                        { to: '/studio/almacenamiento', label: 'Almacenamiento', icon: <IconArchive className="h-4 w-4" /> },
-                        { to: '/studio/planes', label: 'Planes y facturación', icon: <IconCreditCard className="h-4 w-4" /> },
+                        { to: '/studio/almacenamiento', label: 'Almacenamiento', icon: <Archive size={16} /> },
+                        { to: '/studio/planes', label: 'Planes y facturación', icon: <CreditCard size={16} /> },
                       ],
                       [
                         { to: '/studio/ajustes', label: 'Configuración', icon: <Settings size={16} /> },
@@ -227,7 +229,7 @@ export function HeaderStudio() {
         items={[
           { to: '/studio/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
           { to: '/studio/pedidos', label: 'Pedidos', icon: <IconCart className="h-full w-full" /> },
-          { to: '/studio/almacenamiento', label: 'Espacio', icon: <IconArchive className="h-full w-full" /> },
+          { to: '/studio/almacenamiento', label: 'Espacio', icon: <Archive className="h-full w-full" /> },
           { to: '/studio/perfil', label: 'Perfil', icon: <UserRound className="h-full w-full" /> },
         ]}
         primary={{ to: '/studio/eventos/new', label: 'Crear', icon: <CirclePlus className="h-full w-full" /> }}

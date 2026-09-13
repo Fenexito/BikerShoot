@@ -9,7 +9,8 @@ import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { useScrollLock } from '../../../ui/shared/useScrollLock'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { createSharedLink } from '../../share/sharedLinks'
-import { IconBookmark, IconCart, IconChevronLeft, IconChevronRight, IconShare } from '../../../ui/shared/icons'
+import { IconBookmark, IconChevronLeft, IconChevronRight, IconShare } from '../../../ui/shared/icons'
+import { Cart } from '../../../ui/animate-icons/icons/Cart'
 import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { X } from '../../../ui/animate-icons/icons/X'
 import { cn } from '../../../lib/cn'
@@ -374,29 +375,33 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
             ) : (
               <span className="px-2 text-base font-bold text-white">Q{photo.price}</span>
             )}
-            <button
-              onClick={handleToggleFavorite}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-              aria-label="Guardar"
-            >
-              <IconBookmark className="h-4 w-4" filled={isFavorite} />
-            </button>
-            {!photo.featured && (
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button
-                onClick={handleAdd}
-                aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
-                className={cn(
-                  // Blanco por defecto, azul relleno una vez agregada — mismo
-                  // criterio que la miniatura de la grilla (PhotoCard.tsx).
-                  'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-                  // `sm:hover:` (no `hover:` a secas) — mismo motivo que en
-                  // PhotoCard.tsx: en móvil el :hover pegajoso tras un toque
-                  // se veía igual que "ya agregada" (mismo azul).
-                  inCart ? 'bg-primary text-white' : 'bg-white text-black sm:hover:bg-primary sm:hover:text-white',
-                )}
+                onClick={handleToggleFavorite}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                aria-label="Guardar"
               >
-                <IconCart className="h-4 w-4" filled={inCart} />
+                <IconBookmark className="h-4 w-4" filled={isFavorite} />
               </button>
+            </AnimateIcon>
+            {!photo.featured && (
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <button
+                  onClick={handleAdd}
+                  aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
+                  className={cn(
+                    // Blanco por defecto, azul relleno una vez agregada — mismo
+                    // criterio que la miniatura de la grilla (PhotoCard.tsx).
+                    'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
+                    // `sm:hover:` (no `hover:` a secas) — mismo motivo que en
+                    // PhotoCard.tsx: en móvil el :hover pegajoso tras un toque
+                    // se veía igual que "ya agregada" (mismo azul).
+                    inCart ? 'bg-primary text-white' : 'bg-white text-black sm:hover:bg-primary sm:hover:text-white',
+                  )}
+                >
+                  <Cart size={16} filled={inCart} />
+                </button>
+              </AnimateIcon>
             )}
           </div>
         </div>

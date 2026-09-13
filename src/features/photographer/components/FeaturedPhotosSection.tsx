@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react'
 import { previewUrl } from '../../../lib/r2'
 import { Button } from '../../../ui/studio/Button'
-import { IconTrash } from '../../../ui/shared/icons'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { Trash } from '../../../ui/animate-icons/icons/Trash'
+import { Star } from '../../../ui/animate-icons/icons/Star'
+import { ChevronDown } from '../../../ui/animate-icons/icons/ChevronDown'
+import { Upload } from '../../../ui/animate-icons/icons/Upload'
 import { useFeaturedPhotosManager, MAX_FEATURED, type FeaturedPhoto, type FeaturedQueueItem } from '../useFeaturedPhotosManager'
 import AccordionGallery from '../../../ui/reactbits/AccordionGallery'
 import { cn } from '../../../lib/cn'
@@ -43,9 +47,11 @@ function MobileFeaturedTile({
         </div>
       ) : (
         onDelete && (
-          <button onClick={onDelete} aria-label="Quitar foto destacada" className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white">
-            <IconTrash className="h-3.5 w-3.5" />
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button onClick={onDelete} aria-label="Quitar foto destacada" className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white">
+              <Trash size={14} />
+            </button>
+          </AnimateIcon>
         )
       )}
     </div>
@@ -79,16 +85,18 @@ export function FeaturedPhotosSection({
       key: photo.id,
       image: previewUrl(photo),
       overlay: (
-        <button
-          onClick={(e: React.MouseEvent) => {
-            e.stopPropagation()
-            removeExisting(photo.id)
-          }}
-          aria-label="Quitar foto destacada"
-          className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
-        >
-          <IconTrash className="h-3.5 w-3.5" />
-        </button>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <button
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation()
+              removeExisting(photo.id)
+            }}
+            aria-label="Quitar foto destacada"
+            className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
+          >
+            <Trash size={14} />
+          </button>
+        </AnimateIcon>
       ),
     })),
     ...queue.map((item: FeaturedQueueItem) => ({
@@ -118,30 +126,36 @@ export function FeaturedPhotosSection({
 
   return (
     <div ref={registerRef} className="overflow-hidden rounded-3xl border border-border bg-card transition-colors hover:border-border-hover">
-      <button onClick={toggleExpanded} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-muted text-2xl">★</span>
-        <div className="min-w-0 flex-1">
-          <h2 className="font-studio text-lg font-bold tracking-tight2">Destacadas</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {usedSlots} / {MAX_FEATURED} · tu portafolio de este evento — no están a la venta
-          </p>
-        </div>
-        <span
-          className={cn(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm transition-transform duration-200',
-            expanded && 'rotate-180',
-          )}
-        >
-          ↓
-        </span>
-      </button>
+      <AnimateIcon animateOnHover animateOnTap asChild>
+        <button onClick={toggleExpanded} className="flex w-full flex-wrap items-center gap-4 p-5 text-left">
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-muted">
+            <Star size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-studio text-lg font-bold tracking-tight2">Destacadas</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {usedSlots} / {MAX_FEATURED} · tu portafolio de este evento — no están a la venta
+            </p>
+          </div>
+          <span
+            className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-transform duration-200',
+              expanded && 'rotate-180',
+            )}
+          >
+            <ChevronDown size={16} />
+          </span>
+        </button>
+      </AnimateIcon>
 
       {expanded && (
         <div className="border-t border-border p-5">
           <div className="mb-4 flex justify-end">
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={remaining === 0}>
-              + Subir destacadas
-            </Button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={remaining === 0}>
+                <Upload size={14} /> Subir destacadas
+              </Button>
+            </AnimateIcon>
             <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => enqueue(e.target.files)} />
           </div>
 
