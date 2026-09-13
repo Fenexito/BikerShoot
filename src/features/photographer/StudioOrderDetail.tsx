@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useOrderGroup, toGridPhoto, type PhotographerOrderGroup, type RawOrderItem, type RawOrderItemPhoto } from './useMyOrders'
 import { usePhotographerDetails } from './usePhotographerDetails'
@@ -21,11 +21,10 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconGift, IconWhatsapp, IconDownload, IconEye, IconTrash, IconChevronLeft } from '../../ui/shared/icons'
+import { IconGift, IconWhatsapp, IconDownload, IconEye, IconTrash } from '../../ui/shared/icons'
 import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
-import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
 import { cn } from '../../lib/cn'
 
 /** Cuántas cortesías puede dar el fotógrafo en este pedido, según cuántas
@@ -744,7 +743,6 @@ function OrderTimeline({ order }: { order: PhotographerOrderGroup }) {
 export function StudioOrderDetail() {
   const { id } = useParams()
   useBackButton('/studio/pedidos')
-  const navigate = useNavigate()
   const { user, profile } = useAuth()
   const { data: details } = usePhotographerDetails(user?.id)
   const orderCodeName = details?.order_nickname ?? profile?.display_name
@@ -759,13 +757,9 @@ export function StudioOrderDetail() {
   // resulta que el biker no ha subido nada, se cierra solo y se avisa.
   const [proof, setProof] = useState<{ viewUrl: string | null; uploadedAt: string } | null>(null)
 
-  // Header interactivo — misma estructura EXACTA que StudioEventView.tsx:
-  // en escritorio transforma el header global; en móvil vive en su PROPIA
-  // barra pegajosa local (ver el JSX más abajo), nunca en el header global
-  // (que ahí solo se transforma a partir de `md`) — así nunca se ven dos
-  // barras encimadas ni depende de `mobileEnabled` para nada en móvil.
+  // Header interactivo — el mismo header global se transforma (crossfade),
+  // también en móvil (`mobileEnabled`) — ver headerTransformStore.
   const scrolledPast = useScrolledPast(140)
-  const headerHidden = useAutoHideHeader()
   const [activePointLabel, setActivePointLabel] = useState<string | null>(null)
   const pointRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -842,22 +836,23 @@ export function StudioOrderDetail() {
 
   useHeaderTransform(
     order && statusStyleForHeader ? (
-      <div className="flex w-full min-w-0 items-center gap-3">
-        <StatusPill
-          dot={statusStyleForHeader.dot}
-          text={statusStyleForHeader.text}
-          label={statusStyleForHeader.label}
-          className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex"
-        />
-        <p className="min-w-0 flex-1 truncate text-base font-bold">
+      // En móvil, estado+código van en su propia fila y el punto activo en
+      // una fila debajo (con el texto tan chico, todo en una sola línea no
+      // se alcanzaba a leer). En escritorio se queda como una sola línea.
+      <div className="flex w-full min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex items-center gap-2 sm:contents">
+          <StatusPill dot={statusStyleForHeader.dot} text={statusStyleForHeader.text} label={statusStyleForHeader.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
+          <span className="truncate text-xs text-muted-foreground sm:hidden">{formatOrderCode(order.orderNumber)}</span>
+        </div>
+        <p className="hidden min-w-0 flex-1 truncate text-base font-bold sm:block">
           {formatOrderCode(order.orderNumber)}
           {activePointLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">· 📍 {activePointLabel}</span>}
         </p>
-        <ActionMenu items={actionMenuItems} />
+        {activePointLabel && <p className="truncate text-sm font-semibold sm:hidden">📍 {activePointLabel}</p>}
       </div>
     ) : null,
     scrolledPast,
-    { hideSearchTrigger: true },
+    { mobileEnabled: true, suppressAutoHide: true, hideSearchTrigger: true, actionsSlot: <ActionMenu items={actionMenuItems} /> },
   )
 
   async function cancelOrder() {
@@ -980,29 +975,6 @@ export function StudioOrderDetail() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      {/* Barra pegajosa SOLO en móvil — calcada de la de StudioEventView.tsx:
-          en escritorio ese rol ya lo cumple el header transformado (mismo
-          código de pedido/status/menú), así que aquí basta con el flujo
-          normal para no tener dos barras encimadas. */}
-      <div
-        className={cn(
-          'sticky z-20 mb-4 transition-[top] duration-300 sm:hidden',
-          headerHidden ? 'top-3' : 'top-[4.75rem]',
-        )}
-      >
-        <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md">
-          <button onClick={() => navigate('/studio/pedidos')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
-            <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-bold tracking-tight2">{formatOrderCode(order.orderNumber)}</h1>
-            {activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
-          </div>
-          <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
-          <ActionMenu items={actionMenuItems} />
-        </div>
-      </div>
-
       {/* Cabecera compacta — en escritorio, pago/comprobante/whatsapp viven
           a la derecha junto al status (una sola fila con todo lo
           importante); en móvil no caben ahí, así que bajan a su propia

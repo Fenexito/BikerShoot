@@ -57,6 +57,7 @@ export function HeaderStudio() {
   const transformActive = useHeaderTransformStore((s) => s.active)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
+  const actionsSlot = useHeaderTransformStore((s) => s.actionsSlot)
   const suppressAutoHide = useHeaderTransformStore((s) => s.suppressAutoHide)
   const transformed = transformActive && transformContent != null
   const hidden = suppressAutoHide ? false : autoHidden
@@ -183,6 +184,10 @@ export function HeaderStudio() {
               )}
             >
               <div className="min-w-0 flex-1 overflow-hidden">{transformContent}</div>
+              {/* Fuera del contenedor `overflow-hidden` de arriba a propósito
+                  — un panel flotante (ej. el menú "···" de ActionMenu) que
+                  viviera adentro quedaría recortado apenas se abriera. */}
+              {actionsSlot}
               {/* Ancho fijo a propósito — igual al espacio que ocupan
                   buscar+notificaciones+perfil juntos en el estado normal
                   (40px+8px+40px+8px+40px = 176px), así el cambio se siente

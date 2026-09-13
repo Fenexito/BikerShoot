@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, groupOrderByPhotographer, deriveOrderEffectiveStatus, deriveGroupStatus, toGridPhoto, type MyOrderItem, type MyOrderPhotographerGroup } from './useMyOrders'
 import { PurchasedPhotoTile, downloadPurchasedPhoto } from './components/PurchasedPhotoTile'
@@ -20,11 +20,9 @@ import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
-import { useAutoHideHeader } from '../../ui/shared/useAutoHideHeader'
 import { supabase } from '../../lib/supabase'
-import { IconDownload, IconEye, IconEdit, IconWhatsapp, IconTrash, IconChevronLeft } from '../../ui/shared/icons'
+import { IconDownload, IconEye, IconEdit, IconWhatsapp, IconTrash } from '../../ui/shared/icons'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
-import { cn } from '../../lib/cn'
 
 // Misma línea (168px) que usa el header pegajoso de la vista de evento del
 // fotógrafo, para decidir qué sección "cuenta" como la que se está viendo.
@@ -244,7 +242,6 @@ function DownloadAllButton({ items, photographerLabel, orderNumber }: { items: M
 export function HistoryOrderDetail() {
   const { id } = useParams()
   useBackButton('/app/historial')
-  const navigate = useNavigate()
   const { user, profile } = useAuth()
   const push = useToastStore((s) => s.push)
   const { data: orders = [], isLoading } = useMyOrders(user?.id)
@@ -256,17 +253,12 @@ export function HistoryOrderDetail() {
   const overallStatus = order ? deriveOrderEffectiveStatus(order) : null
   const overallStyle = overallStatus ? getEffectiveStatusStyle(overallStatus) : null
 
-  // Header interactivo — misma estructura EXACTA que StudioEventView.tsx (y
-  // ahora que StudioOrderDetail.tsx): en escritorio transforma el header
-  // global; en móvil vive en su PROPIA barra pegajosa local (ver el JSX más
-  // abajo), nunca en el header global — así nunca se ven dos barras
-  // encimadas ni depende de `mobileEnabled`. Además de detectar qué
-  // fotógrafo se está viendo, guarda su `photographerId` — el grupo
-  // "activo" es el que alimenta las acciones del menú de tres puntos
-  // (comprobante/WhatsApp/cancelar), igual que el punto activo alimentaba
-  // el menú de StudioEventView.
+  // Header interactivo — el mismo header global se transforma (crossfade),
+  // también en móvil (`mobileEnabled`) — ver headerTransformStore. Además de
+  // detectar qué fotógrafo se está viendo, guarda su `photographerId` — el
+  // grupo "activo" es el que alimenta las acciones del menú de tres puntos
+  // (comprobante/WhatsApp/cancelar).
   const scrolledPast = useScrolledPast(140)
-  const headerHidden = useAutoHideHeader()
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -399,17 +391,24 @@ export function HistoryOrderDetail() {
 
   useHeaderTransform(
     order && overallStyle ? (
-      <div className="flex w-full min-w-0 items-center gap-3">
-        <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="hidden shrink-0 text-xs font-bold uppercase tracking-wide lg:flex" />
-        <p className="min-w-0 flex-1 truncate text-base font-bold">
+      // En móvil, estado+código van en su propia fila y el nombre del
+      // fotógrafo activo en una fila debajo — con el texto tan chico, todo
+      // en una sola línea se perdía y no se alcanzaba a leer a quién se
+      // estaba viendo. En escritorio (`sm:`) se queda como una sola línea.
+      <div className="flex w-full min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex items-center gap-2 sm:contents">
+          <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-xs font-bold uppercase tracking-wide" />
+          <span className="truncate text-xs text-muted-foreground sm:hidden">{formatOrderCode(order.order_number)}</span>
+        </div>
+        <p className="hidden min-w-0 flex-1 truncate text-base font-bold sm:block">
           {formatOrderCode(order.order_number)}
           {activePhotographerName && <span className="ml-2 text-sm font-normal text-muted-foreground">· {activePhotographerName}</span>}
         </p>
-        <ActionMenu items={actionMenuItems} />
+        {activePhotographerName && <p className="truncate text-sm font-semibold sm:hidden">{activePhotographerName}</p>}
       </div>
     ) : null,
     scrolledPast,
-    { hideSearchTrigger: true, hideCartTrigger: true },
+    { mobileEnabled: true, suppressAutoHide: true, hideSearchTrigger: true, hideCartTrigger: true, actionsSlot: <ActionMenu items={actionMenuItems} /> },
   )
 
   // Un solo visor para TODO el pedido — las flechas navegan entre todas
@@ -469,26 +468,6 @@ export function HistoryOrderDetail() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
-      {/* Barra pegajosa SOLO en móvil — calcada de la de StudioEventView.tsx
-          (y ahora StudioOrderDetail.tsx): en escritorio ese rol ya lo
-          cumple el header transformado, así que aquí basta con el flujo
-          normal para no tener dos barras encimadas. */}
-      {overallStyle && (
-        <div className={cn('sticky z-20 mb-4 transition-[top] duration-300 sm:hidden', headerHidden ? 'top-3' : 'top-[4.75rem]')}>
-          <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md">
-            <button onClick={() => navigate('/app/historial')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
-              <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-            </button>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-sm font-bold tracking-tight2">{formatOrderCode(order.order_number)}</h1>
-              {activePhotographerName && <p className="mt-0.5 truncate text-xs text-muted-foreground">{activePhotographerName}</p>}
-            </div>
-            <StatusPill dot={overallStyle.dot} text={overallStyle.text} label={overallStyle.label} className="shrink-0 text-[9px] uppercase tracking-wide" />
-            <ActionMenu items={actionMenuItems} />
-          </div>
-        </div>
-      )}
-
       <input
         ref={proofInputRef}
         type="file"

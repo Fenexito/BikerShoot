@@ -44,6 +44,13 @@ export interface HeaderTransformOptions {
    * pone los 6 filtros en una sola fila dentro de `content` y no usa esto. */
   extraContent?: ReactNode | null
   extraActive?: boolean
+  /** Control fijo (ej. un `ActionMenu` de "···") que vive FUERA de `content`,
+   * como hermano en vez de hijo — `content` se renderiza dentro de un
+   * contenedor con `overflow-hidden` (para truncar texto largo sin romper el
+   * layout), que de paso recorta cualquier panel flotante que dependa de
+   * `position: absolute` (como el menú desplegable de ActionMenu). Puesto
+   * aquí, al lado de los triggers de buscar/carrito, nunca queda recortado. */
+  actionsSlot?: ReactNode | null
 }
 
 interface HeaderTransformState extends HeaderTransformOptions {
@@ -71,6 +78,7 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
   suppressAutoHide: false,
   extraContent: null,
   extraActive: false,
+  actionsSlot: null,
   setTransform: (content, active, options = {}) =>
     set({
       content,
@@ -82,5 +90,6 @@ export const useHeaderTransformStore = create<HeaderTransformState>((set) => ({
       suppressAutoHide: options.suppressAutoHide ?? false,
       extraContent: options.extraContent ?? null,
       extraActive: options.extraActive ?? false,
+      actionsSlot: options.actionsSlot ?? null,
     }),
 }))

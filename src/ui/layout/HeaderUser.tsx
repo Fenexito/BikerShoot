@@ -65,6 +65,7 @@ export function HeaderUser() {
   const transformActive = useHeaderTransformStore((s) => s.active)
   const hideSearchTrigger = useHeaderTransformStore((s) => s.hideSearchTrigger)
   const hideCartTrigger = useHeaderTransformStore((s) => s.hideCartTrigger)
+  const actionsSlot = useHeaderTransformStore((s) => s.actionsSlot)
   const mobileEnabled = useHeaderTransformStore((s) => s.mobileEnabled)
   const mobileBackSlotContent = useHeaderTransformStore((s) => s.mobileBackSlotContent)
   const suppressAutoHide = useHeaderTransformStore((s) => s.suppressAutoHide)
@@ -250,6 +251,10 @@ export function HeaderUser() {
               )}
             >
               <div className="min-w-0 flex-1 overflow-hidden">{transformContent}</div>
+              {/* Fuera del contenedor `overflow-hidden` de arriba a propósito
+                  — un panel flotante (ej. el menú "···" de ActionMenu) que
+                  viviera adentro quedaría recortado apenas se abriera. */}
+              {actionsSlot}
               {!hideSearchTrigger && (
                 <button
                   onClick={() => setSearchOpen(true)}
