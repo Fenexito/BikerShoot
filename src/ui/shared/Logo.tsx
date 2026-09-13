@@ -46,7 +46,17 @@ interface LogoProps {
  * imágenes separadas compuestas acá con `flex`. */
 export function Logo({ className, iconClassName, textClassName, theme = 'auto', variant = 'biker', iconOnly }: LogoProps) {
   const iconSize = iconClassName ?? 'h-7 w-auto'
-  const textSize = textClassName ?? 'h-4 w-auto'
+  // Ancho fijo (no alto) a propósito: "Motogram" y "Motogram Studio" son dos
+  // imágenes de TEXTO con el mismo ancho de lienzo (6390px) pero distinto
+  // alto (722px vs 1084px — la de Studio reserva espacio extra abajo para
+  // "Studio"). Si se dimensionan por ALTO, la palabra "MOTOGRAM" en sí
+  // termina más chica en la versión de Studio (confirmado en vivo: mismo
+  // contenedor de 28px de alto, 191px vs 144px de ancho — la letra no se
+  // veía del mismo tamaño entre los dos headers). Por ANCHO, ambas
+  // reservan el mismo espacio horizontal para "MOTOGRAM" y quedan
+  // ópticamente idénticas, aunque el contenedor de Studio sea un poco más
+  // alto (el texto "Studio" ocupa esa franja extra debajo).
+  const textSize = textClassName ?? 'w-36 h-auto'
   const [tLight, tDark] = variant === 'studio' ? [textStudioLight, textStudioDark] : [textLight, textDark]
   const label = variant === 'studio' ? 'Motogram Studio' : 'Motogram'
 
@@ -94,7 +104,11 @@ interface AuthLogoProps {
  * las páginas de login/registro/recuperar contraseña, centrado sobre el
  * formulario. */
 export function AuthLogo({ className, theme = 'auto', variant = 'biker' }: AuthLogoProps) {
-  const size = className ?? 'h-24 w-auto'
+  // Ancho fijo, mismo motivo que en `Logo` — el lockup de Studio (con
+  // "Studio" debajo) usa el mismo ancho de lienzo que el del biker pero
+  // reserva más alto, así que dimensionar por alto encogía el ícono+
+  // "MOTOGRAM" de Studio respecto al del biker.
+  const size = className ?? 'w-72 h-auto'
   const [light, dark] = variant === 'studio' ? [studioStackedLight, studioStackedDark] : [stackedLight, stackedDark]
   const label = variant === 'studio' ? 'Motogram Studio' : 'Motogram'
 

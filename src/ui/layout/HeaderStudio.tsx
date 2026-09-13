@@ -110,7 +110,7 @@ export function HeaderStudio() {
               )}
             >
               <Link to="/studio" className="flex shrink-0 items-center">
-                <Logo variant="studio" iconClassName="h-7 w-auto" textClassName="h-4 w-auto" />
+                <Logo variant="studio" />
               </Link>
               <nav className="ml-2 hidden flex-1 items-center gap-1 text-sm font-medium md:flex">
                 {NAV_ITEMS.map((item) => (
