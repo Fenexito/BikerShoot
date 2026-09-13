@@ -24,6 +24,7 @@ import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
 import { BikerSearchModal } from '../../features/biker/components/BikerSearchModal'
+import { Logo } from '../shared/Logo'
 import { cn } from '../../lib/cn'
 
 // "Mapa" se quitó de aquí — ahora vive como acceso directo dentro de
@@ -159,8 +160,8 @@ export function HeaderUser() {
                   : 'translate-y-0 opacity-100',
               )}
             >
-              <Link to="/app" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
-                MotoShots
+              <Link to="/app" className="shrink-0">
+                <Logo />
               </Link>
               <nav className="hidden flex-1 items-center gap-1 text-sm font-medium lg:flex">
                 {NAV_ITEMS.map((item) => (

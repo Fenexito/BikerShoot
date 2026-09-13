@@ -58,7 +58,7 @@ export function Landing() {
             </div>
             <h3 className="mt-5 text-2xl font-bold">Soy fotógrafo</h3>
             <p className="mt-2 text-muted-foreground">
-              Sube tus eventos, gestiona pedidos y cobra directamente en MotoShots Studio.
+              Sube tus eventos, gestiona pedidos y cobra directamente en Motogram Studio.
             </p>
             <div className="mt-6 flex gap-3">
               <Link to="/studio/login" className="flex-1">

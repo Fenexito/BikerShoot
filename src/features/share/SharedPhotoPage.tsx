@@ -77,7 +77,7 @@ export function SharedPhotoPage() {
         <p className="text-muted-foreground">La foto pudo haberse eliminado, o el link está incompleto.</p>
         <Link to="/">
           <Button size="lg" className="mt-4">
-            Ir a MotoShots
+            Ir a Motogram
           </Button>
         </Link>
       </div>

@@ -443,7 +443,7 @@ export function HistoryOrderDetail() {
     if (!openPhoto || !openItem || !order) return
     setDownloading(true)
     try {
-      const filename = buildDeliveredFilename(openItem.photographer?.display_name ?? 'MotoShots', order.order_number, openItem.position, openPhoto.original_filename)
+      const filename = buildDeliveredFilename(openItem.photographer?.display_name ?? 'Motogram', order.order_number, openItem.position, openPhoto.original_filename)
       await downloadPurchasedPhoto(openPhoto.id, filename)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
@@ -593,7 +593,7 @@ export function HistoryOrderDetail() {
                                   status={item.status}
                                   showStatusPill={false}
                                   justClosed={item.photo_id === justClosedId}
-                                  downloadFilename={buildDeliveredFilename(item.photographer?.display_name ?? 'MotoShots', order.order_number, item.position, item.photo?.original_filename)}
+                                  downloadFilename={buildDeliveredFilename(item.photographer?.display_name ?? 'Motogram', order.order_number, item.position, item.photo?.original_filename)}
                                   onClick={() => setOpenIndex(allPhotos.findIndex((p) => p.id === item.photo_id))}
                                 />
                               ))}

@@ -4,7 +4,7 @@ export function TermsPage() {
   return (
     <LegalPage title="Términos y condiciones" updated="10 de septiembre de 2026">
       <p>
-        Estos términos rigen el uso de MotoShots, la plataforma donde fotógrafos publican fotografías
+        Estos términos rigen el uso de Motogram, la plataforma donde fotógrafos publican fotografías
         de eventos de motociclismo y bikers las encuentran y compran. Al crear una cuenta o usar la
         app aceptas estas condiciones junto con nuestra{' '}
         <a href="/privacidad" className="font-semibold text-primary">
@@ -17,7 +17,7 @@ export function TermsPage() {
         .
       </p>
 
-      <h2>1. Quién puede usar MotoShots</h2>
+      <h2>1. Quién puede usar Motogram</h2>
       <p>
         Debes tener al menos 13 años para crear una cuenta. Si eres fotógrafo, tu cuenta pasa por una
         revisión antes de aprobarse — nos reservamos el derecho de aprobar, rechazar o suspender
@@ -67,10 +67,10 @@ export function TermsPage() {
           <a href="/derechos-de-autor" className="font-semibold text-primary">
             Derechos de autor
           </a>
-          ) — MotoShots solo es el canal de venta.
+          ) — Motogram solo es el canal de venta.
         </li>
         <li>
-          MotoShots <strong>no cobra comisión</strong> sobre tus ventas. En su lugar, pagas un plan de
+          Motogram <strong>no cobra comisión</strong> sobre tus ventas. En su lugar, pagas un plan de
           almacenamiento mensual según el volumen de fotos que mantengas publicadas.
         </li>
         <li>
@@ -96,7 +96,7 @@ export function TermsPage() {
       </p>
 
       <h2>6. Conducta prohibida</h2>
-      <p>Al usar MotoShots te comprometes a NO:</p>
+      <p>Al usar Motogram te comprometes a NO:</p>
       <ul>
         <li>Subir contenido que no te pertenece o que infringe derechos de terceros.</li>
         <li>Intentar descargar, redistribuir o revender vistas previas con marca de agua.</li>
@@ -107,23 +107,23 @@ export function TermsPage() {
 
       <h2>7. Propiedad de la plataforma</h2>
       <p>
-        El nombre "MotoShots", su logotipo, diseño y código son propiedad de MotoShots. Estos términos
+        El nombre "Motogram", su logotipo, diseño y código son propiedad de Motogram. Estos términos
         no te otorgan ningún derecho sobre la marca o la plataforma en sí, más allá de tu propio uso
         como usuario.
       </p>
 
       <h2>8. Limitación de responsabilidad</h2>
       <p>
-        MotoShots conecta a fotógrafos y bikers, pero no participa en la toma de las fotografías ni
+        Motogram conecta a fotógrafos y bikers, pero no participa en la toma de las fotografías ni
         controla la calidad, exactitud o legalidad del contenido subido por cada fotógrafo. En la
-        medida permitida por la ley, MotoShots no es responsable por daños indirectos derivados del
+        medida permitida por la ley, Motogram no es responsable por daños indirectos derivados del
         uso de la plataforma o del contenido de terceros publicado en ella.
       </p>
 
       <h2>9. Cambios a estos términos</h2>
       <p>
         Podemos actualizar estos términos ocasionalmente. Los cambios significativos se anunciarán
-        dentro de la app antes de entrar en vigor. Seguir usando MotoShots después de un cambio
+        dentro de la app antes de entrar en vigor. Seguir usando Motogram después de un cambio
         implica que lo aceptas.
       </p>
 

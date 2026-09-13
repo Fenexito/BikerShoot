@@ -21,7 +21,7 @@ export function ChangelogPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 font-flat md:px-8">
       <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">Historial de versiones</h1>
-      <p className="mb-8 text-muted-foreground">Novedades y mejoras de MotoShots.</p>
+      <p className="mb-8 text-muted-foreground">Novedades y mejoras de Motogram.</p>
 
       {isLoading && <SkeletonRows count={4} />}
       {error && <p className="text-red-600">No se pudo cargar el historial.</p>}

@@ -4,13 +4,13 @@ export function PrivacyPage() {
   return (
     <LegalPage title="Política de privacidad" updated="10 de septiembre de 2026">
       <p>
-        Esta política explica qué información recopila MotoShots, para qué la usamos, con quién la
+        Esta política explica qué información recopila Motogram, para qué la usamos, con quién la
         compartimos y qué control tienes sobre ella. Aplica tanto a bikers como a fotógrafos que usan
         la plataforma.
       </p>
 
       <h2>1. Información que recopilamos</h2>
-      <p>Dependiendo de cómo uses MotoShots, podemos recopilar:</p>
+      <p>Dependiendo de cómo uses Motogram, podemos recopilar:</p>
       <ul>
         <li>
           <strong>Datos de cuenta:</strong> correo electrónico, nombre, contraseña (almacenada
@@ -67,7 +67,7 @@ export function PrivacyPage() {
         </li>
         <li>
           <strong>Un proveedor de pagos externo certificado</strong> — procesa el cobro de tus
-          compras; MotoShots nunca ve ni almacena el número completo de tu tarjeta.
+          compras; Motogram nunca ve ni almacena el número completo de tu tarjeta.
         </li>
       </ul>
       <p>
@@ -103,14 +103,14 @@ export function PrivacyPage() {
 
       <h2>7. Seguridad</h2>
       <p>
-        Tu contraseña se almacena cifrada. Las conexiones a MotoShots viajan siempre por HTTPS. Los
+        Tu contraseña se almacena cifrada. Las conexiones a Motogram viajan siempre por HTTPS. Los
         enlaces de descarga de fotos originales son temporales y firmados, para que no puedan
         compartirse ni reutilizarse fuera de tu sesión.
       </p>
 
       <h2>8. Menores de edad</h2>
       <p>
-        MotoShots no está dirigido a menores de 13 años. Si eres padre o tutor y crees que un menor
+        Motogram no está dirigido a menores de 13 años. Si eres padre o tutor y crees que un menor
         nos proporcionó datos personales sin tu consentimiento, contáctanos para eliminarlos.
       </p>
 

@@ -36,7 +36,7 @@ export function StudioSample() {
             expuesto en grande.
           </h1>
           <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Sube tus fotos de evento, gestiona pedidos y cobra sin fricción. MotoShots Studio
+            Sube tus fotos de evento, gestiona pedidos y cobra sin fricción. Motogram Studio
             es la herramienta que respeta tu trabajo.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-8">

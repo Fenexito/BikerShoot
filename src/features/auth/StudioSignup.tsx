@@ -82,7 +82,7 @@ export function StudioSignup() {
   }
 
   return (
-    <AuthSplitLayout logoTo="/" logoLabel="MotoShots Studio">
+    <AuthSplitLayout logoTo="/" logoSuffix="Studio" logoTheme="dark">
       <h1 className="mb-3 font-studio text-4xl font-bold tracking-tight2">Crea tu estudio</h1>
       <p className="mb-10 text-muted-foreground">Empieza a vender tus fotos sin fricción.</p>
 

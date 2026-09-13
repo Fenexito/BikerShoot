@@ -35,7 +35,7 @@ export function AuthCallback() {
         type: 'error',
         title:
           intendedRole === 'biker'
-            ? 'Esta cuenta es de fotógrafo. Inicia sesión en MotoShots Studio.'
+            ? 'Esta cuenta es de fotógrafo. Inicia sesión en Motogram Studio.'
             : 'Esta cuenta es de biker. Inicia sesión en el sitio principal.',
       })
       navigate(intendedRole === 'biker' ? '/login' : '/studio/login', { replace: true })

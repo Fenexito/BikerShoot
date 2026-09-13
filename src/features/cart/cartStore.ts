@@ -44,7 +44,7 @@ export const useCartStore = create<CartState>()(
       total: () => get().items.reduce((sum, i) => sum + i.price, 0),
     }),
     {
-      name: 'motoshots-cart',
+      name: 'motogram-cart',
       version: 4,
       migrate: (persisted) => {
         const state = persisted as { items?: CartItem[] }

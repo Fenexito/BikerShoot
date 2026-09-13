@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return {
         error:
           portal === 'biker'
-            ? 'Esta cuenta es de fotógrafo. Inicia sesión en MotoShots Studio.'
+            ? 'Esta cuenta es de fotógrafo. Inicia sesión en Motogram Studio.'
             : 'Esta cuenta es de biker. Inicia sesión en el sitio principal.',
       }
     }

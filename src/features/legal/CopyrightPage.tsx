@@ -5,13 +5,13 @@ export function CopyrightPage() {
     <LegalPage title="Derechos de autor" updated="10 de septiembre de 2026">
       <p>
         Esta página explica cómo funcionan los derechos de autor sobre las fotografías publicadas en
-        MotoShots, qué licencia obtienes al comprar una foto, y cómo reportar una posible infracción.
+        Motogram, qué licencia obtienes al comprar una foto, y cómo reportar una posible infracción.
       </p>
 
       <h2>1. El fotógrafo conserva la propiedad</h2>
       <p>
         Cada fotógrafo conserva todos los derechos de autor sobre las fotografías que sube a
-        MotoShots. Publicarlas en la plataforma no transfiere la propiedad a MotoShots ni a los
+        Motogram. Publicarlas en la plataforma no transfiere la propiedad a Motogram ni a los
         compradores.
       </p>
 
@@ -48,15 +48,15 @@ export function CopyrightPage() {
         adicional sobre el archivo final.
       </p>
 
-      <h2>5. Marca MotoShots</h2>
+      <h2>5. Marca Motogram</h2>
       <p>
-        El nombre "MotoShots", su logotipo y su identidad visual son propiedad de MotoShots y no
+        El nombre "Motogram", su logotipo y su identidad visual son propiedad de Motogram y no
         pueden usarse sin autorización, independientemente de los derechos de autor de cada fotógrafo
         sobre su propio contenido.
       </p>
 
       <h2>6. Reportar una infracción</h2>
-      <p>Si crees que una foto subida a MotoShots infringe tus derechos de autor u otros derechos, contáctanos con:</p>
+      <p>Si crees que una foto subida a Motogram infringe tus derechos de autor u otros derechos, contáctanos con:</p>
       <ul>
         <li>El enlace directo a la foto o al evento en cuestión.</li>
         <li>Una descripción de por qué crees que infringe tus derechos.</li>

@@ -17,6 +17,6 @@ export const useFavoritesStore = create<FavoritesState>()(
         })),
       has: (photoId) => get().ids.includes(photoId),
     }),
-    { name: 'motoshots-favorites' },
+    { name: 'motogram-favorites' },
   ),
 )

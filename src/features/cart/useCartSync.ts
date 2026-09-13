@@ -126,8 +126,8 @@ export function useCartSync(userId: string | undefined) {
     // (ej. agregado antes de iniciar sesión) — de ahí en adelante, el
     // reintento de pendientes (ver `pendingKey` arriba) se encarga de
     // cualquier foto que se agregue después y falle al sincronizar.
-    const migratedKey = `motoshots_cart_migrated_${uid}`
-    const pendingKey = `motoshots_cart_pending_${uid}`
+    const migratedKey = `motogram_cart_migrated_${uid}`
+    const pendingKey = `motogram_cart_pending_${uid}`
 
     async function initialSync() {
       const { data, error } = await supabase.from('cart_items').select('*').eq('profile_id', uid)

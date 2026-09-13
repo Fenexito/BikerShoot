@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Logo } from '../shared/Logo'
 
 const LINKS = [
   { to: '/eventos', label: 'Eventos' },
@@ -18,8 +19,8 @@ export function Footer() {
     <footer className="mt-auto border-t border-border bg-muted/40 px-6 py-12 text-sm text-muted-foreground md:px-16">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-lg font-extrabold tracking-tight text-primary">MotoShots</p>
-          <p className="mt-1 max-w-xs">Fotos de rodadas, pistas y encuentros en Guatemala.</p>
+          <Logo />
+          <p className="mt-2 max-w-xs">Fotos de rodadas, pistas y encuentros en Guatemala.</p>
         </div>
         <div className="flex flex-col gap-2">
           {LINKS.map((l) => (
@@ -37,7 +38,7 @@ export function Footer() {
         </div>
       </div>
       <div className="mx-auto mt-10 max-w-6xl border-t border-border pt-6">
-        © {new Date().getFullYear()} MotoShots. Todos los derechos reservados.
+        © {new Date().getFullYear()} Motogram. Todos los derechos reservados.
       </div>
     </footer>
   )

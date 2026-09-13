@@ -5,6 +5,7 @@ import { AnimateIcon } from '../animate-icons/icon'
 import { Menu } from '../animate-icons/icons/Menu'
 import { X } from '../animate-icons/icons/X'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
+import { Logo } from '../shared/Logo'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -25,8 +26,8 @@ export function HeaderPublic() {
               <Menu size={24} />
             </button>
           </AnimateIcon>
-          <Link to="/" className="pl-2 text-lg font-extrabold tracking-tight text-primary">
-            MotoShots
+          <Link to="/" className="pl-2">
+            <Logo />
           </Link>
         </div>
         <nav className="hidden items-center gap-1 text-sm font-medium md:flex">
@@ -62,7 +63,7 @@ export function HeaderPublic() {
 
       <MobileMenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} className="rounded-b-3xl border-b border-border bg-background">
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <span className="text-lg font-extrabold tracking-tight text-primary">MotoShots</span>
+          <Logo />
           <AnimateIcon animateOnHover animateOnTap asChild>
             <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="text-foreground">
               <X size={24} />

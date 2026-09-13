@@ -99,7 +99,7 @@ export function PurchasedPhotoTile({
     if (!photo || downloading) return
     setDownloading(true)
     try {
-      await downloadPurchasedPhoto(photoId, downloadFilename ?? `motoshots-${photoId}.jpg`)
+      await downloadPurchasedPhoto(photoId, downloadFilename ?? `motogram-${photoId}.jpg`)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
     } finally {

@@ -40,7 +40,7 @@ const TILE_SIZE_DEFAULT = 220
 // Pasos grandes a propósito: cada movimiento del control debe sentirse
 // como un cambio de tamaño real, no un ajuste casi imperceptible.
 const TILE_SIZE_STEP = 20
-const TILE_SIZE_KEY = 'motoshots_biker_photo_tile_size'
+const TILE_SIZE_KEY = 'motogram_biker_photo_tile_size'
 
 const MOBILE_EXPAND_IDLE_MS = 5000
 

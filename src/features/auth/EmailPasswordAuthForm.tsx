@@ -10,7 +10,8 @@ import { useAuth } from './AuthContext'
 
 interface EmailPasswordAuthFormProps {
   portal: 'biker' | 'studio'
-  logoLabel: string
+  logoSuffix?: string
+  logoTheme?: 'auto' | 'light' | 'dark'
   signupTo: string
   forgotPasswordTo: string
   successTo: string
@@ -21,7 +22,7 @@ interface EmailPasswordAuthFormProps {
  * correo; si ya existe una cuenta, revela el campo de contraseña con una
  * animación; si no, invita a registrarse — así no hace falta un botón de
  * "crear cuenta" aparte. */
-export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPasswordTo, successTo }: EmailPasswordAuthFormProps) {
+export function EmailPasswordAuthForm({ portal, logoSuffix, logoTheme, signupTo, forgotPasswordTo, successTo }: EmailPasswordAuthFormProps) {
   const { signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
   // Si se llegó aquí desde un link que exige sesión (ej. una foto
@@ -92,7 +93,7 @@ export function EmailPasswordAuthForm({ portal, logoLabel, signupTo, forgotPassw
   }
 
   return (
-    <AuthSplitLayout logoTo="/" logoLabel={logoLabel}>
+    <AuthSplitLayout logoTo="/" logoSuffix={logoSuffix} logoTheme={logoTheme}>
       <div className="mb-8 transition-all duration-500 ease-in-out">
         {step === 'password' ? (
           <>

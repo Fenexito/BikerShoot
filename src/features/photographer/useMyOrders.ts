@@ -174,7 +174,7 @@ export function usePhotographerOrders(photographerId: string | undefined) {
       // Lo que el biker de verdad transfiere a este fotógrafo — incluye la
       // tarifa de servicio de cada foto (Q2, salvo cortesías), que el
       // fotógrafo recibe junto con el resto pero le debe de vuelta a
-      // MotoShots en su próxima factura de plan (ver `service_fee` por
+      // Motogram en su próxima factura de plan (ver `service_fee` por
       // item más abajo, y `usePendingServiceFees` para el saldo total).
       total: items.reduce((sum, i) => sum + i.price + i.service_fee, 0),
       serviceFeeTotal: items.reduce((sum, i) => sum + i.service_fee, 0),

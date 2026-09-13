@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
+import { Logo } from '../../ui/shared/Logo'
 import { useAuth } from './AuthContext'
 
 const schema = z.object({ email: z.string().email('Correo inválido') })
@@ -34,8 +35,8 @@ export function BikerForgotPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 font-flat">
       <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 inline-block text-2xl font-extrabold tracking-tight text-primary">
-          MotoShots
+        <Link to="/" className="mb-8 inline-block">
+          <Logo className="h-7" />
         </Link>
 
         {sent ? (

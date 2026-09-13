@@ -127,7 +127,7 @@ function DeliverPhotoTile({
     try {
       const { data, error } = await supabase.functions.invoke('r2-delivered-view-url', { body: { photoId: photo.id } })
       if (error || !data?.downloadUrl) throw new Error(error?.message ?? 'No se pudo generar el enlace')
-      await downloadFile(data.downloadUrl, photo.original_filename ?? `motoshots-${photo.id}.jpg`)
+      await downloadFile(data.downloadUrl, photo.original_filename ?? `motogram-${photo.id}.jpg`)
     } catch (err) {
       push({ type: 'error', title: 'No se pudo descargar', description: (err as Error).message })
     } finally {
@@ -841,7 +841,7 @@ export function StudioOrderDetail() {
                 tone: 'success' as const,
                 href: buildWhatsAppLink(
                   order.bikerPhone,
-                  `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de MotoShots 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
+                  `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de Motogram 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
                 ),
               },
             ]
@@ -976,7 +976,7 @@ export function StudioOrderDetail() {
           <a
             href={buildWhatsAppLink(
               order.bikerPhone,
-              `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de MotoShots 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
+              `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de Motogram 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
             )}
             target="_blank"
             rel="noreferrer"
@@ -1058,7 +1058,7 @@ export function StudioOrderDetail() {
                 )}
                 {order.serviceFeeTotal > 0 && (
                   <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Tarifa de servicio MotoShots (incluida, se liquida después)</span>
+                    <span>Tarifa de servicio Motogram (incluida, se liquida después)</span>
                     <span>Q{order.serviceFeeTotal.toFixed(2)}</span>
                   </div>
                 )}
@@ -1103,7 +1103,7 @@ export function StudioOrderDetail() {
             order={order}
             photographerId={user.id}
             expanded={details?.feature_addon_ids.includes('cortesias_ampliadas') ?? false}
-            photographerLabel={profile?.display_name ?? 'MotoShots'}
+            photographerLabel={profile?.display_name ?? 'Motogram'}
             pointRefs={pointRefs}
           />
         )}

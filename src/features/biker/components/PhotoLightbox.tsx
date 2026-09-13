@@ -159,10 +159,10 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
     try {
       const code = await createSharedLink(photo.id, shareSearchParams ?? '')
       const url = `${window.location.origin}/f/${code}`
-      const text = `Mira esta foto de ${photo.eventTitle} en MotoShots 🏍️📸`
+      const text = `Mira esta foto de ${photo.eventTitle} en Motogram 🏍️📸`
       if (navigator.share) {
         try {
-          await navigator.share({ title: 'MotoShots', text, url })
+          await navigator.share({ title: 'Motogram', text, url })
         } catch {
           // AbortError si la persona cierra el panel nativo sin elegir nada
           // — no es un error real, no hay nada que avisar.

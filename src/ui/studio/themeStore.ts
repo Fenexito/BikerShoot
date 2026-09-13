@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 type StudioTheme = 'light' | 'dark'
 
-const STORAGE_KEY = 'motoshots-studio-theme'
+const STORAGE_KEY = 'motogram-studio-theme'
 
 function readInitialTheme(): StudioTheme {
   if (typeof window === 'undefined') return 'dark'

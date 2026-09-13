@@ -21,7 +21,7 @@ export interface CartPhotographerGroup {
   faceSubtotal: number
   /** Total real de las fotos de este fotógrafo, ya con su descuento por volumen aplicado. */
   subtotal: number
-  /** Tarifa de servicio de MotoShots para este fotógrafo (ver computeServiceFee). */
+  /** Tarifa de servicio de Motogram para este fotógrafo (ver computeServiceFee). */
   serviceFee: number
   /** Lo que el biker debe transferirle a ESTE fotógrafo — subtotal + su tarifa. */
   totalToPay: number

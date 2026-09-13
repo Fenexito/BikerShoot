@@ -35,7 +35,7 @@ const CATEGORY_LABELS: Record<SearchCategory, string> = {
   rutas: 'Rutas',
 }
 
-const RECENTS_KEY = 'motoshots_biker_recent_searches'
+const RECENTS_KEY = 'motogram_biker_recent_searches'
 const MAX_RECENTS = 8
 
 function loadRecents(): SearchResult[] {

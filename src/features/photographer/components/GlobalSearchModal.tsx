@@ -40,7 +40,7 @@ const CATEGORY_LABELS: Record<SearchCategory, string> = {
   paginas: 'Páginas y funciones',
 }
 
-const RECENTS_KEY = 'motoshots_studio_recent_searches'
+const RECENTS_KEY = 'motogram_studio_recent_searches'
 const MAX_RECENTS = 8
 
 function loadRecents(): SearchResult[] {

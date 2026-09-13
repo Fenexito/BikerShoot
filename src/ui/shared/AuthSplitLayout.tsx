@@ -3,26 +3,31 @@ import { Link } from 'react-router-dom'
 import { usePublicPhotoSample } from '../../features/biker/usePublicData'
 import { previewUrl } from '../../lib/r2'
 import DriftWall from '../reactbits/DriftWall'
+import { Logo } from './Logo'
 
 interface AuthSplitLayoutProps {
   children: ReactNode
   logoTo?: string
-  logoLabel?: string
+  logoSuffix?: string
+  /** Studio usa una paleta oscura fija en sus páginas de auth (sin `.dark`
+   * ancestro), así que ahí se fuerza el logo claro-sobre-oscuro. */
+  logoTheme?: 'auto' | 'light' | 'dark'
 }
 
 /** Layout de las 4 páginas de auth (biker/Studio × login/signup) — panel de
  * formulario a la izquierda, muro de fotos reales a la derecha. Mismo
  * patrón visual que la referencia de Mobbin (login con showcase a un lado),
  * pero con fotos de eventos reales en vez de screenshots de apps. */
-export function AuthSplitLayout({ children, logoTo = '/', logoLabel = 'MotoShots' }: AuthSplitLayoutProps) {
+export function AuthSplitLayout({ children, logoTo = '/', logoSuffix, logoTheme = 'auto' }: AuthSplitLayoutProps) {
   const { data: photos = [] } = usePublicPhotoSample(30)
 
   return (
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col justify-center px-6 py-16 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="mx-auto w-full max-w-md">
-          <Link to={logoTo} className="mb-10 inline-block text-2xl font-extrabold tracking-tight text-primary">
-            {logoLabel}
+          <Link to={logoTo} className="mb-10 inline-flex items-center gap-2">
+            <Logo className="h-7" theme={logoTheme} />
+            {logoSuffix && <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{logoSuffix}</span>}
           </Link>
           {children}
         </div>

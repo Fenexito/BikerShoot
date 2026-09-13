@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 type FlatTheme = 'light' | 'dark'
 
-const STORAGE_KEY = 'motoshots-biker-theme'
+const STORAGE_KEY = 'motogram-biker-theme'
 
 function readInitialTheme(): FlatTheme {
   if (typeof window === 'undefined') return 'light'

@@ -8,6 +8,7 @@ import { LogOut } from '../animate-icons/icons/LogOut'
 import { MobileMenuOverlay } from '../shared/MobileMenuOverlay'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
+import { Logo } from '../shared/Logo'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -42,8 +43,9 @@ export function HeaderAdmin() {
             <Menu size={24} />
           </button>
         </AnimateIcon>
-        <Link to="/admin" className="shrink-0 text-lg font-extrabold tracking-tight text-primary">
-          MotoShots Admin
+        <Link to="/admin" className="flex shrink-0 items-center gap-1.5">
+          <Logo />
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Admin</span>
         </Link>
         <nav className="ml-2 hidden flex-1 items-center gap-1 text-sm font-medium md:flex">
           {NAV_ITEMS.map((item) => (
@@ -75,7 +77,10 @@ export function HeaderAdmin() {
 
       <MobileMenuOverlay open={menuOpen} onClose={() => setMenuOpen(false)} className="rounded-b-3xl border-b border-border bg-background">
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <span className="text-lg font-extrabold tracking-tight text-primary">MotoShots Admin</span>
+          <div className="flex items-center gap-1.5">
+            <Logo />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Admin</span>
+          </div>
           <AnimateIcon animateOnHover animateOnTap asChild>
             <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="text-foreground">
               <X size={24} />

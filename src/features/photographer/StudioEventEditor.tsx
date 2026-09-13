@@ -255,7 +255,7 @@ export function StudioEventEditor() {
   // en una página recién abierta y sin editar.
   const hydrationDoneRef = useRef(false)
   const [leaveHref, setLeaveHref] = useState<string | null>(null)
-  const draftKey = user ? `motoshots-event-draft-${user.id}-${id ?? 'new'}` : null
+  const draftKey = user ? `motogram-event-draft-${user.id}-${id ?? 'new'}` : null
 
   useEffect(() => {
     dirtyRef.current = dirty
