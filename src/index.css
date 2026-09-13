@@ -437,8 +437,8 @@ html {
   transition: background-color 200ms ease, border-color 200ms ease;
 }
 
-/* Logo.tsx/StudioLogo.tsx alternan su versión clara/oscura con estas clases
-   en vez de los utilitarios `dark:` de Tailwind —
+/* Logo.tsx (Logo/AuthLogo) alternan su versión clara/oscura con estas
+   clases en vez de los utilitarios `dark:` de Tailwind —
    `darkMode: ['class', '.theme-studio.dark']` en tailwind.config.js hace
    que `dark:` SOLO reaccione dentro de `.theme-studio.dark` (el portal
    Studio), nunca con el `.dark` genérico que gana el portal biker
@@ -447,17 +447,20 @@ html {
    ambos portales por igual. */
 .motogram-icon-dark,
 .motogram-text-dark,
-.motogram-studio-dark {
+.motogram-studio-dark,
+.motogram-stacked-dark {
   display: none;
 }
 .dark .motogram-icon-light,
 .dark .motogram-text-light,
-.dark .motogram-studio-light {
+.dark .motogram-studio-light,
+.dark .motogram-stacked-light {
   display: none;
 }
 .dark .motogram-icon-dark,
 .dark .motogram-text-dark,
-.dark .motogram-studio-dark {
+.dark .motogram-studio-dark,
+.dark .motogram-stacked-dark {
   display: block;
 }
 

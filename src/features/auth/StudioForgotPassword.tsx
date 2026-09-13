@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '../../ui/studio/Button'
 import { Input } from '../../ui/studio/Input'
-import { StudioLogo } from '../../ui/shared/Logo'
+import { AuthLogo } from '../../ui/shared/Logo'
 import { useAuth } from './AuthContext'
 
 const schema = z.object({ email: z.string().email('Correo inválido') })
@@ -35,8 +35,8 @@ export function StudioForgotPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
       <div className="w-full max-w-md">
-        <Link to="/" className="mb-10 inline-block">
-          <StudioLogo theme="dark" className="h-16" />
+        <Link to="/" className="mb-10 flex justify-center">
+          <AuthLogo variant="studio" theme="dark" />
         </Link>
 
         {sent ? (

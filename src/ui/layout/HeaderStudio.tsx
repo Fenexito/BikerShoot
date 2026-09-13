@@ -23,7 +23,7 @@ import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
-import { StudioLogo } from '../shared/Logo'
+import { Logo } from '../shared/Logo'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -88,7 +88,7 @@ export function HeaderStudio() {
                 ahí), y en escritorio se desvanece cuando `transformed`. */}
             <div
               className={cn(
-                'absolute inset-0 flex items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+                'absolute inset-0 flex items-center gap-4 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-8',
                 // OJO: cada rama de este ternario reemplaza el set COMPLETO
                 // de clases de opacidad/traslado (nunca las agrega encima de
                 // una base fija) — `cn` aquí es un simple `clsx`, SIN el
@@ -110,7 +110,7 @@ export function HeaderStudio() {
               )}
             >
               <Link to="/studio" className="flex shrink-0 items-center">
-                <StudioLogo />
+                <Logo variant="studio" iconClassName="h-7 w-auto" textClassName="h-4 w-auto" />
               </Link>
               <nav className="ml-2 hidden flex-1 items-center gap-1 text-sm font-medium md:flex">
                 {NAV_ITEMS.map((item) => (

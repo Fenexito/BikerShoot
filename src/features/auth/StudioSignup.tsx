@@ -7,7 +7,7 @@ import { Button } from '../../ui/studio/Button'
 import { Input } from '../../ui/studio/Input'
 import { GoogleIcon } from '../../ui/shared/GoogleIcon'
 import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
-import { StudioLogo } from '../../ui/shared/Logo'
+import { AuthLogo } from '../../ui/shared/Logo'
 import { useAuth } from './AuthContext'
 
 const schema = z
@@ -83,7 +83,7 @@ export function StudioSignup() {
   }
 
   return (
-    <AuthSplitLayout logoTo="/" logo={<StudioLogo theme="dark" className="h-16" />}>
+    <AuthSplitLayout logoTo="/" logo={<AuthLogo variant="studio" theme="dark" />}>
       <h1 className="mb-3 font-studio text-4xl font-bold tracking-tight2">Crea tu estudio</h1>
       <p className="mb-10 text-muted-foreground">Empieza a vender tus fotos sin fricción.</p>
 

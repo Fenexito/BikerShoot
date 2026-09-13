@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom'
 import { usePublicPhotoSample } from '../../features/biker/usePublicData'
 import { previewUrl } from '../../lib/r2'
 import DriftWall from '../reactbits/DriftWall'
-import { Logo } from './Logo'
+import { AuthLogo } from './Logo'
 
 interface AuthSplitLayoutProps {
   children: ReactNode
   logoTo?: string
-  /** Por defecto el lockup biker (ícono + "Motogram"). Studio pasa su
-   * propio `<StudioLogo theme="dark" />` (paleta oscura fija, sin `.dark`
-   * ancestro en estas páginas). */
+  /** Por defecto el lockup apilado del biker (`<AuthLogo />`). Studio pasa
+   * su propio `<AuthLogo variant="studio" theme="dark" />` (paleta oscura
+   * fija, sin `.dark` ancestro en estas páginas). */
   logo?: ReactNode
 }
 
@@ -25,8 +25,8 @@ export function AuthSplitLayout({ children, logoTo = '/', logo }: AuthSplitLayou
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col justify-center px-6 py-16 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="mx-auto w-full max-w-md">
-          <Link to={logoTo} className="mb-10 inline-block">
-            {logo ?? <Logo iconClassName="h-8" textClassName="h-4" />}
+          <Link to={logoTo} className="mb-10 flex justify-center">
+            {logo ?? <AuthLogo />}
           </Link>
           {children}
         </div>

@@ -152,7 +152,7 @@ export function HeaderUser() {
                 medio) se vieran las dos capas superpuestas al mismo tiempo. */}
             <div
               className={cn(
-                'absolute inset-0 flex items-center gap-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-5',
+                'absolute inset-0 flex items-center gap-3 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:gap-8',
                 transformed
                   ? mobileEnabled
                     ? 'pointer-events-none -translate-y-2.5 opacity-0'
