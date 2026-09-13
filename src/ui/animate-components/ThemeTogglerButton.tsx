@@ -23,6 +23,11 @@ interface ThemeTogglerButtonProps {
    * EXACTAMENTE junto con la transición, no después de que termine (que es
    * cuando se llama `setTheme`). */
   onImmediateChange?: (theme: ThemeSelection) => void
+  /** Extra frente al original: si es `true` (default), el barrido es un
+   * CÍRCULO que crece desde el centro del propio botón — como una onda
+   * expansiva — en vez de la cortina direccional de `direction`.
+   * `direction` solo se usa cuando esto es `false`. */
+  circleFromButton?: boolean
   direction?: Direction
   size?: 'sm' | 'default' | 'lg'
   className?: string
@@ -34,14 +39,30 @@ const SIZE_CLASS: Record<NonNullable<ThemeTogglerButtonProps['size']>, string> =
   lg: 'h-12 w-12',
 }
 
-export function ThemeTogglerButton({ theme, setTheme, onImmediateChange, direction = 'ltr', size = 'default', className }: ThemeTogglerButtonProps) {
+export function ThemeTogglerButton({
+  theme,
+  setTheme,
+  onImmediateChange,
+  circleFromButton = true,
+  direction = 'ltr',
+  size = 'default',
+  className,
+}: ThemeTogglerButtonProps) {
   return (
     <ThemeToggler theme={theme} resolvedTheme={theme} setTheme={setTheme} onImmediateChange={onImmediateChange} direction={direction}>
       {({ effective, toggleTheme }) => (
         <button
           type="button"
           aria-label={effective === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          onClick={() => toggleTheme(effective === 'dark' ? 'light' : 'dark')}
+          onClick={(e) => {
+            const next = effective === 'dark' ? 'light' : 'dark'
+            if (!circleFromButton) {
+              toggleTheme(next)
+              return
+            }
+            const rect = e.currentTarget.getBoundingClientRect()
+            toggleTheme(next, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+          }}
           className={cn(
             'flex shrink-0 items-center justify-center rounded-full border border-border bg-muted text-foreground transition-colors hover:bg-border',
             SIZE_CLASS[size],

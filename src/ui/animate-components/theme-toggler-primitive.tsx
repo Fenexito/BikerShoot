@@ -9,10 +9,21 @@ import { flushSync } from 'react-dom'
 // client' (no aplica fuera de Next.js).
 type ThemeSelection = 'light' | 'dark'
 type Direction = 'btt' | 'ttb' | 'ltr' | 'rtl'
+/** Punto de origen (coordenadas de viewport, ej. el centro del botón que
+ * disparó el cambio) — cuando se da, el barrido deja de ser una cortina
+ * direccional y pasa a ser un círculo que crece DESDE ese punto hacia
+ * afuera, como una onda expansiva. No existe en el componente original de
+ * Animate UI — se agregó a pedido, reutilizando el mismo mecanismo de
+ * `clipPath` sobre `::view-transition-new(root)`. */
+type Origin = { x: number; y: number }
 
 type ChildrenRender =
   | React.ReactNode
-  | ((state: { resolved: ThemeSelection; effective: ThemeSelection; toggleTheme: (theme: ThemeSelection) => void }) => React.ReactNode)
+  | ((state: {
+      resolved: ThemeSelection
+      effective: ThemeSelection
+      toggleTheme: (theme: ThemeSelection, origin?: Origin) => void
+    }) => React.ReactNode)
 
 function getClipKeyframes(direction: Direction): [string, string] {
   switch (direction) {
@@ -27,6 +38,20 @@ function getClipKeyframes(direction: Direction): [string, string] {
     default:
       return ['inset(0 100% 0 0)', 'inset(0 0 0 0)']
   }
+}
+
+/** Radio necesario para que el círculo cubra TODA la pantalla desde el
+ * punto de origen — la distancia a la esquina más lejana (las 4 esquinas
+ * del viewport, la mayor de las 4 gana). */
+function getCircleKeyframes(origin: Origin): [string, string] {
+  const { innerWidth: w, innerHeight: h } = window
+  const radius = Math.max(
+    Math.hypot(origin.x, origin.y),
+    Math.hypot(w - origin.x, origin.y),
+    Math.hypot(origin.x, h - origin.y),
+    Math.hypot(w - origin.x, h - origin.y),
+  )
+  return [`circle(0px at ${origin.x}px ${origin.y}px)`, `circle(${radius}px at ${origin.x}px ${origin.y}px)`]
 }
 
 type ThemeTogglerProps = {
@@ -59,7 +84,7 @@ function ThemeToggler({ theme, resolvedTheme, setTheme, onImmediateChange, direc
   const [fromClip, toClip] = getClipKeyframes(direction)
 
   const toggleTheme = React.useCallback(
-    async (theme: ThemeSelection) => {
+    async (theme: ThemeSelection, origin?: Origin) => {
       const resolved = theme
 
       setCurrent({ effective: theme, resolved })
@@ -80,9 +105,11 @@ function ThemeToggler({ theme, resolvedTheme, setTheme, onImmediateChange, direc
         })
       }).ready
 
+      const clipPath = origin ? getCircleKeyframes(origin) : [fromClip, toClip]
+
       document.documentElement
         .animate(
-          { clipPath: [fromClip, toClip] },
+          { clipPath },
           {
             duration: 700,
             easing: 'ease-in-out',
@@ -104,4 +131,4 @@ function ThemeToggler({ theme, resolvedTheme, setTheme, onImmediateChange, direc
   )
 }
 
-export { ThemeToggler, type ThemeTogglerProps, type ThemeSelection, type Direction }
+export { ThemeToggler, type ThemeTogglerProps, type ThemeSelection, type Direction, type Origin }
