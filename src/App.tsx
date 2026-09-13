@@ -10,6 +10,7 @@ const PlaceholderPage = lazy(() => import('./features/auth/PlaceholderPage').the
 const ChangelogPage = lazy(() => import('./features/changelog/ChangelogPage').then((m) => ({ default: m.ChangelogPage })))
 const StudioSample = lazy(() => import('./features/style-sample/StudioSample').then((m) => ({ default: m.StudioSample })))
 const FlatSample = lazy(() => import('./features/style-sample/FlatSample').then((m) => ({ default: m.FlatSample })))
+const IconsSample = lazy(() => import('./features/style-sample/IconsSample').then((m) => ({ default: m.IconsSample })))
 const Landing = lazy(() => import('./features/home/Landing').then((m) => ({ default: m.Landing })))
 const BikerLogin = lazy(() => import('./features/auth/BikerLogin').then((m) => ({ default: m.BikerLogin })))
 const BikerSignup = lazy(() => import('./features/auth/BikerSignup').then((m) => ({ default: m.BikerSignup })))
@@ -63,6 +64,7 @@ export default function App() {
           header/footer persistente que proteger de un remount. */}
       <Route path="/style-sample/studio" element={<Suspense fallback={<RouteFallback />}><StudioSample /></Suspense>} />
       <Route path="/style-sample/flat" element={<Suspense fallback={<RouteFallback />}><FlatSample /></Suspense>} />
+      <Route path="/style-sample/icons" element={<Suspense fallback={<RouteFallback />}><IconsSample /></Suspense>} />
       <Route path="/auth/callback" element={<Suspense fallback={<RouteFallback />}><AuthCallback /></Suspense>} />
 
       <Route element={<PortalLayout />}>
