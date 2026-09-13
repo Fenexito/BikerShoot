@@ -18,7 +18,10 @@ interface ProfileMenuProps {
   avatar?: ReactNode
   socialLinks?: ReactNode
   editProfile?: { label: string; to: string }
-  themeSwitcher?: ReactNode
+  /** Recibe una función para cerrar el menú — el switch de tema la llama
+   * apenas se hace click, así el overlay no tapa la animación de barrido
+   * del cambio de tema. */
+  themeSwitcher?: (closeMenu: () => void) => ReactNode
   /** Grupos de links — cada grupo se separa del siguiente con una línea. */
   sections: ProfileMenuLink[][]
 }
@@ -83,7 +86,7 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, the
             </div>
           )}
 
-          {themeSwitcher && <div className="border-t border-white/10 px-4 py-3">{themeSwitcher}</div>}
+          {themeSwitcher && <div className="border-t border-white/10 px-4 py-3">{themeSwitcher(() => setOpen(false))}</div>}
 
           {sections.map((group, gi) => (
             <div key={gi} className="border-t border-white/10 py-2">

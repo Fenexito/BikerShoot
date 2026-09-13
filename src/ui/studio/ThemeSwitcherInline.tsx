@@ -28,8 +28,13 @@ import { cn } from '../../lib/cn'
  * Cada botón envuelve su ícono animado con `<AnimateIcon animateOnHover
  * asChild>` — a propósito ENVOLVIENDO EL BOTÓN (no el ícono suelto): así
  * el hover que dispara la animación es el del botón completo (toda su
- * área clicable), no solo el del SVG chico de adentro. */
-export function ThemeSwitcherInline() {
+ * área clicable), no solo el del SVG chico de adentro.
+ *
+ * `onToggled`, si se pasa, se llama de inmediato al hacer click (antes de
+ * disparar el barrido) — lo usa `ProfileMenu` para cerrarse solo ahí mismo,
+ * así el overlay no tapa la animación de cambio de tema que el usuario
+ * quiere ver. */
+export function ThemeSwitcherInline({ onToggled }: { onToggled?: () => void } = {}) {
   const { theme, setTheme } = useStudioTheme()
 
   return (
@@ -42,6 +47,7 @@ export function ThemeSwitcherInline() {
               <button
                 onClick={(e) => {
                   if (effective === 'light') return
+                  onToggled?.()
                   const rect = e.currentTarget.getBoundingClientRect()
                   toggleTheme('light', { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
                 }}
@@ -58,6 +64,7 @@ export function ThemeSwitcherInline() {
               <button
                 onClick={(e) => {
                   if (effective === 'dark') return
+                  onToggled?.()
                   const rect = e.currentTarget.getBoundingClientRect()
                   toggleTheme('dark', { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
                 }}

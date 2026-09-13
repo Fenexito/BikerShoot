@@ -232,7 +232,7 @@ export function HeaderUser() {
                         ? { label: 'Completar perfil', to: '/app/perfil' }
                         : undefined
                     }
-                    themeSwitcher={<ThemeSwitcherInline />}
+                    themeSwitcher={(close) => <ThemeSwitcherInline onToggled={close} />}
                     sections={[
                       [
                         { to: '/app/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },

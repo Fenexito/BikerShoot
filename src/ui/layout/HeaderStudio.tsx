@@ -161,7 +161,7 @@ export function HeaderStudio() {
                       />
                     }
                     editProfile={profileIncomplete ? { label: 'Completar perfil', to: '/studio/perfil' } : undefined}
-                    themeSwitcher={<ThemeSwitcherInline />}
+                    themeSwitcher={(close) => <ThemeSwitcherInline onToggled={close} />}
                     sections={[
                       [
                         { to: '/studio/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },
