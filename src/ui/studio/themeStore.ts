@@ -13,6 +13,11 @@ function readInitialTheme(): StudioTheme {
 interface StudioThemeState {
   theme: StudioTheme
   toggle: () => void
+  /** Fija un valor específico (a diferencia de `toggle`, que solo invierte)
+   * — lo necesita `ThemeTogglerButton`/`ThemeToggler` (ver
+   * ui/animate-components), que siempre sabe de antemano a qué tema
+   * exacto quiere pasar. */
+  setTheme: (next: StudioTheme) => void
 }
 
 export const useStudioTheme = create<StudioThemeState>((set) => ({
@@ -23,4 +28,8 @@ export const useStudioTheme = create<StudioThemeState>((set) => ({
       window.localStorage.setItem(STORAGE_KEY, next)
       return { theme: next }
     }),
+  setTheme: (next) => {
+    window.localStorage.setItem(STORAGE_KEY, next)
+    set({ theme: next })
+  },
 }))

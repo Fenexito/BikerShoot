@@ -18,6 +18,11 @@ function readInitialTheme(): FlatTheme {
 interface FlatThemeState {
   theme: FlatTheme
   toggle: () => void
+  /** Fija un valor específico (a diferencia de `toggle`, que solo invierte)
+   * — lo necesita `ThemeTogglerButton`/`ThemeToggler` (ver
+   * ui/animate-components), que siempre sabe de antemano a qué tema
+   * exacto quiere pasar. */
+  setTheme: (next: FlatTheme) => void
 }
 
 export const useFlatTheme = create<FlatThemeState>((set) => ({
@@ -28,4 +33,8 @@ export const useFlatTheme = create<FlatThemeState>((set) => ({
       window.localStorage.setItem(STORAGE_KEY, next)
       return { theme: next }
     }),
+  setTheme: (next) => {
+    window.localStorage.setItem(STORAGE_KEY, next)
+    set({ theme: next })
+  },
 }))
