@@ -7,7 +7,9 @@ import { useCartDrawerStore } from '../../features/cart/cartDrawerStore'
 import { useCartSync } from '../../features/cart/useCartSync'
 import { CartDrawer } from '../../features/cart/CartDrawer'
 import { r2Url } from '../../lib/r2'
-import { IconCart, IconImages, IconReceipt } from '../shared/icons'
+import { Cart } from '../animate-icons/icons/Cart'
+import { Images } from '../animate-icons/icons/Images'
+import { Receipt } from '../animate-icons/icons/Receipt'
 import { AnimateIcon } from '../animate-icons/icon'
 import { Search } from '../animate-icons/icons/Search'
 import { Heart } from '../animate-icons/icons/Heart'
@@ -103,7 +105,7 @@ export function HeaderUser() {
     <>
       <div
         className={cn(
-          'fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-4 md:pt-0 md:!translate-y-0',
+          'app-header-vt fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-4 md:pt-0 md:!translate-y-0',
           hidden ? '-translate-y-[calc(100%+1rem)]' : 'translate-y-0',
         )}
       >
@@ -201,20 +203,22 @@ export function HeaderUser() {
                     <Heart size={20} />
                   </Link>
                 </AnimateIcon>
-                <button
-                  data-cart-icon
-                  onClick={openCartDrawer}
-                  aria-label="Carrito"
-                  title="Carrito"
-                  className="relative hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border md:flex"
-                >
-                  <IconCart className="h-5 w-5" />
-                  {itemCount > 0 && (
-                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                      {itemCount}
-                    </span>
-                  )}
-                </button>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <button
+                    data-cart-icon
+                    onClick={openCartDrawer}
+                    aria-label="Carrito"
+                    title="Carrito"
+                    className="relative hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border md:flex"
+                  >
+                    <Cart size={20} filled={itemCount > 0} />
+                    {itemCount > 0 && (
+                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                        {itemCount}
+                      </span>
+                    )}
+                  </button>
+                </AnimateIcon>
                 <NotificationsMenu />
                 <HeaderThemeToggle />
                 <div className="hidden md:block">
@@ -236,7 +240,7 @@ export function HeaderUser() {
                     sections={[
                       [
                         { to: '/app/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },
-                        { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-4 w-4" /> },
+                        { to: '/app/historial', label: 'Mis compras', icon: <Cart size={16} /> },
                         { to: '/app/favoritos', label: 'Favoritos', icon: <Heart size={16} /> },
                       ],
                       [
@@ -299,20 +303,22 @@ export function HeaderUser() {
                   detalle de un pedido lo oculta (`hideCartTrigger`): ahí el
                   biker no está navegando fotos para comprar. */}
               {!hideCartTrigger && (
-                <button
-                  data-cart-icon
-                  onClick={openCartDrawer}
-                  aria-label="Carrito"
-                  title="Carrito"
-                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-                >
-                  <IconCart className="h-5 w-5" />
-                  {itemCount > 0 && (
-                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                      {itemCount}
-                    </span>
-                  )}
-                </button>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <button
+                    data-cart-icon
+                    onClick={openCartDrawer}
+                    aria-label="Carrito"
+                    title="Carrito"
+                    className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+                  >
+                    <Cart size={20} filled={itemCount > 0} />
+                    {itemCount > 0 && (
+                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                        {itemCount}
+                      </span>
+                    )}
+                  </button>
+                </AnimateIcon>
               )}
             </div>
           </div>
@@ -341,9 +347,9 @@ export function HeaderUser() {
           // "Inicio" se quitó (Eventos ocupa su lugar) y "Pedidos" ocupa el
           // lugar donde antes vivía Eventos — misma relación de accesos que
           // el menú inferior del fotógrafo (Eventos/Pedidos/Espacio/Perfil).
-          { to: '/app/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
-          { to: '/app/historial', label: 'Pedidos', icon: <IconReceipt className="h-full w-full" /> },
-          { to: '/app/checkout', label: 'Carrito', icon: <IconCart className="h-full w-full" />, badge: itemCount },
+          { to: '/app/eventos', label: 'Eventos', icon: <Images className="h-full w-full" /> },
+          { to: '/app/historial', label: 'Pedidos', icon: <Receipt className="h-full w-full" /> },
+          { to: '/app/checkout', label: 'Carrito', icon: <Cart className="h-full w-full" filled={itemCount > 0} />, badge: itemCount },
           { to: '/app/perfil', label: 'Perfil', icon: <UserRound className="h-full w-full" /> },
         ]}
         primary={{ to: '/app/buscar', label: 'Buscar', icon: <Search className="h-full w-full" /> }}

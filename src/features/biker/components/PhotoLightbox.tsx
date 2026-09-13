@@ -342,18 +342,6 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
         </div>
       </div>
 
-      {/* Etiqueta superior centrada — solo para fotos de un pedido
-          (`mode="purchased"`) que ya tienen su entrega final subida; las
-          que aún están en preparación no muestran nada acá, para no
-          prometer algo que todavía no está listo. */}
-      {purchased && photo.delivered_path && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 sm:top-6">
-          <span className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm sm:text-xs">
-            <Check size={14} /> Completada
-          </span>
-        </div>
-      )}
-
       {/* Esquina superior derecha: contador + cerrar — nunca se
           superponen, cada uno es su propio elemento en la misma fila. */}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-3 sm:right-6 sm:top-6">
@@ -385,7 +373,20 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
           descargar, o subir entrega final) vía `cornerSlot` — ninguno de
           los botones de compra aplica ahí. */}
       {purchased ? (
-        cornerSlot && <div className="absolute bottom-4 right-4 z-10 sm:bottom-6 sm:right-6">{cornerSlot}</div>
+        (cornerSlot || photo.delivered_path) && (
+          <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 sm:bottom-6 sm:right-6">
+            {/* Etiqueta "Completada" — a la izquierda del botón de
+                descargar, mismo lugar, para que el usuario las relacione de
+                un vistazo (antes vivía arriba centrada, lejos de la
+                descarga). Solo si la foto ya tiene entrega final subida. */}
+            {photo.delivered_path && (
+              <span className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm sm:text-xs">
+                <Check size={14} /> Completada
+              </span>
+            )}
+            {cornerSlot}
+          </div>
+        )
       ) : (
         <div className="absolute bottom-4 right-4 z-10 sm:bottom-6 sm:right-6">
           <div className="flex items-center gap-2 rounded-2xl bg-black/40 p-2 backdrop-blur-sm">

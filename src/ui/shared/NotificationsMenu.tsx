@@ -108,8 +108,12 @@ export function NotificationsMenu() {
           className="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
         >
           <Bell size={20} />
+          {/* Mismo estilo que el contador del carrito (número, no solo un
+              punto) — así ambos badges se leen igual de un vistazo. */}
           {unread.length > 0 && (
-            <span className="absolute right-1.5 top-1.5 flex h-2 w-2 items-center justify-center rounded-full bg-primary" />
+            <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+              {unread.length > 9 ? '9+' : unread.length}
+            </span>
           )}
         </button>
       </AnimateIcon>

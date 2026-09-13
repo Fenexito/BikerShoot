@@ -69,41 +69,41 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
     <Link
       to={`/app/historial/${order.id}`}
       className={cn(
-        'animate-[fade-in-up_.3s_ease-out_backwards] flex flex-col gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-colors hover:border-primary/30 sm:flex-row sm:items-stretch sm:gap-4 sm:p-3.5',
+        'animate-[fade-in-up_.3s_ease-out_backwards] flex items-stretch gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-colors hover:border-primary/30 sm:gap-4 sm:p-3.5',
         statusStyle.dot.replace('bg-', 'border-l-'),
       )}
       style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
     >
-      {/* Miniaturas de escritorio — ANCHO fijo (nunca crece, así nunca
-          empuja el texto), alto estirado para llenar lo que ocupe el texto
-          de la derecha. Solo en escritorio: la galería de acordeón de abajo
-          (probada en vivo) no se ve bien en la vista web, ahí se queda este
-          stack de siempre. */}
-      <div className="hidden shrink-0 -space-x-3 sm:flex">
+      {/* Miniaturas de móvil — el stack de siempre, sin cambios. Solo en
+          móvil: en escritorio esta misma área usa la galería de acordeón de
+          abajo (pedido explícito: acordeón SOLO en escritorio, nunca en
+          móvil). */}
+      <div className="flex shrink-0 -space-x-3 sm:hidden">
         {previewItems.map((item) => (
           <img
             key={item.id}
             src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
             alt=""
-            className="h-full max-h-24 w-16 shrink-0 rounded-xl border-2 border-card object-cover"
+            className="h-full max-h-24 w-12 shrink-0 rounded-xl border-2 border-card object-cover"
           />
         ))}
         {extraCount > 0 && (
-          <span className="flex h-full max-h-24 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
+          <span className="flex h-full max-h-24 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
             +{extraCount}
           </span>
         )}
       </div>
 
-      {/* Galería tipo acordeón — solo en móvil (mismo componente que usa el
-          fotógrafo en la vista de evento). Altura chica a propósito (110px
-          contra los 260px del fotógrafo): a tamaño completo empujaba el
-          texto del pedido demasiado abajo en una lista donde hay muchas
-          filas. */}
-      <div className="sm:hidden">
+      {/* Galería tipo acordeón — SOLO en escritorio (mismo componente que
+          usa el fotógrafo en la vista de evento), acotada al MISMO espacio
+          que ocupaba el stack de miniaturas de siempre (ancho fijo ~168px,
+          alto 96px = el mismo `max-h-24` de arriba) — no un tamaño de
+          galería completo, solo la animación de acordeón viviendo dentro de
+          esa misma área chica. */}
+      <div className="hidden shrink-0 sm:block" style={{ width: 168 }}>
         <AccordionGallery
           items={galleryItems}
-          height={110}
+          height={96}
           radius={14}
           expandRatio={0.35}
           tilt={4}
@@ -115,12 +115,7 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
         />
       </div>
 
-      {/* `sm:contents` en escritorio: estos dos hijos vuelven a ser
-          hermanos directos de las miniaturas de arriba, restaurando la fila
-          original. En móvil es un flex normal (texto + precio) debajo de la
-          galería. */}
-      <div className="flex items-stretch gap-3 sm:contents">
-        <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
           <div className="mb-0.5 flex flex-wrap items-center gap-2">
             <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="text-xs font-bold" />
             <span className="text-xs text-muted-foreground">{formatOrderCode(order.order_number)}</span>
@@ -155,8 +150,7 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
           )}
         </div>
 
-        <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
-      </div>
+      <span className="shrink-0 self-center rounded-full bg-muted px-3 py-1 text-sm font-bold">Q{order.total}</span>
     </Link>
   )
 }

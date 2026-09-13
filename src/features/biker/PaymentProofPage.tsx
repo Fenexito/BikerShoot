@@ -5,12 +5,15 @@ import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { Button } from '../../ui/flat/Button'
-import { Card } from '../../ui/flat/Card'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
+import { useBackButton } from '../../ui/shared/useBackButton'
 import { IconCart } from '../../ui/shared/icons'
 import { AnimateIcon } from '../../ui/animate-icons/icon'
 import { Upload } from '../../ui/animate-icons/icons/Upload'
+import { Eye } from '../../ui/animate-icons/icons/Eye'
+import { Edit } from '../../ui/animate-icons/icons/Edit'
+import { Check } from '../../ui/animate-icons/icons/Check'
 import { PhotoLightbox } from './components/PhotoLightbox'
 
 interface BankDetails {
@@ -24,6 +27,8 @@ interface PhotographerDue {
   photographerId: string
   photographerName: string
   itemCount: number
+  priceTotal: number
+  serviceFeeTotal: number
   total: number
   bank: BankDetails | null
 }
@@ -53,16 +58,22 @@ function useOrderPaymentInfo(orderId: string | undefined) {
         photographer: { display_name: string; photographer_details: BankDetails | BankDetails[] | null } | null
       }[]) {
         const existing = byPhotographer.get(row.photographer_id)
-        const amount = row.is_courtesy ? 0 : Number(row.price) + Number(row.service_fee)
+        // Las cortesías no cobran nada — ni precio ni tarifa de servicio.
+        const price = row.is_courtesy ? 0 : Number(row.price)
+        const serviceFee = row.is_courtesy ? 0 : Number(row.service_fee)
         if (existing) {
-          existing.total += amount
+          existing.priceTotal += price
+          existing.serviceFeeTotal += serviceFee
+          existing.total += price + serviceFee
           existing.itemCount += 1
         } else {
           byPhotographer.set(row.photographer_id, {
             photographerId: row.photographer_id,
             photographerName: row.photographer?.display_name ?? 'Fotógrafo',
             itemCount: 1,
-            total: amount,
+            priceTotal: price,
+            serviceFeeTotal: serviceFee,
+            total: price + serviceFee,
             bank: normalizeOne(row.photographer?.photographer_details ?? null),
           })
         }
@@ -88,6 +99,25 @@ function useExistingProofs(orderId: string | undefined) {
   })
 }
 
+/** URL firmada del comprobante ya subido — se pide en cuanto `hasProof` es
+ * cierto (no solo al hacer click en "Ver"), así para cuando el usuario
+ * hace click el visor ya tiene la imagen lista casi siempre; si no, el
+ * visor se abre igual mostrando su propio loader hasta que llegue (ver
+ * `loading` en PhotoLightbox), en vez de dejar al usuario esperando
+ * afuera. También sirve para la miniatura junto a "Ver"/"Reemplazar". */
+function useProofViewUrl(orderId: string | undefined, photographerId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['payment-proof-view-url', orderId, photographerId],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId, photographerId } })
+      if (error || !data?.viewUrl) return null
+      return data.viewUrl as string
+    },
+    enabled: enabled && !!orderId,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 /** Sube con PUT vía XMLHttpRequest (no `fetch`) porque `fetch` no expone
  * progreso de subida en todos los navegadores — XHR sí, con el evento
  * `upload.onprogress`, necesario para la barra de "Subiendo… 42%". */
@@ -109,9 +139,9 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
   const push = useToastStore((s) => s.push)
   const [progress, setProgress] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
-  const [viewerUrl, setViewerUrl] = useState<string | null>(null)
-  const [loadingViewer, setLoadingViewer] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
   const hasProof = !!proof
+  const { data: proofViewUrl } = useProofViewUrl(orderId, due.photographerId, hasProof)
 
   const bankLines = due.bank
     ? [
@@ -133,21 +163,6 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
     }
   }
 
-  async function openViewer() {
-    setLoadingViewer(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('r2-payment-proof-view-url', {
-        body: { orderId, photographerId: due.photographerId },
-      })
-      if (error || !data?.viewUrl) throw new Error(error?.message ?? 'No se pudo abrir tu comprobante')
-      setViewerUrl(data.viewUrl)
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo abrir tu comprobante', description: (err as Error).message })
-    } finally {
-      setLoadingViewer(false)
-    }
-  }
-
   async function handleFile(file: File | undefined) {
     if (!file) return
     setProgress(0)
@@ -166,6 +181,7 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
 
       push({ type: 'success', title: 'Comprobante subido', description: `${due.photographerName} lo verá para confirmar tu pago.` })
       queryClient.invalidateQueries({ queryKey: ['order-payment-proofs', orderId] })
+      queryClient.invalidateQueries({ queryKey: ['payment-proof-view-url', orderId, due.photographerId] })
     } catch (err) {
       push({ type: 'error', title: 'No se pudo subir el comprobante', description: (err as Error).message })
     } finally {
@@ -176,23 +192,39 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
   const uploading = progress !== null
 
   return (
-    <Card className="cursor-default hover:scale-100">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="font-bold">{due.photographerName}</p>
-          <p className="text-sm text-muted-foreground">
-            {due.itemCount} foto{due.itemCount === 1 ? '' : 's'}
-          </p>
+    <div className="rounded-3xl border border-border bg-card p-4 md:p-5">
+      {/* El nombre del fotógrafo es la info PRINCIPAL de la tarjeta — todo
+          lo demás (fotos, tarifa, total) cuelga de él. */}
+      <p className="text-lg font-bold tracking-tight">{due.photographerName}</p>
+      <p className="text-sm text-muted-foreground">
+        {due.itemCount} foto{due.itemCount === 1 ? '' : 's'}
+      </p>
+
+      {/* Desglose: precio de las fotos (ya con cualquier descuento
+          aplicado, viene calculado así desde el carrito) + tarifa de
+          servicio correspondiente = el total que el biker debe
+          transferir a ESTE fotógrafo. */}
+      <div className="mt-3 flex flex-col gap-1 rounded-2xl bg-muted px-4 py-3 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Fotos</span>
+          <span className="font-medium">Q{due.priceTotal}</span>
         </div>
-        <p className="text-xl font-bold text-primary">Q{due.total}</p>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Tarifa de servicio</span>
+          <span className="font-medium">Q{due.serviceFeeTotal}</span>
+        </div>
+        <div className="mt-1 flex items-center justify-between border-t border-border pt-1.5">
+          <span className="font-semibold">Total a transferir</span>
+          <span className="text-lg font-bold text-primary">Q{due.total}</span>
+        </div>
       </div>
 
       {bankLines.length === 0 ? (
-        <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
           Este fotógrafo todavía no registró sus datos bancarios. Escríbele para coordinar el pago.
         </p>
       ) : (
-        <div className="mt-4 rounded-2xl bg-muted p-4 text-sm">
+        <div className="mt-3 rounded-2xl bg-muted p-4 text-sm">
           {bankLines.map((line) => (
             <p key={line}>{line}</p>
           ))}
@@ -204,7 +236,9 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
 
       <div className="mt-4 border-t border-border pt-4">
         {hasProof ? (
-          <p className="flex items-center gap-2 text-sm font-semibold text-secondary">✓ Comprobante subido — puedes verlo o reemplazarlo si te equivocaste</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-secondary">
+            <Check size={16} /> Comprobante subido
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">Sube la captura de tu comprobante de transferencia para este fotógrafo.</p>
         )}
@@ -215,15 +249,32 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
           </div>
         )}
 
-        <div className="mt-2 flex gap-2">
-          {hasProof && (
-            <Button variant="secondary" className="flex-1" loading={loadingViewer} onClick={openViewer}>
-              Ver comprobante
-            </Button>
+        <div className="mt-2 flex items-center gap-2">
+          {/* Miniatura del comprobante ya subido — mientras se resuelve la
+              URL firmada, un loader chico en vez de un hueco vacío. */}
+          {hasProof && !uploading && (
+            <button
+              onClick={() => setViewerOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted"
+              aria-label="Ver comprobante"
+            >
+              {proofViewUrl ? (
+                <img src={proofViewUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              )}
+            </button>
+          )}
+          {hasProof && !uploading && (
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <Button variant="secondary" className="flex-1 gap-1.5" onClick={() => setViewerOpen(true)}>
+                <Eye size={16} /> Ver comprobante
+              </Button>
+            </AnimateIcon>
           )}
           <AnimateIcon animateOnHover animateOnTap asChild>
-            <label className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90">
-              {!uploading && <Upload size={16} />}
+            <label className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90">
+              {!uploading && (hasProof ? <Edit size={16} /> : <Upload size={16} />)}
               {uploading ? `Subiendo… ${progress}%` : hasProof ? 'Reemplazar' : 'Subir comprobante'}
               <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
             </label>
@@ -231,7 +282,7 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
         </div>
       </div>
 
-      {viewerUrl && (
+      {viewerOpen && (
         <PhotoLightbox
           photos={[
             {
@@ -253,10 +304,11 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
             },
           ]}
           index={0}
-          onClose={() => setViewerUrl(null)}
+          onClose={() => setViewerOpen(false)}
           onNavigate={() => {}}
           mode="purchased"
-          resolveSrc={() => viewerUrl}
+          loading={!proofViewUrl}
+          resolveSrc={() => proofViewUrl ?? undefined}
           infoRows={[
             { label: 'Enviado a', value: due.photographerName },
             { label: 'Enviado por', value: bikerName },
@@ -265,7 +317,7 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
           ]}
         />
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -274,10 +326,14 @@ export function PaymentProofPage() {
   const { profile } = useAuth()
   const { data, isLoading } = useOrderPaymentInfo(orderId)
   const { data: proofs = {} } = useExistingProofs(orderId)
+  // Reservado en el header — 'back' regresa en el historial del navegador
+  // sin importar de dónde vino (carrito, el pedido en Mis compras, o un
+  // link directo desde la página del evento).
+  useBackButton('back')
 
   if (isLoading || !data) {
     return (
-      <div className="mx-auto max-w-2xl px-3 py-6 font-flat md:px-8 md:py-10">
+      <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="mt-6 h-48 w-full rounded-3xl" />
       </div>
@@ -287,7 +343,7 @@ export function PaymentProofPage() {
   const allUploaded = data.dues.every((d) => !!proofs[d.photographerId])
 
   return (
-    <div className="mx-auto max-w-2xl px-3 py-6 font-flat md:px-8 md:py-10">
+    <div className="mx-auto max-w-6xl px-3 py-6 font-flat md:px-8 md:py-10">
       {/* "Ir a Mis compras" siempre arriba a la izquierda; una vez que ya
           subió todo, "Ver mi pedido" aparece al lado opuesto — el camino
           más directo de vuelta al pedido en vez de la lista completa. */}
@@ -304,15 +360,21 @@ export function PaymentProofPage() {
         )}
       </div>
 
-      <span className="mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✓</span>
-      <h1 className="mt-4 text-2xl font-bold tracking-tight md:text-3xl">Completa tu pago por transferencia</h1>
-      <p className="mt-2 text-muted-foreground">
-        {data.dues.length > 1
-          ? 'Tu pedido incluye varios fotógrafos — transfiere el monto exacto a CADA UNO por separado, y sube el comprobante correspondiente.'
-          : 'Transfiere el monto exacto y sube la captura de tu comprobante.'}
-      </p>
+      <div className="mt-6 flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+          <Check size={20} />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Completa tu pago por transferencia</h1>
+          <p className="mt-1 text-muted-foreground">
+            {data.dues.length > 1
+              ? 'Tu pedido incluye varios fotógrafos — transfiere el monto exacto a CADA UNO por separado, y sube el comprobante correspondiente.'
+              : 'Transfiere el monto exacto y sube la captura de tu comprobante.'}
+          </p>
+        </div>
+      </div>
 
-      <div className="mt-6 flex flex-col gap-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {data.dues.map((due) => (
           <PhotographerDueCard key={due.photographerId} due={due} orderId={orderId!} bikerName={profile?.display_name ?? 'Biker'} proof={proofs[due.photographerId]} />
         ))}

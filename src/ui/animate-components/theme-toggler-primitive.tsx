@@ -107,18 +107,37 @@ function ThemeToggler({ theme, resolvedTheme, setTheme, onImmediateChange, direc
 
       const clipPath = origin ? getCircleKeyframes(origin) : [fromClip, toClip]
 
-      document.documentElement
-        .animate(
-          { clipPath },
-          {
-            duration: 700,
-            easing: 'ease-in-out',
-            pseudoElement: '::view-transition-new(root)',
-          },
-        )
-        .finished.finally(() => {
-          setTheme(theme)
-        })
+      // El header y el menú inferior (`position: fixed`) tienen su propio
+      // grupo de view-transition (`app-header`/`app-bottom-nav`, ver
+      // index.css) porque el navegador los deja fuera de la foto de
+      // "antes/después" del resto de la página — sin este barrido propio
+      // se repintaban al instante en vez de barrerse junto con todo. Se
+      // anima cada uno con el MISMO clip-path que el root; si alguno no
+      // está montado en esta página (ej. el header de un portal que no
+      // usa `app-header-vt` en la ruta actual), `document.documentElement
+      // .getAnimations` simplemente no encuentra ese pseudo-elemento y el
+      // navegador ignora la llamada sin lanzar error.
+      // No todas las páginas tienen los 3 grupos montados a la vez (ej. el
+      // menú inferior es `display:none` en escritorio, y algunos headers
+      // — HeaderAdmin/HeaderPublic — no llevan `app-header-vt` porque no
+      // exponen un selector de tema en vivo) — un pseudo-elemento ausente
+      // puede lanzar de forma síncrona al construir la animación, así que
+      // cada intento va envuelto en su propio try/catch para que uno
+      // faltante nunca tumbe el barrido de los demás.
+      const sweep = (pseudoElement: string) => {
+        try {
+          return document.documentElement.animate({ clipPath }, { duration: 700, easing: 'ease-in-out', pseudoElement }).finished
+        } catch {
+          return Promise.resolve()
+        }
+      }
+
+      await Promise.allSettled([
+        sweep('::view-transition-new(root)'),
+        sweep('::view-transition-new(app-header)'),
+        sweep('::view-transition-new(app-bottom-nav)'),
+      ])
+      setTheme(theme)
     },
     [onImmediateChange, fromClip, toClip, setTheme],
   )

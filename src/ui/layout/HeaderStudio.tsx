@@ -4,7 +4,8 @@ import { HeaderThemeToggle } from '../studio/HeaderThemeToggle'
 import { useAuth } from '../../features/auth/AuthContext'
 import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
-import { IconImages, IconCart } from '../shared/icons'
+import { Images } from '../animate-icons/icons/Images'
+import { Receipt } from '../animate-icons/icons/Receipt'
 import { Archive } from '../animate-icons/icons/Archive'
 import { CreditCard } from '../animate-icons/icons/CreditCard'
 import { AnimateIcon } from '../animate-icons/icon'
@@ -76,7 +77,7 @@ export function HeaderStudio() {
     <>
       <div
         className={cn(
-          'fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-6 md:pt-0 md:!translate-y-0',
+          'app-header-vt fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-6 md:pt-0 md:!translate-y-0',
           hidden ? '-translate-y-[calc(100%+1rem)]' : 'translate-y-0',
         )}
       >
@@ -228,8 +229,8 @@ export function HeaderStudio() {
 
       <MobileBottomNav
         items={[
-          { to: '/studio/eventos', label: 'Eventos', icon: <IconImages className="h-full w-full" /> },
-          { to: '/studio/pedidos', label: 'Pedidos', icon: <IconCart className="h-full w-full" /> },
+          { to: '/studio/eventos', label: 'Eventos', icon: <Images className="h-full w-full" /> },
+          { to: '/studio/pedidos', label: 'Pedidos', icon: <Receipt className="h-full w-full" /> },
           { to: '/studio/almacenamiento', label: 'Espacio', icon: <Archive className="h-full w-full" /> },
           { to: '/studio/perfil', label: 'Perfil', icon: <UserRound className="h-full w-full" /> },
         ]}
