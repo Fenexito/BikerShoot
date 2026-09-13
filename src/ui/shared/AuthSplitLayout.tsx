@@ -22,10 +22,10 @@ export function AuthSplitLayout({ children, logoTo = '/', logo }: AuthSplitLayou
   const { data: photos = [] } = usePublicPhotoSample(30)
 
   return (
-    <div className="flex min-h-screen">
-      <div className="flex w-full flex-col justify-center px-6 py-16 lg:w-1/2 lg:px-16 xl:px-24">
+    <div className="flex h-dvh overflow-hidden">
+      <div className="flex w-full flex-col justify-center overflow-y-auto px-6 py-6 sm:py-16 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="mx-auto w-full max-w-md">
-          <Link to={logoTo} className="mb-10 flex justify-center">
+          <Link to={logoTo} className="mb-5 flex justify-center sm:mb-10">
             {logo ?? <AuthLogo />}
           </Link>
           {children}

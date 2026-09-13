@@ -1,8 +1,10 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
 import { GoogleIcon } from '../../ui/shared/GoogleIcon'
+import { FacebookIcon } from '../../ui/shared/FacebookIcon'
+import { AppleIcon } from '../../ui/shared/AppleIcon'
 import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
 import { PortalSwitch } from '../../ui/shared/PortalSwitch'
 import { supabase } from '../../lib/supabase'
@@ -36,6 +38,23 @@ export function EmailPasswordAuthForm({ portal, logo, signupTo, forgotPasswordTo
   const [signingIn, setSigningIn] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Si el usuario cancela en la pantalla de Google (botón "atrás" del
+  // navegador) en vez de completar el login, el navegador restaura esta
+  // página desde el bfcache tal cual quedó antes de salir — con
+  // `googleLoading` todavía en `true` y el botón congelado en su estado de
+  // carga para siempre, porque `signInWithOAuth` nunca vuelve a ejecutar
+  // código en esta página (la redirección la saca del todo). `pageshow`
+  // con `event.persisted` detecta justo ese caso (restaurado desde
+  // bfcache, no una carga nueva) y libera el botón para que el usuario
+  // pueda seguir con el login normal o reintentar.
+  useEffect(() => {
+    function onPageShow(e: PageTransitionEvent) {
+      if (e.persisted) setGoogleLoading(false)
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault()
@@ -93,7 +112,7 @@ export function EmailPasswordAuthForm({ portal, logo, signupTo, forgotPasswordTo
 
   return (
     <AuthSplitLayout logoTo="/" logo={logo}>
-      <div className="mb-8 transition-all duration-500 ease-in-out">
+      <div className="mb-4 transition-all duration-500 ease-in-out sm:mb-8">
         {step === 'password' ? (
           <>
             <button
@@ -115,7 +134,7 @@ export function EmailPasswordAuthForm({ portal, logo, signupTo, forgotPasswordTo
         )}
       </div>
 
-      <form onSubmit={step === 'email' || step === 'not-found' ? handleEmailSubmit : handlePasswordSubmit} className="flex flex-col gap-4">
+      <form onSubmit={step === 'email' || step === 'not-found' ? handleEmailSubmit : handlePasswordSubmit} className="flex flex-col gap-3 sm:gap-4">
         <div
           className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
         >
@@ -176,17 +195,33 @@ export function EmailPasswordAuthForm({ portal, logo, signupTo, forgotPasswordTo
         className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
       >
         <div className="min-h-0">
-          <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+          <div className="my-3 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground sm:my-6">
             <span className="h-px flex-1 bg-border" />o continúa con<span className="h-px flex-1 bg-border" />
           </div>
-          <Button variant="secondary" size="lg" onClick={onGoogle} loading={googleLoading} className="w-full">
-            <GoogleIcon className="h-5 w-5" />
-            Continuar con Google
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button variant="secondary" size="default" onClick={onGoogle} loading={googleLoading} className="w-full">
+              <GoogleIcon className="h-5 w-5" />
+              Continuar con Google
+            </Button>
+            {/* Facebook y Apple: solo la parte visual por ahora — conectarlos
+                de verdad requiere una app registrada en Facebook Developers
+                y en Apple Developer Program (Apple además es requisito de
+                Apple para publicar la futura app móvil), configuradas como
+                providers en Supabase Auth. Deshabilitados hasta tener esas
+                credenciales. */}
+            <Button variant="secondary" size="default" disabled title="Próximamente" className="w-full opacity-60">
+              <FacebookIcon className="h-5 w-5" />
+              Continuar con Facebook
+            </Button>
+            <Button variant="secondary" size="default" disabled title="Próximamente" className="w-full opacity-60">
+              <AppleIcon className="h-4 w-4" />
+              Continuar con Apple
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="mt-8 flex justify-center">
+      <div className="mt-5 flex justify-center sm:mt-8">
         <PortalSwitch current={portal} />
       </div>
     </AuthSplitLayout>

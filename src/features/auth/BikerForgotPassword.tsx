@@ -33,7 +33,7 @@ export function BikerForgotPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 font-flat">
+    <div className="flex h-dvh items-center justify-center overflow-y-auto bg-background px-6 py-8 font-flat">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-8 flex justify-center">
           <AuthLogo />

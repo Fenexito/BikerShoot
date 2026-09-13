@@ -33,7 +33,7 @@ export function StudioForgotPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 text-foreground">
+    <div className="flex h-dvh items-center justify-center overflow-y-auto bg-background px-6 py-8 text-foreground">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-10 flex justify-center">
           <AuthLogo variant="studio" theme="dark" />

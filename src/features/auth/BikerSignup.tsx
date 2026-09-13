@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -6,7 +6,10 @@ import { z } from 'zod'
 import { Button } from '../../ui/flat/Button'
 import { Input } from '../../ui/flat/Input'
 import { GoogleIcon } from '../../ui/shared/GoogleIcon'
+import { FacebookIcon } from '../../ui/shared/FacebookIcon'
+import { AppleIcon } from '../../ui/shared/AppleIcon'
 import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
+import { AuthLogo } from '../../ui/shared/Logo'
 import { useAuth } from './AuthContext'
 
 const schema = z
@@ -30,6 +33,18 @@ export function BikerSignup() {
   const [formError, setFormError] = useState<string | null>(null)
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+
+  // Ver el mismo fix en EmailPasswordAuthForm.tsx: si el usuario cancela en
+  // Google con el botón "atrás", esta página se restaura desde el bfcache
+  // con `googleLoading` congelado en `true` para siempre — `pageshow` +
+  // `event.persisted` lo libera.
+  useEffect(() => {
+    function onPageShow(e: PageTransitionEvent) {
+      if (e.persisted) setGoogleLoading(false)
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   const onGoogle = async () => {
     setFormError(null)
@@ -63,7 +78,7 @@ export function BikerSignup() {
 
   if (pendingConfirmation) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 font-flat">
+      <div className="flex h-dvh items-center justify-center bg-background px-6 py-16 font-flat">
         <div className="w-full max-w-md text-center">
           <span className="text-5xl">📬</span>
           <h1 className="mt-6 text-2xl font-bold tracking-tight">Revisa tu correo</h1>
@@ -79,11 +94,11 @@ export function BikerSignup() {
   }
 
   return (
-    <AuthSplitLayout>
-      <h1 className="mb-2 text-3xl font-bold tracking-tight">Crear cuenta</h1>
-      <p className="mb-8 text-muted-foreground">Encuentra tus fotos de moto en segundos.</p>
+    <AuthSplitLayout logo={<AuthLogo className="w-36 h-auto sm:w-72" />}>
+      <h1 className="mb-1 text-2xl font-bold tracking-tight sm:mb-2 sm:text-3xl">Crear cuenta</h1>
+      <p className="mb-3 text-muted-foreground sm:mb-8">Encuentra tus fotos de moto en segundos.</p>
 
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="flex flex-col gap-1.5 sm:gap-4" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Nombre" placeholder="Tu nombre" error={errors.displayName?.message} {...register('displayName')} />
           <Input label="Correo" type="email" placeholder="tu@correo.com" error={errors.email?.message} {...register('email')} />
           <Input label="Contraseña" type="password" placeholder="••••••••" error={errors.password?.message} {...register('password')} />
@@ -102,19 +117,29 @@ export function BikerSignup() {
           </Button>
         </form>
 
-        <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="my-2 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground sm:my-6">
           <span className="h-px flex-1 bg-border" />o continúa con<span className="h-px flex-1 bg-border" />
         </div>
 
-        <Button variant="secondary" size="lg" onClick={onGoogle} loading={googleLoading} className="w-full">
-          <GoogleIcon className="h-5 w-5" />
-          Continuar con Google
-        </Button>
+        <div className="flex flex-col gap-1.5 sm:gap-2">
+          <Button variant="secondary" size="default" onClick={onGoogle} loading={googleLoading} className="w-full">
+            <GoogleIcon className="h-5 w-5" />
+            Continuar con Google
+          </Button>
+          <Button variant="secondary" size="default" disabled title="Próximamente" className="w-full opacity-60">
+            <FacebookIcon className="h-5 w-5" />
+            Continuar con Facebook
+          </Button>
+          <Button variant="secondary" size="default" disabled title="Próximamente" className="w-full opacity-60">
+            <AppleIcon className="h-4 w-4" />
+            Continuar con Apple
+          </Button>
+        </div>
 
-        <p className="mt-6 text-sm text-muted-foreground">
+        <p className="mt-3 text-sm text-muted-foreground sm:mt-6">
           ¿Ya tienes cuenta? <Link to="/login" className="font-semibold text-primary">Iniciar sesión</Link>
         </p>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground sm:mt-2">
           ¿Eres fotógrafo? <Link to="/studio/signup" className="font-semibold text-primary">Regístrate en Studio</Link>
         </p>
     </AuthSplitLayout>

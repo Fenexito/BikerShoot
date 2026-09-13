@@ -19,7 +19,7 @@ import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
 import { MobileBottomNav } from '../shared/MobileBottomNav'
-import { ThemeSwitcherInline } from '../flat/ThemeSwitcherInline'
+import { HeaderThemeToggle } from '../flat/HeaderThemeToggle'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
@@ -216,6 +216,7 @@ export function HeaderUser() {
                   )}
                 </button>
                 <NotificationsMenu />
+                <HeaderThemeToggle />
                 <div className="hidden md:block">
                   <ProfileMenu
                     name={profile?.display_name ?? 'Biker'}
@@ -232,7 +233,6 @@ export function HeaderUser() {
                         ? { label: 'Completar perfil', to: '/app/perfil' }
                         : undefined
                     }
-                    themeSwitcher={(close) => <ThemeSwitcherInline onToggled={close} />}
                     sections={[
                       [
                         { to: '/app/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },

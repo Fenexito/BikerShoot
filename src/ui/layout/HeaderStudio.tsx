@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
+import { HeaderThemeToggle } from '../studio/HeaderThemeToggle'
 import { useAuth } from '../../features/auth/AuthContext'
 import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
@@ -140,6 +140,7 @@ export function HeaderStudio() {
                   </button>
                 </AnimateIcon>
                 <NotificationsMenu />
+                <HeaderThemeToggle />
                 <div className="hidden md:block">
                   <ProfileMenu
                     name={profile?.display_name ?? 'Estudio'}
@@ -160,7 +161,6 @@ export function HeaderStudio() {
                       />
                     }
                     editProfile={profileIncomplete ? { label: 'Completar perfil', to: '/studio/perfil' } : undefined}
-                    themeSwitcher={(close) => <ThemeSwitcherInline onToggled={close} />}
                     sections={[
                       [
                         { to: '/studio/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },

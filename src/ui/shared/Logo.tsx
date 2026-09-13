@@ -108,7 +108,7 @@ export function AuthLogo({ className, theme = 'auto', variant = 'biker' }: AuthL
   // "Studio" debajo) usa el mismo ancho de lienzo que el del biker pero
   // reserva más alto, así que dimensionar por alto encogía el ícono+
   // "MOTOGRAM" de Studio respecto al del biker.
-  const size = className ?? 'w-72 h-auto'
+  const size = className ?? 'w-48 h-auto sm:w-72'
   const [light, dark] = variant === 'studio' ? [studioStackedLight, studioStackedDark] : [stackedLight, stackedDark]
   const label = variant === 'studio' ? 'Motogram Studio' : 'Motogram'
 
