@@ -23,7 +23,7 @@ import { MobileBottomNav } from '../shared/MobileBottomNav'
 import { useAutoHideHeader } from '../shared/useAutoHideHeader'
 import { useHeaderTransformStore } from './headerTransformStore'
 import { HeaderBackSlot } from '../shared/HeaderBackSlot'
-import { Logo } from '../shared/Logo'
+import { StudioLogo } from '../shared/Logo'
 import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
@@ -109,9 +109,8 @@ export function HeaderStudio() {
                   : 'translate-y-0 opacity-100',
               )}
             >
-              <Link to="/studio" className="flex shrink-0 items-center gap-1.5">
-                <Logo />
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Studio</span>
+              <Link to="/studio" className="flex shrink-0 items-center">
+                <StudioLogo />
               </Link>
               <nav className="ml-2 hidden flex-1 items-center gap-1 text-sm font-medium md:flex">
                 {NAV_ITEMS.map((item) => (

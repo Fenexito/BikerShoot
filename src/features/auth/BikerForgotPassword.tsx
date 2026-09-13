@@ -36,7 +36,7 @@ export function BikerForgotPassword() {
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16 font-flat">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-8 inline-block">
-          <Logo className="h-7" />
+          <Logo iconClassName="h-8" textClassName="h-4" />
         </Link>
 
         {sent ? (
