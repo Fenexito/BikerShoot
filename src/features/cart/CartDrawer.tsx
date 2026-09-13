@@ -8,7 +8,10 @@ import { getPortalRoot } from '../../ui/shared/portalRoot'
 import { useScrollLock } from '../../ui/shared/useScrollLock'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { previewUrl } from '../../lib/r2'
-import { IconClose, IconCart, IconTrash } from '../../ui/shared/icons'
+import { IconCart } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { X } from '../../ui/animate-icons/icons/X'
+import { Trash } from '../../ui/animate-icons/icons/Trash'
 
 const CLOSE_ANIMATION_MS = 220
 
@@ -90,9 +93,11 @@ export function CartDrawer() {
             Tu carrito
             {items.length > 0 && <span className="text-sm font-normal text-muted-foreground">({items.length})</span>}
           </h2>
-          <button onClick={close} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-border">
-            <IconClose className="h-4 w-4" />
-          </button>
+          <AnimateIcon animateOnHover asChild>
+            <button onClick={close} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-border">
+              <X size={16} />
+            </button>
+          </AnimateIcon>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
@@ -149,13 +154,15 @@ export function CartDrawer() {
                                           es cuál. */}
                                       <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{item.originalFilename ?? 'Foto'}</p>
                                       <p className="shrink-0 text-sm font-bold">Q{item.effectivePrice}</p>
-                                      <button
-                                        onClick={() => handleRemove(item)}
-                                        aria-label="Quitar del carrito"
-                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
-                                      >
-                                        <IconTrash className="h-3.5 w-3.5" />
-                                      </button>
+                                      <AnimateIcon animateOnHover asChild>
+                                        <button
+                                          onClick={() => handleRemove(item)}
+                                          aria-label="Quitar del carrito"
+                                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
+                                        >
+                                          <Trash size={14} />
+                                        </button>
+                                      </AnimateIcon>
                                     </div>
                                   ))}
                                 </div>

@@ -4,7 +4,13 @@ import { ThemeSwitcherInline } from '../studio/ThemeSwitcherInline'
 import { useAuth } from '../../features/auth/AuthContext'
 import { usePhotographerDetails } from '../../features/photographer/usePhotographerDetails'
 import { r2Url } from '../../lib/r2'
-import { IconUser, IconLogOut, IconArchive, IconCreditCard, IconSettings, IconSparkles, IconImages, IconCart, IconPlus, IconSearch } from '../shared/icons'
+import { IconUser, IconArchive, IconCreditCard, IconImages, IconCart, IconPlus } from '../shared/icons'
+import { AnimateIcon } from '../animate-icons/icon'
+import { Search } from '../animate-icons/icons/Search'
+import { UserRound } from '../animate-icons/icons/UserRound'
+import { Settings } from '../animate-icons/icons/Settings'
+import { Sparkles } from '../animate-icons/icons/Sparkles'
+import { LogOut } from '../animate-icons/icons/LogOut'
 import { GlobalSearchModal } from '../../features/photographer/components/GlobalSearchModal'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
@@ -119,14 +125,16 @@ export function HeaderStudio() {
                 ))}
               </nav>
               <div className="ml-auto flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => setSearchOpen(true)}
-                  aria-label="Buscar en todo el sitio"
-                  title="Buscar"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-                >
-                  <IconSearch className="h-5 w-5" />
-                </button>
+                <AnimateIcon animateOnHover asChild>
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    aria-label="Buscar en todo el sitio"
+                    title="Buscar"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+                  >
+                    <Search size={20} />
+                  </button>
+                </AnimateIcon>
                 <NotificationsMenu />
                 <div className="hidden md:block">
                   <ProfileMenu
@@ -151,14 +159,14 @@ export function HeaderStudio() {
                     themeSwitcher={<ThemeSwitcherInline />}
                     sections={[
                       [
-                        { to: '/studio/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
+                        { to: '/studio/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },
                         { to: '/studio/almacenamiento', label: 'Almacenamiento', icon: <IconArchive className="h-4 w-4" /> },
                         { to: '/studio/planes', label: 'Planes y facturación', icon: <IconCreditCard className="h-4 w-4" /> },
                       ],
                       [
-                        { to: '/studio/ajustes', label: 'Configuración', icon: <IconSettings className="h-4 w-4" /> },
-                        { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
-                        { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+                        { to: '/studio/ajustes', label: 'Configuración', icon: <Settings size={16} /> },
+                        { to: '/changelog', label: 'Novedades', icon: <Sparkles size={16} /> },
+                        { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <LogOut size={16} />, tone: 'danger' },
                       ],
                     ]}
                   />
@@ -194,16 +202,18 @@ export function HeaderStudio() {
                   página como el detalle de un pedido lo oculta del todo con
                   `hideSearchTrigger` — ahí no aporta nada buscar. */}
               {!hideSearchTrigger && (
-                <button
-                  onClick={() => setSearchOpen(true)}
-                  className={cn(
-                    'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
-                    mobileEnabled && 'hidden sm:flex',
-                  )}
-                >
-                  <IconSearch className="h-5 w-5 shrink-0" />
-                  <span className="truncate">Buscar…</span>
-                </button>
+                <AnimateIcon animateOnHover asChild>
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    className={cn(
+                      'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
+                      mobileEnabled && 'hidden sm:flex',
+                    )}
+                  >
+                    <Search size={20} className="shrink-0" />
+                    <span className="truncate">Buscar…</span>
+                  </button>
+                </AnimateIcon>
               )}
             </div>
           </div>

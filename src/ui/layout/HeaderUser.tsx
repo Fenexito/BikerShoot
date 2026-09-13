@@ -7,7 +7,14 @@ import { useCartDrawerStore } from '../../features/cart/cartDrawerStore'
 import { useCartSync } from '../../features/cart/useCartSync'
 import { CartDrawer } from '../../features/cart/CartDrawer'
 import { r2Url } from '../../lib/r2'
-import { IconBookmark, IconCart, IconUser, IconLogOut, IconSearch, IconSparkles, IconImages, IconSettings, IconReceipt } from '../shared/icons'
+import { IconCart, IconUser, IconImages, IconReceipt } from '../shared/icons'
+import { AnimateIcon } from '../animate-icons/icon'
+import { Search } from '../animate-icons/icons/Search'
+import { Heart } from '../animate-icons/icons/Heart'
+import { UserRound } from '../animate-icons/icons/UserRound'
+import { Settings } from '../animate-icons/icons/Settings'
+import { Sparkles } from '../animate-icons/icons/Sparkles'
+import { LogOut } from '../animate-icons/icons/LogOut'
 import { InitialsAvatar } from '../shared/InitialsAvatar'
 import { ProfileMenu } from '../shared/ProfileMenu'
 import { NotificationsMenu } from '../shared/NotificationsMenu'
@@ -173,22 +180,26 @@ export function HeaderUser() {
                 ))}
               </nav>
               <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
-                <button
-                  onClick={() => setSearchOpen(true)}
-                  aria-label="Buscar en tus pedidos, eventos, fotógrafos y rutas"
-                  title="Buscar"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-                >
-                  <IconSearch className="h-5 w-5" />
-                </button>
-                <Link
-                  to="/app/favoritos"
-                  aria-label="Favoritos"
-                  title="Favoritos"
-                  className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
-                >
-                  <IconBookmark className="h-5 w-5" />
-                </Link>
+                <AnimateIcon animateOnHover asChild>
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    aria-label="Buscar en tus pedidos, eventos, fotógrafos y rutas"
+                    title="Buscar"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+                  >
+                    <Search size={20} />
+                  </button>
+                </AnimateIcon>
+                <AnimateIcon animateOnHover asChild>
+                  <Link
+                    to="/app/favoritos"
+                    aria-label="Favoritos"
+                    title="Favoritos"
+                    className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
+                  >
+                    <Heart size={20} />
+                  </Link>
+                </AnimateIcon>
                 <button
                   data-cart-icon
                   onClick={openCartDrawer}
@@ -223,9 +234,9 @@ export function HeaderUser() {
                     themeSwitcher={<ThemeSwitcherInline />}
                     sections={[
                       [
-                        { to: '/app/perfil', label: 'Mi perfil', icon: <IconUser className="h-4 w-4" /> },
+                        { to: '/app/perfil', label: 'Mi perfil', icon: <UserRound size={16} /> },
                         { to: '/app/historial', label: 'Mis compras', icon: <IconCart className="h-4 w-4" /> },
-                        { to: '/app/favoritos', label: 'Favoritos', icon: <IconBookmark className="h-4 w-4" /> },
+                        { to: '/app/favoritos', label: 'Favoritos', icon: <Heart size={16} /> },
                       ],
                       [
                         // Mismo lugar/patrón que en el menú del fotógrafo —
@@ -234,9 +245,9 @@ export function HeaderUser() {
                         // notificaciones bajo el título "Configuración"),
                         // pero antes no había NINGÚN acceso a ella con ese
                         // nombre desde este menú.
-                        { to: '/app/perfil', label: 'Configuración', icon: <IconSettings className="h-4 w-4" /> },
-                        { to: '/changelog', label: 'Novedades', icon: <IconSparkles className="h-4 w-4" /> },
-                        { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <IconLogOut className="h-4 w-4" />, tone: 'danger' },
+                        { to: '/app/perfil', label: 'Configuración', icon: <Settings size={16} /> },
+                        { to: '/changelog', label: 'Novedades', icon: <Sparkles size={16} /> },
+                        { onClick: handleSignOut, label: signingOut ? 'Saliendo…' : 'Cerrar sesión', icon: <LogOut size={16} />, tone: 'danger' },
                       ],
                     ]}
                   />
@@ -265,19 +276,21 @@ export function HeaderUser() {
                   viviera adentro quedaría recortado apenas se abriera. */}
               {actionsSlot}
               {!hideSearchTrigger && (
-                <button
-                  onClick={() => setSearchOpen(true)}
-                  className={cn(
-                    'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
-                    // En móvil los filtros ya necesitan todo el espacio
-                    // disponible — el buscador permanente vuelve a partir
-                    // de `sm` (tablet en adelante), donde sí sobra sitio.
-                    mobileEnabled && 'hidden sm:flex',
-                  )}
-                >
-                  <IconSearch className="h-5 w-5 shrink-0" />
-                  <span className="truncate">Buscar…</span>
-                </button>
+                <AnimateIcon animateOnHover asChild>
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    className={cn(
+                      'flex h-10 w-44 shrink-0 items-center gap-2 rounded-full bg-muted px-4 text-sm text-muted-foreground transition-colors hover:bg-border',
+                      // En móvil los filtros ya necesitan todo el espacio
+                      // disponible — el buscador permanente vuelve a partir
+                      // de `sm` (tablet en adelante), donde sí sobra sitio.
+                      mobileEnabled && 'hidden sm:flex',
+                    )}
+                  >
+                    <Search size={20} className="shrink-0" />
+                    <span className="truncate">Buscar…</span>
+                  </button>
+                </AnimateIcon>
               )}
               {/* El carrito se conserva también en la capa transformada,
                   siempre al borde derecho — es la única herramienta que no
@@ -332,7 +345,7 @@ export function HeaderUser() {
           { to: '/app/checkout', label: 'Carrito', icon: <IconCart className="h-full w-full" />, badge: itemCount },
           { to: '/app/perfil', label: 'Perfil', icon: <IconUser className="h-full w-full" /> },
         ]}
-        primary={{ to: '/app/buscar', label: 'Buscar', icon: <IconSearch className="h-full w-full" /> }}
+        primary={{ to: '/app/buscar', label: 'Buscar', icon: <Search className="h-full w-full" /> }}
         activeClassName="text-primary"
         autoHide={mobileEnabled && !suppressAutoHide}
       />

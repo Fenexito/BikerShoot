@@ -9,7 +9,9 @@ import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { useScrollLock } from '../../../ui/shared/useScrollLock'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { createSharedLink } from '../../share/sharedLinks'
-import { IconClose, IconBookmark, IconCart, IconChevronLeft, IconChevronRight, IconShare } from '../../../ui/shared/icons'
+import { IconBookmark, IconCart, IconChevronLeft, IconChevronRight, IconShare } from '../../../ui/shared/icons'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { X } from '../../../ui/animate-icons/icons/X'
 import { cn } from '../../../lib/cn'
 import type { GridPhoto } from './PhotoGrid'
 
@@ -351,9 +353,11 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
         <span className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-sm sm:text-sm">
           {index + 1} / {photos.length}
         </span>
-        <button onClick={requestClose} aria-label="Cerrar" className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60">
-          <IconClose className="h-4 w-4" />
-        </button>
+        <AnimateIcon animateOnHover asChild>
+          <button onClick={requestClose} aria-label="Cerrar" className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60">
+            <X size={16} />
+          </button>
+        </AnimateIcon>
       </div>
 
       {/* Esquina inferior derecha: en modo compra, precio + guardar +

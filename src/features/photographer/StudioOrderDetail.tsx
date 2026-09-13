@@ -21,7 +21,8 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconGift, IconWhatsapp, IconDownload, IconEye, IconTrash } from '../../ui/shared/icons'
+import { IconGift, IconWhatsapp, IconDownload, IconEye } from '../../ui/shared/icons'
+import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
@@ -837,7 +838,7 @@ export function StudioOrderDetail() {
               },
             ]
           : []),
-        ...(canCancel ? [{ label: 'Cancelar pedido', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' as const, onClick: cancelOrder }] : []),
+        ...(canCancel ? [{ label: 'Cancelar pedido', icon: <Trash size={16} />, tone: 'danger' as const, onClick: cancelOrder }] : []),
       ]
     : []
 

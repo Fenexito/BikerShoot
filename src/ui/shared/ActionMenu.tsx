@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { IconMoreHorizontal } from './icons'
+import { AnimateIcon } from '../animate-icons/icon'
+import { Ellipsis } from '../animate-icons/icons/Ellipsis'
 import { cn } from '../../lib/cn'
 
 export interface ActionMenuItem {
@@ -46,20 +47,22 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          setOpen((o) => !o)
-        }}
-        aria-label="Más opciones"
-        className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted',
-          triggerClassName,
-        )}
-      >
-        <IconMoreHorizontal className="h-4 w-4" />
-      </button>
+      <AnimateIcon animateOnHover asChild>
+        <button
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setOpen((o) => !o)
+          }}
+          aria-label="Más opciones"
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted',
+            triggerClassName,
+          )}
+        >
+          <Ellipsis size={16} />
+        </button>
+      </AnimateIcon>
 
       {open && (
         <div
@@ -79,30 +82,39 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
               'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/10',
               item.tone === 'danger' ? 'text-red-400' : item.tone === 'success' ? 'text-emerald-400' : 'text-white/90',
             )
+            // Envuelto en `AnimateIcon animateOnHover asChild` — la fila
+            // COMPLETA (no solo el ícono) dispara el hover, para cualquier
+            // ícono animado que un caller pase en `item.icon` (uno estático
+            // simplemente lo ignora, sin efecto ni error).
             if (item.href) {
               return (
-                <a key={item.label} href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={itemClass}>
-                  {content}
-                </a>
+                <AnimateIcon key={item.label} animateOnHover asChild>
+                  <a href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={itemClass}>
+                    {content}
+                  </a>
+                </AnimateIcon>
               )
             }
             return item.to ? (
-              <Link key={item.label} to={item.to} onClick={() => setOpen(false)} className={itemClass}>
-                {content}
-              </Link>
+              <AnimateIcon key={item.label} animateOnHover asChild>
+                <Link to={item.to} onClick={() => setOpen(false)} className={itemClass}>
+                  {content}
+                </Link>
+              </AnimateIcon>
             ) : (
-              <button
-                key={item.label}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setOpen(false)
-                  item.onClick?.()
-                }}
-                className={itemClass}
-              >
-                {content}
-              </button>
+              <AnimateIcon key={item.label} animateOnHover asChild>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setOpen(false)
+                    item.onClick?.()
+                  }}
+                  className={itemClass}
+                >
+                  {content}
+                </button>
+              </AnimateIcon>
             )
           })}
         </div>

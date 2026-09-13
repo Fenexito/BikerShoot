@@ -16,7 +16,7 @@ import { Slot, type WithAsChild } from './slot'
 // Portado a mano desde el registro de Animate UI (animate-ui.com/docs/icons)
 // — el componente base del que depende CUALQUIER ícono animado de esa
 // librería (`AnimateIcon`/`IconWrapper`/`useAnimateIconContext`/
-// `getVariants`). Sin cambios de lógica frente al original — la animación
+// `useVariants`). Sin cambios de lógica frente al original — la animación
 // y los props (`animateOnHover`, `animateOnTap`, `animateOnView`, `loop`,
 // etc.) se conservan EXACTOS; solo se adaptaron los imports (`@/lib/utils`
 // → `../../lib/cn`, `@/hooks/use-is-in-view` → `./useIsInView`,
@@ -539,7 +539,7 @@ function IconWrapper<T extends string>({
   return <IconComponent size={size} className={cn(className, (animationProp === 'path' || animationProp === 'path-loop') && pathClassName)} {...props} />
 }
 
-function getVariants<V extends { default: T; [key: string]: T }, T extends Record<string, Variants>>(animations: V): T {
+function useVariants<V extends { default: T; [key: string]: T }, T extends Record<string, Variants>>(animations: V): T {
   const { animation: animationType } = useAnimateIconContext()
 
   let result: T
@@ -564,7 +564,7 @@ export {
   AnimateIcon,
   IconWrapper,
   useAnimateIconContext,
-  getVariants,
+  useVariants,
   type IconProps,
   type IconWrapperProps,
   type AnimateIconProps,

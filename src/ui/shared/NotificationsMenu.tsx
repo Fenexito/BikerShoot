@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useNotifications, markNotificationRead, markAllNotificationsRead, type AppNotification, type NotificationType } from '../../features/notifications/useNotifications'
-import { IconBell, IconCart, IconVerified } from './icons'
+import { IconCart, IconVerified } from './icons'
+import { AnimateIcon } from '../animate-icons/icon'
+import { Bell } from '../animate-icons/icons/Bell'
 import { cn } from '../../lib/cn'
 
 const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
@@ -98,17 +100,19 @@ export function NotificationsMenu() {
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Notificaciones"
-        title="Notificaciones"
-        className="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-      >
-        <IconBell className="h-5 w-5" />
-        {unread.length > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-2 w-2 items-center justify-center rounded-full bg-primary" />
-        )}
-      </button>
+      <AnimateIcon animateOnHover asChild>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Notificaciones"
+          title="Notificaciones"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+        >
+          <Bell size={20} />
+          {unread.length > 0 && (
+            <span className="absolute right-1.5 top-1.5 flex h-2 w-2 items-center justify-center rounded-full bg-primary" />
+          )}
+        </button>
+      </AnimateIcon>
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-3 w-80 animate-menu-in overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 text-white shadow-2xl">

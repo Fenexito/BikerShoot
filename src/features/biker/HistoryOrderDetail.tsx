@@ -21,7 +21,8 @@ import { ActionMenu, type ActionMenuItem } from '../../ui/shared/ActionMenu'
 import { useHeaderTransform } from '../../ui/layout/useHeaderTransform'
 import { useScrolledPast } from '../../ui/shared/useScrolledPast'
 import { supabase } from '../../lib/supabase'
-import { IconDownload, IconEye, IconEdit, IconWhatsapp, IconTrash } from '../../ui/shared/icons'
+import { IconDownload, IconEye, IconEdit, IconWhatsapp } from '../../ui/shared/icons'
+import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
 
 // Misma línea (168px) que usa el header pegajoso de la vista de evento del
@@ -384,7 +385,7 @@ export function HistoryOrderDetail() {
             ]
           : []),
         ...(canCancelGroup(activeGroup)
-          ? [{ label: 'Cancelar Pedido', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' as const, onClick: () => cancelGroup(activeGroup) }]
+          ? [{ label: 'Cancelar Pedido', icon: <Trash size={16} />, tone: 'danger' as const, onClick: () => cancelGroup(activeGroup) }]
           : []),
       ]
     : []

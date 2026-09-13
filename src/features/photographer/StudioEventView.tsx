@@ -18,7 +18,12 @@ import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
-import { IconTrash, IconEdit, IconPlay, IconPause, IconChevronLeft } from '../../ui/shared/icons'
+import { IconEdit } from '../../ui/shared/icons'
+import { AnimateIcon } from '../../ui/animate-icons/icon'
+import { Trash } from '../../ui/animate-icons/icons/Trash'
+import { Play } from '../../ui/animate-icons/icons/Play'
+import { Pause } from '../../ui/animate-icons/icons/Pause'
+import { ChevronLeft } from '../../ui/animate-icons/icons/ChevronLeft'
 import { ActionMenu } from '../../ui/shared/ActionMenu'
 import { ScrollToTopButton } from '../../ui/shared/ScrollToTopButton'
 import { Dropdown } from '../../ui/shared/Dropdown'
@@ -120,16 +125,18 @@ function AccordionRow({
             >
               ✓
             </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(photo.id)
-              }}
-              aria-label="Eliminar foto"
-              className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
-            >
-              <IconTrash className="h-3.5 w-3.5" />
-            </button>
+            <AnimateIcon animateOnHover asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(photo.id)
+                }}
+                aria-label="Eliminar foto"
+                className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
+              >
+                <Trash size={14} />
+              </button>
+            </AnimateIcon>
           </>
         ),
       }))}
@@ -751,7 +758,7 @@ export function StudioEventView() {
         <ActionMenu
           items={[
             { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
-            { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
+            { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
           ]}
         />
       </div>
@@ -829,9 +836,11 @@ export function StudioEventView() {
               thumbnail no caben cómodos aquí, y pausar/publicar se mueve
               dentro del menú. */}
           <div className="flex items-center gap-3 rounded-full border border-border bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:hidden">
-            <button onClick={() => navigate('/studio/eventos')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
-              <IconChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-            </button>
+            <AnimateIcon animateOnHover asChild>
+              <button onClick={() => navigate('/studio/eventos')} aria-label="Volver" className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground transition-colors hover:text-muted-foreground">
+                <ChevronLeft size={20} strokeWidth={2.5} />
+              </button>
+            </AnimateIcon>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-bold tracking-tight2">{event.title}</h1>
               {scrolled && activePointLabel && <p className="mt-0.5 truncate text-xs text-muted-foreground">📍 {activePointLabel}</p>}
@@ -840,10 +849,10 @@ export function StudioEventView() {
             <ActionMenu
               items={[
                 event.status === 'pausado'
-                  ? { onClick: () => toggleStatus('activo'), label: 'Publicar evento', icon: <IconPlay className="h-4 w-4" /> }
-                  : { onClick: () => toggleStatus('pausado'), label: 'Pausar evento', icon: <IconPause className="h-4 w-4" /> },
+                  ? { onClick: () => toggleStatus('activo'), label: 'Publicar evento', icon: <Play size={16} /> }
+                  : { onClick: () => toggleStatus('pausado'), label: 'Pausar evento', icon: <Pause size={16} /> },
                 { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
-                { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
+                { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
               ]}
             />
           </div>
@@ -900,7 +909,7 @@ export function StudioEventView() {
                 <ActionMenu
                   items={[
                     { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <IconEdit className="h-4 w-4" /> },
-                    { onClick: deleteEvent, label: 'Eliminar evento', icon: <IconTrash className="h-4 w-4" />, tone: 'danger' },
+                    { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
                   ]}
                 />
               </div>
@@ -995,13 +1004,15 @@ export function StudioEventView() {
             >
               Asignar hora
             </button>
-            <button
-              onClick={bulkDelete}
-              className="flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"
-            >
-              <IconTrash className="h-3.5 w-3.5" />
-              Eliminar
-            </button>
+            <AnimateIcon animateOnHover asChild>
+              <button
+                onClick={bulkDelete}
+                className="flex items-center gap-1.5 rounded-full bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"
+              >
+                <Trash size={14} />
+                Eliminar
+              </button>
+            </AnimateIcon>
             <button onClick={() => setSelectedIds(new Set())} aria-label="Cancelar selección" className="ml-1 text-muted-foreground hover:text-foreground">
               ✕
             </button>

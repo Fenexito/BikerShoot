@@ -10,7 +10,10 @@ import { formatOrderCode } from '../../../lib/orderStatus'
 import { EVENT_STATUS_STYLE } from '../../../lib/eventStatus'
 import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { InitialsAvatar } from '../../../ui/shared/InitialsAvatar'
-import { IconSearch, IconClose, IconImages, IconCart, IconUser, IconArchive, IconCreditCard, IconSettings, IconPlus } from '../../../ui/shared/icons'
+import { IconImages, IconCart, IconUser, IconArchive, IconCreditCard, IconSettings, IconPlus } from '../../../ui/shared/icons'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { Search } from '../../../ui/animate-icons/icons/Search'
+import { X } from '../../../ui/animate-icons/icons/X'
 import { cn } from '../../../lib/cn'
 
 type SearchCategory = 'bikers' | 'eventos' | 'pedidos' | 'fotos' | 'paginas'
@@ -262,7 +265,7 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
       <div className="relative z-10 flex w-full max-w-4xl items-start gap-4">
         <div className="flex w-full flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-900 text-white shadow-2xl animate-search-modal-in">
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-          <IconSearch className="h-5 w-5 shrink-0 text-white/50" />
+          <Search size={20} className="shrink-0 text-white/50" />
           <input
             autoFocus={autoFocusInput}
             value={query}
@@ -270,9 +273,11 @@ export function GlobalSearchModal({ open, onClose }: { open: boolean; onClose: (
             placeholder="Bikers, eventos, pedidos, fotos, páginas…"
             className="w-full bg-transparent text-base outline-none placeholder:text-white/40"
           />
-          <button onClick={onClose} aria-label="Cerrar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
-            <IconClose className="h-4 w-4" />
-          </button>
+          <AnimateIcon animateOnHover asChild>
+            <button onClick={onClose} aria-label="Cerrar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+              <X size={16} />
+            </button>
+          </AnimateIcon>
         </div>
 
         {!query.trim() && visibleRecents.length > 0 && (

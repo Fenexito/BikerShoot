@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { AnimateIcon } from '../animate-icons/icon'
 import { cn } from '../../lib/cn'
 
 export interface ProfileMenuLink {
@@ -98,27 +99,33 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, the
                   'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-white/10',
                   link.tone === 'danger' ? 'text-red-400' : 'text-white/90',
                 )
+                // Fila COMPLETA envuelta en AnimateIcon (no solo el ícono)
+                // — cualquier ícono animado que un caller pase en
+                // `link.icon` dispara su animación con el hover de toda la
+                // fila; uno estático lo ignora sin problema.
                 return link.to ? (
-                  <Link
-                    key={link.label}
-                    to={link.to}
-                    onClick={() => setOpen(false)}
-                    className={itemClass}
-                    {...(link.external ? { target: '_blank', rel: 'noreferrer' } : {})}
-                  >
-                    {content}
-                  </Link>
+                  <AnimateIcon key={link.label} animateOnHover asChild>
+                    <Link
+                      to={link.to}
+                      onClick={() => setOpen(false)}
+                      className={itemClass}
+                      {...(link.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                    >
+                      {content}
+                    </Link>
+                  </AnimateIcon>
                 ) : (
-                  <button
-                    key={link.label}
-                    onClick={() => {
-                      setOpen(false)
-                      link.onClick?.()
-                    }}
-                    className={itemClass}
-                  >
-                    {content}
-                  </button>
+                  <AnimateIcon key={link.label} animateOnHover asChild>
+                    <button
+                      onClick={() => {
+                        setOpen(false)
+                        link.onClick?.()
+                      }}
+                      className={itemClass}
+                    >
+                      {content}
+                    </button>
+                  </AnimateIcon>
                 )
               })}
             </div>
