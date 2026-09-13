@@ -9,8 +9,12 @@ import { getPortalRoot } from '../../../ui/shared/portalRoot'
 import { useScrollLock } from '../../../ui/shared/useScrollLock'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { createSharedLink } from '../../share/sharedLinks'
-import { IconBookmark, IconChevronLeft, IconChevronRight, IconShare } from '../../../ui/shared/icons'
+import { IconBookmark } from '../../../ui/shared/icons'
 import { Cart } from '../../../ui/animate-icons/icons/Cart'
+import { Bookmark } from '../../../ui/animate-icons/icons/Bookmark'
+import { Share } from '../../../ui/animate-icons/icons/Share'
+import { ChevronLeft } from '../../../ui/animate-icons/icons/ChevronLeft'
+import { ChevronRight } from '../../../ui/animate-icons/icons/ChevronRight'
 import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { X } from '../../../ui/animate-icons/icons/X'
 import { cn } from '../../../lib/cn'
@@ -341,15 +345,17 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
           superponen, cada uno es su propio elemento en la misma fila. */}
       <div className="absolute right-4 top-4 z-10 flex items-center gap-3 sm:right-6 sm:top-6">
         {!purchased && (
-          <button
-            onClick={handleShare}
-            disabled={sharing}
-            aria-label="Compartir esta foto"
-            title="Compartir"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-50"
-          >
-            {sharing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <IconShare className="h-4 w-4" />}
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={handleShare}
+              disabled={sharing}
+              aria-label="Compartir esta foto"
+              title="Compartir"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-50"
+            >
+              {sharing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Share size={16} />}
+            </button>
+          </AnimateIcon>
         )}
         <span className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-sm sm:text-sm">
           {index + 1} / {photos.length}
@@ -381,7 +387,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                 aria-label="Guardar"
               >
-                <IconBookmark className="h-4 w-4" filled={isFavorite} />
+                <Bookmark size={16} filled={isFavorite} />
               </button>
             </AnimateIcon>
             {!photo.featured && (
@@ -412,22 +418,26 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
           zoom se desactivó ahí y conviene dejar una forma de navegar con
           un toque sin depender solo del gesto. */}
       {index > 0 && (
-        <button
-          onClick={() => go(-1)}
-          aria-label="Foto anterior"
-          className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:left-4 sm:h-12 sm:w-12"
-        >
-          <IconChevronLeft className="h-5 w-5" />
-        </button>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <button
+            onClick={() => go(-1)}
+            aria-label="Foto anterior"
+            className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:left-4 sm:h-12 sm:w-12"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        </AnimateIcon>
       )}
       {index < photos.length - 1 && (
-        <button
-          onClick={() => go(1)}
-          aria-label="Foto siguiente"
-          className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:right-4 sm:h-12 sm:w-12"
-        >
-          <IconChevronRight className="h-5 w-5" />
-        </button>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <button
+            onClick={() => go(1)}
+            aria-label="Foto siguiente"
+            className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:right-4 sm:h-12 sm:w-12"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </AnimateIcon>
       )}
     </div>,
     getPortalRoot(),

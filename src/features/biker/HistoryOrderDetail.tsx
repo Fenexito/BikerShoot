@@ -610,6 +610,24 @@ export function HistoryOrderDetail() {
                   </div>
                 ))}
               </div>
+
+              {/* Antes "Cancelar Pedido" solo vivía escondido dentro del
+                  menú "···" — mientras falta el comprobante (única ventana
+                  en la que cancelar sigue siendo unilateral, ver
+                  `canCancelGroup`) se repite acá abajo, siempre visible,
+                  para que no dependa de que el biker encuentre el menú. */}
+              {canCancelGroup(group) && (
+                <div className="mt-6 border-t border-border pt-4">
+                  <AnimateIcon animateOnHover animateOnTap asChild>
+                    <button
+                      onClick={() => cancelGroup(group)}
+                      className="flex w-full items-center justify-center gap-2 rounded-full border border-red-200 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      <Trash size={16} /> Cancelar pedido
+                    </button>
+                  </AnimateIcon>
+                </div>
+              )}
             </div>
           )
         })}

@@ -5,7 +5,10 @@ import { useCartStore } from '../../cart/cartStore'
 import { useFavoritesStore } from '../favoritesStore'
 import { timeAgo } from '../../../lib/timeAgo'
 import { flyToCart } from '../../../lib/flyToCart'
-import { IconBookmark, IconCart } from '../../../ui/shared/icons'
+import { IconBookmark } from '../../../ui/shared/icons'
+import { Bookmark } from '../../../ui/animate-icons/icons/Bookmark'
+import { Cart } from '../../../ui/animate-icons/icons/Cart'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { cn } from '../../../lib/cn'
 
 interface PhotoCardProps {
@@ -179,16 +182,18 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
             ) : (
               <span />
             )}
-            <button
-              onClick={handleToggleFavorite}
-              aria-label="Guardar"
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
-                isFavorite ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              <IconBookmark className="h-3.5 w-3.5" filled={isFavorite} />
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={handleToggleFavorite}
+                aria-label="Guardar"
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-sm transition-transform duration-200 hover:scale-110',
+                  isFavorite ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                <Bookmark size={14} filled={isFavorite} />
+              </button>
+            </AnimateIcon>
           </div>
 
           {/* Barra inferior: solo agregar al carrito — sin recuadro de fotógrafo/evento
@@ -199,24 +204,26 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
                 ★ Destacada
               </span>
             ) : (
-              <button
-                onClick={handleAddClick}
-                aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
-                className={cn(
-                  // Blanco por defecto, azul relleno una vez agregada — antes
-                  // usaba un check verde separado; ahora es el mismo botón, el
-                  // color y el ícono (carrito relleno vs. contorno) son la
-                  // única diferencia entre "agregar" y "ya en el carrito".
-                  'pointer-events-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-sm transition-all duration-200 sm:h-9 sm:px-3',
-                  // `sm:hover:` (no `hover:` a secas): en móvil no hay
-                  // verdadero hover, y el :hover "pegajoso" tras un toque
-                  // podía quedarse en azul, mismo color que "ya agregada",
-                  // prestándose a confundirlas.
-                  inCart ? 'bg-primary text-white' : 'bg-white text-foreground sm:hover:bg-primary sm:hover:text-white',
-                )}
-              >
-                <IconCart className="h-3.5 w-3.5" filled={inCart} />
-              </button>
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <button
+                  onClick={handleAddClick}
+                  aria-label={inCart ? 'Quitar del carrito' : 'Agregar al carrito'}
+                  className={cn(
+                    // Blanco por defecto, azul relleno una vez agregada — antes
+                    // usaba un check verde separado; ahora es el mismo botón, el
+                    // color y el ícono (carrito relleno vs. contorno) son la
+                    // única diferencia entre "agregar" y "ya en el carrito".
+                    'pointer-events-auto flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold shadow-sm transition-all duration-200 sm:h-9 sm:px-3',
+                    // `sm:hover:` (no `hover:` a secas): en móvil no hay
+                    // verdadero hover, y el :hover "pegajoso" tras un toque
+                    // podía quedarse en azul, mismo color que "ya agregada",
+                    // prestándose a confundirlas.
+                    inCart ? 'bg-primary text-white' : 'bg-white text-foreground sm:hover:bg-primary sm:hover:text-white',
+                  )}
+                >
+                  <Cart size={14} filled={inCart} />
+                </button>
+              </AnimateIcon>
             )}
           </div>
         </>
