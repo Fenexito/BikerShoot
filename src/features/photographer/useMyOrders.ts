@@ -45,7 +45,7 @@ export interface RawOrderItem {
   cancelled_at: string | null
   photo: RawOrderItemPhoto | null
   event: { title: string } | null
-  order: { order_number: number; payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { id: string; display_name: string; phone: string | null } | null } | null
+  order: { order_number: number; payment_method: 'tarjeta' | 'transferencia'; created_at: string; biker: { id: string; display_name: string; phone: string | null; avatar_url: string | null } | null } | null
 }
 
 /** Adapta un item de pedido (lado fotógrafo) a la forma que espera el
@@ -82,6 +82,7 @@ export interface PhotographerOrderGroup {
   bikerId: string | null
   bikerName: string
   bikerPhone: string | null
+  bikerAvatarUrl: string | null
   eventTitle: string
   paymentMethod: 'tarjeta' | 'transferencia'
   createdAt: string
@@ -108,7 +109,7 @@ function useRawOrderItems(photographerId: string | undefined) {
     queryFn: async (): Promise<RawOrderItem[]> => {
       const { data, error } = await supabase
         .from('order_items')
-        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured, created_at, point:event_points(label, time_start, time_end)), event:events(title), order:orders(order_number, payment_method, created_at, biker:profiles(id, display_name, phone))')
+        .select('*, photo:photos(id, storage_path, preview_path, delivered_path, raw_path, original_filename, featured, created_at, point:event_points(label, time_start, time_end)), event:events(title), order:orders(order_number, payment_method, created_at, biker:profiles(id, display_name, phone, avatar_url))')
         .eq('photographer_id', photographerId)
         .order('created_at', { ascending: false })
         .order('position')
@@ -165,6 +166,7 @@ export function usePhotographerOrders(photographerId: string | undefined) {
       bikerId: items[0].order?.biker?.id ?? null,
       bikerName: items[0].order?.biker?.display_name ?? 'Biker',
       bikerPhone: items[0].order?.biker?.phone ?? null,
+      bikerAvatarUrl: items[0].order?.biker?.avatar_url ?? null,
       eventTitle: items[0].event?.title ?? '',
       paymentMethod,
       createdAt: items[0].order?.created_at ?? items[0].created_at,

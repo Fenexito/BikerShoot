@@ -5,7 +5,7 @@ import { useOrderGroup, toGridPhoto, type PhotographerOrderGroup, type RawOrderI
 import { usePhotographerDetails } from './usePhotographerDetails'
 import { queryClient } from '../../lib/queryClient'
 import { supabase } from '../../lib/supabase'
-import { previewUrl } from '../../lib/r2'
+import { previewUrl, r2Url } from '../../lib/r2'
 import { downloadFile, buildDeliveredFilename, uploadFileWithProgress } from '../../lib/download'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
 import { getOrderStatusStyle, getPhotographerStatusStyle, formatOrderCode, type OrderItemStatus } from '../../lib/orderStatus'
@@ -1050,7 +1050,15 @@ export function StudioOrderDetail() {
       <div className="rounded-3xl border border-border bg-card p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <InitialsAvatar name={order.bikerName} className="h-12 w-12 shrink-0 bg-foreground text-base text-background sm:h-14 sm:w-14" />
+            {order.bikerAvatarUrl ? (
+              <img
+                src={order.bikerAvatarUrl.startsWith('http') ? order.bikerAvatarUrl : r2Url(order.bikerAvatarUrl)}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14"
+              />
+            ) : (
+              <InitialsAvatar name={order.bikerName} className="h-12 w-12 shrink-0 bg-foreground text-base text-background sm:h-14 sm:w-14" />
+            )}
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">{order.bikerName}</h1>
               <p className="truncate text-xs text-muted-foreground sm:text-sm">{formatOrderCode(order.orderNumber, orderCodeName)} · {eventLabel}</p>
@@ -1137,26 +1145,23 @@ export function StudioOrderDetail() {
           )}
         </div>
 
-        {action && (
-          <div className="mt-6 flex justify-end border-t border-border pt-4">
-            <Button variant="dark" onClick={confirmAction}>{action.label}</Button>
-          </div>
-        )}
-
-        {/* Antes "Cancelar pedido" solo vivía escondido en el menú "···"
-            que aparece al hacer scroll — se repite acá abajo, siempre
-            visible, mismo criterio que en la vista del biker: un botón
-            regular (no de ancho completo) abajo a la derecha. */}
-        {canCancel && (
-          <div className={cn('flex justify-end', !action && 'mt-6 border-t border-border pt-4')}>
-            <AnimateIcon animateOnHover animateOnTap asChild>
-              <button
-                onClick={cancelOrder}
-                className="flex items-center gap-1.5 rounded-full border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-              >
-                <Trash size={16} /> Cancelar pedido
-              </button>
-            </AnimateIcon>
+        {/* "Confirmar pago recibido" y "Cancelar pedido" — antes cada uno
+            vivía en su propio bloque apilado; ahora comparten una sola
+            fila (el de cancelar siempre a la izquierda del de confirmar,
+            cuando ambos existen a la vez). */}
+        {(action || canCancel) && (
+          <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+            {canCancel && (
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <button
+                  onClick={cancelOrder}
+                  className="flex items-center gap-1.5 rounded-full border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                >
+                  <Trash size={16} /> Cancelar pedido
+                </button>
+              </AnimateIcon>
+            )}
+            {action && <Button variant="dark" onClick={confirmAction}>{action.label}</Button>}
           </div>
         )}
       </div>

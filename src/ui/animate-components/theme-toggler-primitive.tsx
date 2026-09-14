@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { flushSync } from 'react-dom'
+import { getPortalRoot } from '../shared/portalRoot'
 
 // Portado a mano desde animate-ui.com (registry/primitives/effects/theme-toggler)
 // — el efecto de "barrido" al cambiar de tema NO usa `motion`, usa la View
@@ -86,42 +87,74 @@ function ThemeToggler({ theme, resolvedTheme, setTheme, onImmediateChange, direc
   const toggleTheme = React.useCallback(
     async (theme: ThemeSelection, origin?: Origin) => {
       const resolved = theme
-
       setCurrent({ effective: theme, resolved })
-      onImmediateChange?.(theme)
-
-      if (!document.startViewTransition) {
-        flushSync(() => {
-          setPreview({ effective: theme, resolved })
-        })
-        setTheme(theme)
-        return
-      }
-
-      await document.startViewTransition(() => {
-        flushSync(() => {
-          setPreview({ effective: theme, resolved })
-          document.documentElement.classList.toggle('dark', resolved === 'dark')
-        })
-      }).ready
 
       const clipPath = origin ? getCircleKeyframes(origin) : [fromClip, toClip]
 
-      // Se intentó darle al header y al menú inferior (`position: fixed`)
-      // su propio grupo de view-transition (`app-header`/`app-bottom-nav`)
-      // para que barrieran junto con el resto en vez de repintarse al
-      // instante — en pruebas reales eso resultó PEOR: el navegador a
-      // veces deja ese grupo "congelado" mostrando la foto vieja para
-      // siempre (nunca revela el DOM real ya actualizado), un cuelgue
-      // visual mucho más grave que el salto instantáneo original. Se
-      // revirtió a animar solo `root` — header/menú inferior vuelven a
-      // cambiar de golpe, pero de forma confiable, sin pantallas
-      // congeladas. Si en el futuro se reintenta, investigar por qué
-      // Chrome no siempre corre el "finished" de una animación construida
-      // a mano (`Element.animate`) contra el ciclo de vida real de
-      // `ViewTransition.finished` para grupos con nombre.
-      await document.documentElement.animate({ clipPath }, { duration: 700, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' })
-        .finished
+      // Overlay propio en vez de `document.startViewTransition` — se probó
+      // la View Transitions API nativa dándole al header y al menú inferior
+      // (`position: fixed`) su propio grupo con nombre para que barrieran
+      // junto con el resto en vez de repintarse aparte: en pruebas reales
+      // eso resultó en pantallas que Chrome deja "congeladas" mostrando la
+      // foto vieja para siempre. También se descubrió la causa real de por
+      // qué el header/menú inferior parecían cambiar de golpe ANTES que el
+      // resto de la página incluso animando solo `root`: `onImmediateChange`
+      // (el que de verdad dispara el cambio de tema real en el store, y por
+      // lo tanto todo el repintado de colores) se llamaba aquí arriba, ANTES
+      // de que existiera cualquier animación — el repintado real ocurría
+      // casi al instante, y el header (con su propia capa de composición al
+      // ser `fixed`) se colaba mostrándolo antes de tiempo mientras el resto
+      // de la página seguía "congelado" en la foto vieja del navegador.
+      // Un overlay manual (un solo `<div>` opaco, encima de TODO —header,
+      // menú inferior y cuerpo por igual, sin depender de qué elemento
+      // tenga su propia capa) que se abre con una transición de CSS
+      // `clip-path` evita ambos problemas: el cambio real de tema ocurre
+      // siempre escondido bajo el overlay (nunca se cuela nada antes de
+      // tiempo), y la limpieza no depende del ciclo de vida frágil de la
+      // View Transitions API — un `transitionend` normal más un
+      // `setTimeout` de respaldo garantizan que el overlay siempre se
+      // quita, nunca se queda pegado en pantalla.
+      const overlay = document.createElement('div')
+      overlay.style.position = 'fixed'
+      overlay.style.inset = '0'
+      overlay.style.zIndex = '2147483647'
+      overlay.style.pointerEvents = 'none'
+      overlay.style.backgroundColor = 'rgb(var(--color-background))'
+      overlay.style.clipPath = clipPath[1]
+      // Dentro de `#portal-theme-root` (no `document.body`) — ahí es donde
+      // viven las variables CSS del tema activo (`.theme-studio.dark`,
+      // etc.); fuera de ese wrapper el overlay caería a los valores de
+      // `:root` y podría pintarse del color equivocado.
+      getPortalRoot().appendChild(overlay)
+
+      // El cambio real (clase `dark` + el store de tema, que es lo que de
+      // verdad repinta colores vía `#portal-theme-root`) ocurre ya, de un
+      // solo golpe sincronizado — pero queda escondido bajo el overlay
+      // opaco de arriba hasta que este empiece a abrirse.
+      flushSync(() => {
+        setPreview({ effective: theme, resolved })
+        document.documentElement.classList.toggle('dark', resolved === 'dark')
+        onImmediateChange?.(theme)
+      })
+
+      // Reflow forzado: si no, el navegador junta el clip-path inicial y el
+      // final en el mismo frame y la transición nunca se llega a ver.
+      void overlay.offsetHeight
+      overlay.style.transition = 'clip-path 700ms ease-in-out'
+      overlay.style.clipPath = clipPath[0]
+
+      await new Promise<void>((resolve) => {
+        let done = false
+        const finish = () => {
+          if (done) return
+          done = true
+          overlay.removeEventListener('transitionend', finish)
+          resolve()
+        }
+        overlay.addEventListener('transitionend', finish)
+        setTimeout(finish, 900)
+      })
+      overlay.remove()
       setTheme(theme)
     },
     [onImmediateChange, fromClip, toClip, setTheme],
@@ -130,7 +163,6 @@ function ThemeToggler({ theme, resolvedTheme, setTheme, onImmediateChange, direc
   return (
     <React.Fragment {...props}>
       {typeof children === 'function' ? children({ effective: current.effective, resolved: current.resolved, toggleTheme }) : children}
-      <style>{`::view-transition-old(root), ::view-transition-new(root){animation:none;mix-blend-mode:normal;}`}</style>
     </React.Fragment>
   )
 }

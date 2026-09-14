@@ -10,7 +10,6 @@ import { FilterBar } from '../../ui/shared/FilterBar'
 import { previewUrl } from '../../lib/r2'
 import { cn } from '../../lib/cn'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
-import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 
 const PAGE_SIZE_FIRST = 10
 const PAGE_SIZE_MORE = 15
@@ -70,16 +69,6 @@ export function OrderRow({ order, profileName }: { order: PhotographerOrderGroup
   // referencia (fotos DEL PEDIDO) + "+N" si hay más.
   const previewItems = order.items.slice(0, 3)
   const extraCount = order.items.length - previewItems.length
-  // Mismo tratamiento que "Mis compras" del biker: acordeón SOLO en
-  // escritorio (acotado al mismo espacio que el stack), stack de siempre
-  // en móvil (achicado al 70% de su ancho de antes).
-  const galleryItems = previewItems.map((item, i) => ({
-    image: previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null }),
-    overlay:
-      i === previewItems.length - 1 && extraCount > 0 ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-bold text-white">+{extraCount}</div>
-      ) : undefined,
-  }))
 
   return (
     <Link
@@ -89,41 +78,22 @@ export function OrderRow({ order, profileName }: { order: PhotographerOrderGroup
         borderColor,
       )}
     >
-      {/* Miniaturas de móvil — stack de siempre, achicado al 70% (w-12→
-          ~34px). Solo en móvil: en escritorio esta misma área usa la
-          galería de acordeón de abajo. */}
-      <div className="flex shrink-0 -space-x-2 sm:hidden">
+      {/* Miniaturas de referencia — stack apilado de siempre, sin
+          acordeón (se probó y se revirtió: no se veía bien). */}
+      <div className="flex shrink-0 -space-x-3">
         {previewItems.map((item) => (
           <img
             key={item.id}
             src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
             alt=""
-            className="h-full max-h-24 w-[34px] shrink-0 rounded-xl border-2 border-card object-cover"
+            className="h-full max-h-24 w-12 shrink-0 rounded-xl border-2 border-card object-cover sm:w-16"
           />
         ))}
         {extraCount > 0 && (
-          <span className="flex h-full max-h-24 w-[34px] shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
+          <span className="flex h-full max-h-24 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground sm:w-16">
             +{extraCount}
           </span>
         )}
-      </div>
-
-      {/* Galería tipo acordeón — SOLO en escritorio, acotada al mismo
-          espacio que ocupaba el stack de miniaturas (168×96px). */}
-      <div className="hidden shrink-0 sm:block" style={{ width: 168 }}>
-        <AccordionGallery
-          items={galleryItems}
-          height={96}
-          gap={4}
-          radius={14}
-          expandRatio={0.35}
-          tilt={4}
-          parallax={0.25}
-          accentColor="rgb(37 99 235)"
-          overlayColor="#000000"
-          showLabels={false}
-          defaultIndex={0}
-        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">

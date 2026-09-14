@@ -4,7 +4,6 @@ import { useAuth } from '../auth/AuthContext'
 import { useMyOrders, deriveOrderEffectiveStatus, groupOrderByPhotographer, type MyOrder } from './useMyOrders'
 import type { EffectiveOrderStatus } from '../../lib/orderStatus'
 import { previewUrl } from '../../lib/r2'
-import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { Button } from '../../ui/flat/Button'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { FilterBar } from '../../ui/shared/FilterBar'
@@ -50,18 +49,6 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
   // por un "+N" con la cantidad restante (no una miniatura más).
   const previewItems = order.order_items.slice(0, 3)
   const extraCount = order.order_items.length - previewItems.length
-  // Galería tipo acordeón (misma que usa el fotógrafo en la vista de
-  // evento) — las MISMAS 3 fotos de referencia que ya muestra la
-  // miniatura de siempre (no todo el pedido), con el "+N" como overlay
-  // sobre la última si hay más — el mismo criterio, solo con la
-  // animación de acordeón en vez del stack apilado.
-  const galleryItems = previewItems.map((item, i) => ({
-    image: previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null }),
-    overlay:
-      i === previewItems.length - 1 && extraCount > 0 ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-bold text-white">+{extraCount}</div>
-      ) : undefined,
-  }))
   // La barra de progreso del pedido en la LISTA se basa en el TOTAL de
   // fotos compradas (sin importar de cuántos fotógrafos distintos son) —
   // así el biker entiende de un vistazo en qué momento se completa TODO
@@ -79,51 +66,23 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
       )}
       style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}
     >
-      {/* Miniaturas de móvil — el stack de siempre, achicado al 70% de su
-          ancho de antes (w-12→~34px, -space-x-3→-space-x-2 en la misma
-          proporción) para que ocupe menos espacio en la fila. Solo en
-          móvil: en escritorio esta misma área usa la galería de acordeón de
-          abajo (pedido explícito: acordeón SOLO en escritorio, nunca en
-          móvil). */}
-      <div className="flex shrink-0 -space-x-2 sm:hidden">
+      {/* Miniaturas de referencia — stack apilado de siempre, sin acordeón
+          (se probó y se revirtió: no se veía bien). Igual en móvil y
+          escritorio. */}
+      <div className="flex shrink-0 -space-x-3">
         {previewItems.map((item) => (
           <img
             key={item.id}
             src={previewUrl({ storage_path: item.photo?.storage_path ?? null, preview_path: item.photo?.preview_path ?? null })}
             alt=""
-            className="h-full max-h-24 w-[34px] shrink-0 rounded-xl border-2 border-card object-cover"
+            className="h-full max-h-24 w-12 shrink-0 rounded-xl border-2 border-card object-cover sm:w-16"
           />
         ))}
         {extraCount > 0 && (
-          <span className="flex h-full max-h-24 w-[34px] shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground">
+          <span className="flex h-full max-h-24 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-card bg-muted text-xs font-bold text-muted-foreground sm:w-16">
             +{extraCount}
           </span>
         )}
-      </div>
-
-      {/* Galería tipo acordeón — SOLO en escritorio (mismo componente que
-          usa el fotógrafo en la vista de evento), acotada al MISMO espacio
-          que ocupaba el stack de miniaturas de siempre (ancho fijo ~168px,
-          alto 96px = el mismo `max-h-24` de arriba) — no un tamaño de
-          galería completo, solo la animación de acordeón viviendo dentro de
-          esa misma área chica. Mismas 3 fotos que el stack (+ el "+N" como
-          overlay), con gap chico (4 en vez del default) — al ser una
-          miniatura, no una galería grande, un gap generoso se veía
-          demasiado separado. */}
-      <div className="hidden shrink-0 sm:block" style={{ width: 168 }}>
-        <AccordionGallery
-          items={galleryItems}
-          height={96}
-          gap={4}
-          radius={14}
-          expandRatio={0.35}
-          tilt={4}
-          parallax={0.25}
-          accentColor="rgb(37 99 235)"
-          overlayColor="#000000"
-          showLabels={false}
-          defaultIndex={0}
-        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
