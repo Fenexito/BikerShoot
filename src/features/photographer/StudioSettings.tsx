@@ -808,12 +808,16 @@ export function StudioSettings() {
               </Section>
 
               <Section title="Administrar cuenta">
-                <div className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center sm:justify-between">
+                {/* Ancho completo SIEMPRE y más prominente que el resto —
+                    es la acción que más se busca, no debería competir por
+                    espacio con su propia etiqueta (mismo criterio en el
+                    portal biker). */}
+                <div className="flex flex-col gap-3 border-b border-border py-4">
                   <div>
                     <p className="text-sm font-semibold">Cerrar sesión</p>
                     <p className="text-sm text-muted-foreground">Sales de este dispositivo.</p>
                   </div>
-                  <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={handleSignOutClick} loading={signingOut}>
+                  <Button size="lg" className="w-full justify-center" onClick={handleSignOutClick} loading={signingOut}>
                     Cerrar sesión
                   </Button>
                 </div>

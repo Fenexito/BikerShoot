@@ -77,7 +77,7 @@ export function HeaderStudio() {
     <>
       <div
         className={cn(
-          'app-header-vt fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-6 md:pt-0 md:!translate-y-0',
+          'fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-6 md:pt-0 md:!translate-y-0',
           hidden ? '-translate-y-[calc(100%+1rem)]' : 'translate-y-0',
         )}
       >

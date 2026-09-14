@@ -97,7 +97,7 @@ export function MobileBottomNav({ items, primary, activeClassName, autoHide = fa
   return (
     <nav
       className={cn(
-        'app-bottomnav-vt fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md transition-transform duration-300 md:hidden',
+        'fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md transition-transform duration-300 md:hidden',
         hidden ? 'translate-y-full' : 'translate-y-0',
       )}
     >

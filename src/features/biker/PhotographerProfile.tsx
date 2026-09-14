@@ -94,19 +94,25 @@ export function PhotographerProfile() {
       )}
 
       <div className="mx-auto max-w-5xl px-3 md:px-8">
-        <div className="relative -mt-14 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+        {/* Mismo estilo que el perfil del fotógrafo en su propio portal
+            (StudioProfilePage.tsx) — avatar más grande superpuesto a la
+            portada, encabezado más prominente. Sin la barra de
+            almacenamiento, el botón de "Editar perfil" ni la cantidad de
+            fotos subidas — ninguno de los 3 aplica del lado del biker; el
+            botón de WhatsApp ocupa el mismo lugar que ahí ocupa "Editar". */}
+        <div className="relative z-10 -mt-20 flex flex-col items-center gap-4 sm:flex-row sm:items-end md:-mt-24">
           {avatarUrl ? (
-            <img src={avatarUrl} alt={photographer.display_name} className="h-28 w-28 rounded-full border-4 border-background object-cover" />
+            <img src={avatarUrl} alt={photographer.display_name} className="h-36 w-36 shrink-0 rounded-full border-4 border-background object-cover shadow-sm md:h-40 md:w-40" />
           ) : (
             <InitialsAvatar
               name={photographer.display_name}
-              className="h-28 w-28 rounded-full border-4 border-background bg-primary text-3xl text-white"
+              className="h-36 w-36 shrink-0 rounded-full border-4 border-background bg-primary text-3xl text-white shadow-sm md:h-40 md:w-40"
             />
           )}
           <div className="flex-1 text-center sm:text-left">
             <div className="flex items-center justify-center gap-1.5 sm:justify-start">
-              <h1 className="text-2xl font-bold tracking-tight">{photographer.display_name}</h1>
-              <IconVerified className="h-5 w-5 shrink-0" aria-label="Fotógrafo verificado" />
+              <h1 className="text-3xl font-bold tracking-tight">{photographer.display_name}</h1>
+              <IconVerified className="h-6 w-6 shrink-0" aria-label="Fotógrafo verificado" />
             </div>
             {photographer.city && <p className="text-muted-foreground">{photographer.city}</p>}
             <SocialLinks
@@ -118,7 +124,7 @@ export function PhotographerProfile() {
           </div>
           {photographer.whatsapp ? (
             <AnimateIcon animateOnHover animateOnTap asChild>
-              <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">
+              <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="hidden sm:inline-flex">
                 <Button size="lg" style={{ backgroundColor: '#25D366' }}>
                   <Whatsapp size={20} />
                   Contactar por WhatsApp
@@ -126,13 +132,32 @@ export function PhotographerProfile() {
               </a>
             </AnimateIcon>
           ) : (
-            <Button size="lg" disabled>Sin contacto</Button>
+            <Button size="lg" disabled className="hidden sm:inline-flex">Sin contacto</Button>
           )}
         </div>
 
-        <div className="animate-stat-in mt-8 inline-flex items-center gap-3 rounded-full border border-border bg-card px-6 py-3">
-          <p className="text-2xl font-bold">{events.length}</p>
-          <p className="text-sm text-muted-foreground">evento{events.length === 1 ? '' : 's'} cubierto{events.length === 1 ? '' : 's'}</p>
+        {/* Tarjeta con borde (mismo estilo que las tarjetas de stats del
+            fotógrafo) — un solo dato (eventos cubiertos), sin cantidad de
+            fotos ni almacenamiento. En móvil, el botón de WhatsApp (oculto
+            arriba en esa vista) se repite al lado, mismo patrón que usa
+            Studio con su botón "Editar" en móvil. */}
+        <div className="mt-8 flex w-full items-center gap-3 sm:w-auto">
+          <div className="animate-stat-in flex-1 rounded-3xl border border-border bg-card px-6 py-5 text-center sm:w-56 sm:flex-none">
+            <p className="text-2xl font-bold">{events.length}</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Evento{events.length === 1 ? '' : 's'} cubierto{events.length === 1 ? '' : 's'}</p>
+          </div>
+          {photographer.whatsapp ? (
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <a href={`https://wa.me/${photographer.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="shrink-0 sm:hidden">
+                <Button size="sm" style={{ backgroundColor: '#25D366' }}>
+                  <Whatsapp size={16} />
+                  WhatsApp
+                </Button>
+              </a>
+            </AnimateIcon>
+          ) : (
+            <Button size="sm" disabled className="shrink-0 sm:hidden">Sin contacto</Button>
+          )}
         </div>
 
         {photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>}

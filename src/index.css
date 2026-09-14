@@ -437,25 +437,6 @@ html {
   transition: background-color 200ms ease, border-color 200ms ease;
 }
 
-/* El header y el menú inferior fijo (`position: fixed`) viven en su propia
-   capa de composición del navegador — la View Transitions API los deja
-   FUERA de la foto de "antes/después" que anima el resto de la página
-   (`::view-transition-old/new(root)`), así que en vez de barrerse junto
-   con todo lo demás, se repintaban al instante con la transición local de
-   200ms de arriba (que sí corre en la capa real, visible, mientras el
-   resto de la página sigue tapado por la foto animándose durante 700ms) —
-   eso también arrastraba consigo cualquier botón/menú abierto ADENTRO del
-   header (ej. "Editar perfil"), que "brillaba" al cambiar de golpe antes
-   de que el barrido general terminara. Dándoles su propio grupo con
-   `view-transition-name`, `theme-toggler-primitive.tsx` los anima con el
-   MISMO clip-path que el resto, así todo se barre junto. */
-.app-header-vt {
-  view-transition-name: app-header;
-}
-.app-bottomnav-vt {
-  view-transition-name: app-bottom-nav;
-}
-
 /* Logo.tsx (Logo/AuthLogo) alternan su versión clara/oscura con estas
    clases en vez de los utilitarios `dark:` de Tailwind —
    `darkMode: ['class', '.theme-studio.dark']` en tailwind.config.js hace

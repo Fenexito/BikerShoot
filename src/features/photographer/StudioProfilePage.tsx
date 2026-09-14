@@ -16,7 +16,6 @@ import { CreditCard } from '../../ui/animate-icons/icons/CreditCard'
 import { Settings } from '../../ui/animate-icons/icons/Settings'
 import { LogOut } from '../../ui/animate-icons/icons/LogOut'
 import { Edit } from '../../ui/animate-icons/icons/Edit'
-import { ThemeToggle } from '../../ui/studio/ThemeToggle'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import DriftWall from '../../ui/reactbits/DriftWall'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
@@ -196,12 +195,15 @@ export function StudioProfilePage() {
 
         {photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>}
 
-        <div className="mt-8 flex flex-wrap gap-2">
+        {/* Tabs con línea debajo (no chips) — mismo estilo que ve el biker
+            en el perfil público del fotógrafo (PhotographerProfile.tsx),
+            para que ambas vistas se sientan como la misma app. */}
+        <div className="mt-8 flex gap-2 border-b border-border">
           <button
             onClick={() => setTab('destacadas')}
             className={cn(
-              'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-              tab === 'destacadas' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
+              'border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
+              tab === 'destacadas' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground',
             )}
           >
             Fotos destacadas
@@ -209,8 +211,8 @@ export function StudioProfilePage() {
           <button
             onClick={() => setTab('eventos')}
             className={cn(
-              'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-              tab === 'eventos' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-border hover:text-foreground',
+              'border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
+              tab === 'eventos' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground',
             )}
           >
             Eventos ({events.length})
@@ -279,19 +281,20 @@ export function StudioProfilePage() {
             </Link>
           </AnimateIcon>
         </div>
-        <div className="mt-4 flex items-center justify-between md:hidden">
-          <AnimateIcon animateOnHover animateOnTap asChild>
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground disabled:opacity-50"
-            >
-              <LogOut size={16} />
-              {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
-            </button>
-          </AnimateIcon>
-          <ThemeToggle />
-        </div>
+        {/* El selector de tema que vivía acá al lado se quitó — ahora es
+            un ícono fijo en el header (HeaderThemeToggle), visible también
+            en móvil, así que tenerlo acá también era un control duplicado.
+            El botón de cerrar sesión ahora ocupa todo el ancho. */}
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background disabled:opacity-50 md:hidden"
+          >
+            <LogOut size={16} />
+            {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
+          </button>
+        </AnimateIcon>
       </div>
     </div>
   )

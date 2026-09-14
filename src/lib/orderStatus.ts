@@ -135,5 +135,16 @@ export function deriveOverallStatus(groupStatuses: EffectiveOrderStatus[]): Effe
   if (active.length > 1 && active.some((s) => s === 'entregado') && active.some((s) => s !== 'entregado')) {
     return 'entrega_parcial'
   }
-  return active.reduce((least, s) => (STATUS_RANK[s] < STATUS_RANK[least] ? s : least), active[0])
+  // Con varios fotógrafos, "Falta Comprobante" (el único status que de
+  // verdad exige una acción del biker) solo debe ganar como status GENERAL
+  // si NINGÚN fotógrafo tiene ya su comprobante — en cuanto uno lo sube, su
+  // parte del pedido ya puede seguir su curso (confirmación, preparación),
+  // y el pedido completo no debería quedarse mostrando el mismo bloqueo del
+  // fotógrafo al que todavía le falta el suyo. Se excluyen esos grupos de
+  // "los menos avanzados" cuando al menos uno ya avanzó.
+  const consideredActive =
+    active.length > 1 && active.some((s) => s !== 'pendiente_comprobante')
+      ? active.filter((s) => s !== 'pendiente_comprobante')
+      : active
+  return consideredActive.reduce((least, s) => (STATUS_RANK[s] < STATUS_RANK[least] ? s : least), consideredActive[0])
 }

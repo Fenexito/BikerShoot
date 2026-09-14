@@ -6,13 +6,12 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { InitialsAvatar } from '../../ui/shared/InitialsAvatar'
-import { IconUser, IconSettings, IconBell, IconCart, IconBookmark, IconSun, IconMoon, IconEye, IconEyeOff } from '../../ui/shared/icons'
+import { IconUser, IconSettings, IconBell, IconCart, IconBookmark, IconEye, IconEyeOff } from '../../ui/shared/icons'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { SettingsSection, SettingsEditableRow, SettingsNotificationToggle, settingsInputClass } from '../../ui/shared/SettingsPrimitives'
-import { useFlatTheme } from '../../ui/flat/themeStore'
 import { cn } from '../../lib/cn'
 import type { NotificationType } from '../notifications/useNotifications'
 
@@ -38,7 +37,6 @@ type TabId = (typeof TABS)[number]['id']
 export function BikerProfilePage() {
   const { user, profile, updateProfileLocal, refreshProfile, signOut, signOutEverywhere, updatePassword } = useAuth()
   const { data: details, isLoading } = useBikerDetails(user?.id)
-  const { theme, toggle: toggleTheme } = useFlatTheme()
   const push = useToastStore((s) => s.push)
   const navigate = useNavigate()
   const [tab, setTab] = useState<TabId>('perfil')
@@ -297,36 +295,10 @@ export function BikerProfilePage() {
 
           {tab === 'cuenta' && (
             <>
-              <SettingsSection title="Apariencia">
-                <div className="flex items-center justify-between gap-3 py-1">
-                  <div>
-                    <p className="text-sm font-semibold">Tema</p>
-                    <p className="text-sm text-muted-foreground">Elige cómo se ve la app en este dispositivo.</p>
-                  </div>
-                  <div className="flex shrink-0 gap-1 rounded-full bg-muted p-1">
-                    <button
-                      onClick={() => theme !== 'light' && toggleTheme()}
-                      aria-label="Modo claro"
-                      className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
-                        theme === 'light' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      <IconSun className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => theme !== 'dark' && toggleTheme()}
-                      aria-label="Modo oscuro"
-                      className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
-                        theme === 'dark' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      <IconMoon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </SettingsSection>
+              {/* La sección "Apariencia" (tema claro/oscuro) se quitó de
+                  acá — ahora vive como ícono fijo en el header (ver
+                  HeaderThemeToggle), visible también en móvil; tenerla acá
+                  también era un control duplicado. */}
 
               <SettingsSection title="Datos de acceso">
                 <SettingsEditableRow label="Correo" value={user?.email ?? ''} type="email" onSave={saveEmail} description="Te enviaremos un enlace de confirmación al nuevo correo." />
@@ -374,7 +346,12 @@ export function BikerProfilePage() {
               </SettingsSection>
 
               <SettingsSection title="Administrar cuenta">
-                <div className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center sm:justify-between">
+                {/* Ancho completo SIEMPRE (no solo en móvil) y más alto/
+                    oscuro que el resto de botones de esta página — es la
+                    acción que un biker busca con más frecuencia, así que
+                    debe ser la más fácil de encontrar y tocar, no un botón
+                    chico compitiendo por espacio con su propia etiqueta. */}
+                <div className="flex flex-col gap-3 border-b border-border py-4">
                   <div>
                     <p className="text-sm font-semibold">Cerrar sesión</p>
                     <p className="text-sm text-muted-foreground">Sales de este dispositivo.</p>
@@ -382,7 +359,7 @@ export function BikerProfilePage() {
                   <button
                     onClick={handleSignOutClick}
                     disabled={signingOut}
-                    className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-muted px-5 text-sm font-semibold text-foreground transition-colors hover:bg-border disabled:opacity-50 sm:w-auto"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
                   </button>

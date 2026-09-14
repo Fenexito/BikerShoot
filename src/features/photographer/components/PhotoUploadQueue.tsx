@@ -8,6 +8,9 @@ import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
 import { segmentPickerDialog, type SegmentOption } from '../../../ui/overlays/segmentPickerStore'
+import { AnimateIcon } from '../../../ui/animate-icons/icon'
+import { LayoutDashboard } from '../../../ui/animate-icons/icons/LayoutDashboard'
+import { List } from '../../../ui/animate-icons/icons/List'
 import { cn } from '../../../lib/cn'
 
 const CONCURRENCY = 4
@@ -336,18 +339,26 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                 <Button variant="ghost" onClick={retryAllFailed}>Reintentar todos los fallidos</Button>
               )}
               <div className="flex gap-1 rounded-full bg-muted p-1">
-                <button
-                  onClick={() => setView('grid')}
-                  className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-                >
-                  Grid
-                </button>
-                <button
-                  onClick={() => setView('list')}
-                  className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-                >
-                  Lista
-                </button>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <button
+                    onClick={() => setView('grid')}
+                    aria-label="Vista de cuadrícula"
+                    title="Grid"
+                    className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    <LayoutDashboard size={16} />
+                  </button>
+                </AnimateIcon>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <button
+                    onClick={() => setView('list')}
+                    aria-label="Vista de lista"
+                    title="Lista"
+                    className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    <List size={16} />
+                  </button>
+                </AnimateIcon>
               </div>
             </div>
           </div>

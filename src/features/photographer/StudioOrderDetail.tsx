@@ -21,7 +21,10 @@ import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton, SkeletonGrid } from '../../ui/shared/Skeleton'
 import { PhotoLightbox } from '../biker/components/PhotoLightbox'
 import { useDeliveredViewUrl } from '../biker/components/PurchasedPhotoTile'
-import { IconDownload } from '../../ui/shared/icons'
+import { Download } from '../../ui/animate-icons/icons/Download'
+import { Check } from '../../ui/animate-icons/icons/Check'
+import { LayoutDashboard } from '../../ui/animate-icons/icons/LayoutDashboard'
+import { List } from '../../ui/animate-icons/icons/List'
 import { Eye } from '../../ui/animate-icons/icons/Eye'
 import { Gift } from '../../ui/animate-icons/icons/Gift'
 import { Lock } from '../../ui/animate-icons/icons/Lock'
@@ -206,17 +209,19 @@ function DeliverPhotoTile({
         )}
         {delivered && (
           <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              onClick={handleDownloadOwn}
-              disabled={downloadingOwn}
-              aria-label="Descargar"
-              title="Descargar"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              <IconDownload className="h-3.5 w-3.5" />
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={handleDownloadOwn}
+                disabled={downloadingOwn}
+                aria-label="Descargar"
+                title="Descargar"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                <Download size={14} />
+              </button>
+            </AnimateIcon>
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white" title="Entregada">
-              ✓
+              <Check size={14} animate />
             </span>
           </div>
         )}
@@ -251,17 +256,19 @@ function DeliverPhotoTile({
             sin abrir cada una. */}
         {delivered && (
           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-            <button
-              onClick={handleDownloadOwn}
-              disabled={downloadingOwn}
-              aria-label="Descargar"
-              title="Descargar"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              <IconDownload className="h-3.5 w-3.5" />
-            </button>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={handleDownloadOwn}
+                disabled={downloadingOwn}
+                aria-label="Descargar"
+                title="Descargar"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                <Download size={14} />
+              </button>
+            </AnimateIcon>
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm" title="Entregada">
-              ✓
+              <Check size={14} animate />
             </span>
           </div>
         )}
@@ -542,18 +549,26 @@ function OrderPhotosSection({
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold tracking-tight">{order.items.length} fotos compradas</h2>
         <div className="flex gap-1 rounded-full bg-muted p-1">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-          >
-            Grid
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={cn('rounded-full px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-          >
-            Lista
-          </button>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => setViewMode('grid')}
+              aria-label="Vista de cuadrícula"
+              title="Grid"
+              className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', viewMode === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+            >
+              <LayoutDashboard size={16} />
+            </button>
+          </AnimateIcon>
+          <AnimateIcon animateOnHover animateOnTap asChild>
+            <button
+              onClick={() => setViewMode('list')}
+              aria-label="Vista de lista"
+              title="Lista"
+              className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', viewMode === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+            >
+              <List size={16} />
+            </button>
+          </AnimateIcon>
         </div>
       </div>
       <p className="mb-5 text-sm text-muted-foreground">
@@ -644,13 +659,15 @@ function OrderPhotosSection({
           ]}
           cornerSlot={
             openItem?.photo?.delivered_path ? (
-              <button
-                onClick={handleDownloadOpen}
-                disabled={downloading}
-                className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                <IconDownload className="h-4 w-4" /> {downloading ? 'Descargando…' : 'Descargar'}
-              </button>
+              <AnimateIcon animateOnHover animateOnTap asChild>
+                <button
+                  onClick={handleDownloadOpen}
+                  disabled={downloading}
+                  className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <Download size={16} /> {downloading ? 'Descargando…' : 'Descargar'}
+                </button>
+              </AnimateIcon>
             ) : undefined
           }
         />
@@ -844,7 +861,12 @@ export function StudioOrderDetail() {
   // confirmó el pago) — antes también se permitía en "en_preparacion", lo
   // cual no debería ser posible unilateralmente una vez el pago ya se dio
   // por recibido.
-  const canCancel = order?.status === 'pendiente_pago'
+  // A diferencia del biker (que pierde el derecho a cancelar en cuanto el
+  // fotógrafo confirma el pago), el fotógrafo puede cancelar mientras el
+  // pedido no esté ya entregado/cancelado — incluso con comprobante
+  // subido o pago ya confirmado. `cancelOrder` ajusta la advertencia según
+  // si ya hay comprobante (ahí sí implica devolver el dinero).
+  const canCancel = order?.status === 'pendiente_pago' || order?.status === 'en_preparacion'
   const statusStyleForHeader = order ? getPhotographerStatusStyle(order.effectiveStatus) : null
 
   const actionMenuItems: ActionMenuItem[] = order
@@ -893,9 +915,15 @@ export function StudioOrderDetail() {
   async function cancelOrder() {
     if (!order) return
     const orderCode = String(order.orderNumber ?? '').padStart(6, '0')
+    // Si el biker ya subió su comprobante (o el pago ya está confirmado),
+    // ya recibiste esa transferencia — cancelar el pedido implica
+    // devolverle el dinero, no solo quitarle el acceso a las fotos.
+    const alreadyPaid = order.hasPaymentProof || order.status === 'en_preparacion'
     const { confirmed, extraValue } = await typedConfirmDialog.ask({
       title: `Esto cancela el pedido de ${order.bikerName} — el biker pierde acceso a estas fotos y recibe una notificación.`,
-      description: 'Esta acción no se puede deshacer desde aquí.',
+      description: alreadyPaid
+        ? 'El biker ya transfirió el pago de este pedido — al cancelar, debes devolverle el dinero por tu cuenta (esta acción no se puede deshacer desde aquí).'
+        : 'Esta acción no se puede deshacer desde aquí.',
       matchText: orderCode,
       matchLabel: 'Escribe el número de pedido para confirmar',
       confirmLabel: 'Cancelar pedido',
@@ -1112,6 +1140,23 @@ export function StudioOrderDetail() {
         {action && (
           <div className="mt-6 flex justify-end border-t border-border pt-4">
             <Button variant="dark" onClick={confirmAction}>{action.label}</Button>
+          </div>
+        )}
+
+        {/* Antes "Cancelar pedido" solo vivía escondido en el menú "···"
+            que aparece al hacer scroll — se repite acá abajo, siempre
+            visible, mismo criterio que en la vista del biker: un botón
+            regular (no de ancho completo) abajo a la derecha. */}
+        {canCancel && (
+          <div className={cn('flex justify-end', !action && 'mt-6 border-t border-border pt-4')}>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                onClick={cancelOrder}
+                className="flex items-center gap-1.5 rounded-full border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+              >
+                <Trash size={16} /> Cancelar pedido
+              </button>
+            </AnimateIcon>
           </div>
         )}
       </div>

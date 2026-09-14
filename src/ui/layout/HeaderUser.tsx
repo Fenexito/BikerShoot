@@ -105,7 +105,7 @@ export function HeaderUser() {
     <>
       <div
         className={cn(
-          'app-header-vt fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-4 md:pt-0 md:!translate-y-0',
+          'fixed inset-x-0 top-0 z-30 px-3 pt-3 transition-transform duration-300 md:sticky md:top-4 md:px-4 md:pt-0 md:!translate-y-0',
           hidden ? '-translate-y-[calc(100%+1rem)]' : 'translate-y-0',
         )}
       >
@@ -192,16 +192,6 @@ export function HeaderUser() {
                   >
                     <Search size={20} />
                   </button>
-                </AnimateIcon>
-                <AnimateIcon animateOnHover animateOnTap asChild>
-                  <Link
-                    to="/app/favoritos"
-                    aria-label="Favoritos"
-                    title="Favoritos"
-                    className="hidden h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border sm:flex"
-                  >
-                    <Heart size={20} />
-                  </Link>
                 </AnimateIcon>
                 <AnimateIcon animateOnHover animateOnTap asChild>
                   <button
