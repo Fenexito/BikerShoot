@@ -35,7 +35,7 @@ export interface MyOrderItem {
   // usar `phone` acá por error dejaba el botón de WhatsApp sin número casi
   // siempre, ya que casi ningún fotógrafo llena ese campo (llenan el suyo
   // propio, `whatsapp`, en su perfil de Studio).
-  photographer: { display_name: string; photographer_details: { whatsapp: string | null } | { whatsapp: string | null }[] | null } | null
+  photographer: { display_name: string; avatar_url: string | null; photographer_details: { whatsapp: string | null } | { whatsapp: string | null }[] | null } | null
 }
 
 export interface MyOrder {
@@ -55,6 +55,7 @@ export interface MyOrderPhotographerGroup {
   photographerId: string
   photographerName: string
   photographerPhone: string | null
+  photographerAvatarUrl: string | null
   items: MyOrderItem[]
   /** Suma de precios de las fotos, SIN la tarifa de servicio — usar
    * `totalToPay` para el monto real que este fotógrafo debe recibir. */
@@ -96,6 +97,7 @@ export function groupOrderByPhotographer(order: MyOrder): MyOrderPhotographerGro
     photographerId,
     photographerName: items[0].photographer?.display_name ?? 'Fotógrafo',
     photographerPhone,
+    photographerAvatarUrl: items[0].photographer?.avatar_url ?? null,
     items,
     subtotal: items.reduce((s, i) => s + i.price, 0),
     serviceFeeTotal: items.reduce((s, i) => s + i.service_fee, 0),
@@ -153,7 +155,7 @@ export function useMyOrders(bikerId: string | undefined) {
       const { data, error } = await supabase
         .from('orders')
         .select(
-          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name, photographer_details(whatsapp))), order_payment_proofs(photographer_id)',
+          '*, order_items(*, photo:photos(id, event_id, photographer_id, storage_path, preview_path, delivered_path, raw_path, price, featured, original_filename, created_at, point:event_points(label, time_start, time_end)), event:events(title), photographer:profiles(display_name, avatar_url, photographer_details(whatsapp))), order_payment_proofs(photographer_id)',
         )
         .eq('biker_id', bikerId)
         .order('created_at', { ascending: false })

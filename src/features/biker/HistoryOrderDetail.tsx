@@ -29,6 +29,7 @@ import { AnimateIcon } from '../../ui/animate-icons/icon'
 import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { buildWhatsAppLink } from '../../lib/whatsapp'
+import { r2Url } from '../../lib/r2'
 
 // Misma línea (168px) que usa el header pegajoso de la vista de evento del
 // fotógrafo, para decidir qué sección "cuenta" como la que se está viendo.
@@ -67,213 +68,25 @@ function groupItemsByEventoPunto(items: MyOrderItem[]) {
   })
 }
 
-/** Botón de comprobante por fotógrafo — mientras no hay ninguno, un botón
- * NEGRO bien visible ("Subir Comprobante": es lo único que bloquea todo
- * el pedido, no debería pasar desapercibido). Una vez subido, se
- * convierte en un menú "Comprobantes" con Ver (abre el visor compartido)
- * y Editar (reemplaza el archivo ahí mismo, sin salir de esta página —
- * antes "Editar" navegaba a la página de carga solo para volver a subir
- * el mismo archivo). */
-function ProofButton({ orderId, photographerId, photographerName, bikerName, amount, hasProof, canEdit }: {
-  orderId: string
-  photographerId: string
-  photographerName: string
-  bikerName: string
-  amount: number
-  hasProof: boolean
-  /** Una vez que el fotógrafo confirma el pago (el pedido pasa de
-   * "pendiente_pago" a "en_preparacion"), el comprobante deja de poder
-   * editarse — ya cumplió su propósito y cambiarlo después solo generaría
-   * confusión sobre qué fue lo que realmente se confirmó. */
-  canEdit: boolean
-}) {
-  const push = useToastStore((s) => s.push)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [replacing, setReplacing] = useState(false)
-  // `viewUrl: null` mientras se resuelve — el visor se abre YA (con su
-  // animación) mostrando un spinner, en vez de dejar al usuario sin
-  // ninguna señal por varios segundos mientras se pide la URL firmada.
-  const [proof, setProof] = useState<{ viewUrl: string | null; uploadedAt: string } | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    function onClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [menuOpen])
-
-  async function openViewer() {
-    setMenuOpen(false)
-    setProof({ viewUrl: null, uploadedAt: '' })
-    try {
-      const [{ data, error }, { data: row }] = await Promise.all([
-        supabase.functions.invoke('r2-payment-proof-view-url', { body: { orderId, photographerId } }),
-        supabase.from('order_payment_proofs').select('uploaded_at').eq('order_id', orderId).eq('photographer_id', photographerId).maybeSingle(),
-      ])
-      if (error || !data?.viewUrl) throw new Error(error?.message ?? 'No se pudo abrir el comprobante')
-      setProof({ viewUrl: data.viewUrl, uploadedAt: row?.uploaded_at ?? '' })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo abrir el comprobante', description: (err as Error).message })
-      setProof(null)
-    }
-  }
-
-  async function handleReplace(file: File | undefined) {
-    setMenuOpen(false)
-    if (!file) return
-    setReplacing(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('r2-payment-proof-upload-url', {
-        body: { orderId, photographerId, fileName: file.name, contentType: file.type },
-      })
-      if (error || !data?.uploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
-      const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-      if (!putRes.ok) throw new Error(`R2 respondió ${putRes.status}`)
-      const { error: upsertError } = await supabase
-        .from('order_payment_proofs')
-        .upsert({ order_id: orderId, photographer_id: photographerId, proof_path: data.proofPath }, { onConflict: 'order_id,photographer_id' })
-      if (upsertError) throw upsertError
-      push({ type: 'success', title: 'Comprobante actualizado' })
-      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo actualizar el comprobante', description: (err as Error).message })
-    } finally {
-      setReplacing(false)
-    }
-  }
-
-  if (!hasProof) {
-    // Negro resaltado (variant="dark") a propósito — es el único bloqueo
-    // real para que el pedido avance, así que no debería mimetizarse con
-    // el resto de botones secundarios de la página.
-    return (
-      <AnimateIcon animateOnHover animateOnTap asChild>
-        <Link to={`/app/checkout/pago/${orderId}`}>
-          <Button variant="dark" size="sm" className="gap-1.5">
-            <Upload size={16} /> Subir Comprobante
-          </Button>
-        </Link>
-      </AnimateIcon>
-    )
-  }
-
-  // Una vez confirmado el pago, ya no hay nada que "reemplazar" — el
-  // desplegable con 2 opciones deja de tener sentido, así que el botón se
-  // convierte en un simple "Ver comprobante" directo.
-  if (!canEdit) {
-    return (
-      <AnimateIcon animateOnHover animateOnTap asChild>
-        <button
-          onClick={openViewer}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-muted"
-        >
-          <Eye size={16} /> Ver comprobante
-        </button>
-      </AnimateIcon>
-    )
-  }
-
-  return (
-    <>
-      <div ref={menuRef} className="relative">
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          disabled={replacing}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-50"
-        >
-          {replacing ? 'Actualizando…' : 'Comprobantes'} <span className="text-xs text-muted-foreground">▾</span>
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-full z-50 mt-2 w-52 origin-top overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1.5 text-white shadow-2xl animate-menu-in">
-            <AnimateIcon animateOnHover animateOnTap asChild>
-              <button onClick={openViewer} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
-                <Eye size={16} className="shrink-0" /> Ver comprobante
-              </button>
-            </AnimateIcon>
-            <AnimateIcon animateOnHover animateOnTap asChild>
-              <label className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10">
-                <Edit size={16} className="shrink-0" /> Editar comprobante
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReplace(e.target.files?.[0])} />
-              </label>
-            </AnimateIcon>
-          </div>
-        )}
-      </div>
-      {proof && (
-        <PhotoLightbox
-          photos={[
-            {
-              id: `proof-${photographerId}`,
-              event_id: '',
-              photographer_id: photographerId,
-              point_id: null,
-              storage_path: null,
-              preview_path: null,
-              raw_path: null,
-              delivered_path: null,
-              price: amount,
-              moto_brand: null,
-              featured: false,
-              original_filename: null,
-              created_at: '',
-              eventTitle: '',
-              photographerName,
-            },
-          ]}
-          index={0}
-          onClose={() => setProof(null)}
-          onNavigate={() => {}}
-          mode="purchased"
-          loading={!proof.viewUrl}
-          resolveSrc={() => proof.viewUrl ?? undefined}
-          infoRows={[
-            { label: 'Enviado a', value: photographerName },
-            { label: 'Enviado por', value: bikerName },
-            ...(proof.uploadedAt ? [{ label: 'Fecha', value: new Date(proof.uploadedAt).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) }] : []),
-            { label: 'Monto', value: `Q${amount}` },
-          ]}
-        />
-      )}
-    </>
-  )
-}
-
 /** Descarga TODAS las fotos entregadas de un fotógrafo de una sola vez —
  * solo aparece cuando ese fotógrafo ya completó su parte del pedido. Baja
  * cada archivo en secuencia (con una pausa corta entre cada uno) en vez de
  * simultáneo — los navegadores bloquean/preguntan permiso para varias
  * descargas a la vez si llegan todas de golpe. Sigue existiendo la
- * descarga individual por si el biker solo quiere una en particular. */
-function DownloadAllButton({ items, photographerLabel, orderNumber }: { items: MyOrderItem[]; photographerLabel: string; orderNumber: number | null }) {
-  const push = useToastStore((s) => s.push)
-  const [downloading, setDownloading] = useState(false)
-
-  async function handleDownloadAll() {
-    setDownloading(true)
-    try {
-      for (const item of items) {
-        if (!item.photo?.delivered_path) continue
-        const filename = buildDeliveredFilename(photographerLabel, orderNumber, item.position, item.photo.original_filename)
-        await downloadPurchasedPhoto(item.photo_id, filename)
-        await new Promise((r) => setTimeout(r, 400))
-      }
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo descargar todo', description: (err as Error).message })
-    } finally {
-      setDownloading(false)
+ * descarga individual por si el biker solo quiere una en particular. Vive
+ * como acción dentro del menú "···" (no como botón propio), así que es una
+ * función simple en vez de un componente con su propio estado de carga. */
+async function downloadAllPhotos(items: MyOrderItem[], photographerLabel: string, orderNumber: number | null) {
+  try {
+    for (const item of items) {
+      if (!item.photo?.delivered_path) continue
+      const filename = buildDeliveredFilename(photographerLabel, orderNumber, item.position, item.photo.original_filename)
+      await downloadPurchasedPhoto(item.photo_id, filename)
+      await new Promise((r) => setTimeout(r, 400))
     }
+  } catch (err) {
+    useToastStore.getState().push({ type: 'error', title: 'No se pudo descargar todo', description: (err as Error).message })
   }
-
-  return (
-    <AnimateIcon animateOnHover animateOnTap asChild>
-      <Button variant="secondary" size="sm" className="gap-1.5" loading={downloading} onClick={handleDownloadAll}>
-        <Download size={16} /> Descargar todas
-      </Button>
-    </AnimateIcon>
-  )
 }
 
 export function HistoryOrderDetail() {
@@ -399,31 +212,55 @@ export function HistoryOrderDetail() {
     queryClient.invalidateQueries({ queryKey: ['my-orders'] })
   }
 
+  // Un solo input de archivo compartido por TODA la página — "Editar
+  // comprobante" puede dispararse desde el menú del header (el grupo
+  // "activo" por scroll) o desde el menú "···" de CUALQUIER tarjeta de
+  // fotógrafo más abajo, así que se guarda a cuál de los dos apunta en vez
+  // de asumir siempre el activo.
+  const [editingPhotographerId, setEditingPhotographerId] = useState<string | null>(null)
+  function triggerEditProof(photographerId: string) {
+    setEditingPhotographerId(photographerId)
+    proofInputRef.current?.click()
+  }
+
+  // Ver comprobante / Editar comprobante / WhatsApp / Descargar todas — las
+  // mismas 4 acciones, sin importar si el menú "···" es el del header
+  // (siempre apuntando al fotógrafo activo por scroll) o el de la tarjeta
+  // de un fotógrafo en particular más abajo en la página.
+  function groupActionItems(group: MyOrderPhotographerGroup): ActionMenuItem[] {
+    return [
+      ...(order?.payment_method === 'transferencia' && proofPhotographerIds.has(group.photographerId)
+        ? [
+            { label: 'Ver comprobante', icon: <Eye size={16} />, onClick: () => openHeaderProofViewer(group.photographerId, group.photographerName) },
+            // El comprobante deja de poder editarse en cuanto el fotógrafo
+            // confirma el pago (el pedido sale de "pendiente_pago") — ya
+            // cumplió su propósito, cambiarlo después solo confundiría
+            // sobre qué fue lo que realmente se confirmó.
+            ...(canCancelGroup(group) ? [{ label: 'Editar comprobante', icon: <Edit size={16} />, onClick: () => triggerEditProof(group.photographerId) }] : []),
+          ]
+        : []),
+      ...(group.photographerPhone
+        ? [
+            {
+              label: 'WhatsApp',
+              icon: <Whatsapp size={16} />,
+              tone: 'success' as const,
+              href: buildWhatsAppLink(
+                group.photographerPhone,
+                `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order?.order_number ?? null)}: ${window.location.origin}/studio/pedidos/${order?.id}`,
+              ),
+            },
+          ]
+        : []),
+      ...(group.effectiveStatus === 'entregado'
+        ? [{ label: 'Descargar todas', icon: <Download size={16} />, onClick: () => downloadAllPhotos(group.items, group.photographerName, order?.order_number ?? null) }]
+        : []),
+    ]
+  }
+
   const actionMenuItems: ActionMenuItem[] = activeGroup
     ? [
-        ...(order?.payment_method === 'transferencia' && proofPhotographerIds.has(activeGroup.photographerId)
-          ? [
-              { label: 'Ver comprobante', icon: <Eye size={16} />, onClick: () => openHeaderProofViewer(activeGroup.photographerId, activeGroup.photographerName) },
-              // El comprobante deja de poder editarse en cuanto el fotógrafo
-              // confirma el pago (el pedido sale de "pendiente_pago") — ya
-              // cumplió su propósito, cambiarlo después solo confundiría
-              // sobre qué fue lo que realmente se confirmó.
-              ...(canCancelGroup(activeGroup) ? [{ label: 'Editar comprobante', icon: <Edit size={16} />, onClick: () => proofInputRef.current?.click() }] : []),
-            ]
-          : []),
-        ...(activeGroup.photographerPhone
-          ? [
-              {
-                label: 'WhatsApp',
-                icon: <Whatsapp size={16} />,
-                tone: 'success' as const,
-                href: buildWhatsAppLink(
-                  activeGroup.photographerPhone,
-                  `Hola ${activeGroup.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order?.order_number ?? null)}: ${window.location.origin}/studio/pedidos/${order?.id}`,
-                ),
-              },
-            ]
-          : []),
+        ...groupActionItems(activeGroup),
         ...(canCancelGroup(activeGroup)
           ? [{ label: 'Cancelar Pedido', icon: <Trash size={16} />, tone: 'danger' as const, onClick: () => cancelGroup(activeGroup) }]
           : []),
@@ -521,7 +358,7 @@ export function HistoryOrderDetail() {
         accept="image/*"
         className="hidden"
         onChange={(e) => {
-          if (activeGroup) handleHeaderProofReplace(e.target.files?.[0], activeGroup.photographerId)
+          if (editingPhotographerId) handleHeaderProofReplace(e.target.files?.[0], editingPhotographerId)
         }}
       />
 
@@ -532,53 +369,10 @@ export function HistoryOrderDetail() {
       <div className="flex flex-col gap-6">
         {photographerGroups.map((group) => {
           const groupStyle = getEffectiveStatusStyle(group.effectiveStatus)
-          // Mismo patrón que el pedido visto por el fotógrafo: en
-          // escritorio, pago+comprobante+whatsapp viven junto al status a
-          // la derecha (una sola fila); en móvil no caben ahí, así que
-          // bajan a su propia fila debajo del nombre.
-          const paymentActions = (
-            <>
-              <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
-                {order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{group.totalToPay}
-              </span>
-              {/* Botón de comprobante propio de ESTE fotógrafo — un
-                  pedido con varios fotógrafos necesita uno por cada uno,
-                  no un solo botón genérico para todo el pedido. */}
-              {order.payment_method === 'transferencia' && (
-                <ProofButton
-                  orderId={order.id}
-                  photographerId={group.photographerId}
-                  photographerName={group.photographerName}
-                  bikerName={profile?.display_name ?? 'Biker'}
-                  amount={group.totalToPay}
-                  hasProof={proofPhotographerIds.has(group.photographerId)}
-                  canEdit={canCancelGroup(group)}
-                />
-              )}
-              {group.photographerPhone && (
-                <AnimateIcon animateOnHover animateOnTap asChild>
-                  <a
-                    href={buildWhatsAppLink(
-                      group.photographerPhone,
-                      `Hola ${group.photographerName}, soy ${profile?.display_name ?? 'un biker'} 👋 Te escribo por mi pedido ${formatOrderCode(order.order_number)}: ${window.location.origin}/studio/pedidos/${order.id}`,
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-                    title="Escribir por WhatsApp"
-                    aria-label="Escribir por WhatsApp"
-                  >
-                    <Whatsapp size={16} />
-                  </a>
-                </AnimateIcon>
-              )}
-              {/* Solo cuando ESTE fotógrafo ya entregó todo lo suyo —
-                  bajar todas de un tirón en vez de una por una. */}
-              {group.effectiveStatus === 'entregado' && (
-                <DownloadAllButton items={group.items} photographerLabel={group.photographerName} orderNumber={order.order_number} />
-              )}
-            </>
-          )
+          const hasProof = proofPhotographerIds.has(group.photographerId)
+          const avatarUrl = group.photographerAvatarUrl
+            ? (group.photographerAvatarUrl.startsWith('http') ? group.photographerAvatarUrl : r2Url(group.photographerAvatarUrl))
+            : null
           return (
             <div
               key={group.photographerId}
@@ -587,7 +381,11 @@ export function HistoryOrderDetail() {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <InitialsAvatar name={group.photographerName} className="h-12 w-12 shrink-0 bg-foreground text-base text-background sm:h-14 sm:w-14" />
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14" />
+                  ) : (
+                    <InitialsAvatar name={group.photographerName} className="h-12 w-12 shrink-0 bg-foreground text-base text-background sm:h-14 sm:w-14" />
+                  )}
                   <div className="min-w-0">
                     <Link to={`/app/fotografos/${group.photographerId}`} className="truncate text-lg font-bold tracking-tight hover:underline sm:text-xl">
                       {group.photographerName}
@@ -595,13 +393,31 @@ export function HistoryOrderDetail() {
                     <p className="truncate text-xs text-muted-foreground sm:text-sm">{formatOrderCode(order.order_number)} · {eventLabelFor(group.items)}</p>
                   </div>
                 </div>
+                {/* Pago + status + botón de acciones, todo a la derecha de
+                    la fila — antes cada acción (ver comprobante, whatsapp,
+                    descargar todas) era su propio botón suelto, duplicado
+                    aparte para móvil; ahora un solo menú "···" agrupa las
+                    tres, siempre en la misma fila sin importar el ancho de
+                    pantalla. "Subir Comprobante" (mientras no hay ninguno)
+                    se queda FUERA del menú — es el único bloqueo real del
+                    pedido, no debe pasar desapercibido dentro de un menú. */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="hidden items-center gap-2 lg:flex">{paymentActions}</div>
+                  <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
+                    {order.payment_method === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{group.totalToPay}
+                  </span>
+                  {order.payment_method === 'transferencia' && !hasProof && (
+                    <AnimateIcon animateOnHover animateOnTap asChild>
+                      <Link to={`/app/checkout/pago/${order.id}`}>
+                        <Button variant="dark" size="sm" className="gap-1.5">
+                          <Upload size={16} /> Subir Comprobante
+                        </Button>
+                      </Link>
+                    </AnimateIcon>
+                  )}
                   <StatusPill dot={groupStyle.dot} text={groupStyle.text} label={groupStyle.label} className="shrink-0 text-sm font-bold" />
+                  <ActionMenu items={groupActionItems(group)} />
                 </div>
               </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">{paymentActions}</div>
 
               {group.effectiveStatus !== 'cancelado' && (
                 <OrderStepper steps={flowLabels} currentIndex={Math.max(0, flow.indexOf(group.effectiveStatus))} className="mb-2 mt-6" />

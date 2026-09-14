@@ -1003,43 +1003,10 @@ export function StudioOrderDetail() {
   const distinctEventTitles = Array.from(new Set(order.items.map((i) => i.event?.title).filter(Boolean)))
   const eventLabel = distinctEventTitles.length === 1 ? distinctEventTitles[0] : `${distinctEventTitles.length} eventos`
 
-  // Pago + comprobante + whatsapp — en escritorio viven a la derecha junto
-  // al status (misma fila, todo lo "de un vistazo" del lado derecho); en
-  // móvil no caben ahí, así que bajan a su propia fila angosta debajo.
-  const paymentActions = (
-    <>
-      <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
-        {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
-      </span>
-      {/* Solo si el biker YA subió algo — antes se veía siempre, aunque el
-          estado fuera "Subir Comprobante" (nada que ver todavía). */}
-      {order.paymentMethod === 'transferencia' && order.hasPaymentProof && (
-        <AnimateIcon animateOnHover animateOnTap asChild>
-          <Button variant="secondary" size="sm" onClick={viewPaymentProof} className="gap-1.5">
-            <Eye size={16} />
-            Ver comprobante
-          </Button>
-        </AnimateIcon>
-      )}
-      {order.bikerPhone && (
-        <AnimateIcon animateOnHover animateOnTap asChild>
-          <a
-            href={buildWhatsAppLink(
-              order.bikerPhone,
-              `Hola ${order.bikerName}, soy ${orderCodeName ?? 'tu fotógrafo'} de Motogram 👋 Te escribo por tu pedido ${formatOrderCode(order.orderNumber, orderCodeName)}. Puedes ver tus fotos aquí: ${window.location.origin}/app/historial/${order.orderId}`,
-            )}
-            target="_blank"
-            rel="noreferrer"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white transition-opacity hover:opacity-90"
-            title="Escribir por WhatsApp"
-            aria-label="Escribir por WhatsApp"
-          >
-            <Whatsapp size={16} />
-          </a>
-        </AnimateIcon>
-      )}
-    </>
-  )
+  // Pago + status + botón de acciones — antes "Ver comprobante" y
+  // WhatsApp eran botones sueltos (duplicados aparte para móvil); ahora
+  // comparten el mismo menú "···" que ya usa el header (ver comprobante,
+  // whatsapp, cancelar pedido), siempre en una sola fila.
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
@@ -1065,14 +1032,15 @@ export function StudioOrderDetail() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="hidden items-center gap-2 lg:flex">{paymentActions}</div>
+            <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold">
+              {order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'} · Q{order.total.toFixed(2)}
+            </span>
             {/* Más notoria que antes: texto más grande y con más padding, en
                 vez de compartir el mismo tamaño chico que el resto de chips. */}
             <StatusPill dot={statusStyle.dot} text={statusStyle.text} label={statusStyle.label} className="shrink-0 text-sm font-bold" />
+            <ActionMenu items={actionMenuItems} />
           </div>
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">{paymentActions}</div>
 
         {order.status !== 'cancelado' && <OrderStepper steps={TOP_STEP_LABELS} currentIndex={stepIndex} className="mt-6" />}
 
@@ -1145,23 +1113,12 @@ export function StudioOrderDetail() {
           )}
         </div>
 
-        {/* "Confirmar pago recibido" y "Cancelar pedido" — antes cada uno
-            vivía en su propio bloque apilado; ahora comparten una sola
-            fila (el de cancelar siempre a la izquierda del de confirmar,
-            cuando ambos existen a la vez). */}
-        {(action || canCancel) && (
-          <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-            {canCancel && (
-              <AnimateIcon animateOnHover animateOnTap asChild>
-                <button
-                  onClick={cancelOrder}
-                  className="flex items-center gap-1.5 rounded-full border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-                >
-                  <Trash size={16} /> Cancelar pedido
-                </button>
-              </AnimateIcon>
-            )}
-            {action && <Button variant="dark" onClick={confirmAction}>{action.label}</Button>}
+        {/* "Cancelar pedido" ya vive en el menú "···" de arriba (junto a
+            ver comprobante y whatsapp) — acá solo queda la acción primaria
+            del momento. */}
+        {action && (
+          <div className="mt-6 flex justify-end border-t border-border pt-4">
+            <Button variant="dark" onClick={confirmAction}>{action.label}</Button>
           </div>
         )}
       </div>
