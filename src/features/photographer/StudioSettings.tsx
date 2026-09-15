@@ -22,6 +22,7 @@ import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { Switch } from '../../ui/shared/Switch'
+import { SettingsTabs } from '../../ui/shared/Tabs'
 import type { NotificationType } from '../notifications/useNotifications'
 
 const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description: string }[] = [
@@ -638,24 +639,7 @@ export function StudioSettings() {
         {/* Móvil: pestañas horizontales subrayadas (mismo patrón que el
             propio mobbin.com/settings en su versión angosta). Escritorio:
             lista vertical a la izquierda, la activa marcada con un borde. */}
-        <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
-          {TABS.map((t) => (
-            <AnimateIcon key={t.id} animateOnHover animateOnTap asChild>
-              <button
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
-                  tab === t.id
-                    ? 'border-foreground font-bold text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <t.icon className="h-4 w-4 shrink-0" />
-                {t.label}
-              </button>
-            </AnimateIcon>
-          ))}
-        </nav>
+        <SettingsTabs tabs={TABS} value={tab} onChange={setTab} />
 
         <div key={tab} className="flex flex-col gap-6 animate-tab-in">
           {tab === 'perfil' && (

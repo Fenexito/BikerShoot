@@ -16,6 +16,7 @@ import { Whatsapp } from '../../ui/animate-icons/icons/Whatsapp'
 import { PlaceholderPage } from '../auth/PlaceholderPage'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useBackButton } from '../../ui/shared/useBackButton'
+import { UnderlineTabs } from '../../ui/shared/Tabs'
 
 export function PhotographerProfile() {
   const { id } = useParams()
@@ -163,23 +164,23 @@ export function PhotographerProfile() {
         {photographer.bio && <p className="mt-6 max-w-2xl text-muted-foreground">{photographer.bio}</p>}
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-border">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setTab('fotos')}
-              className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${tab === 'fotos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-            >
-              Fotos destacadas
-            </button>
-            <button
-              onClick={() => setTab('eventos')}
-              className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${tab === 'eventos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-            >
-              Eventos ({events.length})
-            </button>
-          </div>
+          <UnderlineTabs
+            tabs={[
+              { value: 'fotos', label: 'Fotos destacadas' },
+              { value: 'eventos', label: `Eventos (${events.length})` },
+            ]}
+            value={tab}
+            onChange={setTab}
+            className="flex gap-2"
+            tabClassName="px-4 py-3 text-sm font-semibold transition-colors"
+            activeClassName="text-primary"
+            inactiveClassName="text-muted-foreground"
+            indicatorClassName="bg-primary"
+          />
           {tab === 'fotos' && (
             <div className="mb-2 flex gap-1 rounded-full bg-muted p-1">
               <button
+                data-no-ripple
                 onClick={() => setGalleryLayout('muro')}
                 aria-label="Vista muro"
                 className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'muro' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
@@ -187,6 +188,7 @@ export function PhotographerProfile() {
                 ✦ Muro
               </button>
               <button
+                data-no-ripple
                 onClick={() => setGalleryLayout('grid')}
                 aria-label="Vista cuadrícula"
                 className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'grid' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
@@ -194,6 +196,7 @@ export function PhotographerProfile() {
                 ▦ Grid
               </button>
               <button
+                data-no-ripple
                 onClick={() => setGalleryLayout('mosaic')}
                 aria-label="Vista mosaico"
                 className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${galleryLayout === 'mosaic' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}

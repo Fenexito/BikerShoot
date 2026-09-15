@@ -17,6 +17,7 @@ import { Settings } from '../../ui/animate-icons/icons/Settings'
 import { LogOut } from '../../ui/animate-icons/icons/LogOut'
 import { Edit } from '../../ui/animate-icons/icons/Edit'
 import { Skeleton } from '../../ui/shared/Skeleton'
+import { UnderlineTabs } from '../../ui/shared/Tabs'
 import DriftWall from '../../ui/reactbits/DriftWall'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import { cn } from '../../lib/cn'
@@ -198,26 +199,19 @@ export function StudioProfilePage() {
         {/* Tabs con línea debajo (no chips) — mismo estilo que ve el biker
             en el perfil público del fotógrafo (PhotographerProfile.tsx),
             para que ambas vistas se sientan como la misma app. */}
-        <div className="mt-8 flex gap-2 border-b border-border">
-          <button
-            onClick={() => setTab('destacadas')}
-            className={cn(
-              'border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
-              tab === 'destacadas' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground',
-            )}
-          >
-            Fotos destacadas
-          </button>
-          <button
-            onClick={() => setTab('eventos')}
-            className={cn(
-              'border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
-              tab === 'eventos' ? 'border-accent text-accent' : 'border-transparent text-muted-foreground',
-            )}
-          >
-            Eventos ({events.length})
-          </button>
-        </div>
+        <UnderlineTabs
+          tabs={[
+            { value: 'destacadas', label: 'Fotos destacadas' },
+            { value: 'eventos', label: `Eventos (${events.length})` },
+          ]}
+          value={tab}
+          onChange={setTab}
+          className="mt-8 flex gap-2 border-b border-border"
+          tabClassName="px-4 py-3 text-sm font-semibold transition-colors"
+          activeClassName="text-accent"
+          inactiveClassName="text-muted-foreground"
+          indicatorClassName="bg-accent"
+        />
 
         <div key={tab} className="animate-tab-in py-8">
           {tab === 'destacadas' ? (

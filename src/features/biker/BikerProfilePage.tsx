@@ -12,6 +12,7 @@ import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { typedConfirmDialog } from '../../ui/overlays/typedConfirmStore'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { SettingsSection, SettingsEditableRow, SettingsNotificationToggle, settingsInputClass } from '../../ui/shared/SettingsPrimitives'
+import { SettingsTabs } from '../../ui/shared/Tabs'
 import { cn } from '../../lib/cn'
 import type { NotificationType } from '../notifications/useNotifications'
 
@@ -246,21 +247,7 @@ export function BikerProfilePage() {
         {/* Móvil: pestañas horizontales subrayadas. Escritorio: lista
             vertical a la izquierda, la activa marcada con un borde — mismo
             patrón que StudioSettings. */}
-        <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
-                tab === t.id ? 'border-foreground font-bold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <t.icon className="h-4 w-4 shrink-0" />
-              {t.label}
-            </button>
-          ))}
-        </nav>
+        <SettingsTabs tabs={TABS} value={tab} onChange={setTab} />
 
         <div key={tab} className="flex flex-col gap-6 animate-tab-in">
           {tab === 'perfil' && (

@@ -1,4 +1,5 @@
 import { IconSearch } from './icons'
+import { UnderlineTabs } from './Tabs'
 import { cn } from '../../lib/cn'
 
 export interface FilterOption {
@@ -72,6 +73,7 @@ export function FilterBar({
             {segments.map((s) => (
               <button
                 key={s.value}
+                data-no-ripple
                 onClick={() => onSegmentChange?.(s.value)}
                 className={cn(
                   'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
@@ -98,20 +100,15 @@ export function FilterBar({
           // de cortarse o desbordar la página — con las 5-6 tabs actuales
           // de Pedidos/Eventos, en la práctica el ancho siempre alcanza y
           // `justify-between` es quien realmente se ve.
-          <nav className="flex flex-1 items-center justify-between gap-2 overflow-x-auto sm:flex-none sm:shrink-0 sm:justify-start sm:gap-5">
-            {tabs.map((t) => (
-              <button
-                key={t.value}
-                onClick={() => onTabChange(t.value)}
-                className={cn(
-                  'shrink-0 whitespace-nowrap border-b-2 pb-0.5 text-xs font-medium transition-colors sm:text-sm',
-                  tabValue === t.value ? 'border-foreground font-bold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <UnderlineTabs
+            tabs={tabs}
+            value={tabValue ?? tabs[0]?.value ?? ''}
+            onChange={onTabChange}
+            className="flex flex-1 items-center justify-between gap-2 overflow-x-auto sm:flex-none sm:shrink-0 sm:justify-start sm:gap-5"
+            tabClassName="shrink-0 whitespace-nowrap pb-0.5 text-xs font-medium transition-colors sm:text-sm"
+            activeClassName="font-bold text-foreground"
+            inactiveClassName="text-muted-foreground hover:text-foreground"
+          />
         )}
       </div>
 
