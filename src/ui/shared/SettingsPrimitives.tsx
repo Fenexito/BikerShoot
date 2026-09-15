@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { cn } from '../../lib/cn'
+import { Switch } from './Switch'
 
 export const settingsInputClass = 'w-full rounded-2xl border border-border bg-input px-4 py-2.5 text-sm outline-none focus:border-accent'
 
@@ -103,21 +103,12 @@ export function SettingsNotificationToggle({ enabled, onChange }: { enabled: boo
   useEffect(() => setChecked(enabled), [enabled])
 
   return (
-    <button
-      onClick={() => {
-        setChecked((c) => !c) // optimista: cambia al instante, sin esperar la vuelta del servidor
-        onChange(!checked)
+    <Switch
+      checked={checked}
+      onCheckedChange={(next) => {
+        setChecked(next) // optimista: cambia al instante, sin esperar la vuelta del servidor
+        onChange(next)
       }}
-      role="switch"
-      aria-checked={checked}
-      className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', checked ? 'bg-foreground' : 'bg-muted')}
-    >
-      <span
-        className={cn(
-          'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
-          checked ? 'translate-x-5' : 'translate-x-0',
-        )}
-      />
-    </button>
+    />
   )
 }

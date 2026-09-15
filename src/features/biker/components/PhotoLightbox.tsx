@@ -19,6 +19,7 @@ import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { X } from '../../../ui/animate-icons/icons/X'
 import { Check } from '../../../ui/animate-icons/icons/Check'
 import { cn } from '../../../lib/cn'
+import { Progress } from '../../../ui/shared/Progress'
 import type { GridPhoto } from './PhotoGrid'
 
 interface PhotoLightboxProps {
@@ -272,7 +273,7 @@ export function PhotoLightbox({ photos, index, onClose, onNavigate, shareSearchP
             // tener la URL real lista — antes el usuario se quedaba varios
             // segundos sin saber si su click hizo algo.
             <div className="flex h-[50vh] w-[50vw] max-h-[70vh] max-w-[70vw] items-center justify-center">
-              <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white" />
+              <Progress indeterminate className="w-40 bg-white/20" indicatorClassName="bg-white" />
             </div>
           ) : (
             <img

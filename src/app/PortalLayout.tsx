@@ -15,6 +15,7 @@ import { BugReportWidget } from '../features/bug-reports/BugReportWidget'
 import { useStudioTheme } from '../ui/studio/themeStore'
 import { useFlatTheme } from '../ui/flat/themeStore'
 import { RouteFallback } from '../ui/shared/RouteFallback'
+import { TooltipProvider } from '../ui/shared/Tooltip'
 
 const AUTH_PATHS = [
   '/login',
@@ -65,42 +66,44 @@ export function PortalLayout() {
   }, [themeClass, isDark])
 
   return (
-    <div
-      id="portal-theme-root"
-      // `min-h-dvh` (dynamic viewport height) en vez de `min-h-screen`
-      // (100vh estático) — en Chrome/Safari de iPhone, la barra del
-      // navegador se oculta/aparece al hacer scroll y cambia la altura real
-      // visible; con 100vh fijo eso hacía que el layout (y el menú inferior
-      // `fixed`) se reajustara de golpe cada vez, sintiéndose brusco. `dvh`
-      // sigue el alto visible real en cada momento, así el reacomodo es
-      // continuo en vez de un salto.
-      className={cn('flex min-h-dvh flex-col bg-background text-foreground transition-colors duration-300', themeClass)}
-    >
-      <ScrollRestoration />
-      {!isAuthPage && (
-        isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
-      )}
+    <TooltipProvider>
       <div
-        className={cn(
-          'flex-1',
-          // El header del portal biker bajó de alto (h-16 → h-14 en móvil,
-          // ver HeaderUser.tsx) para ocupar menos espacio en pantallas
-          // chicas — el padding compensatorio baja con él. Studio no tocó
-          // su alto, así que se queda con el valor de siempre.
-          isUserPortal && !isAuthPage && 'pb-20 pt-[4.25rem] md:pb-0 md:pt-0',
-          isStudioPortal && !isAuthPage && 'pb-20 pt-[4.75rem] md:pb-0 md:pt-0',
-        )}
+        id="portal-theme-root"
+        // `min-h-dvh` (dynamic viewport height) en vez de `min-h-screen`
+        // (100vh estático) — en Chrome/Safari de iPhone, la barra del
+        // navegador se oculta/aparece al hacer scroll y cambia la altura real
+        // visible; con 100vh fijo eso hacía que el layout (y el menú inferior
+        // `fixed`) se reajustara de golpe cada vez, sintiéndose brusco. `dvh`
+        // sigue el alto visible real en cada momento, así el reacomodo es
+        // continuo en vez de un salto.
+        className={cn('flex min-h-dvh flex-col bg-background text-foreground transition-colors duration-300', themeClass)}
       >
-        <Suspense fallback={<RouteFallback />}>
-          <Outlet />
-        </Suspense>
+        <ScrollRestoration />
+        {!isAuthPage && (
+          isAdminPortal ? <HeaderAdmin /> : isUserPortal ? <HeaderUser /> : isStudioPortal ? <HeaderStudio /> : <HeaderPublic />
+        )}
+        <div
+          className={cn(
+            'flex-1',
+            // El header del portal biker bajó de alto (h-16 → h-14 en móvil,
+            // ver HeaderUser.tsx) para ocupar menos espacio en pantallas
+            // chicas — el padding compensatorio baja con él. Studio no tocó
+            // su alto, así que se queda con el valor de siempre.
+            isUserPortal && !isAuthPage && 'pb-20 pt-[4.25rem] md:pb-0 md:pt-0',
+            isStudioPortal && !isAuthPage && 'pb-20 pt-[4.75rem] md:pb-0 md:pt-0',
+          )}
+        >
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
+        </div>
+        {!isUserPortal && !isStudioPortal && !isAdminPortal && !isAuthPage && <Footer />}
+        <Toaster />
+        <ConfirmDialog />
+        <TypedConfirmDialog />
+        <SegmentPickerDialog />
+        {!isAdminPortal && <BugReportWidget />}
       </div>
-      {!isUserPortal && !isStudioPortal && !isAdminPortal && !isAuthPage && <Footer />}
-      <Toaster />
-      <ConfirmDialog />
-      <TypedConfirmDialog />
-      <SegmentPickerDialog />
-      {!isAdminPortal && <BugReportWidget />}
-    </div>
+    </TooltipProvider>
   )
 }

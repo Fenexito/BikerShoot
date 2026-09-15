@@ -21,6 +21,7 @@ import { Bell } from '../../ui/animate-icons/icons/Bell'
 import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
 import { useBackButton } from '../../ui/shared/useBackButton'
+import { Switch } from '../../ui/shared/Switch'
 import type { NotificationType } from '../notifications/useNotifications'
 
 const NOTIFICATION_TOGGLES: { type: NotificationType; label: string; description: string }[] = [
@@ -249,22 +250,13 @@ function NotificationToggle({ enabled, onChange }: { enabled: boolean; onChange:
   useEffect(() => setChecked(enabled), [enabled])
 
   return (
-    <button
-      onClick={() => {
-        setChecked((c) => !c) // optimista: cambia al instante, sin esperar la vuelta del servidor
-        onChange(!checked)
+    <Switch
+      checked={checked}
+      onCheckedChange={(next) => {
+        setChecked(next) // optimista: cambia al instante, sin esperar la vuelta del servidor
+        onChange(next)
       }}
-      role="switch"
-      aria-checked={checked}
-      className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', checked ? 'bg-foreground' : 'bg-muted')}
-    >
-      <span
-        className={cn(
-          'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform',
-          checked ? 'translate-x-5' : 'translate-x-0',
-        )}
-      />
-    </button>
+    />
   )
 }
 

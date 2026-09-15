@@ -12,6 +12,7 @@ import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { LayoutDashboard } from '../../../ui/animate-icons/icons/LayoutDashboard'
 import { List } from '../../../ui/animate-icons/icons/List'
 import { cn } from '../../../lib/cn'
+import { Progress } from '../../../ui/shared/Progress'
 
 const CONCURRENCY = 4
 // Se deja el check verde visible un momento antes de quitarla de la cola —
@@ -377,9 +378,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                   <img src={item.localPreview} alt={item.name} className="h-full w-full object-cover" />
                   {(item.status === 'pendiente' || item.status === 'subiendo') && (
                     <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1">
-                      <div className="h-1 w-full bg-white/20">
-                        <div className="h-full bg-accent transition-all" style={{ width: `${item.progress}%` }} />
-                      </div>
+                      <Progress value={item.progress} className="h-1 bg-white/20" />
                     </div>
                   )}
                   {item.status === 'lista' && (
@@ -410,12 +409,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                     {item.status === 'error' ? (
                       <p className="truncate text-[10px] text-accent">{item.errorMessage ?? 'Error'}</p>
                     ) : (
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={cn('h-full transition-all', item.status === 'lista' ? 'bg-emerald-500' : 'bg-accent')}
-                          style={{ width: `${item.progress}%` }}
-                        />
-                      </div>
+                      <Progress value={item.progress} indicatorClassName={item.status === 'lista' ? 'bg-emerald-500' : undefined} />
                     )}
                   </div>
                   <div className="w-16 shrink-0 text-right">

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
+import { Progress } from './Progress'
 
 /** Fallback de Suspense para chunks lazy — espera 150ms antes de mostrar
- * nada para que una carga rápida (chunk ya en caché) no parpadee. */
+ * nada para que una carga rápida (chunk ya en caché) no parpadee. Barra
+ * indeterminada en blanco/negro (`bg-foreground`/`bg-muted`, sigue el tema
+ * activo solo) en vez del spinner circular de antes — mismo componente que
+ * el resto de "página cargando" en la app. */
 export function RouteFallback() {
   const [show, setShow] = useState(false)
 
@@ -14,7 +18,7 @@ export function RouteFallback() {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
+      <Progress indeterminate className="w-48" />
     </div>
   )
 }

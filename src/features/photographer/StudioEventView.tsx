@@ -37,6 +37,8 @@ import { useBackButton } from '../../ui/shared/useBackButton'
 import ScrollExpand from '../../ui/reactbits/ScrollExpand'
 import AccordionGallery from '../../ui/reactbits/AccordionGallery'
 import { cn } from '../../lib/cn'
+import { Checkbox } from '../../ui/shared/Checkbox'
+import { ConfirmDeleteButton } from '../../ui/shared/ConfirmDeleteButton'
 import type { EventStatus } from '../../types/db'
 import { Skeleton } from '../../ui/shared/Skeleton'
 
@@ -57,11 +59,13 @@ function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: s
       {photo.delivered_path && (
         <span className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Vendida</span>
       )}
-      <AnimateIcon animateOnHover animateOnTap asChild>
-        <button onClick={() => onDelete(photo.id)} className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-accent">
-          <Trash size={14} /> Eliminar
-        </button>
-      </AnimateIcon>
+      <ConfirmDeleteButton
+        onConfirm={() => onDelete(photo.id)}
+        label="Eliminar foto"
+        triggerClassName="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-accent"
+      >
+        <Trash size={14} /> Eliminar
+      </ConfirmDeleteButton>
     </div>
   )
 }
@@ -118,31 +122,28 @@ function AccordionRow({
                 Vendida
               </span>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleSelect(photo.id)
-              }}
-              aria-label="Seleccionar foto"
-              className={cn(
-                'absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold opacity-100 transition-colors sm:opacity-0 sm:group-hover:opacity-100',
-                selectedIds.has(photo.id) ? 'border-red-500 bg-red-500 text-white' : 'border-white/80 bg-black/30 text-transparent hover:bg-black/50',
-              )}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute right-2 top-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
             >
-              ✓
-            </button>
-            <AnimateIcon animateOnHover animateOnTap asChild>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(photo.id)
-                }}
-                aria-label="Eliminar foto"
-                className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
-              >
-                <Trash size={14} />
-              </button>
-            </AnimateIcon>
+              <Checkbox
+                checked={selectedIds.has(photo.id)}
+                onCheckedChange={() => onToggleSelect(photo.id)}
+                aria-label="Seleccionar foto"
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors',
+                  selectedIds.has(photo.id) ? 'border-red-500 bg-red-500' : 'border-white/80 bg-black/30 hover:bg-black/50',
+                )}
+              />
+            </div>
+            <ConfirmDeleteButton
+              onConfirm={() => onDelete(photo.id)}
+              label="Eliminar foto"
+              containerClassName="absolute bottom-2 right-2"
+              triggerClassName="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white opacity-100 transition-colors sm:opacity-0 sm:hover:bg-red-500 sm:group-hover:opacity-100"
+            >
+              <Trash size={14} />
+            </ConfirmDeleteButton>
           </>
         ),
       }))}
@@ -628,9 +629,10 @@ export function StudioEventView() {
     queryClient.invalidateQueries({ queryKey: ['my-events', user?.id] })
   }
 
+  // La confirmación ya no es un modal aparte — vive en línea junto al
+  // propio botón de eliminar (ver `ConfirmDeleteButton`), así que para
+  // cuando esta función se llama, el fotógrafo ya confirmó.
   async function deletePhoto(photoId: string) {
-    const ok = await confirmDialog.ask({ title: '¿Eliminar esta foto?', confirmLabel: 'Eliminar', tone: 'danger' })
-    if (!ok) return
     const { error } = await supabase.from('photos').delete().eq('id', photoId)
     if (error) {
       if (error.code === '23503') {
