@@ -97,6 +97,54 @@ export function flyToCart(sourceRect: DOMRect, imageUrl: string) {
   })
 
   const anim = el.animate(keyframes, { duration: 650, easing: 'cubic-bezier(0.33, 0, 0.2, 1)', fill: 'forwards' })
-  anim.onfinish = () => el.remove()
+  anim.onfinish = () => {
+    el.remove()
+    impactCartIcon(target!)
+  }
   anim.oncancel = () => el.remove()
+}
+
+/** El "golpe" que recibe el carrito justo cuando la miniatura que voló
+ * termina de llegar — sin esto, el ícono se quedaba estático todo el
+ * tiempo y la animación se sentía incompleta, como si la foto
+ * desapareciera en el aire en vez de de verdad "caer" en el carrito. Un
+ * rebote elástico del propio ícono + un anillo que se expande y se
+ * desvanece alrededor — las dos animaciones se miden contra el tamaño
+ * real del ícono en pantalla, así se ven bien sin importar en qué header
+ * (biker/fotógrafo) o tamaño de pantalla estén. */
+function impactCartIcon(target: HTMLElement) {
+  const rect = target.getBoundingClientRect()
+
+  const ring = document.createElement('span')
+  ring.style.position = 'fixed'
+  ring.style.left = `${rect.left}px`
+  ring.style.top = `${rect.top}px`
+  ring.style.width = `${rect.width}px`
+  ring.style.height = `${rect.height}px`
+  ring.style.borderRadius = '9999px'
+  ring.style.border = '2px solid currentColor'
+  ring.style.color = getComputedStyle(target).color
+  ring.style.pointerEvents = 'none'
+  ring.style.zIndex = '9999'
+  document.body.appendChild(ring)
+  const ringAnim = ring.animate(
+    [
+      { transform: 'scale(1)', opacity: 0.7 },
+      { transform: 'scale(2.1)', opacity: 0 },
+    ],
+    { duration: 500, easing: 'ease-out' },
+  )
+  ringAnim.onfinish = () => ring.remove()
+  ringAnim.oncancel = () => ring.remove()
+
+  target.animate(
+    [
+      { transform: 'scale(1)' },
+      { transform: 'scale(1.22)' },
+      { transform: 'scale(0.93)' },
+      { transform: 'scale(1.04)' },
+      { transform: 'scale(1)' },
+    ],
+    { duration: 420, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+  )
 }

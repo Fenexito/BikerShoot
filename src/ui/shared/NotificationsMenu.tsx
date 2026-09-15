@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AnimatePresence, motion } from 'motion/react'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useNotifications, markNotificationRead, markAllNotificationsRead, type AppNotification, type NotificationType } from '../../features/notifications/useNotifications'
 import { IconCart, IconVerified } from './icons'
@@ -32,7 +33,7 @@ function timeAgoShort(iso: string) {
   return `${days}d`
 }
 
-function NotificationRow({ notification, userId, onNavigate }: { notification: AppNotification; userId: string; onNavigate: () => void }) {
+function NotificationRow({ notification, userId, index, onNavigate }: { notification: AppNotification; userId: string; index: number; onNavigate: () => void }) {
   const unread = !notification.read_at
 
   const content = (
@@ -46,7 +47,21 @@ function NotificationRow({ notification, userId, onNavigate }: { notification: A
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
         <span className="text-[10px] text-white/40">{timeAgoShort(notification.created_at)}</span>
-        {unread && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+        {/* AnimatePresence propio (no depende de que la fila entera se
+            desmonte) — al marcar como leída, este punto se encoge y se
+            desvanece en vez de simplemente desaparecer de golpe. */}
+        <AnimatePresence>
+          {unread && (
+            <motion.span
+              layout
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="h-1.5 w-1.5 rounded-full bg-white"
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -56,14 +71,25 @@ function NotificationRow({ notification, userId, onNavigate }: { notification: A
     onNavigate()
   }
 
+  // Entrada escalonada al abrir el menú — cada fila aparece un poco
+  // después de la anterior (`delay` por índice) en vez de que las 5-10
+  // notificaciones aparezcan todas de golpe.
+  const motionProps = {
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.25, delay: Math.min(index, 8) * 0.04, ease: 'easeOut' as const },
+  }
+
   return notification.link ? (
-    <Link to={notification.link} onClick={handleClick}>
-      {content}
-    </Link>
+    <motion.div {...motionProps}>
+      <Link to={notification.link} onClick={handleClick}>
+        {content}
+      </Link>
+    </motion.div>
   ) : (
-    <button onClick={handleClick} className="block w-full text-left">
+    <motion.button {...motionProps} onClick={handleClick} className="block w-full text-left">
       {content}
-    </button>
+    </motion.button>
   )
 }
 
@@ -143,8 +169,8 @@ export function NotificationsMenu() {
             </div>
           ) : (
             <div className="mt-3 max-h-96 overflow-y-auto border-t border-white/10 py-1">
-              {notifications.map((n) => (
-                <NotificationRow key={n.id} notification={n} userId={user!.id} onNavigate={() => setOpen(false)} />
+              {notifications.map((n, i) => (
+                <NotificationRow key={n.id} notification={n} userId={user!.id} index={i} onNavigate={() => setOpen(false)} />
               ))}
             </div>
           )}
