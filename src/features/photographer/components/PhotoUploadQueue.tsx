@@ -378,7 +378,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
                   <img src={item.localPreview} alt={item.name} className="h-full w-full object-cover" />
                   {(item.status === 'pendiente' || item.status === 'subiendo') && (
                     <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1">
-                      <Progress value={item.progress} className="h-1 bg-white/20" />
+                      <Progress value={item.progress} className="h-1 w-full bg-white/20" />
                     </div>
                   )}
                   {item.status === 'lista' && (

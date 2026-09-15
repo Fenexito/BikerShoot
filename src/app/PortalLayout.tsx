@@ -16,6 +16,7 @@ import { useStudioTheme } from '../ui/studio/themeStore'
 import { useFlatTheme } from '../ui/flat/themeStore'
 import { RouteFallback } from '../ui/shared/RouteFallback'
 import { TooltipProvider } from '../ui/shared/Tooltip'
+import { GlobalRipple } from '../ui/shared/GlobalRipple'
 
 const AUTH_PATHS = [
   '/login',
@@ -103,6 +104,7 @@ export function PortalLayout() {
         <TypedConfirmDialog />
         <SegmentPickerDialog />
         {!isAdminPortal && <BugReportWidget />}
+        <GlobalRipple />
       </div>
     </TooltipProvider>
   )

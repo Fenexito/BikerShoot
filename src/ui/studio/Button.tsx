@@ -1,7 +1,5 @@
 import { type ButtonHTMLAttributes, forwardRef } from 'react'
 import { cn } from '../../lib/cn'
-import { useRipple } from '../shared/useRipple'
-import { RippleLayer } from '../shared/RippleLayer'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'dark' | 'danger'
 type Size = 'sm' | 'default' | 'lg'
@@ -34,18 +32,17 @@ const variantClasses: Record<Variant, string> = {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'default', loading, disabled, className, children, onPointerDown, ...props }, ref) => {
-    const { ripples, addRipple, removeRipple } = useRipple()
+  ({ variant = 'primary', size = 'default', loading, disabled, className, children, ...props }, ref) => {
     return (
       <button
         ref={ref}
         disabled={disabled || loading}
-        onPointerDown={(e) => {
-          addRipple(e)
-          onPointerDown?.(e)
-        }}
         className={cn(
-          'relative overflow-hidden inline-flex items-center justify-center whitespace-nowrap rounded-full font-semibold transition-all duration-150',
+          // El ripple ya no vive aquí — un solo mecanismo global
+          // (`GlobalRipple`, montado en `PortalLayout`) lo aplica a
+          // CUALQUIER <button> de la app, no solo a este componente
+          // compartido.
+          'inline-flex items-center justify-center whitespace-nowrap rounded-full font-semibold transition-all duration-150',
           'active:scale-[0.98]',
           'disabled:pointer-events-none disabled:opacity-50',
           focusRing,
@@ -57,7 +54,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading && <Spinner />}
         {children}
-        <RippleLayer ripples={ripples} onDone={removeRipple} />
       </button>
     )
   },

@@ -68,7 +68,19 @@ export function ConfirmDeleteButton({
   }, [open])
 
   return (
-    <div ref={rootRef} className={cn('relative z-10 flex items-center gap-1.5', containerClassName)}>
+    // OJO: `containerClassName` (ej. "absolute bottom-2 right-2" para
+    // anclar el botón a una esquina de una foto) NUNCA debe combinarse con
+    // un `relative` propio de este componente — sin `tailwind-merge` en el
+    // proyecto (`cn` es solo `clsx`), tener `relative` Y `absolute` en el
+    // mismo string deja cuál gana al azar según el orden en que Tailwind
+    // generó esas reglas, no el orden de las clases — eso fue justo el bug
+    // reportado (el botón "saltaba" a la esquina opuesta): `relative`
+    // ganaba a veces, y sin `position:absolute` real el panel dejaba de
+    // estar anclado a la foto y cualquier badge hermano (la miniatura del
+    // punto, el ✓ de "seleccionar") lo empujaba a otro lugar. Por eso
+    // `relative` solo se aplica cuando NO se da `containerClassName` (el
+    // caso de fila en línea, sin posicionamiento propio).
+    <div ref={rootRef} className={cn('z-10 flex items-center gap-1.5', containerClassName ?? 'relative')}>
       <div
         aria-hidden={!open}
         className={cn(

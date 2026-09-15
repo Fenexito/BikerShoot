@@ -17,8 +17,9 @@ export function RouteFallback() {
   if (!show) return null
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <Progress indeterminate className="w-48" />
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
+      <Progress indeterminate className="w-40 bg-muted" />
+      <p className="text-xs font-medium text-muted-foreground">Cargando…</p>
     </div>
   )
 }
