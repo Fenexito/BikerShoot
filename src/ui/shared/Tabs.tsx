@@ -57,9 +57,18 @@ export function UnderlineTabs<T extends string>({
           >
             {t.label}
             {active && (
+              // `bottom-0` (nunca un valor negativo) a propósito: un
+              // contenedor con `overflow-x-auto` activa también
+              // `overflow-y` por la regla de pareja de la spec de CSS —
+              // un indicador que se saliera de la caja del botón (ej.
+              // `-bottom-[2px]`) quedaba recortado o forzaba un scroll
+              // vertical minúsculo para poder verlo. Quedándose DENTRO del
+              // borde inferior del botón (donde antes vivía el
+              // `border-b-2` original) no depende de que el contenedor de
+              // afuera tenga overflow visible.
               <motion.span
                 layoutId={`underline-tabs-${groupId}`}
-                className={cn('absolute inset-x-0 -bottom-[2px] h-0.5 rounded-full bg-foreground', indicatorClassName)}
+                className={cn('absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-foreground', indicatorClassName)}
                 transition={SPRING}
               />
             )}
@@ -112,15 +121,24 @@ export function SettingsTabs<T extends string>({
               <t.icon className="h-4 w-4 shrink-0" />
               {t.label}
               {active && (
+                // Mismo criterio que en `UnderlineTabs`: nunca un offset
+                // negativo. `bottom-0`/`left-0` se quedan DENTRO de la
+                // caja del botón (donde vivía el `border-b-2`/`border-l-2`
+                // original) — un valor negativo se salía de esa caja y,
+                // como el `<nav>` de afuera usa `overflow-x-auto` (activa
+                // `overflow-y` también, por la regla de pareja de CSS) o
+                // vive dentro de la columna angosta del sidebar en
+                // escritorio, terminaba recortado — invisible del todo en
+                // vez de solo necesitar un scroll para verse.
                 <>
                   <motion.span
                     layoutId={`settings-tabs-underline-${groupId}`}
-                    className="absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full bg-foreground lg:hidden"
+                    className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-foreground lg:hidden"
                     transition={SPRING}
                   />
                   <motion.span
                     layoutId={`settings-tabs-border-${groupId}`}
-                    className="absolute inset-y-0 -left-0.5 hidden w-0.5 rounded-full bg-foreground lg:block"
+                    className="absolute inset-y-0 left-0 hidden w-0.5 rounded-full bg-foreground lg:block"
                     transition={SPRING}
                   />
                 </>
