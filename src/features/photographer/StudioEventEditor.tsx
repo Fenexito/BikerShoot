@@ -126,7 +126,7 @@ function PointSegmentRow({
   return (
     <div className="rounded-2xl border border-border">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <button onClick={() => setExpanded((e) => !e)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <button onClick={() => setExpanded((e) => !e)} data-no-ripple className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <span className={cn('shrink-0 text-xs transition-transform', expanded && 'rotate-180')}>▾</span>
           <span className="min-w-0">
             <p className="truncate font-semibold">{point.label}</p>
@@ -174,12 +174,14 @@ function PointSegmentRow({
             <div className="flex gap-1 rounded-full bg-muted p-1">
               <button
                 onClick={() => setStep(15)}
+                data-no-ripple
                 className={cn('rounded-full px-3 py-1 text-xs font-semibold transition-colors', step === 15 ? 'bg-foreground text-background' : 'text-muted-foreground')}
               >
                 15 min
               </button>
               <button
                 onClick={() => setStep(30)}
+                data-no-ripple
                 className={cn('rounded-full px-3 py-1 text-xs font-semibold transition-colors', step === 30 ? 'bg-foreground text-background' : 'text-muted-foreground')}
               >
                 30 min
@@ -889,7 +891,7 @@ export function StudioEventEditor() {
               <Section title="Portada y marca de agua">
                 <div className="flex flex-wrap gap-8">
                   <div className="flex items-center gap-4">
-                    <button onClick={() => coverInputRef.current?.click()} className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted">
+                    <button onClick={() => coverInputRef.current?.click()} data-no-ripple className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted">
                       {(coverLocalPreview || coverPath) ? (
                         <img src={coverLocalPreview ?? r2Url(coverPath!)} alt="Portada" className="h-full w-full object-cover" />
                       ) : (
@@ -901,11 +903,11 @@ export function StudioEventEditor() {
                       <p className="text-sm font-semibold">Foto de portada</p>
                       <p className="mb-1 text-xs text-muted-foreground">Banner ancho en la vista del evento. Opcional.</p>
                       <div className="flex gap-2">
-                        <button onClick={() => coverInputRef.current?.click()} className="text-xs font-semibold text-foreground hover:underline">
+                        <button onClick={() => coverInputRef.current?.click()} data-no-ripple className="text-xs font-semibold text-foreground hover:underline">
                           {coverPath || coverLocalPreview ? 'Cambiar' : 'Subir'}
                         </button>
                         {(coverPath || coverLocalPreview) && (
-                          <button onClick={clearCover} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                          <button onClick={clearCover} data-no-ripple className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
                             Quitar
                           </button>
                         )}
@@ -916,6 +918,7 @@ export function StudioEventEditor() {
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => watermarkInputRef.current?.click()}
+                      data-no-ripple
                       className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-border bg-muted [background-image:linear-gradient(45deg,#8884_25%,transparent_25%),linear-gradient(-45deg,#8884_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#8884_75%),linear-gradient(-45deg,transparent_75%,#8884_75%)] [background-size:10px_10px]"
                     >
                       {(watermarkLocalPreview || watermarkPath) ? (
@@ -929,11 +932,11 @@ export function StudioEventEditor() {
                       <p className="text-sm font-semibold">Marca de agua (PNG)</p>
                       <p className="mb-1 text-xs text-muted-foreground">Se estampa sobre las fotos. Opcional.</p>
                       <div className="flex gap-2">
-                        <button onClick={() => watermarkInputRef.current?.click()} className="text-xs font-semibold text-foreground hover:underline">
+                        <button onClick={() => watermarkInputRef.current?.click()} data-no-ripple className="text-xs font-semibold text-foreground hover:underline">
                           {watermarkPath || watermarkLocalPreview ? 'Cambiar' : 'Subir'}
                         </button>
                         {(watermarkPath || watermarkLocalPreview) && (
-                          <button onClick={clearWatermark} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                          <button onClick={clearWatermark} data-no-ripple className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
                             Quitar
                           </button>
                         )}

@@ -57,6 +57,7 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, sec
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Menú de perfil"
+        data-no-ripple
         className="block h-10 w-10 shrink-0 overflow-hidden rounded-full ring-2 ring-transparent transition-all hover:ring-white/20"
       >
         {avatar}
@@ -128,14 +129,14 @@ export function ProfileMenu({ name, email, avatar, socialLinks, editProfile, sec
             </div>
           ))}
 
-          <div className="grid grid-cols-3 gap-2 border-t border-white/10 px-4 py-3 text-[11px] text-white/40">
-            {FOOTER_LINKS.map((link, i) => (
-              <Link
-                key={link.label}
-                to={link.to!}
-                onClick={() => setOpen(false)}
-                className={cn('truncate transition-colors hover:text-white/70', i === 0 ? 'text-left' : i === 1 ? 'text-center' : 'text-right')}
-              >
+          {/* `flex justify-between` (no `grid grid-cols-3`): cada link mide
+              su propio texto en vez de repartirse en tercios iguales —
+              "Derechos de autor" no cabía en un tercio y se recortaba
+              (`truncate`), ocultándose. Sin `truncate` ni ancho forzado, los
+              tres caben en una sola línea con espacio parejo entre ellos. */}
+          <div className="flex items-center justify-between gap-2 border-t border-white/10 px-4 py-3 text-[11px] text-white/40">
+            {FOOTER_LINKS.map((link) => (
+              <Link key={link.label} to={link.to!} onClick={() => setOpen(false)} className="whitespace-nowrap transition-colors hover:text-white/70">
                 {link.label}
               </Link>
             ))}

@@ -58,13 +58,6 @@ function invalidateStorage() {
   queryClient.invalidateQueries({ queryKey: ['my-events'] })
 }
 
-type CleanupScope = 'unsold' | 'sold' | 'all'
-const SCOPE_OPTIONS = [
-  { value: 'unsold', label: 'No vendidas' },
-  { value: 'sold', label: 'Vendidas' },
-  { value: 'all', label: 'Todas' },
-]
-
 /** A quién apunta el borrado: `{eventId, pointId?}` para evento/punto reales
  * (la mayoría de las fotos, en un solo DELETE eficiente), o `{photoIds}`
  * para granularidades más finas (horario, leftover de un punto, o el
@@ -72,40 +65,33 @@ const SCOPE_OPTIONS = [
  * `pointId`/`eventId`. */
 type CleanupTarget = { eventId: string; pointId?: string } | { photoIds: string[] }
 
-function CleanupControl({ target, scopeLabel, stats }: { target: CleanupTarget; scopeLabel: string; stats: { totalPhotos: number; soldPhotos: number; bytes: number; soldBytes: number; unsoldBytes: number } }) {
+/** Un botón por categoría (no vendidas / vendidas) — cada uno ya trae su
+ * propia cantidad y bytes en la etiqueta, así el usuario ve de un vistazo
+ * qué va a liberar SIN tener que elegir primero en un desplegable. Se quitó
+ * la opción combinada "Todas": presionar los dos botones logra lo mismo. */
+function CleanupCategoryButton({
+  kind,
+  target,
+  scopeLabel,
+  photos,
+  bytes,
+}: {
+  kind: 'unsold' | 'sold'
+  target: CleanupTarget
+  scopeLabel: string
+  photos: number
+  bytes: number
+}) {
   const push = useToastStore((s) => s.push)
-  const [scope, setScope] = useState<CleanupScope>('unsold')
   const [busy, setBusy] = useState(false)
 
-  const unsoldPhotos = stats.totalPhotos - stats.soldPhotos
-  const scopeInfo: Record<CleanupScope, { photos: number; bytes: number }> = {
-    unsold: { photos: unsoldPhotos, bytes: stats.unsoldBytes },
-    sold: { photos: stats.soldPhotos, bytes: stats.soldBytes },
-    all: { photos: stats.totalPhotos, bytes: stats.bytes },
-  }
-  const info = scopeInfo[scope]
-
-  async function deleteUnsold() {
-    const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: target })
-    if (error) throw new Error(error.message)
-    return { deleted: data.deleted as number }
-  }
-
-  async function cleanupSold() {
-    const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { ...target, clear: 'both' } })
-    if (error) throw new Error(error.message)
-    return { deleted: data.cleaned as number, bytesFreed: data.bytesFreed as number }
-  }
-
   async function run() {
-    const descriptions: Record<CleanupScope, string> = {
-      unsold: `Borra permanentemente las fotos de "${scopeLabel}" que nadie ha comprado.`,
-      sold: `Borra el preview y el respaldo crudo de las fotos ya vendidas de "${scopeLabel}". La entrega final del comprador NUNCA se toca.`,
-      all: `Borra las fotos no vendidas de "${scopeLabel}" por completo, y libera el preview/respaldo de las vendidas. La entrega final del comprador NUNCA se toca.`,
-    }
     const ok = await confirmDialog.ask({
-      title: `¿Liberar ${info.photos} foto${info.photos === 1 ? '' : 's'} (${formatBytes(info.bytes)})?`,
-      description: descriptions[scope],
+      title: `¿Liberar ${photos} foto${photos === 1 ? '' : 's'} (${formatBytes(bytes)})?`,
+      description:
+        kind === 'unsold'
+          ? `Borra permanentemente las fotos de "${scopeLabel}" que nadie ha comprado. No se puede deshacer.`
+          : `Borra el preview y el respaldo crudo de las fotos ya vendidas de "${scopeLabel}". La entrega final del comprador NUNCA se toca.`,
       confirmLabel: 'Liberar espacio',
       tone: 'danger',
     })
@@ -114,14 +100,15 @@ function CleanupControl({ target, scopeLabel, stats }: { target: CleanupTarget; 
     try {
       let deleted = 0
       let bytesFreed = 0
-      if (scope === 'unsold' || scope === 'all') {
-        const r = await deleteUnsold()
-        deleted += r.deleted
-      }
-      if (scope === 'sold' || scope === 'all') {
-        const r = await cleanupSold()
-        deleted += r.deleted
-        bytesFreed += r.bytesFreed
+      if (kind === 'unsold') {
+        const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: target })
+        if (error) throw new Error(error.message)
+        deleted = data.deleted as number
+      } else {
+        const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { ...target, clear: 'both' } })
+        if (error) throw new Error(error.message)
+        deleted = data.cleaned as number
+        bytesFreed = data.bytesFreed as number
       }
       push({
         type: 'success',
@@ -137,15 +124,18 @@ function CleanupControl({ target, scopeLabel, stats }: { target: CleanupTarget; 
   }
 
   return (
+    <Button variant="secondary" size="sm" onClick={run} loading={busy} disabled={photos === 0}>
+      Liberar {photos} {kind === 'unsold' ? 'no vendida' : 'vendida'}{photos === 1 ? '' : 's'} · {formatBytes(bytes)}
+    </Button>
+  )
+}
+
+function CleanupControl({ target, scopeLabel, stats }: { target: CleanupTarget; scopeLabel: string; stats: { totalPhotos: number; soldPhotos: number; bytes: number; soldBytes: number; unsoldBytes: number } }) {
+  const unsoldPhotos = stats.totalPhotos - stats.soldPhotos
+  return (
     <div className="flex flex-wrap items-center gap-3">
-      <FancySelect value={scope} onChange={(v) => setScope(v as CleanupScope)} options={SCOPE_OPTIONS} clearable={false} className="w-40" />
-      <p className="text-xs text-muted-foreground">
-        Esto liberaría <span className="font-semibold text-foreground">{info.photos} foto{info.photos === 1 ? '' : 's'}</span> ·{' '}
-        <span className="font-semibold text-foreground">{formatBytes(info.bytes)}</span>
-      </p>
-      <Button variant="secondary" size="sm" onClick={run} loading={busy} disabled={info.photos === 0}>
-        Liberar espacio
-      </Button>
+      <CleanupCategoryButton kind="unsold" target={target} scopeLabel={scopeLabel} photos={unsoldPhotos} bytes={stats.unsoldBytes} />
+      <CleanupCategoryButton kind="sold" target={target} scopeLabel={scopeLabel} photos={stats.soldPhotos} bytes={stats.soldBytes} />
     </div>
   )
 }
@@ -158,7 +148,7 @@ const UNASSIGNED = '__unassigned__'
  * nuevo), aplicado aquí a la lista exacta de `photoIds` del nodo en vez de
  * a una selección manual. Restringido al mismo evento: mover entre eventos
  * rompería el precio y la ruta asociados a cada uno. */
-function MoveControl({ event, sourcePointId, photoIds }: { event: EventStorage; sourcePointId: string | null; photoIds: string[] }) {
+function MoveControl({ event, sourceLabel, sourcePointId, photoIds }: { event: EventStorage; sourceLabel: string; sourcePointId: string | null; photoIds: string[] }) {
   const push = useToastStore((s) => s.push)
   const [dest, setDest] = useState('')
   const [busy, setBusy] = useState(false)
@@ -167,9 +157,16 @@ function MoveControl({ event, sourcePointId, photoIds }: { event: EventStorage; 
     ...event.points.filter((p) => p.id !== null && p.id !== sourcePointId).map((p) => ({ value: p.id as string, label: p.label })),
     ...(sourcePointId !== null ? [{ value: UNASSIGNED, label: 'Sin punto asignado' }] : []),
   ]
+  const destLabel = options.find((o) => o.value === dest)?.label
 
   async function run() {
-    if (!dest || photoIds.length === 0) return
+    if (!dest || photoIds.length === 0 || !destLabel) return
+    const ok = await confirmDialog.ask({
+      title: `¿Mover ${photoIds.length} foto${photoIds.length === 1 ? '' : 's'}?`,
+      description: `De "${sourceLabel}" a "${destLabel}".`,
+      confirmLabel: 'Mover fotos',
+    })
+    if (!ok) return
     setBusy(true)
     const { error } = await supabase
       .from('photos')
@@ -303,7 +300,7 @@ export function StorageDetailPanel({ node, photographerId }: { node: StorageNode
 
       {canMove && (
         <Section title="Mover fotos">
-          <MoveControl event={node.event} sourcePointId={sourcePointId} photoIds={photoIds} />
+          <MoveControl event={node.event} sourceLabel={breadcrumb(node)} sourcePointId={sourcePointId} photoIds={photoIds} />
         </Section>
       )}
 

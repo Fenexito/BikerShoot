@@ -55,6 +55,7 @@ export function ActionMenu({ items, triggerClassName, align = 'right' }: ActionM
             setOpen((o) => !o)
           }}
           aria-label="Más opciones"
+          data-no-ripple
           className={cn(
             'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted',
             triggerClassName,

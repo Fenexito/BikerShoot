@@ -22,7 +22,7 @@ export function EventCard({ event, photos = [] }: { event: PublicEvent; photos?:
 
   return (
     <div className="group overflow-hidden rounded-3xl border border-border transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl">
-      <Link to={`/app/eventos/${event.id}`} className="block">
+      <Link to={`/app/eventos/${event.id}`} role="button" className="block">
         <EventCoverMedia
           coverUrl={event.cover_path ? r2Url(event.cover_path) : null}
           placeholderIcon="🏍️"

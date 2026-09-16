@@ -17,8 +17,6 @@ function formatBytes(n: number) {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
-type SortMode = 'oldest' | 'newest' | 'biggest'
-
 const eventKeyOf = (event: EventStorage) => `event:${event.id}`
 const pointKeyOf = (event: EventStorage, point: PointStorage) => `point:${event.id}:${point.id ?? 'unassigned'}`
 const horarioKeyOf = (key: string) => `horario:${key}`
@@ -75,7 +73,6 @@ export function StudioStorage() {
   const { data: details } = usePhotographerDetails(user?.id)
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: events, isLoading } = useStorageOverview(user?.id)
-  const [sort, setSort] = useState<SortMode>('oldest')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
@@ -100,11 +97,7 @@ export function StudioStorage() {
     }
   }
 
-  const sorted = [...(events ?? [])].sort((a, b) => {
-    if (sort === 'oldest') return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
-    if (sort === 'newest') return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
-    return b.bytes - a.bytes
-  })
+  const sorted = [...(events ?? [])].sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
 
   const selectedNode = findNode(selectedKey, sorted)
   const limitBytes = details?.storage_plan ? details.storage_plan.gb_limit * 1024 * 1024 * 1024 : 0
@@ -112,51 +105,35 @@ export function StudioStorage() {
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
-      <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Almacenamiento</h1>
-      <p className="mt-2 text-muted-foreground">
-        Explora tu almacenamiento como carpetas — evento, punto y horario — y administra cada nivel por separado.
-      </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Almacenamiento</h1>
+          <p className="mt-2 text-muted-foreground">
+            Explora tu almacenamiento como carpetas — evento, punto y horario — y administra cada nivel por separado.
+          </p>
+        </div>
 
-      {details?.storage_plan && (
-        <div className="mt-6 rounded-3xl border border-border bg-card p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span>Uso total</span>
+        {details?.storage_plan && (
+          <div className="w-full shrink-0 rounded-2xl border border-border bg-card p-4 sm:max-w-[260px]">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">
-                {formatBytes(usageBytes)} de {details.storage_plan.gb_limit} GB
+                {formatBytes(usageBytes)} <span className="font-normal text-muted-foreground">de {details.storage_plan.gb_limit} GB</span>
               </span>
-              <span>· Plan {details.storage_plan.name}</span>
+              <span>Plan {details.storage_plan.name}</span>
             </div>
-            <Link to="/studio/planes">
-              <Button variant="secondary" size="sm">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className={cn('h-full rounded-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
+            </div>
+            <Link to="/studio/planes" className="mt-3 block">
+              <Button variant="secondary" size="sm" className="w-full">
                 {pct > 80 ? 'Mejorar plan →' : 'Ver planes'}
               </Button>
             </Link>
           </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div className={cn('h-full rounded-full transition-all', pct > 90 ? 'bg-red-500' : 'bg-accent')} style={{ width: `${pct}%` }} />
-          </div>
-        </div>
-      )}
-
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold tracking-tight">Tus eventos</h2>
-        <div className="flex gap-1 rounded-full bg-muted p-1">
-          {(['oldest', 'newest', 'biggest'] as SortMode[]).map((s) => (
-            <button
-              key={s}
-              data-no-ripple
-              onClick={() => setSort(s)}
-              className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                sort === s ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {s === 'oldest' ? 'Más antiguos' : s === 'newest' ? 'Más recientes' : 'Más pesados'}
-            </button>
-          ))}
-        </div>
+        )}
       </div>
+
+      <h2 className="mt-8 text-lg font-bold tracking-tight">Tus eventos</h2>
 
       <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
         <div className="flex flex-col gap-0.5 rounded-3xl border border-border bg-card p-2 lg:w-[380px] lg:shrink-0 lg:max-h-[70vh] lg:overflow-y-auto">

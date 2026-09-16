@@ -253,7 +253,7 @@ export function BikerProfilePage() {
           {tab === 'perfil' && (
             <SettingsSection title="Foto de perfil">
               <div className="flex items-center gap-4">
-                <button onClick={() => avatarInputRef.current?.click()} className="relative h-16 w-16 shrink-0 rounded-full" disabled={uploadingAvatar}>
+                <button onClick={() => avatarInputRef.current?.click()} data-no-ripple className="relative h-16 w-16 shrink-0 rounded-full" disabled={uploadingAvatar}>
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full border-2 border-border object-cover" />
                   ) : (
@@ -263,7 +263,7 @@ export function BikerProfilePage() {
                 <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
                 <div>
                   <p className="text-sm font-semibold">{profile.display_name || 'Tu perfil'}</p>
-                  <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} className="text-xs font-semibold text-foreground hover:underline">
+                  <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} data-no-ripple className="text-xs font-semibold text-foreground hover:underline">
                     {uploadingAvatar ? 'Subiendo…' : 'Cambiar foto'}
                   </button>
                 </div>
@@ -292,7 +292,7 @@ export function BikerProfilePage() {
                 <div className="border-b border-border py-4 last:border-b-0">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold">Contraseña</p>
-                    <button onClick={() => setEditingPassword((e) => !e)} className="shrink-0 text-xs font-semibold text-foreground hover:underline">
+                    <button onClick={() => setEditingPassword((e) => !e)} data-no-ripple className="shrink-0 text-xs font-semibold text-foreground hover:underline">
                       {editingPassword ? 'Cancelar' : 'Cambiar'}
                     </button>
                   </div>
@@ -333,12 +333,10 @@ export function BikerProfilePage() {
               </SettingsSection>
 
               <SettingsSection title="Administrar cuenta">
-                {/* Ancho completo SIEMPRE (no solo en móvil) y más alto/
-                    oscuro que el resto de botones de esta página — es la
-                    acción que un biker busca con más frecuencia, así que
-                    debe ser la más fácil de encontrar y tocar, no un botón
-                    chico compitiendo por espacio con su propia etiqueta. */}
-                <div className="flex flex-col gap-3 border-b border-border py-4">
+                {/* Mismo tamaño/layout que las otras dos filas — solo
+                    "Eliminar cuenta" se queda en rojo, la única de las tres
+                    que es realmente irreversible. */}
+                <div className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold">Cerrar sesión</p>
                     <p className="text-sm text-muted-foreground">Sales de este dispositivo.</p>
@@ -346,7 +344,7 @@ export function BikerProfilePage() {
                   <button
                     onClick={handleSignOutClick}
                     disabled={signingOut}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-muted px-5 text-sm font-semibold text-foreground transition-colors hover:bg-border disabled:opacity-50 sm:w-auto"
                   >
                     {signingOut ? 'Saliendo…' : 'Cerrar sesión'}
                   </button>

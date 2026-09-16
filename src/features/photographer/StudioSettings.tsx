@@ -20,6 +20,8 @@ import { Settings } from '../../ui/animate-icons/icons/Settings'
 import { Bell } from '../../ui/animate-icons/icons/Bell'
 import { CirclePlus } from '../../ui/animate-icons/icons/CirclePlus'
 import { Trash } from '../../ui/animate-icons/icons/Trash'
+import { ConfirmDeleteButton } from '../../ui/shared/ConfirmDeleteButton'
+import { BankAccountsSection } from './components/BankAccountsSection'
 import { useBackButton } from '../../ui/shared/useBackButton'
 import { Switch } from '../../ui/shared/Switch'
 import { SettingsTabs } from '../../ui/shared/Tabs'
@@ -95,7 +97,7 @@ function EditableRow({
     <div className="border-b border-border py-4 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold">{label}</p>
-        <button onClick={() => setEditing((e) => !e)} className="shrink-0 text-xs font-semibold text-foreground hover:underline">
+        <button onClick={() => setEditing((e) => !e)} data-no-ripple className="shrink-0 text-xs font-semibold text-foreground hover:underline">
           {editing ? 'Cancelar' : 'Editar'}
         </button>
       </div>
@@ -224,11 +226,9 @@ function PricingTiersEditor({ photographerId, basePrice }: { photographerId: str
                 className={cn(inputClass, 'w-28')}
               />
             </div>
-            <AnimateIcon animateOnHover animateOnTap asChild>
-              <button onClick={() => removeRow(i)} aria-label="Quitar escalón" className="shrink-0 text-muted-foreground hover:text-red-500">
-                <Trash size={16} />
-              </button>
-            </AnimateIcon>
+            <ConfirmDeleteButton onConfirm={() => removeRow(i)} label="Quitar escalón" triggerClassName="shrink-0 text-muted-foreground hover:text-red-500">
+              <Trash size={16} />
+            </ConfirmDeleteButton>
           </div>
         ))}
       </div>
@@ -647,7 +647,7 @@ export function StudioSettings() {
               <Section title="Foto de perfil, portada y logo">
                 <div className="flex flex-wrap gap-8">
                   <div className="flex items-center gap-4">
-                    <button onClick={() => avatarInputRef.current?.click()} className="relative h-16 w-16 shrink-0 rounded-full" disabled={uploadingAvatar}>
+                    <button onClick={() => avatarInputRef.current?.click()} data-no-ripple className="relative h-16 w-16 shrink-0 rounded-full" disabled={uploadingAvatar}>
                       {avatarUrl ? (
                         <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full border-2 border-border object-cover" />
                       ) : (
@@ -657,14 +657,14 @@ export function StudioSettings() {
                     <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
                     <div>
                       <p className="text-sm font-semibold">Foto de perfil</p>
-                      <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} className="text-xs font-semibold text-foreground hover:underline">
+                      <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} data-no-ripple className="text-xs font-semibold text-foreground hover:underline">
                         {uploadingAvatar ? 'Subiendo…' : 'Cambiar'}
                       </button>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <button onClick={() => coverInputRef.current?.click()} className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted" disabled={uploadingCover}>
+                    <button onClick={() => coverInputRef.current?.click()} data-no-ripple className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted" disabled={uploadingCover}>
                       {details?.profile_cover_path ? (
                         <img src={r2Url(details.profile_cover_path)} alt="" className="h-full w-full object-cover" />
                       ) : (
@@ -675,11 +675,11 @@ export function StudioSettings() {
                     <div>
                       <p className="text-sm font-semibold">Foto de portada</p>
                       <div className="flex gap-2">
-                        <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="text-xs font-semibold text-foreground hover:underline">
+                        <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} data-no-ripple className="text-xs font-semibold text-foreground hover:underline">
                           {uploadingCover ? 'Subiendo…' : 'Cambiar'}
                         </button>
                         {details?.profile_cover_path && (
-                          <button onClick={removeCover} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                          <button onClick={removeCover} data-no-ripple className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
                             Quitar
                           </button>
                         )}
@@ -688,7 +688,7 @@ export function StudioSettings() {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <button onClick={() => logoInputRef.current?.click()} className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-border bg-muted" disabled={uploadingLogo}>
+                    <button onClick={() => logoInputRef.current?.click()} data-no-ripple className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-border bg-muted" disabled={uploadingLogo}>
                       {details?.logo_path ? (
                         <img src={r2Url(details.logo_path)} alt="" className="h-full w-full object-contain" />
                       ) : (
@@ -699,11 +699,11 @@ export function StudioSettings() {
                     <div>
                       <p className="text-sm font-semibold">Logo (opcional)</p>
                       <div className="flex gap-2">
-                        <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="text-xs font-semibold text-foreground hover:underline">
+                        <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} data-no-ripple className="text-xs font-semibold text-foreground hover:underline">
                           {uploadingLogo ? 'Subiendo…' : 'Cambiar'}
                         </button>
                         {details?.logo_path && (
-                          <button onClick={removeLogo} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                          <button onClick={removeLogo} data-no-ripple className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
                             Quitar
                           </button>
                         )}
@@ -734,12 +734,9 @@ export function StudioSettings() {
 
               <Section
                 title="Datos bancarios"
-                description="El biker los ve al pagar por transferencia — asegúrate de que estén completos antes de recibir pedidos."
+                description="El biker los ve al pagar por transferencia — asegúrate de que estén completos antes de recibir pedidos. Puedes agregar más de una cuenta."
               >
-                <EditableRow label="Banco" value={details?.bank_name ?? ''} onSave={(v) => saveDetailsField('bank_name', v)} placeholder="Ej. Banco Industrial" />
-                <EditableRow label="Nombre del titular" value={details?.bank_account_holder ?? ''} onSave={(v) => saveDetailsField('bank_account_holder', v)} placeholder={profile?.display_name ?? ''} />
-                <EditableRow label="Número de cuenta" value={details?.bank_account_number ?? ''} onSave={(v) => saveDetailsField('bank_account_number', v)} placeholder="Ej. 123-456789-0" />
-                <EditableRow label="Tipo de cuenta" value={details?.bank_account_type ?? ''} onSave={(v) => saveDetailsField('bank_account_type', v)} placeholder="Monetaria o Ahorro" />
+                {user && <BankAccountsSection photographerId={user.id} />}
               </Section>
 
               <Section title="Datos personales">
@@ -748,7 +745,7 @@ export function StudioSettings() {
                 <div className="border-b border-border py-4 last:border-b-0">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold">Contraseña</p>
-                    <button onClick={() => setEditingPassword((e) => !e)} className="shrink-0 text-xs font-semibold text-foreground hover:underline">
+                    <button onClick={() => setEditingPassword((e) => !e)} data-no-ripple className="shrink-0 text-xs font-semibold text-foreground hover:underline">
                       {editingPassword ? 'Cancelar' : 'Cambiar'}
                     </button>
                   </div>
@@ -784,16 +781,19 @@ export function StudioSettings() {
               </Section>
 
               <Section title="Administrar cuenta">
-                {/* Ancho completo SIEMPRE y más prominente que el resto —
-                    es la acción que más se busca, no debería competir por
-                    espacio con su propia etiqueta (mismo criterio en el
-                    portal biker). */}
-                <div className="flex flex-col gap-3 border-b border-border py-4">
+                {/* Mismo tamaño/layout que las otras dos filas — antes
+                    "Cerrar sesión" usaba `size="lg"` sin `variant` (accent, a
+                    ancho completo) y se veía mucho más grande y prominente
+                    que "Cerrar en todos lados"/"Eliminar cuenta", sin que
+                    hubiera una razón real para esa jerarquía. Solo "Eliminar
+                    cuenta" se queda en rojo — es la única acción realmente
+                    irreversible de las tres. */}
+                <div className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold">Cerrar sesión</p>
                     <p className="text-sm text-muted-foreground">Sales de este dispositivo.</p>
                   </div>
-                  <Button size="lg" className="w-full justify-center" onClick={handleSignOutClick} loading={signingOut}>
+                  <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={handleSignOutClick} loading={signingOut}>
                     Cerrar sesión
                   </Button>
                 </div>

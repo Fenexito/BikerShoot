@@ -131,6 +131,7 @@ export function NotificationsMenu() {
           onClick={() => setOpen((o) => !o)}
           aria-label="Notificaciones"
           title="Notificaciones"
+          data-no-ripple
           className="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
         >
           <Bell size={20} />

@@ -75,7 +75,7 @@ export function SettingsEditableRow({
     <div className="border-b border-border py-4 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold">{label}</p>
-        <button onClick={() => setEditing((e) => !e)} className="shrink-0 text-xs font-semibold text-foreground hover:underline">
+        <button onClick={() => setEditing((e) => !e)} data-no-ripple className="shrink-0 text-xs font-semibold text-foreground hover:underline">
           {editing ? 'Cancelar' : 'Editar'}
         </button>
       </div>

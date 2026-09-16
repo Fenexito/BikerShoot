@@ -73,6 +73,7 @@ export function OrderRow({ order, profileName }: { order: PhotographerOrderGroup
   return (
     <Link
       to={`/studio/pedidos/${order.orderId}`}
+      role="button"
       className={cn(
         'flex items-stretch gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-all hover:shadow-sm sm:gap-4 sm:p-3.5',
         borderColor,
@@ -150,7 +151,7 @@ function CategorySection({ category, profileName }: { category: OrderCategory; p
 
   return (
     <div id={`pedidos-cat-${category.key}`} className="scroll-mt-28">
-      <button onClick={() => setOpen((o) => !o)} className="mb-3 flex w-full items-center justify-between gap-2 text-left">
+      <button onClick={() => setOpen((o) => !o)} data-no-ripple className="mb-3 flex w-full items-center justify-between gap-2 text-left">
         <h2 className={cn('flex items-center gap-2 text-sm font-bold uppercase tracking-wide', category.tone === 'danger' ? 'text-red-500' : 'text-muted-foreground')}>
           {category.label}
           <span className={cn('rounded-full px-2 py-0.5 text-xs', category.tone === 'danger' ? 'bg-red-500/10' : 'bg-muted')}>{category.orders.length}</span>

@@ -105,8 +105,16 @@ export function FilterBar({
             value={tabValue ?? tabs[0]?.value ?? ''}
             onChange={onTabChange}
             className="flex flex-1 items-center justify-between gap-2 overflow-x-auto sm:flex-none sm:shrink-0 sm:justify-start sm:gap-5"
-            tabClassName="shrink-0 whitespace-nowrap pb-0.5 text-xs font-medium transition-colors sm:text-sm"
-            activeClassName="font-bold text-foreground"
+            // Mismo peso de fuente SIEMPRE (`font-semibold` acá, nunca en
+            // `activeClassName`/`inactiveClassName`) — antes la tab activa
+            // pasaba a `font-bold` mientras las demás quedaban en
+            // `font-medium`, y el texto en negrita mide más ancho: justo al
+            // cambiar de tab, `motion`'s `layoutId` medía una geometría
+            // distinta a la que había antes, produciendo un salto vertical
+            // (y a veces horizontal) durante la animación del subrayado.
+            // Con el mismo peso en los dos estados, solo cambia el color.
+            tabClassName="shrink-0 whitespace-nowrap pb-0.5 text-xs font-semibold transition-colors sm:text-sm"
+            activeClassName="text-foreground"
             inactiveClassName="text-muted-foreground hover:text-foreground"
           />
         )}

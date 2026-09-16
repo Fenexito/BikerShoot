@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
+import { r2Url } from '../../lib/r2'
 import { Button } from '../../ui/flat/Button'
 import { Skeleton } from '../../ui/shared/Skeleton'
 import { useToastStore } from '../../ui/overlays/toastStore'
@@ -16,11 +17,12 @@ import { Edit } from '../../ui/animate-icons/icons/Edit'
 import { Check } from '../../ui/animate-icons/icons/Check'
 import { PhotoLightbox } from './components/PhotoLightbox'
 
-interface BankDetails {
+interface BankAccountInfo {
   bank_name: string | null
-  bank_account_holder: string | null
-  bank_account_number: string | null
-  bank_account_type: string | null
+  account_holder: string | null
+  account_number: string | null
+  account_type: string | null
+  info_photo_path: string | null
 }
 
 interface PhotographerDue {
@@ -30,11 +32,7 @@ interface PhotographerDue {
   priceTotal: number
   serviceFeeTotal: number
   total: number
-  bank: BankDetails | null
-}
-
-function normalizeOne<T>(v: T | T[] | null): T | null {
-  return Array.isArray(v) ? (v[0] ?? null) : v
+  bankAccounts: BankAccountInfo[]
 }
 
 function useOrderPaymentInfo(orderId: string | undefined) {
@@ -44,7 +42,7 @@ function useOrderPaymentInfo(orderId: string | undefined) {
       const { data, error } = await supabase
         .from('order_items')
         .select(
-          'photographer_id, price, service_fee, is_courtesy, photographer:profiles(display_name, photographer_details(bank_name, bank_account_holder, bank_account_number, bank_account_type))',
+          'photographer_id, price, service_fee, is_courtesy, photographer:profiles(display_name, photographer_bank_accounts(bank_name, account_holder, account_number, account_type, info_photo_path))',
         )
         .eq('order_id', orderId)
       if (error) throw error
@@ -55,7 +53,7 @@ function useOrderPaymentInfo(orderId: string | undefined) {
         price: number
         service_fee: number
         is_courtesy: boolean
-        photographer: { display_name: string; photographer_details: BankDetails | BankDetails[] | null } | null
+        photographer: { display_name: string; photographer_bank_accounts: BankAccountInfo[] | null } | null
       }[]) {
         const existing = byPhotographer.get(row.photographer_id)
         // Las cortesías no cobran nada — ni precio ni tarifa de servicio.
@@ -74,7 +72,7 @@ function useOrderPaymentInfo(orderId: string | undefined) {
             priceTotal: price,
             serviceFeeTotal: serviceFee,
             total: price + serviceFee,
-            bank: normalizeOne(row.photographer?.photographer_details ?? null),
+            bankAccounts: row.photographer?.photographer_bank_accounts ?? [],
           })
         }
       }
@@ -135,33 +133,46 @@ function uploadWithProgress(url: string, file: File, onProgress: (pct: number) =
   })
 }
 
-function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: PhotographerDue; orderId: string; bikerName: string; proof: { proofPath: string; uploadedAt: string } | undefined }) {
+function BankAccountBlock({ account, total }: { account: BankAccountInfo; total: number }) {
   const push = useToastStore((s) => s.push)
-  const [progress, setProgress] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
-  const [viewerOpen, setViewerOpen] = useState(false)
-  const hasProof = !!proof
-  const { data: proofViewUrl } = useProofViewUrl(orderId, due.photographerId, hasProof)
 
-  const bankLines = due.bank
-    ? [
-        due.bank.bank_name && `Banco: ${due.bank.bank_name}`,
-        due.bank.bank_account_holder && `Titular: ${due.bank.bank_account_holder}`,
-        due.bank.bank_account_number && `Cuenta: ${due.bank.bank_account_number}`,
-        due.bank.bank_account_type && `Tipo: ${due.bank.bank_account_type}`,
-      ].filter(Boolean)
-    : []
+  const lines = [
+    account.bank_name && `Banco: ${account.bank_name}`,
+    account.account_holder && `Titular: ${account.account_holder}`,
+    account.account_number && `Cuenta: ${account.account_number}`,
+    account.account_type && `Tipo: ${account.account_type}`,
+  ].filter((l): l is string => !!l)
 
-  async function copyBankInfo() {
-    const text = [...bankLines, `Monto a transferir: Q${due.total}`].join('\n')
+  async function copy() {
     try {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText([...lines, `Monto a transferir: Q${total}`].join('\n'))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       push({ type: 'error', title: 'No se pudo copiar', description: 'Cópialo manualmente.' })
     }
   }
+
+  return (
+    <div className="rounded-2xl bg-muted p-4 text-sm">
+      {lines.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+      {account.info_photo_path && <img src={r2Url(account.info_photo_path)} alt="Datos de la cuenta" className="mt-2 h-28 w-full rounded-xl border border-border object-cover" />}
+      <button onClick={copy} className="mt-2 text-xs font-semibold text-primary hover:underline">
+        {copied ? '✓ Copiado' : 'Copiar datos'}
+      </button>
+    </div>
+  )
+}
+
+function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: PhotographerDue; orderId: string; bikerName: string; proof: { proofPath: string; uploadedAt: string } | undefined }) {
+  const push = useToastStore((s) => s.push)
+  const [progress, setProgress] = useState<number | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const hasProof = !!proof
+  const { data: proofViewUrl } = useProofViewUrl(orderId, due.photographerId, hasProof)
 
   async function handleFile(file: File | undefined) {
     if (!file) return
@@ -219,18 +230,15 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
         </div>
       </div>
 
-      {bankLines.length === 0 ? (
+      {due.bankAccounts.length === 0 ? (
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
           Este fotógrafo todavía no registró sus datos bancarios. Escríbele para coordinar el pago.
         </p>
       ) : (
-        <div className="mt-3 rounded-2xl bg-muted p-4 text-sm">
-          {bankLines.map((line) => (
-            <p key={line}>{line}</p>
+        <div className="mt-3 flex flex-col gap-2">
+          {due.bankAccounts.map((account, i) => (
+            <BankAccountBlock key={i} account={account} total={due.total} />
           ))}
-          <button onClick={copyBankInfo} className="mt-2 text-xs font-semibold text-primary hover:underline">
-            {copied ? '✓ Copiado' : 'Copiar datos'}
-          </button>
         </div>
       )}
 

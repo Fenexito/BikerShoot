@@ -60,6 +60,7 @@ function OrderRow({ order, effectiveStatus, index }: { order: MyOrder; effective
   return (
     <Link
       to={`/app/historial/${order.id}`}
+      role="button"
       className={cn(
         'animate-[fade-in-up_.3s_ease-out_backwards] flex items-stretch gap-3 rounded-2xl border-l-4 border-y border-r border-border bg-card p-3 transition-colors hover:border-primary/30 sm:gap-4 sm:p-3.5',
         statusStyle.dot.replace('bg-', 'border-l-'),

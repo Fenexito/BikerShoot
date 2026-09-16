@@ -104,7 +104,13 @@ export function SettingsTabs<T extends string>({
 }) {
   const groupId = useId()
   return (
-    <nav className="-mb-px flex gap-5 overflow-x-auto border-b border-border lg:mb-0 lg:flex-col lg:gap-1 lg:border-b-0">
+    // `flex-wrap` (no `overflow-x-auto`) por debajo de `lg:` — con varias
+    // categorías la fila ya no cabe en una sola línea sin desplazarse de
+    // lado, y el indicador activo vive DENTRO de cada botón (no es un
+    // elemento global compartido), así que envolver a una segunda línea es
+    // seguro: cada fila conserva su propio indicador sin importar en cuál
+    // línea caiga.
+    <nav className="-mb-px flex flex-wrap gap-x-5 gap-y-2 border-b border-border lg:mb-0 lg:flex-col lg:flex-nowrap lg:gap-1 lg:border-b-0">
       {tabs.map((t) => {
         const active = t.id === value
         return (

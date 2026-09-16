@@ -68,7 +68,7 @@ function MobilePointRow({ point, photos }: { point: EventPointInfo; photos: Even
 
   return (
     <div className="overflow-hidden rounded-3xl border border-border bg-card">
-      <button onClick={() => setExpanded((e) => !e)} className="flex w-full flex-wrap items-center gap-3 p-4 text-left">
+      <button onClick={() => setExpanded((e) => !e)} data-no-ripple className="flex w-full flex-wrap items-center gap-3 p-4 text-left">
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{point.label}</p>
           <p className="text-xs text-muted-foreground">
@@ -286,7 +286,7 @@ function DesktopPointCard({
 
   return (
     <div className="overflow-hidden rounded-3xl border border-border bg-card">
-      <button onClick={() => setExpanded((e) => !e)} className="flex w-full flex-wrap items-center gap-3 p-4 text-left">
+      <button onClick={() => setExpanded((e) => !e)} data-no-ripple className="flex w-full flex-wrap items-center gap-3 p-4 text-left">
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{point.label}</p>
           <p className="text-xs text-muted-foreground">
@@ -334,7 +334,7 @@ function DesktopPointCard({
                   {row.map((seg) => (
                     <div key={seg.key} className={cn('rounded-2xl border border-border', seg.dashed && 'border-dashed')}>
                       <div className="flex w-full flex-wrap items-center justify-between gap-2 p-3">
-                        <button onClick={() => toggleRow(rowIndex)} className="flex flex-1 items-center justify-between gap-3 text-left">
+                        <button onClick={() => toggleRow(rowIndex)} data-no-ripple className="flex flex-1 items-center justify-between gap-3 text-left">
                           <p className="text-sm font-semibold">{seg.label} <span className="font-normal text-muted-foreground">· {seg.photos.length} fotos</span></p>
                           <span className={cn('text-xs transition-transform', openRows.has(rowIndex) && 'rotate-180')}>▾</span>
                         </button>
