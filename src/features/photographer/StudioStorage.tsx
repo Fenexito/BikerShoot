@@ -1,16 +1,13 @@
-import { Fragment, useState, type CSSProperties } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePhotographerDetails, usePhotographerUsageBytes } from './usePhotographerDetails'
 import { useStorageOverview, type EventStorage, type PointStorage } from './useStorageOverview'
-import { queryClient } from '../../lib/queryClient'
-import { supabase } from '../../lib/supabase'
 import { Button } from '../../ui/studio/Button'
-import { FancySelect } from '../../ui/shared/FancySelect'
 import { STUDIO_PAGE_WIDE } from '../../ui/studio/layout'
-import { useToastStore } from '../../ui/overlays/toastStore'
-import { confirmDialog } from '../../ui/overlays/confirmStore'
 import { SkeletonRows } from '../../ui/shared/Skeleton'
+import { TreeRow, TreeChildren } from '../../ui/shared/Tree'
+import { StorageDetailPanel, type StorageNode } from './components/StorageDetailPanel'
 import { cn } from '../../lib/cn'
 
 function formatBytes(n: number) {
@@ -21,196 +18,56 @@ function formatBytes(n: number) {
 }
 
 type SortMode = 'oldest' | 'newest' | 'biggest'
-type CleanupScope = 'unsold' | 'sold' | 'all'
 
-const SCOPE_OPTIONS = [
-  { value: 'unsold', label: 'No vendidas' },
-  { value: 'sold', label: 'Vendidas' },
-  { value: 'all', label: 'Todas' },
-]
+const eventKeyOf = (event: EventStorage) => `event:${event.id}`
+const pointKeyOf = (event: EventStorage, point: PointStorage) => `point:${event.id}:${point.id ?? 'unassigned'}`
+const horarioKeyOf = (key: string) => `horario:${key}`
+const leftoverKeyOf = (event: EventStorage, point: PointStorage) => `leftover:${event.id}:${point.id ?? 'unassigned'}`
 
-/** Un solo control para liberar espacio, en vez de 3 botones confusos.
- * "No vendidas" borra por completo (nunca se vendieron, nada que proteger).
- * "Vendidas" borra el preview + respaldo crudo pero JAMÁS la entrega final
- * — el biker que ya compró esa foto conserva acceso para siempre. "Todas"
- * aplica ambas cosas de una vez. Muestra cuántas fotos y cuánto espacio
- * corresponden exactamente a la selección actual, antes de tocar nada. */
-function CleanupControl({
-  eventId,
-  pointId,
-  scopeLabel,
-  totalPhotos,
-  soldPhotos,
-  bytes,
-  soldBytes,
-  unsoldBytes,
-}: {
-  eventId: string
-  pointId?: string
-  scopeLabel: string
-  totalPhotos: number
-  soldPhotos: number
-  bytes: number
-  soldBytes: number
-  unsoldBytes: number
-}) {
-  const push = useToastStore((s) => s.push)
-  const [scope, setScope] = useState<CleanupScope>('unsold')
-  const [busy, setBusy] = useState(false)
+/** Reconstruye el nodo seleccionado a partir de su clave y de los datos
+ * FRESCOS del árbol — nunca se guarda el nodo en sí en el estado, para que
+ * el panel de detalle siempre refleje el estado real después de una
+ * acción (mover/eliminar/subir invalida `storage-overview` y esto vuelve a
+ * resolver la misma clave contra los datos ya actualizados). Si la clave
+ * ya no resuelve (ej. se vació y desapareció un bucket "sin horario"),
+ * devuelve `null` y el panel cae al estado vacío. */
+function findNode(key: string | null, events: EventStorage[]): StorageNode | null {
+  if (!key) return null
+  const [kind, ...rest] = key.split(':')
 
-  const unsoldPhotos = totalPhotos - soldPhotos
-  const scopeInfo: Record<CleanupScope, { photos: number; bytes: number }> = {
-    unsold: { photos: unsoldPhotos, bytes: unsoldBytes },
-    sold: { photos: soldPhotos, bytes: soldBytes },
-    all: { photos: totalPhotos, bytes },
-  }
-  const info = scopeInfo[scope]
-
-  async function deleteUnsold() {
-    const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: pointId ? { pointId } : { eventId } })
-    if (error) throw new Error(error.message)
-    return { deleted: data.deleted as number, bytesFreed: 0 }
+  if (kind === 'event') {
+    const event = events.find((e) => e.id === rest.join(':'))
+    return event ? { kind: 'event', event } : null
   }
 
-  async function cleanupSold() {
-    const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { eventId, pointId, clear: 'both' } })
-    if (error) throw new Error(error.message)
-    return { deleted: data.cleaned as number, bytesFreed: data.bytesFreed as number }
+  if (kind === 'point') {
+    const [eventId, pointIdRaw] = rest
+    const event = events.find((e) => e.id === eventId)
+    if (!event) return null
+    const point = event.points.find((p) => (p.id ?? 'unassigned') === pointIdRaw)
+    return point ? { kind: 'point', event, point } : null
   }
 
-  async function run() {
-    const descriptions: Record<CleanupScope, string> = {
-      unsold: `Borra permanentemente las fotos de "${scopeLabel}" que nadie ha comprado.`,
-      sold: `Borra el preview y el respaldo crudo de las fotos ya vendidas de "${scopeLabel}". La entrega final del comprador NUNCA se toca.`,
-      all: `Borra las fotos no vendidas de "${scopeLabel}" por completo, y libera el preview/respaldo de las vendidas. La entrega final del comprador NUNCA se toca.`,
-    }
-    const ok = await confirmDialog.ask({
-      title: `¿Liberar ${info.photos} foto${info.photos === 1 ? '' : 's'} (${formatBytes(info.bytes)})?`,
-      description: descriptions[scope],
-      confirmLabel: 'Liberar espacio',
-      tone: 'danger',
-    })
-    if (!ok) return
-    setBusy(true)
-    try {
-      let deleted = 0
-      let bytesFreed = 0
-      if (scope === 'unsold' || scope === 'all') {
-        const r = await deleteUnsold()
-        deleted += r.deleted
+  if (kind === 'horario') {
+    const horarioKey = rest.join(':')
+    for (const event of events) {
+      for (const point of event.points) {
+        const horario = point.horarios.find((h) => h.key === horarioKey)
+        if (horario) return { kind: 'horario', event, point, horario }
       }
-      if (scope === 'sold' || scope === 'all') {
-        const r = await cleanupSold()
-        deleted += r.deleted
-        bytesFreed += r.bytesFreed
-      }
-      push({
-        type: 'success',
-        title: `${deleted} foto${deleted === 1 ? '' : 's'} liberada${deleted === 1 ? '' : 's'}`,
-        description: bytesFreed > 0 ? `${formatBytes(bytesFreed)} liberados` : undefined,
-      })
-      queryClient.invalidateQueries({ queryKey: ['storage-overview'] })
-      queryClient.invalidateQueries({ queryKey: ['photographer-usage-bytes'] })
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo liberar espacio', description: (err as Error).message })
-    } finally {
-      setBusy(false)
     }
+    return null
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <FancySelect value={scope} onChange={(v) => setScope(v as CleanupScope)} options={SCOPE_OPTIONS} clearable={false} className="w-40" />
-      <p className="text-xs text-muted-foreground">
-        Esto liberaría <span className="font-semibold text-foreground">{info.photos} foto{info.photos === 1 ? '' : 's'}</span> ·{' '}
-        <span className="font-semibold text-foreground">{formatBytes(info.bytes)}</span>
-      </p>
-      <Button variant="secondary" size="sm" onClick={run} loading={busy} disabled={info.photos === 0}>
-        Liberar espacio
-      </Button>
-    </div>
-  )
-}
+  if (kind === 'leftover') {
+    const [eventId, pointIdRaw] = rest
+    const event = events.find((e) => e.id === eventId)
+    if (!event) return null
+    const point = event.points.find((p) => (p.id ?? 'unassigned') === pointIdRaw)
+    return point?.leftover && point.leftover.totalPhotos > 0 ? { kind: 'leftover', event, point } : null
+  }
 
-function PointPanel({ eventId, point }: { eventId: string; point: PointStorage }) {
-  return (
-    <div className="rounded-2xl border border-border bg-muted/30 p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">{point.label}</p>
-        <span className="text-xs text-muted-foreground">
-          {formatBytes(point.bytes)} · {point.totalPhotos} fotos · {point.soldPhotos} vendidas
-        </span>
-      </div>
-      <CleanupControl
-        eventId={eventId}
-        pointId={point.id}
-        scopeLabel={point.label}
-        totalPhotos={point.totalPhotos}
-        soldPhotos={point.soldPhotos}
-        bytes={point.bytes}
-        soldBytes={point.soldBytes}
-        unsoldBytes={point.unsoldBytes}
-      />
-    </div>
-  )
-}
-
-function EventDetailPanel({ event }: { event: EventStorage }) {
-  return (
-    <div className="animate-accordion-in col-span-full rounded-3xl border border-border bg-card p-5">
-      <div className="mb-5 rounded-2xl border border-accent/30 bg-accent/5 p-4">
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-accent">
-          Acciones de todo el evento — afecta los {event.points.length || 0} puntos y lo que no tenga punto asignado
-        </p>
-        <CleanupControl
-          eventId={event.id}
-          scopeLabel={event.title}
-          totalPhotos={event.totalPhotos}
-          soldPhotos={event.soldPhotos}
-          bytes={event.bytes}
-          soldBytes={event.soldBytes}
-          unsoldBytes={event.unsoldBytes}
-        />
-      </div>
-
-      {event.points.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Este evento no tiene puntos.</p>
-      ) : (
-        <>
-          <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {event.points.length} puntos — cada uno se administra por separado
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {event.points.map((pt) => (
-              <PointPanel key={pt.id} eventId={event.id} point={pt} />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-function EventCard({ event, open, onToggle, style }: { event: EventStorage; open: boolean; onToggle: () => void; style?: CSSProperties }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={style}
-      className={cn(
-        'animate-card-in flex flex-col gap-3 rounded-3xl border p-5 text-left transition-all hover:shadow-sm',
-        open ? 'border-accent/50 bg-accent/5' : 'border-border bg-card hover:border-accent/40',
-      )}
-    >
-      <div className="min-w-0">
-        <p className="truncate font-semibold">{event.title}</p>
-        <p className="text-xs text-muted-foreground">{new Date(event.eventDate).toLocaleDateString('es-GT')}</p>
-      </div>
-      <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
-        <span className="font-bold">{formatBytes(event.bytes)}</span>
-        <span className="text-xs text-muted-foreground">{event.totalPhotos} fotos · {event.soldPhotos} vendidas</span>
-      </div>
-    </button>
-  )
+  return null
 }
 
 export function StudioStorage() {
@@ -219,7 +76,29 @@ export function StudioStorage() {
   const { data: usageBytes = 0 } = usePhotographerUsageBytes(user?.id)
   const { data: events, isLoading } = useStorageOverview(user?.id)
   const [sort, setSort] = useState<SortMode>('oldest')
-  const [openEventId, setOpenEventId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function select(key: string) {
+    setSelectedKey(key)
+    // Solo hace falta desplazar la vista en el layout apilado de móvil — en
+    // escritorio el panel ya vive al lado del árbol (`lg:sticky`), y forzar
+    // el scroll ahí de todos modos movía la página entera bajo el cursor,
+    // lo que podía desalinear el siguiente clic justo después de elegir.
+    if (window.innerWidth < 1024) {
+      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
+  }
 
   const sorted = [...(events ?? [])].sort((a, b) => {
     if (sort === 'oldest') return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
@@ -227,13 +106,16 @@ export function StudioStorage() {
     return b.bytes - a.bytes
   })
 
+  const selectedNode = findNode(selectedKey, sorted)
   const limitBytes = details?.storage_plan ? details.storage_plan.gb_limit * 1024 * 1024 * 1024 : 0
   const pct = limitBytes > 0 ? Math.min(100, (usageBytes / limitBytes) * 100) : 0
 
   return (
     <div className={STUDIO_PAGE_WIDE}>
       <h1 className="font-studio text-3xl font-bold tracking-tight2 md:text-4xl">Almacenamiento</h1>
-      <p className="mt-2 text-muted-foreground">Revisa qué eventos ocupan más espacio y libera lo que ya no necesitas.</p>
+      <p className="mt-2 text-muted-foreground">
+        Explora tu almacenamiento como carpetas — evento, punto y horario — y administra cada nivel por separado.
+      </p>
 
       {details?.storage_plan && (
         <div className="mt-6 rounded-3xl border border-border bg-card p-6">
@@ -263,6 +145,7 @@ export function StudioStorage() {
           {(['oldest', 'newest', 'biggest'] as SortMode[]).map((s) => (
             <button
               key={s}
+              data-no-ripple
               onClick={() => setSort(s)}
               className={cn(
                 'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
@@ -275,28 +158,102 @@ export function StudioStorage() {
         </div>
       </div>
 
-      <div key={sort} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {isLoading && <SkeletonRows count={3} />}
-        {!isLoading && sorted.length === 0 && (
-          <div className="col-span-full flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border py-16 text-center">
-            <span className="text-4xl opacity-40">💾</span>
-            <p className="font-semibold">Todavía no tienes eventos</p>
-          </div>
-        )}
-        {sorted.map((event, i) => {
-          const open = openEventId === event.id
-          return (
-            <Fragment key={event.id}>
-              <EventCard
-                event={event}
-                open={open}
-                onToggle={() => setOpenEventId(open ? null : event.id)}
-                style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
-              />
-              {open && <EventDetailPanel event={event} />}
-            </Fragment>
-          )
-        })}
+      <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="flex flex-col gap-0.5 rounded-3xl border border-border bg-card p-2 lg:w-[380px] lg:shrink-0 lg:max-h-[70vh] lg:overflow-y-auto">
+          {isLoading && <SkeletonRows count={3} />}
+          {!isLoading && sorted.length === 0 && (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <span className="text-4xl opacity-40">💾</span>
+              <p className="font-semibold">Todavía no tienes eventos</p>
+            </div>
+          )}
+
+          {sorted.map((event) => {
+            const eKey = eventKeyOf(event)
+            const eOpen = expanded.has(eKey)
+            return (
+              <div key={event.id}>
+                <TreeRow
+                  depth={0}
+                  icon="📁"
+                  label={event.title}
+                  stats={`${event.totalPhotos} · ${formatBytes(event.bytes)}`}
+                  hasChildren={event.points.length > 0}
+                  expanded={eOpen}
+                  selected={selectedKey === eKey}
+                  onToggle={() => toggle(eKey)}
+                  onSelect={() => select(eKey)}
+                />
+                <TreeChildren open={eOpen}>
+                  {event.points.map((point) => {
+                    const pKey = pointKeyOf(event, point)
+                    const pOpen = expanded.has(pKey)
+                    const hasHorarios = point.horarios.length > 0 || (point.leftover?.totalPhotos ?? 0) > 0
+                    return (
+                      <div key={pKey}>
+                        <TreeRow
+                          depth={1}
+                          icon="📂"
+                          label={point.label}
+                          stats={`${point.totalPhotos} · ${formatBytes(point.bytes)}`}
+                          hasChildren={hasHorarios}
+                          expanded={pOpen}
+                          selected={selectedKey === pKey}
+                          onToggle={() => toggle(pKey)}
+                          onSelect={() => select(pKey)}
+                        />
+                        <TreeChildren open={pOpen}>
+                          {point.horarios.map((horario) => {
+                            const hKey = horarioKeyOf(horario.key)
+                            return (
+                              <TreeRow
+                                key={hKey}
+                                depth={2}
+                                icon="🕐"
+                                label={`${horario.start}–${horario.end}`}
+                                stats={`${horario.totalPhotos} · ${formatBytes(horario.bytes)}`}
+                                hasChildren={false}
+                                expanded={false}
+                                selected={selectedKey === hKey}
+                                onToggle={() => {}}
+                                onSelect={() => select(hKey)}
+                              />
+                            )
+                          })}
+                          {point.leftover && point.leftover.totalPhotos > 0 && (
+                            <TreeRow
+                              key={leftoverKeyOf(event, point)}
+                              depth={2}
+                              icon="🕐"
+                              label="Sin horario declarado"
+                              stats={`${point.leftover.totalPhotos} · ${formatBytes(point.leftover.bytes)}`}
+                              hasChildren={false}
+                              expanded={false}
+                              selected={selectedKey === leftoverKeyOf(event, point)}
+                              onToggle={() => {}}
+                              onSelect={() => select(leftoverKeyOf(event, point))}
+                            />
+                          )}
+                        </TreeChildren>
+                      </div>
+                    )
+                  })}
+                </TreeChildren>
+              </div>
+            )
+          })}
+        </div>
+
+        <div ref={detailRef} className="flex-1 scroll-mt-24 lg:sticky lg:top-24">
+          {selectedNode && user ? (
+            <StorageDetailPanel node={selectedNode} photographerId={user.id} />
+          ) : (
+            <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border py-20 text-center text-muted-foreground">
+              <span className="text-3xl opacity-40">🗂️</span>
+              <p className="text-sm font-medium">Selecciona un evento, punto u horario para ver sus detalles</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

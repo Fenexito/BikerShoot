@@ -10,6 +10,13 @@
 // `delivered_path is not null` en la consulta es la única condición que
 // decide qué se puede tocar.
 //
+// Acepta `{ eventId, pointId? }` (como siempre) o `{ photoIds }` — este
+// último para granularidades que no calzan con evento/punto (un horario,
+// un "leftover" de punto, el bucket "sin punto" de un evento), usado por
+// la pantalla de Almacenamiento. En el modo `photoIds` la propiedad se
+// verifica con `photographer_id = user.id` en vez de una verificación de
+// evento aparte.
+//
 // Secrets: los mismos que r2-upload-url (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
 // R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_ORIGINALS_BUCKET).
 
@@ -57,28 +64,40 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser()
   if (userError || !user) return json({ error: 'No autenticado' }, 401)
 
-  const { eventId, pointId, clear } = (await req.json()) as { eventId?: string; pointId?: string; clear?: Clear }
-  if (!eventId || !clear || !['preview', 'raw', 'both'].includes(clear)) {
-    return json({ error: 'Faltan eventId o clear (preview|raw|both)' }, 400)
+  const { eventId, pointId, photoIds, clear } = (await req.json()) as {
+    eventId?: string
+    pointId?: string
+    photoIds?: string[]
+    clear?: Clear
   }
-
-  // Verifica que el evento sea del fotógrafo que llama.
-  const { data: event, error: eventError } = await supabase
-    .from('events')
-    .select('id, photographer_id')
-    .eq('id', eventId)
-    .single()
-  if (eventError || !event || event.photographer_id !== user.id) {
-    return json({ error: 'No autorizado para este evento' }, 403)
+  if (!clear || !['preview', 'raw', 'both'].includes(clear)) {
+    return json({ error: 'Falta clear (preview|raw|both)' }, 400)
+  }
+  if (!eventId && !(photoIds && photoIds.length > 0)) {
+    return json({ error: 'Faltan eventId o photoIds' }, 400)
   }
 
   let query = supabase
     .from('photos')
     .select('id, preview_path, raw_path, preview_size_bytes, raw_size_bytes')
-    .eq('event_id', eventId)
     .eq('photographer_id', user.id)
     .not('delivered_path', 'is', null)
-  if (pointId) query = query.eq('point_id', pointId)
+
+  if (eventId) {
+    // Verifica que el evento sea del fotógrafo que llama.
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id, photographer_id')
+      .eq('id', eventId)
+      .single()
+    if (eventError || !event || event.photographer_id !== user.id) {
+      return json({ error: 'No autorizado para este evento' }, 403)
+    }
+    query = query.eq('event_id', eventId)
+    if (pointId) query = query.eq('point_id', pointId)
+  } else {
+    query = query.in('id', photoIds as string[])
+  }
 
   const { data: photos, error: photosError } = await query
   if (photosError) return json({ error: photosError.message }, 500)

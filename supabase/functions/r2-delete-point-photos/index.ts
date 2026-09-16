@@ -1,10 +1,16 @@
-// Edge Function: borra TODAS las fotos no vendidas de un punto, o de un
-// evento completo — filas de `photos` + sus archivos reales en R2 (preview
-// público, raw privado si existe). Nunca borra el punto (`event_points`)
-// ni el evento en sí, solo sus fotos. Recibe `{ pointId }` para limpiar un
-// punto, o `{ eventId }` para limpiar TODO el evento (incluidas las fotos
-// sin punto asignado, como las que deja Carga rápida sin seleccionar
-// punto) — mutuamente excluyentes.
+// Edge Function: borra TODAS las fotos no vendidas de un punto, de un
+// evento completo, o de una lista exacta de fotos — filas de `photos` +
+// sus archivos reales en R2 (preview público, raw privado si existe).
+// Nunca borra el punto (`event_points`) ni el evento en sí, solo sus
+// fotos. Recibe `{ pointId }` para limpiar un punto, `{ eventId }` para
+// limpiar TODO el evento (incluidas las fotos sin punto asignado, como
+// las que deja Carga rápida sin seleccionar punto), o `{ photoIds }` para
+// borrar exactamente esa lista (usado por la pantalla de Almacenamiento
+// para un horario, un "leftover" de punto, o el bucket "sin punto" —
+// granularidades que no calzan con solo pointId/eventId) — los tres
+// modos son mutuamente excluyentes. En el modo `photoIds` la propiedad se
+// verifica con el mismo filtro `photographer_id = user.id` que ya lleva
+// la consulta base, sin necesitar una verificación de evento/punto aparte.
 //
 // La protección clave ya vive en la base de datos: order_items.photo_id
 // no tiene "on delete cascade", así que Postgres rechaza por sí solo
@@ -57,8 +63,10 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser()
   if (userError || !user) return json({ error: 'No autenticado' }, 401)
 
-  const { pointId, eventId } = (await req.json()) as { pointId?: string; eventId?: string }
-  if (!pointId && !eventId) return json({ error: 'Falta pointId o eventId' }, 400)
+  const { pointId, eventId, photoIds } = (await req.json()) as { pointId?: string; eventId?: string; photoIds?: string[] }
+  if (!pointId && !eventId && !(photoIds && photoIds.length > 0)) {
+    return json({ error: 'Falta pointId, eventId o photoIds' }, 400)
+  }
 
   let query = supabase.from('photos').select('id, preview_path, raw_path').eq('photographer_id', user.id)
 
@@ -75,7 +83,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'No autorizado para este punto' }, 403)
     }
     query = query.eq('point_id', pointId)
-  } else {
+  } else if (eventId) {
     // Verifica que el evento sea del fotógrafo que llama.
     const { data: event, error: eventError } = await supabase
       .from('events')
@@ -86,6 +94,8 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'No autorizado para este evento' }, 403)
     }
     query = query.eq('event_id', eventId as string)
+  } else {
+    query = query.in('id', photoIds as string[])
   }
 
   const { data: photos, error: photosError } = await query
