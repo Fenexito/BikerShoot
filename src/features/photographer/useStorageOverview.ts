@@ -53,7 +53,7 @@ export interface EventStorage extends StorageStats {
   points: PointStorage[]
 }
 
-interface PhotoRow {
+export interface PhotoRow {
   id: string
   event_id: string
   point_id: string | null
@@ -65,11 +65,14 @@ interface PhotoRow {
   delivered_size_bytes: number | null
 }
 
-function photoBytes(p: PhotoRow) {
+/** Exportadas para que `useEventStorageTree.ts` (el mismo árbol pero
+ * acotado a un solo evento, usado dentro del editor) arme sus nodos con la
+ * misma lógica exacta en vez de duplicarla. */
+export function photoBytes(p: PhotoRow) {
   return (p.preview_size_bytes ?? 0) + (p.raw_size_bytes ?? 0) + (p.delivered_size_bytes ?? 0)
 }
 
-function statsFor(list: PhotoRow[]): StorageStats {
+export function statsFor(list: PhotoRow[]): StorageStats {
   const sold = list.filter((p) => p.delivered_path)
   const unsold = list.filter((p) => !p.delivered_path)
   return {
@@ -81,11 +84,11 @@ function statsFor(list: PhotoRow[]): StorageStats {
   }
 }
 
-function rawIds(list: PhotoRow[]) {
+export function rawIds(list: PhotoRow[]) {
   return list.filter((p) => p.raw_path).map((p) => p.id)
 }
 
-function buildPoint(id: string | null, label: string, manualSegments: ManualSegment[] | null, ptPhotos: PhotoRow[]): PointStorage {
+export function buildPoint(id: string | null, label: string, manualSegments: ManualSegment[] | null, ptPhotos: PhotoRow[]): PointStorage {
   const segments = manualSegments ?? []
   let horarios: HorarioStorage[] = []
   let leftover: LeftoverStorage | null = null

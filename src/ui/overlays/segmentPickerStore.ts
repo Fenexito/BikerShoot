@@ -8,6 +8,7 @@ export interface SegmentOption {
 export interface SegmentPickerRequest {
   segments: SegmentOption[]
   title?: string
+  description?: string
 }
 
 interface SegmentPickerState {

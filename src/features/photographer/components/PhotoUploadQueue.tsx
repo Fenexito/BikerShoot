@@ -35,6 +35,11 @@ interface QueueItem {
   backupRaw: boolean
   hash: string
   forcedCapturedAt?: string
+  /** Hora leída del EXIF, precalculada en `enqueue()` (no en `runItem`) —
+   * así el mismo dato sirve para decidir ANTES de subir si hace falta
+   * avisar al fotógrafo que varias fotos no traen hora, sin leer el EXIF
+   * dos veces por archivo. */
+  exifCapturedAt: string | null
 }
 
 function formatBytes(n: number) {
@@ -160,11 +165,10 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       })
       if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
-      const [previewBlob, exifCapturedAt] = await Promise.all([
-        createWatermarkedPreview(item.file, watermarkImageRef.current),
-        item.forcedCapturedAt ? Promise.resolve(null) : extractCapturedAt(item.file),
-      ])
-      const capturedAt = item.forcedCapturedAt ?? exifCapturedAt
+      // El EXIF ya se leyó en `enqueue()` (una sola vez, antes de decidir si
+      // hacía falta avisar sobre fotos sin hora) — no se vuelve a leer acá.
+      const previewBlob = await createWatermarkedPreview(item.file, watermarkImageRef.current)
+      const capturedAt = item.forcedCapturedAt ?? item.exifCapturedAt
 
       let previewPct = 0
       let rawPct = item.backupRaw ? 0 : 100
@@ -207,13 +211,20 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       .sort((a, b) => a.name.localeCompare(b.name))
     if (imageFiles.length === 0) return
 
+    // Un solo pase revisa DOS cosas por archivo: el hash (duplicados) y la
+    // hora real de la toma (EXIF) — leer el EXIF aquí, antes de subir nada,
+    // es lo que permite avisar "N de M fotos no traen hora" en vez de que el
+    // fotógrafo confíe en que el EXIF "va a funcionar" y descubra hasta
+    // después de subir cientos de fotos que muchas quedaron sin horario.
     setCheckingDuplicates(true)
-    const hashed = await Promise.all(imageFiles.map(async (file) => ({ file, hash: await hashFile(file) })))
+    const scanned = await Promise.all(
+      imageFiles.map(async (file) => ({ file, hash: await hashFile(file), exifCapturedAt: forcedCapturedAt ? null : await extractCapturedAt(file) })),
+    )
     setCheckingDuplicates(false)
 
-    const unique: { file: File; hash: string }[] = []
+    const unique: { file: File; hash: string; exifCapturedAt: string | null }[] = []
     let duplicateCount = 0
-    for (const item of hashed) {
+    for (const item of scanned) {
       if (knownHashesRef.current.has(item.hash)) {
         duplicateCount++
         continue
@@ -231,22 +242,48 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     }
     if (unique.length === 0) return
 
-    // Primero el horario (si el punto tiene alguno declarado y esta cola no
-    // viene ya anclada a uno fijo), luego el respaldo — en ese orden, cada
-    // uno su propio modal. Cancelar el horario cancela toda la subida del
-    // lote; sin horarios declarados, se salta directo al respaldo y las
-    // fotos se clasifican solas por EXIF como siempre.
-    let batchForcedCapturedAt = forcedCapturedAt
-    if (!batchForcedCapturedAt && manualSegments && manualSegments.length > 0 && eventDate) {
-      const chosen: SegmentOption | null = await segmentPickerDialog.ask({ segments: manualSegments })
-      if (!chosen) {
-        // Cancelar aquí no debe dejar estas fotos marcadas como "ya
-        // subidas" — si no, un reintento con los mismos archivos las
-        // rechazaría como falsos duplicados sin haberse subido nunca.
-        for (const item of unique) knownHashesRef.current.delete(item.hash)
-        return
+    function forgetAsUploaded() {
+      // Cancelar aquí no debe dejar estas fotos marcadas como "ya
+      // subidas" — si no, un reintento con los mismos archivos las
+      // rechazaría como falsos duplicados sin haberse subido nunca.
+      for (const item of unique) knownHashesRef.current.delete(item.hash)
+    }
+
+    // Cuántas de este lote SÍ traen hora vs. cuántas no — la decisión de
+    // pedir un horario manual (y a cuáles fotos aplicarlo) se basa en esto,
+    // no en si el punto tiene horarios declarados nada más.
+    const missing = forcedCapturedAt ? [] : unique.filter((u) => !u.exifCapturedAt)
+    let missingForcedCapturedAt: string | undefined
+
+    if (missing.length > 0) {
+      if (manualSegments && manualSegments.length > 0 && eventDate) {
+        const chosen: SegmentOption | null = await segmentPickerDialog.ask({
+          segments: manualSegments,
+          title: `${missing.length} de ${unique.length} fotos no traen hora en sus metadatos`,
+          description:
+            unique.length === missing.length
+              ? 'Ninguna trae la hora de la toma (EXIF) — elige a qué horario asignarlas todas.'
+              : `Las ${unique.length - missing.length} que sí traen hora se clasifican solas. Elige a qué horario asignar las ${missing.length} que no.`,
+        })
+        if (!chosen) {
+          forgetAsUploaded()
+          return
+        }
+        missingForcedCapturedAt = new Date(`${eventDate}T${chosen.start}:00`).toISOString()
+      } else {
+        // No hay horarios declarados en este punto todavía — nada a lo que
+        // asignarlas manualmente. Solo se informa antes de subir, en vez de
+        // que el fotógrafo lo descubra después revisando fotos sueltas.
+        const ok = await confirmDialog.ask({
+          title: `${missing.length} de ${unique.length} fotos no traen hora en sus metadatos`,
+          description: 'Esas quedarán "sin horario" dentro de este punto — declara horarios para el punto si quieres poder asignárselos luego, o continúa y ordénalas manualmente después.',
+          confirmLabel: 'Continuar de todos modos',
+        })
+        if (!ok) {
+          forgetAsUploaded()
+          return
+        }
       }
-      batchForcedCapturedAt = new Date(`${eventDate}T${chosen.start}:00`).toISOString()
     }
 
     const backupRaw = await confirmDialog.ask({
@@ -256,7 +293,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       cancelLabel: 'No, solo vista previa',
     })
 
-    const newItems: QueueItem[] = unique.map(({ file, hash }) => ({
+    const newItems: QueueItem[] = unique.map(({ file, hash, exifCapturedAt }) => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       file,
       name: file.name,
@@ -266,7 +303,8 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       progress: 0,
       backupRaw,
       hash,
-      forcedCapturedAt: batchForcedCapturedAt,
+      exifCapturedAt,
+      forcedCapturedAt: forcedCapturedAt ?? (!exifCapturedAt ? missingForcedCapturedAt : undefined),
     }))
     itemsRef.current = [...itemsRef.current, ...newItems]
     rerender()
@@ -322,7 +360,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
           disabled={checkingDuplicates}
           className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {checkingDuplicates ? 'Revisando duplicados…' : 'Elegir archivos'}
+          {checkingDuplicates ? 'Revisando fotos…' : 'Elegir archivos'}
         </button>
         <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => enqueue(e.target.files)} />
       </div>

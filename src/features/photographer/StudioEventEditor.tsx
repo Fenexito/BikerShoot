@@ -7,8 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { r2Url } from '../../lib/r2'
 import { RoutePointPicker, type AddedPoint, type RoutePointPickerHandle } from './components/RoutePointPicker'
-import { FeaturedPhotosSection } from './components/FeaturedPhotosSection'
-import { EventImagesManager } from './components/EventImagesManager'
+import { EventStorageManager } from './components/EventStorageManager'
 import { Input } from '../../ui/studio/Input'
 import { FancySelect } from '../../ui/shared/FancySelect'
 import { DatePicker } from '../../ui/shared/DatePicker'
@@ -848,42 +847,64 @@ export function StudioEventEditor() {
           )}
 
           {tab === 'cobertura' && (
-            <Section
-              title={isRodada ? 'Ruta y puntos' : 'Punto de cobertura'}
-              description={
-                isRodada
-                  ? 'Cada punto es un lugar donde te paraste a cierta hora. Los bikers los usan para encontrarte por su ruta.'
-                  : 'Marca en el mapa dónde vas a estar y a qué hora — los bikers lo usan para encontrar sus fotos.'
-              }
-            >
+            <>
               {isRodada && (
-                <div className="mb-6">
+                <Section title="Paso 1 · Elige tu ruta" description="De esta ruta van a salir los puntos que puedes elegir en el paso 2.">
                   <FancySelect
-                    label="Ruta"
                     value={routeId}
                     onChange={setRouteId}
                     options={routes.map((r) => ({ value: r.id, label: r.name }))}
                     placeholder="Selecciona una ruta"
                   />
-                </div>
+                  {routeId && <p className="mt-3 text-xs font-semibold text-emerald-500">✓ Ruta elegida</p>}
+                </Section>
               )}
+
+              <Section
+                title={isRodada ? 'Paso 2 · Agrega tus puntos' : 'Marca tu punto de cobertura'}
+                description={
+                  isRodada
+                    ? 'Cada punto es un lugar donde te paraste a cierta hora. Usa uno ya existente de la ruta, o marca uno nuevo en el mapa.'
+                    : 'Marca en el mapa dónde vas a estar y a qué hora — los bikers lo usan para encontrar sus fotos.'
+                }
+              >
+                {isRodada && !routeId ? (
+                  <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                    Elige una ruta en el Paso 1 para poder agregar puntos.
+                  </p>
+                ) : (
+                  <RoutePointPicker
+                    ref={routePointPickerRef}
+                    onAdd={addPoint}
+                    useRoute={isRodada}
+                    routeId={routeId}
+                    addedPoints={points.map((p) => ({ routePointId: p.routePointId, lat: p.lat, lng: p.lng, label: p.label }))}
+                  />
+                )}
+              </Section>
 
               {points.length > 0 && (
-                <div className="mb-6 flex flex-col gap-3">
-                  {points.map((pt) => (
-                    <PointSegmentRow key={pt.id} point={pt} onUpdateTime={updatePointTime} onRemove={removePoint} onSaveSegments={saveManualSegments} />
-                  ))}
-                </div>
-              )}
+                <Section
+                  title={`Paso 3 · Horarios por punto (opcional) — ${points.length} punto${points.length === 1 ? '' : 's'} agregado${points.length === 1 ? '' : 's'}`}
+                  description="Declara rangos de 15 o 30 min por punto SOLO si quieres poder clasificar a mano las fotos sin hora en el EXIF — con EXIF, cada foto se clasifica sola sin necesidad de esto."
+                >
+                  <div className="flex flex-col gap-3">
+                    {points.map((pt) => (
+                      <PointSegmentRow key={pt.id} point={pt} onUpdateTime={updatePointTime} onRemove={removePoint} onSaveSegments={saveManualSegments} />
+                    ))}
+                  </div>
 
-              <RoutePointPicker
-                ref={routePointPickerRef}
-                onAdd={addPoint}
-                useRoute={isRodada}
-                routeId={routeId}
-                addedPoints={points.map((p) => ({ routePointId: p.routePointId, lat: p.lat, lng: p.lng, label: p.label }))}
-              />
-            </Section>
+                  {!isNew && (
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+                      <p className="text-sm font-semibold text-emerald-600">✓ Ya puedes subir fotos a estos puntos.</p>
+                      <Button variant="dark" size="sm" onClick={() => setTab('imagenes')}>
+                        Ir a Imágenes →
+                      </Button>
+                    </div>
+                  )}
+                </Section>
+              )}
+            </>
           )}
 
           {tab === 'imagenes' && (
@@ -946,29 +967,18 @@ export function StudioEventEditor() {
                 </div>
               </Section>
 
-              {!isNew && id && user && <FeaturedPhotosSection eventId={id} photographerId={user.id} />}
-
               {!isNew && id && user && (
                 <Section
-                  title="Fotos por punto"
-                  description="Sube y organiza las fotos de cada punto desde aquí mismo — también puedes hacerlo después desde la vista del evento."
+                  title="Administrar fotos de este evento"
+                  description="Explora por punto y horario, o por Destacadas — sube, mueve y elimina sin salir de esta página."
                 >
-                  <EventImagesManager
-                    eventId={id}
-                    photographerId={user.id}
-                    price={price}
-                    watermarkPath={watermarkPath}
-                    eventDate={eventDate}
-                    points={points
-                      .filter((p) => !p.id.startsWith('local-'))
-                      .map((p) => ({ id: p.id, label: p.label, time_start: p.timeStart, time_end: p.timeEnd, manual_segments: p.manualSegments }))}
-                  />
+                  <EventStorageManager eventId={id} photographerId={user.id} price={price} watermarkPath={watermarkPath} eventDate={eventDate} />
                 </Section>
               )}
 
               {isNew && (
                 <p className="text-sm text-muted-foreground">
-                  Las fotos destacadas y las fotos por punto se suben desde aquí mismo una vez creado el evento.
+                  El administrador de fotos por punto, horario y Destacadas aparece aquí en cuanto agregues el primer punto en la pestaña "{isRodada ? 'Ruta' : 'Punto'}".
                 </p>
               )}
             </>

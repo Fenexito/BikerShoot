@@ -82,6 +82,7 @@ export function useFeaturedPhotosManager(eventId: string, photographerId: string
       queryClient.invalidateQueries({ queryKey: ['event-featured-photos', eventId] })
       queryClient.invalidateQueries({ queryKey: ['featured-photographer-photos'] })
       queryClient.invalidateQueries({ queryKey: ['featured-event-photos'] })
+      queryClient.invalidateQueries({ queryKey: ['event-storage-tree', eventId] })
     } catch (err) {
       setQueue((q) => q.map((i) => (i.id === item.id ? { ...i, status: 'error', errorMessage: (err as Error).message } : i)))
     }
@@ -127,6 +128,7 @@ export function useFeaturedPhotosManager(eventId: string, photographerId: string
     queryClient.invalidateQueries({ queryKey: ['event-featured-photos', eventId] })
     queryClient.invalidateQueries({ queryKey: ['featured-photographer-photos'] })
     queryClient.invalidateQueries({ queryKey: ['featured-event-photos'] })
+    queryClient.invalidateQueries({ queryKey: ['event-storage-tree', eventId] })
   }
 
   return { existing, queue, usedSlots, remaining, enqueue, retry, removeExisting }

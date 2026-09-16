@@ -8,6 +8,8 @@ import { FancySelect } from '../../../ui/shared/FancySelect'
 import { PhotoUploadQueue } from './PhotoUploadQueue'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
+import { CleanupControl, type CleanupTarget } from '../../../ui/shared/CleanupControl'
+import { DownloadRawControl } from '../../../ui/shared/DownloadRawControl'
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`
@@ -56,88 +58,6 @@ function invalidateStorage() {
   queryClient.invalidateQueries({ queryKey: ['photographer-usage-bytes'] })
   queryClient.invalidateQueries({ queryKey: ['event-photos-detailed'] })
   queryClient.invalidateQueries({ queryKey: ['my-events'] })
-}
-
-/** A quién apunta el borrado: `{eventId, pointId?}` para evento/punto reales
- * (la mayoría de las fotos, en un solo DELETE eficiente), o `{photoIds}`
- * para granularidades más finas (horario, leftover de un punto, o el
- * bucket "sin punto" de un evento) que las funciones no entienden por
- * `pointId`/`eventId`. */
-type CleanupTarget = { eventId: string; pointId?: string } | { photoIds: string[] }
-
-/** Un botón por categoría (no vendidas / vendidas) — cada uno ya trae su
- * propia cantidad y bytes en la etiqueta, así el usuario ve de un vistazo
- * qué va a liberar SIN tener que elegir primero en un desplegable. Se quitó
- * la opción combinada "Todas": presionar los dos botones logra lo mismo. */
-function CleanupCategoryButton({
-  kind,
-  target,
-  scopeLabel,
-  photos,
-  bytes,
-}: {
-  kind: 'unsold' | 'sold'
-  target: CleanupTarget
-  scopeLabel: string
-  photos: number
-  bytes: number
-}) {
-  const push = useToastStore((s) => s.push)
-  const [busy, setBusy] = useState(false)
-
-  async function run() {
-    const ok = await confirmDialog.ask({
-      title: `¿Liberar ${photos} foto${photos === 1 ? '' : 's'} (${formatBytes(bytes)})?`,
-      description:
-        kind === 'unsold'
-          ? `Borra permanentemente las fotos de "${scopeLabel}" que nadie ha comprado. No se puede deshacer.`
-          : `Borra el preview y el respaldo crudo de las fotos ya vendidas de "${scopeLabel}". La entrega final del comprador NUNCA se toca.`,
-      confirmLabel: 'Liberar espacio',
-      tone: 'danger',
-    })
-    if (!ok) return
-    setBusy(true)
-    try {
-      let deleted = 0
-      let bytesFreed = 0
-      if (kind === 'unsold') {
-        const { data, error } = await supabase.functions.invoke('r2-delete-point-photos', { body: target })
-        if (error) throw new Error(error.message)
-        deleted = data.deleted as number
-      } else {
-        const { data, error } = await supabase.functions.invoke('r2-cleanup-sold-photos', { body: { ...target, clear: 'both' } })
-        if (error) throw new Error(error.message)
-        deleted = data.cleaned as number
-        bytesFreed = data.bytesFreed as number
-      }
-      push({
-        type: 'success',
-        title: `${deleted} foto${deleted === 1 ? '' : 's'} liberada${deleted === 1 ? '' : 's'}`,
-        description: bytesFreed > 0 ? `${formatBytes(bytesFreed)} liberados` : undefined,
-      })
-      invalidateStorage()
-    } catch (err) {
-      push({ type: 'error', title: 'No se pudo liberar espacio', description: (err as Error).message })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Button variant="secondary" size="sm" onClick={run} loading={busy} disabled={photos === 0}>
-      Liberar {photos} {kind === 'unsold' ? 'no vendida' : 'vendida'}{photos === 1 ? '' : 's'} · {formatBytes(bytes)}
-    </Button>
-  )
-}
-
-function CleanupControl({ target, scopeLabel, stats }: { target: CleanupTarget; scopeLabel: string; stats: { totalPhotos: number; soldPhotos: number; bytes: number; soldBytes: number; unsoldBytes: number } }) {
-  const unsoldPhotos = stats.totalPhotos - stats.soldPhotos
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <CleanupCategoryButton kind="unsold" target={target} scopeLabel={scopeLabel} photos={unsoldPhotos} bytes={stats.unsoldBytes} />
-      <CleanupCategoryButton kind="sold" target={target} scopeLabel={scopeLabel} photos={stats.soldPhotos} bytes={stats.soldBytes} />
-    </div>
-  )
 }
 
 const UNASSIGNED = '__unassigned__'
@@ -189,53 +109,6 @@ function MoveControl({ event, sourceLabel, sourcePointId, photoIds }: { event: E
       <FancySelect value={dest} onChange={setDest} options={options} placeholder="Mover a…" className="w-48" />
       <Button variant="secondary" size="sm" onClick={run} loading={busy} disabled={!dest || photoIds.length === 0}>
         Mover fotos
-      </Button>
-    </div>
-  )
-}
-
-/** Descarga el respaldo crudo (si existe) de cada foto del nodo, una URL
- * firmada a la vez vía `r2-raw-download-url` — la única función que ya
- * existe para esto. Sin zip server-side (no hay infraestructura para eso
- * hoy): dispara descargas normales del navegador, espaciadas para no
- * chocar con el bloqueo de pop-ups. */
-function DownloadRawControl({ photoIds, rawPhotoIds }: { photoIds: string[]; rawPhotoIds: string[] }) {
-  const push = useToastStore((s) => s.push)
-  const [busy, setBusy] = useState(false)
-  const skipped = photoIds.length - rawPhotoIds.length
-
-  async function run() {
-    if (rawPhotoIds.length === 0) return
-    setBusy(true)
-    let ok = 0
-    for (const photoId of rawPhotoIds) {
-      try {
-        const { data, error } = await supabase.functions.invoke('r2-raw-download-url', { body: { photoId } })
-        if (error || !data?.downloadUrl) continue
-        const a = document.createElement('a')
-        a.href = data.downloadUrl
-        a.download = ''
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        ok++
-        await new Promise((r) => setTimeout(r, 350))
-      } catch {
-        // sigue con la siguiente
-      }
-    }
-    setBusy(false)
-    push({ type: ok > 0 ? 'success' : 'error', title: ok > 0 ? `${ok} descarga${ok === 1 ? '' : 's'} iniciada${ok === 1 ? '' : 's'}` : 'No se pudo descargar nada' })
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <p className="text-xs text-muted-foreground">
-        {rawPhotoIds.length} foto{rawPhotoIds.length === 1 ? '' : 's'} con respaldo crudo
-        {skipped > 0 && ` · ${skipped} sin respaldo (se omiten)`}
-      </p>
-      <Button variant="secondary" size="sm" onClick={run} loading={busy} disabled={rawPhotoIds.length === 0}>
-        Descargar respaldos
       </Button>
     </div>
   )
@@ -295,7 +168,7 @@ export function StorageDetailPanel({ node, photographerId }: { node: StorageNode
       </div>
 
       <Section title="Liberar espacio">
-        <CleanupControl target={cleanupTarget} scopeLabel={breadcrumb(node)} stats={stats} />
+        <CleanupControl target={cleanupTarget} scopeLabel={breadcrumb(node)} stats={stats} onDone={invalidateStorage} />
       </Section>
 
       {canMove && (

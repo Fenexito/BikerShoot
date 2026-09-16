@@ -16,7 +16,9 @@ export function SegmentPickerDialog() {
       <div className="absolute inset-0 bg-black/60" onClick={() => settle(null)} />
       <div role="alertdialog" aria-modal="true" className="relative z-10 w-full max-w-sm rounded-3xl border border-border bg-card p-6 text-foreground shadow-2xl animate-confirm-in">
         <h2 className="text-base font-bold">{request.title ?? '¿A qué horario pertenecen estas fotos?'}</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Elige el rango declarado al que se asignarán todas las fotos que acabas de seleccionar.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {request.description ?? 'Elige el rango declarado al que se asignarán todas las fotos que acabas de seleccionar.'}
+        </p>
         <div className="mt-4 grid grid-cols-3 gap-2">
           {request.segments.map((seg) => (
             <button
