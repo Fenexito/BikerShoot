@@ -9,6 +9,7 @@ import { GoogleIcon } from '../../ui/shared/GoogleIcon'
 import { FacebookIcon } from '../../ui/shared/FacebookIcon'
 import { AppleIcon } from '../../ui/shared/AppleIcon'
 import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
+import { PortalSwitch } from '../../ui/shared/PortalSwitch'
 import { AuthLogo } from '../../ui/shared/Logo'
 import { useAuth } from './AuthContext'
 
@@ -97,6 +98,10 @@ export function StudioSignup() {
       <h1 className="mb-1 font-studio text-2xl font-bold tracking-tight2 sm:mb-3 sm:text-4xl">Crea tu estudio</h1>
       <p className="mb-3 text-muted-foreground sm:mb-10">Empieza a vender tus fotos sin fricción.</p>
 
+      <div className="mb-3 sm:mb-8">
+        <PortalSwitch current="studio" bikerTo="/signup" studioTo="/studio/signup" label="¿Cómo quieres registrarte?" />
+      </div>
+
       <form className="flex flex-col gap-1.5 sm:gap-5" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Nombre del estudio" placeholder="Tu nombre o estudio" error={errors.displayName?.message} {...register('displayName')} />
           <Input label="Correo" type="email" placeholder="tu@estudio.com" error={errors.email?.message} {...register('email')} />
@@ -137,9 +142,6 @@ export function StudioSignup() {
 
         <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:mt-8">
           ¿Ya tienes cuenta? <Link to="/studio/login" className="text-accent">Entrar</Link>
-        </p>
-        <p className="mt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:mt-3">
-          ¿Eres biker? <Link to="/signup" className="text-accent">Ir al sitio principal</Link>
         </p>
     </AuthSplitLayout>
   )

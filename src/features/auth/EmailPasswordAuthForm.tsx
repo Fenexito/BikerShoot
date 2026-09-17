@@ -134,6 +134,14 @@ export function EmailPasswordAuthForm({ portal, logo, signupTo, forgotPasswordTo
         )}
       </div>
 
+      <div
+        className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'mb-0 grid-rows-[0fr] opacity-0' : 'mb-4 grid-rows-[1fr] opacity-100 sm:mb-8'}`}
+      >
+        <div className="min-h-0">
+          <PortalSwitch current={portal} label="¿Cómo quieres continuar?" />
+        </div>
+      </div>
+
       <form onSubmit={step === 'email' || step === 'not-found' ? handleEmailSubmit : handlePasswordSubmit} className="flex flex-col gap-3 sm:gap-4">
         <div
           className={`grid overflow-hidden transition-all duration-500 ease-in-out ${step === 'password' ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
@@ -221,9 +229,6 @@ export function EmailPasswordAuthForm({ portal, logo, signupTo, forgotPasswordTo
         </div>
       </div>
 
-      <div className="mt-5 flex justify-center sm:mt-8">
-        <PortalSwitch current={portal} />
-      </div>
     </AuthSplitLayout>
   )
 }

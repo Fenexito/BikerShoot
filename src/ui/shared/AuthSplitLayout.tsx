@@ -23,8 +23,12 @@ export function AuthSplitLayout({ children, logoTo = '/', logo }: AuthSplitLayou
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <div className="flex w-full flex-col justify-center overflow-y-auto px-6 py-6 sm:py-16 lg:w-1/2 lg:px-16 xl:px-24">
-        <div className="mx-auto w-full max-w-md">
+      <div className="flex w-full flex-col overflow-y-auto px-6 py-6 sm:py-16 lg:w-1/2 lg:px-16 xl:px-24">
+        {/* `m-auto` en vez de `justify-center` en el padre: centra igual
+            cuando el formulario cabe, pero si no cabe (ej. signup con 4
+            campos en pantallas bajas) se ancla arriba y deja hacer scroll
+            en vez de recortar el logo por encima del viewport. */}
+        <div className="m-auto w-full max-w-md">
           <Link to={logoTo} className="mb-5 flex justify-center sm:mb-10">
             {logo ?? <AuthLogo />}
           </Link>

@@ -9,6 +9,7 @@ import { GoogleIcon } from '../../ui/shared/GoogleIcon'
 import { FacebookIcon } from '../../ui/shared/FacebookIcon'
 import { AppleIcon } from '../../ui/shared/AppleIcon'
 import { AuthSplitLayout } from '../../ui/shared/AuthSplitLayout'
+import { PortalSwitch } from '../../ui/shared/PortalSwitch'
 import { AuthLogo } from '../../ui/shared/Logo'
 import { useAuth } from './AuthContext'
 
@@ -98,6 +99,10 @@ export function BikerSignup() {
       <h1 className="mb-1 text-2xl font-bold tracking-tight sm:mb-2 sm:text-3xl">Crear cuenta</h1>
       <p className="mb-3 text-muted-foreground sm:mb-8">Encuentra tus fotos de moto en segundos.</p>
 
+      <div className="mb-3 sm:mb-8">
+        <PortalSwitch current="biker" bikerTo="/signup" studioTo="/studio/signup" label="¿Cómo quieres registrarte?" />
+      </div>
+
       <form className="flex flex-col gap-1.5 sm:gap-4" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Nombre" placeholder="Tu nombre" error={errors.displayName?.message} {...register('displayName')} />
           <Input label="Correo" type="email" placeholder="tu@correo.com" error={errors.email?.message} {...register('email')} />
@@ -138,9 +143,6 @@ export function BikerSignup() {
 
         <p className="mt-3 text-sm text-muted-foreground sm:mt-6">
           ¿Ya tienes cuenta? <Link to="/login" className="font-semibold text-primary">Iniciar sesión</Link>
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground sm:mt-2">
-          ¿Eres fotógrafo? <Link to="/studio/signup" className="font-semibold text-primary">Regístrate en Studio</Link>
         </p>
     </AuthSplitLayout>
   )
