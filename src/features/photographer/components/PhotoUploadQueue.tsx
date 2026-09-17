@@ -17,6 +17,8 @@ import { List } from '../../../ui/animate-icons/icons/List'
 import { cn } from '../../../lib/cn'
 import { UploadGrid } from './UploadGrid'
 import { UploadList } from './UploadList'
+import { Progress } from '../../../ui/shared/Progress'
+import { formatBytes } from '../../../lib/formatBytes'
 
 const CONCURRENCY = 4
 // Cuántos archivos se procesan a la vez en el pre-escaneo (hash + EXIF) y
@@ -31,6 +33,14 @@ const THUMBNAIL_CONCURRENCY = 4
 // para entonces ya es parte de las fotos del punto/evento más abajo, así
 // que dejarla aquí también sería confuso (¿es la misma foto dos veces?).
 const REMOVE_DONE_DELAY = 1400
+
+function formatDuration(ms: number): string {
+  const totalSec = Math.max(0, Math.round(ms / 1000))
+  if (totalSec < 60) return `${totalSec}s`
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return sec === 0 ? `${min}m` : `${min}m ${sec}s`
+}
 
 type ItemStatus = 'pendiente' | 'subiendo' | 'lista' | 'error'
 
@@ -96,10 +106,63 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [dragging, setDragging] = useState(false)
   const [checkingDuplicates, setCheckingDuplicates] = useState(false)
+  // Progreso del pre-escaneo (hash + EXIF) — antes era un botón fijo
+  // "Revisando fotos…" sin número, y con miles de fotos eso podía tardar
+  // minutos sin que el fotógrafo supiera si iba en la 50 o en la 9,000.
+  const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const knownHashesRef = useRef<Set<string>>(new Set())
+  // Estadísticas del lote activo (progreso total + ETA) — independientes de
+  // itemsRef porque los items "lista" se auto-eliminan de la cola a los
+  // 1.4s, y si el total dependiera de ellos, el porcentaje agregado saltaría
+  // para atrás cada vez que uno desaparece. `active` marca si hay trabajo
+  // en curso (para mostrar la barra) y se apaga al detectar que la cola
+  // quedó sin nada "pendiente"/"subiendo" (`checkBatchCompletion`).
+  const batchRef = useRef({ active: false, startedAt: 0, totalFiles: 0, totalBytes: 0, doneFiles: 0, doneBytes: 0 })
 
   const rerender = () => setTick((t) => t + 1)
+
+  function ensureBatchActive() {
+    if (!batchRef.current.active) {
+      batchRef.current.active = true
+      batchRef.current.startedAt = Date.now()
+    }
+  }
+
+  /** Solo para archivos NUEVOS que nunca formaron parte del lote (los que
+   * vienen de `enqueue`) — un reintento no debe volver a sumarlos al total,
+   * ya estaban contados desde que se agregaron la primera vez. */
+  function registerBatchFiles(newItems: QueueItem[]) {
+    ensureBatchActive()
+    batchRef.current.totalFiles += newItems.length
+    batchRef.current.totalBytes += newItems.reduce((s, i) => s + i.size, 0)
+  }
+
+  /** Se llama cada vez que un item termina (bien o mal). Si ya no queda
+   * nada "pendiente"/"subiendo", el lote terminó: muestra el modal de
+   * cierre con el resumen real (subidas, fallidas, tiempo total) y
+   * reinicia las estadísticas para el próximo lote. */
+  function checkBatchCompletion() {
+    if (!batchRef.current.active) return
+    const busy = itemsRef.current.some((i) => i.status === 'pendiente' || i.status === 'subiendo')
+    if (busy) return
+    const { doneFiles, totalFiles, startedAt } = batchRef.current
+    const failed = itemsRef.current.filter((i) => i.status === 'error').length
+    const elapsedMs = Date.now() - startedAt
+    batchRef.current = { active: false, startedAt: 0, totalFiles: 0, totalBytes: 0, doneFiles: 0, doneBytes: 0 }
+    if (totalFiles === 0) return
+
+    const duration = formatDuration(elapsedMs)
+    confirmDialog.ask({
+      title: failed === 0 ? `Listo — subiste ${doneFiles} foto${doneFiles === 1 ? '' : 's'}` : `Subida terminada con ${failed} error${failed === 1 ? '' : 'es'}`,
+      description:
+        failed === 0
+          ? `Las ${totalFiles} fotos se subieron correctamente en ${duration}.`
+          : `${doneFiles} de ${totalFiles} fotos se subieron bien en ${duration}. ${failed} foto${failed === 1 ? '' : 's'} no se pudo subir — usa "Reintentar todos los fallidos" para intentarlo de nuevo (no vas a duplicar las que sí quedaron bien).`,
+      confirmLabel: 'Entendido',
+      cancelLabel: 'Entendido',
+    })
+  }
 
   // Hashes de todo lo que ya existe en este evento (cualquier punto) — un
   // duplicado no debería colarse solo porque se sube a un punto distinto.
@@ -160,7 +223,12 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     Object.assign(item, patch)
     rerender()
     if (patch.status === 'lista') {
+      batchRef.current.doneFiles += 1
+      batchRef.current.doneBytes += item.size
       setTimeout(() => removeItem(id), REMOVE_DONE_DELAY)
+    }
+    if (patch.status === 'lista' || patch.status === 'error') {
+      checkBatchCompletion()
     }
   }
 
@@ -240,13 +308,29 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     // Promise.all sin tope): cada archivo se lee completo en memoria para
     // el hash, y con miles de fotos a la vez eso satura la pestaña.
     setCheckingDuplicates(true)
-    const scanned = await mapWithConcurrency(imageFiles, SCAN_CONCURRENCY, async (file) => ({
-      file,
-      hash: await hashFile(file),
-      exifCapturedAt: forcedCapturedAt ? null : await extractCapturedAt(file),
-      contentType: resolveContentType(file),
-    }))
+    setScanProgress({ done: 0, total: imageFiles.length })
+    let scanDone = 0
+    let lastScanUiUpdate = 0
+    const scanned = await mapWithConcurrency(imageFiles, SCAN_CONCURRENCY, async (file) => {
+      const result = {
+        file,
+        hash: await hashFile(file),
+        exifCapturedAt: forcedCapturedAt ? null : await extractCapturedAt(file),
+        contentType: resolveContentType(file),
+      }
+      scanDone++
+      // No un setState por archivo (con 10,000 fotos eso es 10,000
+      // renders) — como mucho uno cada 120ms, más el último para que
+      // siempre termine mostrando el 100%.
+      const now = Date.now()
+      if (now - lastScanUiUpdate > 120 || scanDone === imageFiles.length) {
+        lastScanUiUpdate = now
+        setScanProgress({ done: scanDone, total: imageFiles.length })
+      }
+      return result
+    })
     setCheckingDuplicates(false)
+    setScanProgress(null)
 
     const unique: { file: File; hash: string; exifCapturedAt: string | null; contentType: string }[] = []
     let duplicateCount = 0
@@ -312,13 +396,51 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       // de subir, mostrando en qué horarios va a quedar clasificado el
       // lote completo, en vez de subir en silencio y que el fotógrafo se
       // entere después revisando la galería si de verdad quedó bien.
-      const segments = computeSegments(unique.map((u, i) => ({ id: String(i), captured_at: u.exifCapturedAt })))
-      const summary = segments
-        ? segments.map((s) => `${s.label}: ${s.photos.length} foto${s.photos.length === 1 ? '' : 's'}`).join(' · ')
+      //
+      // El resumen se calcula sobre las fotos NUEVAS + las que YA existen
+      // en este punto (no solo el lote local) — así, si esto es un
+      // reintento después de una sesión que se cortó a medias (o
+      // simplemente una segunda tanda del mismo punto), la fusión de
+      // bloques chicos con el vecino (MIN_SEGMENT_PHOTOS en photoSegments)
+      // ve el volumen real y no junta/separa mal por no saber que un
+      // horario "ya tenía" 200 fotos. Es la MISMA función que arma la
+      // galería real del punto — el resumen no es una aproximación aparte,
+      // es un adelanto exacto de cómo va a quedar.
+      let existing: { id: string; captured_at: string | null }[] = []
+      try {
+        let existingQuery = supabase.from('photos').select('id, captured_at').eq('event_id', eventId)
+        existingQuery = pointId ? existingQuery.eq('point_id', pointId) : existingQuery.is('point_id', null)
+        const { data } = await existingQuery
+        existing = data ?? []
+      } catch {
+        // Si falla la consulta, seguimos solo con el lote nuevo — no vale
+        // la pena bloquear la subida por esto, el resumen sale un poco
+        // menos preciso pero la clasificación real (captured_at por foto)
+        // no depende de esta consulta en absoluto.
+      }
+
+      const combined = [
+        ...existing.map((p) => ({ id: `existing-${p.id}`, captured_at: p.captured_at, isNew: false })),
+        ...unique.map((u, i) => ({ id: `new-${i}`, captured_at: u.exifCapturedAt, isNew: true })),
+      ]
+      const segments = computeSegments(combined)
+      const relevantSegments = segments?.filter((s) => s.photos.some((p) => p.isNew)) ?? null
+
+      const summary = relevantSegments && relevantSegments.length > 0
+        ? relevantSegments
+            .map((s) => {
+              const newCount = s.photos.filter((p) => p.isNew).length
+              const existingCount = s.photos.length - newCount
+              return existingCount > 0
+                ? `${s.label}: +${newCount} foto${newCount === 1 ? '' : 's'} (ya había ${existingCount})`
+                : `${s.label}: ${newCount} foto${newCount === 1 ? '' : 's'}`
+            })
+            .join(' · ')
         : (() => {
-            // Un único bloque de 15 min, todas con hora — computeSegments
-            // no lo cuenta como "segmento" (no hace falta esa capa extra en
-            // la galería), pero igual vale confirmar la hora detectada.
+            // Un único bloque de 15 min, todas con hora y sin nada previo
+            // en ese bloque — computeSegments no lo cuenta como "segmento"
+            // (no hace falta esa capa extra en la galería), pero igual
+            // vale confirmar la hora detectada.
             const times = unique.map((u) => new Date(u.exifCapturedAt!).getTime())
             const fmt = (t: number) => new Date(t).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })
             const min = Math.min(...times)
@@ -372,6 +494,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       forcedCapturedAt: forcedCapturedAt ?? (!exifCapturedAt ? missingForcedCapturedAt : undefined),
     }))
     itemsRef.current = [...itemsRef.current, ...newItems]
+    registerBatchFiles(newItems)
     rerender()
     pump()
     generateThumbnails(newItems)
@@ -395,21 +518,33 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   }
 
   function retry(id: string) {
+    const item = itemsRef.current.find((i) => i.id === id)
+    // Si el lote todavía está activo (otras fotos siguen subiendo), este
+    // archivo ya está contado en totalFiles/totalBytes desde que se agregó
+    // — sumarlo de nuevo inflaría el total y el % nunca llegaría a 100. Si
+    // el lote ya se dio por terminado (modal de cierre ya mostrado, todo
+    // reseteado a 0), hay que registrarlo como un lote nuevo de 1 foto para
+    // que la barra/ETA/modal de cierre vuelvan a aparecer para este reintento.
+    if (item && !batchRef.current.active) registerBatchFiles([item])
+    else ensureBatchActive()
     updateItem(id, { status: 'pendiente', progress: 0, errorMessage: undefined })
     pump()
   }
 
   function retryAllFailed() {
-    let any = false
+    const wasIdle = !batchRef.current.active
+    const retried: QueueItem[] = []
     for (const i of itemsRef.current) {
       if (i.status === 'error') {
         i.status = 'pendiente'
         i.progress = 0
         i.errorMessage = undefined
-        any = true
+        retried.push(i)
       }
     }
-    if (any) {
+    if (retried.length > 0) {
+      if (wasIdle) registerBatchFiles(retried)
+      else ensureBatchActive()
       rerender()
       pump()
     }
@@ -425,6 +560,20 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   const doneCount = items.filter((i) => i.status === 'lista').length
   const errorCount = items.filter((i) => i.status === 'error').length
   const busyCount = items.filter((i) => i.status === 'pendiente' || i.status === 'subiendo').length
+
+  // Progreso agregado del lote completo (bytes reales, no cuenta de
+  // archivos — una foto de 40MB pesa lo que debe pesar en la barra) + ETA
+  // estimado a partir de la velocidad observada desde que arrancó el lote.
+  // Se calcula con `batchRef` (no con `items`) porque los "lista" se
+  // auto-eliminan de la cola a los 1.4s — si dependiera de `items`, el
+  // porcentaje saltaría para atrás cada vez que uno desaparece.
+  const batch = batchRef.current
+  const uploadedBytes = batch.doneBytes + items.reduce((s, i) => (i.status === 'subiendo' ? s + i.size * (i.progress / 100) : s), 0)
+  const overallPct = batch.totalBytes > 0 ? Math.min(100, (uploadedBytes / batch.totalBytes) * 100) : 0
+  const elapsedMs = batch.active ? Date.now() - batch.startedAt : 0
+  const bytesPerMs = elapsedMs > 1500 && uploadedBytes > 0 ? uploadedBytes / elapsedMs : 0
+  const remainingBytes = Math.max(0, batch.totalBytes - uploadedBytes)
+  const etaLabel = bytesPerMs > 0 ? `~${formatDuration(remainingBytes / bytesPerMs)} restante` : 'calculando tiempo restante…'
 
   return (
     <div>
@@ -445,11 +594,30 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         >
           {checkingDuplicates ? 'Revisando fotos…' : 'Elegir archivos'}
         </button>
+        {scanProgress && (
+          <div className="w-full max-w-xs">
+            <Progress value={(scanProgress.done / Math.max(1, scanProgress.total)) * 100} className="h-1.5" />
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Revisando duplicados y hora de la toma: {scanProgress.done.toLocaleString('es-GT')} / {scanProgress.total.toLocaleString('es-GT')}
+            </p>
+          </div>
+        )}
         <input ref={fileInputRef} type="file" multiple accept={IMAGE_INPUT_ACCEPT} className="hidden" onChange={(e) => enqueue(e.target.files)} />
       </div>
 
       {items.length > 0 && (
         <div className="mt-6">
+          {batch.totalFiles > 0 && (
+            <div className="mb-4 rounded-2xl border border-border bg-muted/40 px-4 py-3">
+              <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
+                <span>{Math.round(overallPct)}% del lote</span>
+                <span className="font-normal text-muted-foreground">
+                  {formatBytes(uploadedBytes)} / {formatBytes(batch.totalBytes)} · {etaLabel}
+                </span>
+              </div>
+              <Progress value={overallPct} className="h-2" />
+            </div>
+          )}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {doneCount}/{items.length} listas
