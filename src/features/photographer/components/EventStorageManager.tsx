@@ -13,6 +13,7 @@ import { Button } from '../../../ui/studio/Button'
 import { SkeletonRows } from '../../../ui/shared/Skeleton'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
+import { IMAGE_INPUT_ACCEPT } from '../../../lib/rawImage'
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`
@@ -140,7 +141,7 @@ function FeaturedUploadControl({ eventId, photographerId }: { eventId: string; p
         </Button>
         <span className="text-xs text-muted-foreground">{usedSlots} / {MAX_FEATURED} usadas</span>
       </div>
-      <input ref={fileRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => enqueue(e.target.files)} />
+      <input ref={fileRef} type="file" multiple accept={IMAGE_INPUT_ACCEPT} className="hidden" onChange={(e) => enqueue(e.target.files)} />
       {queue.length > 0 && (
         <div className="flex flex-col gap-1">
           {queue.map((item) => (

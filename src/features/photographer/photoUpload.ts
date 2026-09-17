@@ -1,10 +1,62 @@
 // Lógica compartida de subida de fotos — usada por la carga por punto
 // dentro del visor y del editor de un evento. Un solo lugar para el
 // pipeline de reescalado + marca de agua y la subida con progreso a R2.
-import { parse as parseExif } from 'exifr'
+import { parse as parseExif, thumbnail as exifThumbnail } from 'exifr'
+import { isRawFile } from '../../lib/rawImage'
 
 export const PREVIEW_MAX_SIDE = 1600
 export const PREVIEW_QUALITY = 0.5
+
+export const LOCAL_THUMBNAIL_MAX_SIDE = 220
+
+/** Decodifica un archivo a ImageBitmap para poder dibujarlo en canvas. Un
+ * jpg/png/webp/heic lo decodifica el navegador directo. Un RAW (CR2/CR3/
+ * NEF/ARW/...) el navegador NO lo puede decodificar — no hay soporte nativo
+ * para el sensor crudo de cámara — así que en vez de eso se extrae la
+ * miniatura JPEG que la propia cámara graba dentro del archivo (todas las
+ * cámaras la generan para su pantalla LCD) y se decodifica esa. La
+ * resolución de esa miniatura la decide la cámara (varía de ~160x120 a
+ * varios megapixeles según el modelo) — es lo máximo que se puede lograr
+ * sin un decodificador de RAW completo corriendo en el navegador, que no
+ * existe de forma práctica hoy. El archivo original, sin tocar, se puede
+ * respaldar aparte (ver `backupRaw` en PhotoUploadQueue) sin este límite.
+ * `resizeSide`, si se da, le pide al navegador decodificar ya reescalado —
+ * mucho más barato en CPU/memoria que decodificar completo y reescalar
+ * después (crítico para miniaturas locales de archivos en alta resolución). */
+async function decodeToBitmap(file: File, resizeSide?: number): Promise<ImageBitmap> {
+  const opts = resizeSide ? { resizeWidth: resizeSide, resizeHeight: resizeSide, resizeQuality: 'medium' as const } : undefined
+  if (!isRawFile(file)) return createImageBitmap(file, opts)
+
+  const thumb = await exifThumbnail(file).catch(() => null)
+  if (!thumb) {
+    throw new Error('Este archivo RAW no trae una miniatura incrustada — la cámara no la generó, o el formato no es compatible.')
+  }
+  return createImageBitmap(new Blob([new Uint8Array(thumb)], { type: 'image/jpeg' }), opts)
+}
+
+/** Miniatura pequeña y rápida para la cola de subida local — nunca la
+ * versión completa reescalada (esa es `createWatermarkedPreview`, mucho
+ * más cara). Devuelve un object URL; quien la use debe revocarla con
+ * `URL.revokeObjectURL` cuando ya no la necesite. Null si el archivo no se
+ * pudo decodificar en absoluto (RAW sin miniatura incrustada) — el llamador
+ * debe mostrar un ícono de reemplazo, no bloquear el resto de la cola. */
+export async function createLocalThumbnail(file: File, maxSide = LOCAL_THUMBNAIL_MAX_SIDE): Promise<string | null> {
+  try {
+    const bitmap = await decodeToBitmap(file, maxSide)
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0)
+    bitmap.close()
+    return await new Promise<string | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null), 'image/jpeg', 0.7)
+    })
+  } catch {
+    return null
+  }
+}
 
 // Fotos destacadas: portafolio del fotógrafo, no están a la venta y nunca
 // llevan marca de agua — se suben en calidad alta (Full HD) en vez de la
@@ -64,7 +116,7 @@ export async function loadWatermarkImage(url: string): Promise<ImageBitmap> {
  * "robado" en alta calidad antes de la compra. Sin PNG, el preview sale
  * reducido igual pero sin nada encima. */
 export async function createWatermarkedPreview(file: File, watermarkImage: ImageBitmap | null): Promise<Blob> {
-  const bitmap = await createImageBitmap(file)
+  const bitmap = await decodeToBitmap(file)
   const scale = Math.min(1, PREVIEW_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const width = Math.round(bitmap.width * scale)
   const height = Math.round(bitmap.height * scale)
@@ -104,7 +156,7 @@ export async function createWatermarkedPreview(file: File, watermarkImage: Image
 /** Igual reescalado que `createWatermarkedPreview`, pero sin marca de agua y
  * en calidad alta — para fotos destacadas (portafolio, no vendibles). */
 export async function createFullQualityPreview(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file)
+  const bitmap = await decodeToBitmap(file)
   const scale = Math.min(1, FEATURED_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const width = Math.round(bitmap.width * scale)
   const height = Math.round(bitmap.height * scale)

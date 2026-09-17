@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
 import { uploadWithProgress, createFullQualityPreview } from './photoUpload'
+import { isAcceptedImageFile, resolveContentType } from '../../lib/rawImage'
 import { useToastStore } from '../../ui/overlays/toastStore'
 import { confirmDialog } from '../../ui/overlays/confirmStore'
 
@@ -55,7 +56,7 @@ export function useFeaturedPhotosManager(eventId: string, photographerId: string
   async function uploadOne(item: FeaturedQueueItem) {
     try {
       const { data, error } = await supabase.functions.invoke('r2-upload-url', {
-        body: { fileName: item.file.name, contentType: item.file.type, eventId },
+        body: { fileName: item.file.name, contentType: resolveContentType(item.file), eventId },
       })
       if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
@@ -90,7 +91,7 @@ export function useFeaturedPhotosManager(eventId: string, photographerId: string
 
   function enqueue(files: FileList | null) {
     if (!files) return
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    const imageFiles = Array.from(files).filter(isAcceptedImageFile)
     if (imageFiles.length === 0) return
 
     const toAdd = imageFiles.slice(0, remaining)

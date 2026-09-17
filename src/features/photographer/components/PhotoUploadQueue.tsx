@@ -2,8 +2,11 @@ import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '../../../lib/queryClient'
 import { supabase } from '../../../lib/supabase'
-import { r2Url, previewUrl } from '../../../lib/r2'
-import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, hashFile, extractCapturedAt } from '../photoUpload'
+import { r2Url } from '../../../lib/r2'
+import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, createLocalThumbnail, hashFile, extractCapturedAt } from '../photoUpload'
+import { isAcceptedImageFile, resolveContentType, IMAGE_INPUT_ACCEPT } from '../../../lib/rawImage'
+import { mapWithConcurrency } from '../../../lib/concurrency'
+import { computeSegments } from '../photoSegments'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
@@ -12,9 +15,18 @@ import { AnimateIcon } from '../../../ui/animate-icons/icon'
 import { LayoutDashboard } from '../../../ui/animate-icons/icons/LayoutDashboard'
 import { List } from '../../../ui/animate-icons/icons/List'
 import { cn } from '../../../lib/cn'
-import { Progress } from '../../../ui/shared/Progress'
+import { UploadGrid } from './UploadGrid'
+import { UploadList } from './UploadList'
 
 const CONCURRENCY = 4
+// Cuántos archivos se procesan a la vez en el pre-escaneo (hash + EXIF) y
+// en la generación de miniaturas locales — cada uno lee el archivo entero
+// en memoria (hash) o lo decodifica (miniatura). Sin límite, elegir miles
+// de fotos a la vez dispara cientos de ArrayBuffers/decodificaciones en
+// paralelo y puede tumbar la pestaña; con límite, el navegador nunca tiene
+// más que esto en vuelo sin importar si son 10 fotos o 15,000.
+const SCAN_CONCURRENCY = 6
+const THUMBNAIL_CONCURRENCY = 4
 // Se deja el check verde visible un momento antes de quitarla de la cola —
 // para entonces ya es parte de las fotos del punto/evento más abajo, así
 // que dejarla aquí también sería confuso (¿es la misma foto dos veces?).
@@ -22,30 +34,34 @@ const REMOVE_DONE_DELAY = 1400
 
 type ItemStatus = 'pendiente' | 'subiendo' | 'lista' | 'error'
 
-interface QueueItem {
+export interface QueueItem {
   id: string
   file: File
   name: string
   size: number
-  localPreview: string
+  /** Object URL de una miniatura YA reescalada a ~220px — nunca del
+   * archivo completo (antes se usaba `URL.createObjectURL(file)` directo,
+   * que obligaba al navegador a decodificar el original en alta
+   * resolución solo para pintar un cuadrito pequeño; con cientos de fotos
+   * eso es lo que ponía lenta la página). Null mientras se genera (se
+   * muestra un placeholder), o si el archivo no se pudo decodificar. */
+  localPreview: string | null
   status: ItemStatus
   progress: number
   errorMessage?: string
   previewPath?: string
   backupRaw: boolean
   hash: string
+  /** El mismo valor viaja en la firma de la URL de subida del respaldo Y en
+   * el PUT real — tienen que coincidir exacto o R2 rechaza la firma. Nunca
+   * usar `file.type` directo en más de un lugar (viene vacío en RAW). */
+  contentType: string
   forcedCapturedAt?: string
   /** Hora leída del EXIF, precalculada en `enqueue()` (no en `runItem`) —
    * así el mismo dato sirve para decidir ANTES de subir si hace falta
    * avisar al fotógrafo que varias fotos no traen hora, sin leer el EXIF
    * dos veces por archivo. */
   exifCapturedAt: string | null
-}
-
-function formatBytes(n: number) {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 interface PhotoUploadQueueProps {
@@ -130,6 +146,10 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   }, [])
 
   function removeItem(id: string) {
+    const item = itemsRef.current.find((i) => i.id === id)
+    // La miniatura es un object URL propio (no el archivo original) —
+    // hay que liberarlo o se queda en memoria el resto de la sesión.
+    if (item?.localPreview) URL.revokeObjectURL(item.localPreview)
     itemsRef.current = itemsRef.current.filter((i) => i.id !== id)
     rerender()
   }
@@ -161,7 +181,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   async function runItem(item: QueueItem) {
     try {
       const { data, error } = await supabase.functions.invoke('r2-upload-url', {
-        body: { fileName: item.file.name, contentType: item.file.type, eventId, includeRaw: item.backupRaw },
+        body: { fileName: item.file.name, contentType: item.contentType, eventId, includeRaw: item.backupRaw },
       })
       if (error || !data?.previewUploadUrl) throw new Error(error?.message ?? 'No se pudo obtener la URL de subida')
 
@@ -176,7 +196,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
 
       const uploads = [uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', (pct) => { previewPct = pct; reportProgress() })]
       if (item.backupRaw && data.rawUploadUrl) {
-        uploads.push(uploadWithProgress(data.rawUploadUrl, item.file, item.file.type, (pct) => { rawPct = pct; reportProgress() }))
+        uploads.push(uploadWithProgress(data.rawUploadUrl, item.file, item.contentType, (pct) => { rawPct = pct; reportProgress() }))
       }
       await Promise.all(uploads)
 
@@ -207,22 +227,28 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   async function enqueue(files: FileList | File[] | null) {
     if (!files) return
     const imageFiles = Array.from(files)
-      .filter((f) => f.type.startsWith('image/'))
+      .filter(isAcceptedImageFile)
       .sort((a, b) => a.name.localeCompare(b.name))
     if (imageFiles.length === 0) return
 
-    // Un solo pase revisa DOS cosas por archivo: el hash (duplicados) y la
-    // hora real de la toma (EXIF) — leer el EXIF aquí, antes de subir nada,
-    // es lo que permite avisar "N de M fotos no traen hora" en vez de que el
-    // fotógrafo confíe en que el EXIF "va a funcionar" y descubra hasta
-    // después de subir cientos de fotos que muchas quedaron sin horario.
+    // Un solo pase revisa TRES cosas por archivo: el hash (duplicados), la
+    // hora real de la toma (EXIF) y el content-type a usar — leer el EXIF
+    // aquí, antes de subir nada, es lo que permite avisar "N de M fotos no
+    // traen hora" en vez de que el fotógrafo confíe en que el EXIF "va a
+    // funcionar" y descubra hasta después de subir cientos de fotos que
+    // muchas quedaron sin horario. Con límite de concurrencia (no
+    // Promise.all sin tope): cada archivo se lee completo en memoria para
+    // el hash, y con miles de fotos a la vez eso satura la pestaña.
     setCheckingDuplicates(true)
-    const scanned = await Promise.all(
-      imageFiles.map(async (file) => ({ file, hash: await hashFile(file), exifCapturedAt: forcedCapturedAt ? null : await extractCapturedAt(file) })),
-    )
+    const scanned = await mapWithConcurrency(imageFiles, SCAN_CONCURRENCY, async (file) => ({
+      file,
+      hash: await hashFile(file),
+      exifCapturedAt: forcedCapturedAt ? null : await extractCapturedAt(file),
+      contentType: resolveContentType(file),
+    }))
     setCheckingDuplicates(false)
 
-    const unique: { file: File; hash: string; exifCapturedAt: string | null }[] = []
+    const unique: { file: File; hash: string; exifCapturedAt: string | null; contentType: string }[] = []
     let duplicateCount = 0
     for (const item of scanned) {
       if (knownHashesRef.current.has(item.hash)) {
@@ -255,15 +281,15 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     const missing = forcedCapturedAt ? [] : unique.filter((u) => !u.exifCapturedAt)
     let missingForcedCapturedAt: string | undefined
 
-    if (missing.length > 0) {
+    if (!forcedCapturedAt && missing.length === unique.length) {
+      // Ninguna trae hora — no hay nada que "confirmar", solo decidir qué
+      // hacer: asignarlas a mano a un horario ya declarado, o avisar que
+      // van a quedar sin clasificar.
       if (manualSegments && manualSegments.length > 0 && eventDate) {
         const chosen: SegmentOption | null = await segmentPickerDialog.ask({
           segments: manualSegments,
-          title: `${missing.length} de ${unique.length} fotos no traen hora en sus metadatos`,
-          description:
-            unique.length === missing.length
-              ? 'Ninguna trae la hora de la toma (EXIF) — elige a qué horario asignarlas todas.'
-              : `Las ${unique.length - missing.length} que sí traen hora se clasifican solas. Elige a qué horario asignar las ${missing.length} que no.`,
+          title: `Ninguna de estas ${unique.length} foto${unique.length === 1 ? '' : 's'} trae hora en sus metadatos`,
+          description: 'Elige a qué horario asignarlas todas.',
         })
         if (!chosen) {
           forgetAsUploaded()
@@ -271,18 +297,56 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         }
         missingForcedCapturedAt = new Date(`${eventDate}T${chosen.start}:00`).toISOString()
       } else {
-        // No hay horarios declarados en este punto todavía — nada a lo que
-        // asignarlas manualmente. Solo se informa antes de subir, en vez de
-        // que el fotógrafo lo descubra después revisando fotos sueltas.
         const ok = await confirmDialog.ask({
-          title: `${missing.length} de ${unique.length} fotos no traen hora en sus metadatos`,
-          description: 'Esas quedarán "sin horario" dentro de este punto — declara horarios para el punto si quieres poder asignárselos luego, o continúa y ordénalas manualmente después.',
+          title: `Ninguna de estas ${unique.length} foto${unique.length === 1 ? '' : 's'} trae hora en sus metadatos`,
+          description: 'Quedarán "sin horario" dentro de este punto — declara horarios para el punto si quieres poder asignárselos luego, o continúa y ordénalas manualmente después.',
           confirmLabel: 'Continuar de todos modos',
         })
         if (!ok) {
           forgetAsUploaded()
           return
         }
+      }
+    } else if (!forcedCapturedAt) {
+      // Al menos una trae hora (el caso normal) — SIEMPRE se confirma antes
+      // de subir, mostrando en qué horarios va a quedar clasificado el
+      // lote completo, en vez de subir en silencio y que el fotógrafo se
+      // entere después revisando la galería si de verdad quedó bien.
+      const segments = computeSegments(unique.map((u, i) => ({ id: String(i), captured_at: u.exifCapturedAt })))
+      const summary = segments
+        ? segments.map((s) => `${s.label}: ${s.photos.length} foto${s.photos.length === 1 ? '' : 's'}`).join(' · ')
+        : (() => {
+            // Un único bloque de 15 min, todas con hora — computeSegments
+            // no lo cuenta como "segmento" (no hace falta esa capa extra en
+            // la galería), pero igual vale confirmar la hora detectada.
+            const times = unique.map((u) => new Date(u.exifCapturedAt!).getTime())
+            const fmt = (t: number) => new Date(t).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })
+            const min = Math.min(...times)
+            const max = Math.max(...times)
+            return `Todas alrededor de ${fmt(min)}${max !== min ? ` – ${fmt(max)}` : ''}`
+          })()
+
+      const ok = await confirmDialog.ask({
+        title: `Vamos a clasificar ${unique.length} foto${unique.length === 1 ? '' : 's'} así`,
+        description: summary,
+        confirmLabel: 'Sí, continuar',
+        cancelLabel: 'Cancelar',
+      })
+      if (!ok) {
+        forgetAsUploaded()
+        return
+      }
+
+      // Ya confirmado que se van a subir — si además hay algunas sin hora
+      // (mezcladas con otras que sí traen), se puede elegir a qué horario
+      // declarado asignar esas específicamente.
+      if (missing.length > 0 && manualSegments && manualSegments.length > 0 && eventDate) {
+        const chosen: SegmentOption | null = await segmentPickerDialog.ask({
+          segments: manualSegments,
+          title: `${missing.length} de estas fotos no traen hora en sus metadatos`,
+          description: `Las ${unique.length - missing.length} que sí traen hora ya se clasificaron solas. Elige a qué horario asignar las ${missing.length} que no.`,
+        })
+        if (chosen) missingForcedCapturedAt = new Date(`${eventDate}T${chosen.start}:00`).toISOString()
       }
     }
 
@@ -293,22 +357,41 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       cancelLabel: 'No, solo vista previa',
     })
 
-    const newItems: QueueItem[] = unique.map(({ file, hash, exifCapturedAt }) => ({
+    const newItems: QueueItem[] = unique.map(({ file, hash, exifCapturedAt, contentType }) => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       file,
       name: file.name,
       size: file.size,
-      localPreview: URL.createObjectURL(file),
+      localPreview: null,
       status: 'pendiente',
       progress: 0,
       backupRaw,
       hash,
+      contentType,
       exifCapturedAt,
       forcedCapturedAt: forcedCapturedAt ?? (!exifCapturedAt ? missingForcedCapturedAt : undefined),
     }))
     itemsRef.current = [...itemsRef.current, ...newItems]
     rerender()
     pump()
+    generateThumbnails(newItems)
+  }
+
+  /** Miniaturas generadas EN SEGUNDO PLANO, después de arrancar la subida —
+   * son solo cosméticas (la cola local), nunca deben demorar el arranque
+   * de la subida real. Concurrencia limitada por la misma razón que el
+   * pre-escaneo: decodificar miles de fotos a la vez de golpe es justo lo
+   * que ponía lenta la página. */
+  async function generateThumbnails(newItems: QueueItem[]) {
+    await mapWithConcurrency(newItems, THUMBNAIL_CONCURRENCY, async (item) => {
+      const url = await createLocalThumbnail(item.file)
+      const stillQueued = itemsRef.current.some((i) => i.id === item.id)
+      if (!stillQueued) {
+        if (url) URL.revokeObjectURL(url)
+        return
+      }
+      updateItem(item.id, { localPreview: url })
+    })
   }
 
   function retry(id: string) {
@@ -362,7 +445,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         >
           {checkingDuplicates ? 'Revisando fotos…' : 'Elegir archivos'}
         </button>
-        <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => enqueue(e.target.files)} />
+        <input ref={fileInputRef} type="file" multiple accept={IMAGE_INPUT_ACCEPT} className="hidden" onChange={(e) => enqueue(e.target.files)} />
       </div>
 
       {items.length > 0 && (
@@ -402,69 +485,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
             </div>
           </div>
 
-          {view === 'grid' ? (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-              {items.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.status === 'lista' && item.previewPath ? previewUrl({ storage_path: null, preview_path: item.previewPath }) : undefined}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-border"
-                  title={`${item.name} · ${formatBytes(item.size)}`}
-                >
-                  <img src={item.localPreview} alt={item.name} className="h-full w-full object-cover" />
-                  {(item.status === 'pendiente' || item.status === 'subiendo') && (
-                    <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1">
-                      <Progress value={item.progress} className="h-1 w-full bg-white/20" />
-                    </div>
-                  )}
-                  {item.status === 'lista' && (
-                    <div className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs text-white">✓</div>
-                  )}
-                  {item.status === 'error' && (
-                    <button
-                      onClick={(e) => { e.preventDefault(); retry(item.id) }}
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 p-2 text-center text-[10px] text-white"
-                    >
-                      <span>{item.errorMessage ?? 'Error al subir'}</span>
-                      <span className="font-bold uppercase tracking-wide text-accent">Reintentar</span>
-                    </button>
-                  )}
-                </a>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 px-3 py-2">
-                  <img src={item.localPreview} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
-                  </div>
-                  <div className="w-32 shrink-0">
-                    {item.status === 'error' ? (
-                      <p className="truncate text-[10px] text-accent">{item.errorMessage ?? 'Error'}</p>
-                    ) : (
-                      <Progress value={item.progress} indicatorClassName={item.status === 'lista' ? 'bg-emerald-500' : undefined} />
-                    )}
-                  </div>
-                  <div className="w-16 shrink-0 text-right">
-                    {item.status === 'lista' && <span className="text-emerald-500">✓</span>}
-                    {item.status === 'error' && (
-                      <button onClick={() => retry(item.id)} className="text-xs font-semibold uppercase tracking-wide text-accent hover:underline">
-                        Reintentar
-                      </button>
-                    )}
-                    {(item.status === 'pendiente' || item.status === 'subiendo') && (
-                      <span className="text-[10px] text-muted-foreground">{Math.round(item.progress)}%</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {view === 'grid' ? <UploadGrid items={items} onRetry={retry} /> : <UploadList items={items} onRetry={retry} />}
         </div>
       )}
     </div>
