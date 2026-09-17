@@ -16,6 +16,7 @@ interface FancySelectProps {
   /** false para campos obligatorios (categoría, estado) donde no tiene
    * sentido un botón "quitar" que deje el valor vacío. Default true. */
   clearable?: boolean
+  error?: boolean
 }
 
 /** Reemplazo del <select> nativo — mismo panel oscuro y flotante que
@@ -23,7 +24,7 @@ interface FancySelectProps {
  * gris por defecto del navegador. Drop-in casi directo de ui/flat/Select
  * y ui/studio/Select: misma forma (rounded-full, h-12), pero controlado
  * por value/onChange(value) en vez de un evento de <select> nativo. */
-export function FancySelect({ value, onChange, options, placeholder = 'Todos', label, className, clearable = true }: FancySelectProps) {
+export function FancySelect({ value, onChange, options, placeholder = 'Todos', label, className, clearable = true, error }: FancySelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -52,8 +53,8 @@ export function FancySelect({ value, onChange, options, placeholder = 'Todos', l
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex h-12 w-full items-center justify-between gap-2 rounded-full border-2 border-transparent bg-muted px-4 text-left text-sm text-foreground outline-none transition-colors duration-200',
-          open ? 'border-primary bg-background' : 'hover:bg-border/60',
+          'flex h-12 w-full items-center justify-between gap-2 rounded-full border-2 bg-muted px-4 text-left text-sm text-foreground outline-none transition-colors duration-200',
+          open ? 'border-primary bg-background' : error ? 'border-accent' : 'border-transparent hover:bg-border/60',
         )}
       >
         <span className={cn('truncate', !current && 'text-muted-foreground')}>{current?.label ?? placeholder}</span>

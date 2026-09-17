@@ -224,12 +224,12 @@ export function StudioEventEditor() {
 
   const [tab, setTab] = useState<TabId>('info')
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('Rodada')
+  const [category, setCategory] = useState<'' | (typeof CATEGORIES)[number]>('')
   const [routeId, setRouteId] = useState('')
   const [city, setCity] = useState('')
   const [venue, setVenue] = useState('')
-  const [eventDate, setEventDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [price, setPrice] = useState(25)
+  const [eventDate, setEventDate] = useState('')
+  const [price, setPrice] = useState<number | ''>('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<EventStatus>('pausado')
   const [points, setPoints] = useState<LocalPoint[]>([])
@@ -308,12 +308,12 @@ export function StudioEventEditor() {
           return
         }
         setTitle(draft.title ?? '')
-        setCategory(draft.category ?? 'Rodada')
+        setCategory(draft.category ?? '')
         setRouteId(draft.routeId ?? '')
         setCity(draft.city ?? '')
         setVenue(draft.venue ?? '')
-        setEventDate(draft.eventDate ?? new Date().toISOString().slice(0, 10))
-        setPrice(draft.price ?? 25)
+        setEventDate(draft.eventDate ?? '')
+        setPrice(draft.price ?? '')
         setDescription(draft.description ?? '')
         setStatus(draft.status ?? 'pausado')
         setPoints(draft.points ?? [])
@@ -427,7 +427,7 @@ export function StudioEventEditor() {
     if (Object.keys(errors).length > 0) {
       setAttemptedSubmit(true)
       setTab('info')
-      push({ type: 'error', title: 'Completa la información básica primero (título, fecha, precio)' })
+      push({ type: 'error', title: 'Completa la información básica primero (título, categoría, fecha, precio)' })
       return null
     }
     const isRodadaNow = category === 'Rodada'
@@ -559,9 +559,10 @@ export function StudioEventEditor() {
 
   function computeErrors() {
     const isRodada = category === 'Rodada'
-    const errors: { title?: boolean; city?: boolean; eventDate?: boolean; price?: boolean } = {}
+    const errors: { title?: boolean; category?: boolean; city?: boolean; eventDate?: boolean; price?: boolean } = {}
     if (!title.trim()) errors.title = true
-    if (!isRodada && !city.trim()) errors.city = true
+    if (!category) errors.category = true
+    if (category && !isRodada && !city.trim()) errors.city = true
     if (!eventDate) errors.eventDate = true
     if (!price || price <= 0) errors.price = true
     return errors
@@ -795,13 +796,16 @@ export function StudioEventEditor() {
                   value={category}
                   onChange={(v) => setCategory(v as typeof category)}
                   options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                  placeholder="Selecciona una categoría"
                   clearable={false}
+                  error={fieldErrors.category}
                 />
                 <Input
                   label="Precio por foto (Q)"
                   type="number"
                   value={price}
-                  onChange={(e) => setPrice(Number(e.target.value))}
+                  onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="Ej. 25"
                   error={fieldErrors.price ? 'Obligatorio' : undefined}
                 />
                 {category !== 'Rodada' && (
@@ -972,7 +976,7 @@ export function StudioEventEditor() {
                   title="Administrar fotos de este evento"
                   description="Explora por punto y horario, o por Destacadas — sube, mueve y elimina sin salir de esta página."
                 >
-                  <EventStorageManager eventId={id} photographerId={user.id} price={price} watermarkPath={watermarkPath} eventDate={eventDate} />
+                  <EventStorageManager eventId={id} photographerId={user.id} price={price || 0} watermarkPath={watermarkPath} eventDate={eventDate} />
                 </Section>
               )}
 
