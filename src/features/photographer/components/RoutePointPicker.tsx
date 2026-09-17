@@ -5,7 +5,7 @@ import { TimePicker } from '../../../ui/shared/TimePicker'
 import { FancySelect } from '../../../ui/shared/FancySelect'
 import { Button } from '../../../ui/studio/Button'
 import { useToastStore } from '../../../ui/overlays/toastStore'
-import { haversineMeters, DUPLICATE_POINT_THRESHOLD_M } from '../../../lib/geo'
+import { isSamePoint, DUPLICATE_POINT_THRESHOLD_M } from '../../../lib/geo'
 import { cn } from '../../../lib/cn'
 
 const GUATEMALA_CENTER = { lat: 14.6349, lng: -90.5069 }
@@ -63,12 +63,14 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   const push = useToastStore((s) => s.push)
   const { data: allRoutePoints = [] } = useRoutePoints(routeId || undefined)
   // Ya agregado a este evento → no debe ofrecerse de nuevo como "existente".
-  // Por coordenadas, no solo por id: un punto agregado sin pasar por
-  // "Guardar en la ruta" (routePointId null) puede coincidir físicamente con
-  // una entrada del catálogo de la ruta creada por otro fotógrafo con otro
-  // nombre — el id no lo detecta, la distancia sí.
+  // Por id cuando se puede (más confiable), y si no por isSamePoint: un
+  // punto agregado sin pasar por "Guardar en la ruta" (routePointId null)
+  // puede coincidir físicamente con una entrada del catálogo de la ruta
+  // creada por otro fotógrafo con el mismo nombre — el id no lo detecta.
+  // Un nombre distinto a la misma distancia (VP Racing Entrada/Salida) SÍ
+  // debe seguir ofreciéndose: es un punto real distinto, no el ya agregado.
   const routePoints = allRoutePoints.filter(
-    (p) => !addedPoints.some((added) => haversineMeters(p.lat, p.lng, added.lat, added.lng) <= DUPLICATE_POINT_THRESHOLD_M),
+    (p) => !addedPoints.some((added) => (added.routePointId && added.routePointId === p.id) || isSamePoint(p, added)),
   )
 
   const [mode, setMode] = useState<'existing' | 'new'>('existing')
@@ -124,14 +126,17 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
   }
 
   /** Busca un punto (de la ruta completa o ya agregado a este evento) que
-   * físicamente sea el mismo lugar — aunque el nombre no coincida. */
-  function findDuplicate(lat: number, lng: number): string | null {
+   * físicamente sea el mismo lugar Y tenga el mismo nombre — un nombre
+   * distinto a la misma distancia (entrada/salida, ida/regreso) es un
+   * punto real y reutilizable a propósito, no un duplicado. */
+  function findDuplicate(label: string, lat: number, lng: number): string | null {
     const candidates = [
       ...allRoutePoints.map((p) => ({ label: p.label, lat: p.lat, lng: p.lng })),
       ...addedPoints,
     ]
+    const point = { label, lat, lng }
     for (const c of candidates) {
-      if (haversineMeters(lat, lng, c.lat, c.lng) <= DUPLICATE_POINT_THRESHOLD_M) return c.label
+      if (isSamePoint(point, c)) return c.label
     }
     return null
   }
@@ -141,9 +146,9 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
       push({ type: 'error', title: 'Ponle un nombre al punto' })
       return
     }
-    const dup = findDuplicate(newLat, newLng)
+    const dup = findDuplicate(newLabel.trim(), newLat, newLng)
     if (dup) {
-      push({ type: 'error', title: 'Ya existe un punto ahí', description: `"${dup}" está a menos de ${DUPLICATE_POINT_THRESHOLD_M}m — es el mismo lugar.` })
+      push({ type: 'error', title: 'Ya existe un punto ahí', description: `"${dup}" está a menos de ${DUPLICATE_POINT_THRESHOLD_M}m con el mismo nombre — es el mismo lugar.` })
       return
     }
     setSavingPoint(true)
@@ -180,9 +185,9 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
       return
     }
     if (effectiveMode === 'new') {
-      const dup = findDuplicate(point.lat, point.lng)
+      const dup = findDuplicate(point.label, point.lat, point.lng)
       if (dup) {
-        push({ type: 'error', title: 'Ya existe un punto ahí', description: `"${dup}" está a menos de ${DUPLICATE_POINT_THRESHOLD_M}m — es el mismo lugar.` })
+        push({ type: 'error', title: 'Ya existe un punto ahí', description: `"${dup}" está a menos de ${DUPLICATE_POINT_THRESHOLD_M}m con el mismo nombre — es el mismo lugar.` })
         return
       }
     }
@@ -251,7 +256,7 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
           <div className="flex items-end gap-3">
             <div className="flex-1 flex-col gap-1.5">
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Nombre del punto</span>
-              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. VP Racing" className={smallInputClass} />
+              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Ej. VP Racing (Entrada)" className={smallInputClass} />
             </div>
             {usingRoute && (
               <Button variant="secondary" size="sm" loading={savingPoint} onClick={handleCreatePoint}>
@@ -262,7 +267,9 @@ export const RoutePointPicker = forwardRef<RoutePointPickerHandle, RoutePointPic
         )}
         {usingRoute && effectiveMode === 'new' && (
           <p className="-mt-2 text-xs text-muted-foreground">
-            "Guardar" lo deja disponible para elegir en futuros eventos de esta misma ruta.
+            "Guardar" lo deja disponible para elegir en futuros eventos de esta misma ruta. Si es el mismo lugar
+            pero mirando hacia el otro lado (entrada/salida, ida/regreso), dale un nombre distinto — ej. "VP Racing
+            (Entrada)" y "VP Racing (Salida)" — para que no se marque como duplicado.
           </p>
         )}
 
