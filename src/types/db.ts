@@ -1,7 +1,7 @@
 // Formas de datos reales de Supabase, compartidas entre el portal biker y
 // el portal fotógrafo — evita duplicar tipos entre features.
 
-export type EventCategory = 'Rodada' | 'Pista' | 'Sesión de Fotos'
+export type EventCategory = 'Rodada' | 'Autódromo' | 'Sesión de Fotos'
 export type EventStatus = 'activo' | 'pausado' | 'cerrado'
 
 export interface DbEventPoint {

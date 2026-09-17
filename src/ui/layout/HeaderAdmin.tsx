@@ -13,6 +13,7 @@ import { cn } from '../../lib/cn'
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Resumen' },
+  { to: '/admin/cuentas', label: 'Cuentas' },
   { to: '/admin/aprobar-fotografos', label: 'Fotógrafos' },
   { to: '/admin/bug-reports', label: 'Bugs' },
   { to: '/admin/releases', label: 'Releases' },

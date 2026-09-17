@@ -74,7 +74,7 @@ begin
     (event_id, 'Km 10 — Carretera al Pacífico', 14.5934, -90.6312, '05:30', '06:00');
 
   insert into public.events (photographer_id, title, category, city, venue, event_date, price_per_photo, description, status)
-  values (photographer1, 'TEST — Track Day Pedro Cofiño', 'Pista', 'Guatemala', 'Autódromo Pedro Cofiño', current_date - 10, 30, 'Evento de prueba (TEST). Tandas de mañana y tarde.', 'activo')
+  values (photographer1, 'TEST — Track Day Pedro Cofiño', 'Autódromo', 'Guatemala', 'Autódromo Pedro Cofiño', current_date - 10, 30, 'Evento de prueba (TEST). Tandas de mañana y tarde.', 'activo')
   returning id into event_id;
   insert into public.event_points (event_id, label, lat, lng, time_start, time_end) values
     (event_id, 'Curva 4', 14.3050, -90.7850, '08:00', '10:00'),
@@ -117,7 +117,7 @@ begin
     (event_id, 'Llegada — Puerto San José', 14.3050, -90.7850, '05:30', '06:00');
 
   insert into public.events (photographer_id, title, category, city, venue, event_date, price_per_photo, description, status)
-  values (photographer3, 'TEST — Track Day Nocturno', 'Pista', 'Escuintla', 'Autódromo Pedro Cofiño', current_date - 20, 30, 'Evento de prueba (TEST).', 'cerrado')
+  values (photographer3, 'TEST — Track Day Nocturno', 'Autódromo', 'Escuintla', 'Autódromo Pedro Cofiño', current_date - 20, 30, 'Evento de prueba (TEST).', 'cerrado')
   returning id into event_id;
   insert into public.event_points (event_id, label, lat, lng, time_start, time_end) values
     (event_id, 'Pista principal', 14.3060, -90.7840, '18:00', '21:00');

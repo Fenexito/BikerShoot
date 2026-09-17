@@ -45,6 +45,7 @@ const StudioEventEditor = lazy(() => import('./features/photographer/StudioEvent
 const StudioOrders = lazy(() => import('./features/photographer/StudioOrders').then((m) => ({ default: m.StudioOrders })))
 const StudioOrderDetail = lazy(() => import('./features/photographer/StudioOrderDetail').then((m) => ({ default: m.StudioOrderDetail })))
 const ApprovePhotographers = lazy(() => import('./features/admin/ApprovePhotographers').then((m) => ({ default: m.ApprovePhotographers })))
+const AccountsAdmin = lazy(() => import('./features/admin/AccountsAdmin').then((m) => ({ default: m.AccountsAdmin })))
 const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
 const BugReportsAdmin = lazy(() => import('./features/admin/BugReportsAdmin').then((m) => ({ default: m.BugReportsAdmin })))
 const ReleasesAdmin = lazy(() => import('./features/admin/ReleasesAdmin').then((m) => ({ default: m.ReleasesAdmin })))
@@ -121,6 +122,7 @@ export default function App() {
           <Route path="/admin" element={<RequireAdmin><AdminHome /></RequireAdmin>} />
           <Route path="/admin/bug-reports" element={<RequireAdmin><BugReportsAdmin /></RequireAdmin>} />
           <Route path="/admin/aprobar-fotografos" element={<RequireAdmin><ApprovePhotographers /></RequireAdmin>} />
+          <Route path="/admin/cuentas" element={<RequireAdmin><AccountsAdmin /></RequireAdmin>} />
           <Route path="/admin/releases" element={<RequireAdmin><ReleasesAdmin /></RequireAdmin>} />
           <Route path="/admin/planes" element={<RequireAdmin><StoragePlansAdmin /></RequireAdmin>} />
       </Route>

@@ -22,6 +22,12 @@ export function AdminHome() {
       <p className="mb-10 text-muted-foreground">Estado general de la plataforma.</p>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <Link to="/admin/cuentas">
+          <Card>
+            <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Cuentas</p>
+            <p className="mt-2 text-base font-medium text-foreground">Bikers, fotógrafos y vínculos entre cuentas</p>
+          </Card>
+        </Link>
         <Link to="/admin/aprobar-fotografos">
           <Card tint={data && data.pendingPhotographers > 0 ? 'amber' : 'default'}>
             <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Fotógrafos pendientes</p>

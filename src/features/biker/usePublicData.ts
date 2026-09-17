@@ -34,7 +34,7 @@ export interface SearchFilters {
   query?: string
   /** Todos multi-selectivos y opcionales — se combinan como AND entre
    * campos distintos, OR dentro del mismo campo (ej. categorías Rodada Y
-   * Pista trae fotos de cualquiera de las dos). */
+   * Autódromo trae fotos de cualquiera de las dos). */
   categories?: string[]
   routeIds?: string[]
   eventIds?: string[]

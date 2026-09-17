@@ -29,7 +29,7 @@ import { cn } from '../../lib/cn'
 import type { EventStatus } from '../../types/db'
 import { Skeleton } from '../../ui/shared/Skeleton'
 
-const CATEGORIES = ['Rodada', 'Pista', 'Sesión de Fotos'] as const
+const CATEGORIES = ['Rodada', 'Autódromo', 'Sesión de Fotos'] as const
 const AUTODROMOS = ['Autodromo Pedro Cofiño', 'Autodromo GT', 'Guatemala Raceway (1/4 de Milla)']
 const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: 'activo', label: 'Activo — visible para todos' },
@@ -817,7 +817,7 @@ export function StudioEventEditor() {
                     error={fieldErrors.city ? 'Obligatorio' : undefined}
                   />
                 )}
-                {category === 'Pista' && (
+                {category === 'Autódromo' && (
                   <FancySelect
                     label="Autódromo"
                     value={venue}

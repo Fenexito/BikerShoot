@@ -20,7 +20,7 @@ import { cn } from '../../lib/cn'
 // Orden fijo (no alfabético ni de aparición) — el biker espera verlas
 // siempre en este orden sin importar cuáles estén disponibles en cada
 // combinación de filtros.
-const CATEGORY_ORDER = ['Rodada', 'Pista', 'Sesión de Fotos']
+const CATEGORY_ORDER = ['Rodada', 'Autódromo', 'Sesión de Fotos']
 
 // Rango del resizer de tamaño de foto — el tope (270px) está calculado
 // para que, incluso en el tamaño MÁS GRANDE posible, sigan cabiendo al

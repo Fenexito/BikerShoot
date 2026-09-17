@@ -22,7 +22,7 @@ type EventGroup = 'rodada' | 'evento' | ''
 // Studio, aquí SÍ hay dos categorías realmente distintas entre sí).
 const EVENT_TYPE_TABS: FilterOption[] = [
   { value: '', label: 'Todos' },
-  { value: 'Pista', label: 'Autódromo' },
+  { value: 'Autódromo', label: 'Autódromo' },
   { value: 'Sesión de Fotos', label: 'Sesión de fotos' },
 ]
 
