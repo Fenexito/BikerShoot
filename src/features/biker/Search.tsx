@@ -22,6 +22,12 @@ import { cn } from '../../lib/cn'
 // combinación de filtros.
 const CATEGORY_ORDER = ['Rodada', 'Autódromo', 'Sesión de Fotos']
 
+// Colchón (minutos) que se le agrega a cada lado del rango real de los
+// puntos que cumplen los filtros activos, al calcular los límites de la
+// barra de horario — así no queda tan exacta que el extremo real (ej. la
+// primera foto a las 6:30) caiga pegado al borde mismo del slider.
+const HOUR_BOUNDS_TOLERANCE_MIN = 30
+
 // Rango del resizer de tamaño de foto — el tope (270px) está calculado
 // para que, incluso en el tamaño MÁS GRANDE posible, sigan cabiendo al
 // menos 6 fotos por fila en el ancho máximo del contenedor: 1800px menos
@@ -389,10 +395,17 @@ export function Search() {
   // campo propio que excluir, a diferencia de los de arriba) — si ninguno
   // de los puntos que cumplen los demás filtros tiene horario (o no hay
   // filtros elegidos todavía), el usuario puede elegir cualquier hora del
-  // día completo.
+  // día completo. Con filtros activos (ej. un fotógrafo con un solo punto
+  // de 6:30 a 8:00) se ajusta a lo real en vez de mostrar siempre el día
+  // completo — con un colchón de HOUR_BOUNDS_TOLERANCE_MIN de cada lado
+  // para no dejar la barra tan exacta que un extremo quede pegado al borde.
   const hourPairs = matchingPoints(events, fieldFilters)
-  const boundsMin = hourPairs.length ? Math.min(...hourPairs.map((p) => timeToMinutes(p.point.time_start))) : 0
-  const boundsMax = hourPairs.length ? Math.max(...hourPairs.map((p) => timeToMinutes(p.point.time_end))) : 23 * 60 + 59
+  const boundsMin = hourPairs.length
+    ? Math.max(0, Math.min(...hourPairs.map((p) => timeToMinutes(p.point.time_start))) - HOUR_BOUNDS_TOLERANCE_MIN)
+    : 0
+  const boundsMax = hourPairs.length
+    ? Math.min(23 * 60 + 59, Math.max(...hourPairs.map((p) => timeToMinutes(p.point.time_end))) + HOUR_BOUNDS_TOLERANCE_MIN)
+    : 23 * 60 + 59
   const hourActive = Boolean(horaDesde || horaHasta)
   const valueMin = Math.max(boundsMin, Math.min(horaDesde ? timeToMinutes(horaDesde) : boundsMin, boundsMax))
   const valueMax = Math.max(boundsMin, Math.min(horaHasta ? timeToMinutes(horaHasta) : boundsMax, boundsMax))
