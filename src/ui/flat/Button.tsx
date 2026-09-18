@@ -20,7 +20,9 @@ const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible
 
 const variantClasses: Record<Variant, string> = {
   primary: 'bg-primary text-primary-foreground hover:bg-blue-600',
-  secondary: 'bg-muted text-foreground hover:bg-gray-200',
+  // dark:hover: — mismo motivo que ui/flat/Card.tsx: sin esto, el botón
+  // "secondary" saltaba a un gris claro fijo al hacer hover en modo oscuro.
+  secondary: 'bg-muted text-foreground hover:bg-gray-200 dark:hover:bg-white/10',
   outline: 'border border-border text-foreground bg-transparent hover:bg-muted',
   dark: 'bg-foreground text-background hover:opacity-90',
 }

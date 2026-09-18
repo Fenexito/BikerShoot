@@ -28,12 +28,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             type={isPassword ? (revealed ? 'text' : 'password') : type}
             className={cn(
-              'h-12 w-full rounded-full border border-border bg-input px-5 text-base text-foreground md:h-14',
+              'h-12 w-full rounded-full border bg-input px-5 text-base text-foreground md:h-14',
               'placeholder:text-muted-foreground',
               'outline-none transition-colors duration-150 focus:border-accent',
               'disabled:cursor-not-allowed disabled:opacity-50',
               isPassword && 'pr-12',
-              error && 'border-accent',
+              // Ternario, no `border-border` fijo + `border-accent` condicional:
+              // cn() acá es clsx puro (sin tailwind-merge), así que dos clases
+              // de border-color a la vez compiten por especificidad en vez de
+              // que la segunda gane — el borde rojo de error no se veía por
+              // esto mismo (Título/Precio usan este Input; Categoría/Fecha
+              // usan FancySelect/DatePicker, que ya hacían el ternario bien).
+              error ? 'border-accent' : 'border-border',
               className,
             )}
             {...props}

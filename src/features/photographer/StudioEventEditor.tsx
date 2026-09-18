@@ -803,7 +803,15 @@ export function StudioEventEditor() {
           ))}
         </nav>
 
-        <div key={tab} className="flex flex-col gap-6 pb-24 animate-tab-in">
+        {/* min-w-0: la columna "1fr" de este grid tiene el mismo problema
+            que un flex-1 — no se encoge por debajo del ancho intrínseco de
+            su contenido (la grilla virtualizada de subida, más abajo)
+            sin esto. Es lo que seguía empujando la página a la derecha
+            aunque el flex-1 de EventStorageManager ya tuviera su propio
+            min-w-0: ese arregla SU columna interna, pero esta de más
+            afuera (la que envuelve la pestaña completa) es la que en
+            realidad delimita el ancho de la página. */}
+        <div key={tab} className="min-w-0 flex flex-col gap-6 pb-24 animate-tab-in">
           {tab === 'info' && (
             <Section title="Información del evento">
               <div className="grid gap-5 sm:grid-cols-2">

@@ -28,12 +28,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             type={isPassword ? (revealed ? 'text' : 'password') : type}
             className={cn(
-              'h-12 w-full rounded-full border-2 border-transparent bg-muted px-5 text-base text-foreground',
+              'h-12 w-full rounded-full border-2 bg-muted px-5 text-base text-foreground',
               'placeholder:text-muted-foreground',
               'outline-none transition-colors duration-200 focus:border-primary focus:bg-background',
               'disabled:cursor-not-allowed disabled:opacity-50',
               isPassword && 'pr-12',
-              error && 'border-red-500',
+              // Ternario, no `border-transparent` fijo + `border-red-500`
+              // condicional a la vez — cn() es clsx puro (sin tailwind-merge),
+              // dos clases de border-color compitiendo dan un resultado
+              // impredecible en vez de que la de error gane siempre.
+              error ? 'border-red-500' : 'border-transparent',
               className,
             )}
             {...props}

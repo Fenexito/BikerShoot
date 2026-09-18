@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { queryClient } from '../../lib/queryClient'
 import type { DbEvent, DbEventPoint, DbPhoto, DbPhotographer } from '../../types/db'
 
 export interface PublicEventPoint extends DbEventPoint {
@@ -265,7 +267,41 @@ export function usePhotographerPhotoCount(photographerId: string | undefined) {
 }
 
 /** Búsqueda de fotos con filtros — trae todas y filtra en cliente (volumen bajo por ahora). */
+/** Se suscribe a cambios en tiempo real de `photos` (cualquier fotógrafo,
+ * cualquier evento) y refresca `['search-photos']` cuando algo cambia —
+ * sin esto, un biker con la búsqueda abierta seguía viendo fotos que un
+ * fotógrafo acababa de borrar, mover de punto/horario o eliminar junto con
+ * el evento: la consulta se trae una sola vez y cambiar de filtro solo
+ * reprocesa esos mismos datos en memoria, nunca vuelve a preguntarle al
+ * servidor. Debounced (900ms de silencio) — un fotógrafo subiendo cientos
+ * de fotos de golpe dispara cientos de eventos, y no hace falta refrescar
+ * la búsqueda de cada biker activo por cada una individualmente. */
+function useSearchPhotosRealtimeSync() {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    function scheduleRefresh() {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['search-photos'] })
+        queryClient.invalidateQueries({ queryKey: ['map-points'] })
+      }, 900)
+    }
+
+    const channel = supabase
+      .channel('public-photos-search-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'photos' }, scheduleRefresh)
+      .subscribe()
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      supabase.removeChannel(channel)
+    }
+  }, [])
+}
+
 export function useSearchPhotos(filters: SearchFilters) {
+  useSearchPhotosRealtimeSync()
   return useQuery({
     queryKey: ['search-photos'],
     queryFn: async (): Promise<PublicPhoto[]> => {

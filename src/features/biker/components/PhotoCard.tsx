@@ -55,6 +55,12 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
   // seguidas antes de que termine la anterior).
   const [saveBurstKey, setSaveBurstKey] = useState<number | null>(null)
   const [unsaveBurstKey, setUnsaveBurstKey] = useState<number | null>(null)
+  // Respaldo del realtime de la búsqueda (ver useSearchPhotosRealtimeSync en
+  // usePublicData.ts): si por lo que sea la foto ya no existe en R2 (un
+  // fotógrafo la borró/movió justo antes de que la invalidación llegara, o
+  // el navegador no soporta el websocket), el navegador ya pidió la imagen
+  // y falló — mejor desaparecer la tarjeta que mostrar el ícono roto.
+  const [broken, setBroken] = useState(false)
   // En móvil, con la columna real ya calculada (ver Search.tsx), el criterio
   // pasa de "tamaño de miniatura" a "cuántas caben por fila" — con 3+
   // columnas el usuario está hojeando muchas fotos chicas a la vez, no
@@ -98,6 +104,8 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
     // carrito en sí, que ya se actualizó arriba.
     if (imgRef.current) flyToCart(imgRef.current.getBoundingClientRect(), previewUrl(photo))
   }
+
+  if (broken) return null
 
   return (
     // Radio de borde más chico en todos lados (`rounded-lg`, antes
@@ -149,6 +157,7 @@ export function PhotoCard({ photo, eventTitle, photographerName, onOpen, layout 
           src={previewUrl(photo)}
           alt={`Foto de ${eventTitle}`}
           loading="lazy"
+          onError={() => setBroken(true)}
           className={cn(
             // `scale-110` (antes 105): zoom de hover un poco más notorio.
             'w-full object-cover transition-transform duration-500 group-hover:scale-110',
