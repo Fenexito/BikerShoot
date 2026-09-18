@@ -81,33 +81,38 @@ export function EventOverviewTree({ eventId }: { eventId: string }) {
                 onSelect={() => {}}
               />
               <TreeChildren open={open}>
-                {point.horarios.map((h) => (
-                  <TreeRow
-                    key={h.key}
-                    depth={1}
-                    icon="🕐"
-                    label={`${h.start}–${h.end}`}
-                    stats={`${h.totalPhotos} · ${formatBytes(h.bytes)}`}
-                    hasChildren={false}
-                    expanded={false}
-                    selected={false}
-                    onToggle={() => {}}
-                    onSelect={() => {}}
-                  />
-                ))}
-                {point.leftover && point.leftover.totalPhotos > 0 && (
-                  <TreeRow
-                    depth={1}
-                    icon="🕐"
-                    label="Sin horario declarado"
-                    stats={`${point.leftover.totalPhotos} · ${formatBytes(point.leftover.bytes)}`}
-                    hasChildren={false}
-                    expanded={false}
-                    selected={false}
-                    onToggle={() => {}}
-                    onSelect={() => {}}
-                  />
-                )}
+                {/* 2 columnas — un punto con 10 horarios declarados (bloques
+                    de 15/30 min) no debe ocupar 10 filas completas, con la
+                    mitad derecha de cada fila vacía. */}
+                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                  {point.horarios.map((h) => (
+                    <TreeRow
+                      key={h.key}
+                      depth={1}
+                      icon="🕐"
+                      label={`${h.start}–${h.end}`}
+                      stats={`${h.totalPhotos} · ${formatBytes(h.bytes)}`}
+                      hasChildren={false}
+                      expanded={false}
+                      selected={false}
+                      onToggle={() => {}}
+                      onSelect={() => {}}
+                    />
+                  ))}
+                  {point.leftover && point.leftover.totalPhotos > 0 && (
+                    <TreeRow
+                      depth={1}
+                      icon="🕐"
+                      label="Sin horario declarado"
+                      stats={`${point.leftover.totalPhotos} · ${formatBytes(point.leftover.bytes)}`}
+                      hasChildren={false}
+                      expanded={false}
+                      selected={false}
+                      onToggle={() => {}}
+                      onSelect={() => {}}
+                    />
+                  )}
+                </div>
               </TreeChildren>
             </div>
           )

@@ -908,28 +908,19 @@ export function StudioEventView() {
             onExpandedChange={(exp) => handlePointExpandedChange('__featured__', exp)}
           />
 
-          {/* 2 columnas desde `lg:` (una sola tarjeta por fila en escritorio
-              ocupaba demasiado espacio vertical con muchos puntos) — se
-              queda en 1 columna hasta ahí a propósito: el acordeón de
-              PhotoGallery ya cambia a su modo "de escritorio" desde `sm:`
-              (640px), y una celda de grid de 2 columnas en ese ancho
-              quedaría demasiado angosta para que el acordeón se vea bien.
-              En móvil (<640px) se queda en 1, que ya funcionaba bien. */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {event.event_points.map((pt) => (
-              <PointCard
-                key={pt.id}
-                point={pt}
-                photos={photosByPoint.get(pt.id) ?? []}
-                eventDate={event.event_date}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onDelete={deletePhoto}
-                registerRef={(el) => (pointRefs.current[pt.id] = el)}
-                onExpandedChange={(exp) => handlePointExpandedChange(pt.id, exp)}
-              />
-            ))}
-          </div>
+          {event.event_points.map((pt) => (
+            <PointCard
+              key={pt.id}
+              point={pt}
+              photos={photosByPoint.get(pt.id) ?? []}
+              eventDate={event.event_date}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onDelete={deletePhoto}
+              registerRef={(el) => (pointRefs.current[pt.id] = el)}
+              onExpandedChange={(exp) => handlePointExpandedChange(pt.id, exp)}
+            />
+          ))}
 
           {unassigned.length > 0 && (
             <div className="overflow-hidden rounded-3xl border border-border bg-card p-5">
