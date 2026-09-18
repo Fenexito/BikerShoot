@@ -111,7 +111,16 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   // minutos sin que el fotógrafo supiera si iba en la 50 o en la 9,000.
   const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const knownHashesRef = useRef<Set<string>>(new Set())
+  // Hashes que YA existen de verdad en la base — se REEMPLAZA por completo
+  // en cada refetch de `existingHashes` (no solo se agrega), para que un
+  // archivo que el fotógrafo acaba de eliminar (limpieza/liberar espacio)
+  // deje de contar como "duplicado" tan pronto la consulta se invalida y
+  // refresca, en vez de quedar marcado para siempre dentro de esta sesión.
+  const persistedHashesRef = useRef<Set<string>>(new Set())
+  // Hashes de archivos que ESTA sesión ya puso en la cola (subidos o
+  // todavía no) — evita el duplicado "arrastré la misma carpeta dos
+  // veces", independiente de lo que diga la base en este instante.
+  const pendingHashesRef = useRef<Set<string>>(new Set())
   // Estadísticas del lote activo (progreso total + ETA) — independientes de
   // itemsRef porque los items "lista" se auto-eliminan de la cola a los
   // 1.4s, y si el total dependiera de ellos, el porcentaje agregado saltaría
@@ -153,14 +162,13 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     if (totalFiles === 0) return
 
     const duration = formatDuration(elapsedMs)
-    confirmDialog.ask({
+    push({
+      type: failed === 0 ? 'success' : 'error',
       title: failed === 0 ? `Listo — subiste ${doneFiles} foto${doneFiles === 1 ? '' : 's'}` : `Subida terminada con ${failed} error${failed === 1 ? '' : 'es'}`,
       description:
         failed === 0
           ? `Las ${totalFiles} fotos se subieron correctamente en ${duration}.`
           : `${doneFiles} de ${totalFiles} fotos se subieron bien en ${duration}. ${failed} foto${failed === 1 ? '' : 's'} no se pudo subir — usa "Reintentar todos los fallidos" para intentarlo de nuevo (no vas a duplicar las que sí quedaron bien).`,
-      confirmLabel: 'Entendido',
-      cancelLabel: 'Entendido',
     })
   }
 
@@ -176,7 +184,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
   })
 
   useEffect(() => {
-    if (existingHashes) for (const h of existingHashes) knownHashesRef.current.add(h)
+    persistedHashesRef.current = new Set(existingHashes ?? [])
   }, [existingHashes])
 
   useEffect(() => {
@@ -335,11 +343,11 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
     const unique: { file: File; hash: string; exifCapturedAt: string | null; contentType: string }[] = []
     let duplicateCount = 0
     for (const item of scanned) {
-      if (knownHashesRef.current.has(item.hash)) {
+      if (persistedHashesRef.current.has(item.hash) || pendingHashesRef.current.has(item.hash)) {
         duplicateCount++
         continue
       }
-      knownHashesRef.current.add(item.hash)
+      pendingHashesRef.current.add(item.hash)
       unique.push(item)
     }
 
@@ -356,7 +364,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       // Cancelar aquí no debe dejar estas fotos marcadas como "ya
       // subidas" — si no, un reintento con los mismos archivos las
       // rechazaría como falsos duplicados sin haberse subido nunca.
-      for (const item of unique) knownHashesRef.current.delete(item.hash)
+      for (const item of unique) pendingHashesRef.current.delete(item.hash)
     }
 
     // Cuántas de este lote SÍ traen hora vs. cuántas no — la decisión de
@@ -609,7 +617,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         <div className="mt-6">
           {batch.totalFiles > 0 && (
             <div className="mb-4 rounded-2xl border border-border bg-muted/40 px-4 py-3">
-              <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2 text-xs font-semibold">
                 <span>{Math.round(overallPct)}% del lote</span>
                 <span className="font-normal text-muted-foreground">
                   {formatBytes(uploadedBytes)} / {formatBytes(batch.totalBytes)} · {etaLabel}

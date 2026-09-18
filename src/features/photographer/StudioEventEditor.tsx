@@ -442,12 +442,19 @@ export function StudioEventEditor() {
       description: description || null,
       status,
     }
-    const { data, error } = await supabase.from('events').insert(payload).select('id').single()
+    const { data, error } = await supabase.from('events').insert(payload).select('*').single()
     if (error || !data) {
       push({ type: 'error', title: 'No se pudo crear el evento', description: error?.message })
       return null
     }
     queryClient.invalidateQueries({ queryKey: ['my-events', user.id] })
+    // Precarga la caché de `useEvent(id)` con lo que ya sabemos ANTES de
+    // navegar — si no, al cambiar la URL de /new al id real, `isNew` pasa
+    // a false pero `existing` todavía no llegó (nueva query, nueva
+    // consulta), y el guard `!isNew && isLoading` de más abajo muestra el
+    // esqueleto de carga completo: un parpadeo que se siente como que la
+    // página se recargó, aunque no cambió nada que el fotógrafo no supiera.
+    queryClient.setQueryData(['event', data.id], { ...data, event_points: [] })
     navigate(`/studio/eventos/${data.id}/editar`, { replace: true })
     return data.id
   }
@@ -568,6 +575,24 @@ export function StudioEventEditor() {
     return errors
   }
   const fieldErrors = attemptedSubmit ? computeErrors() : {}
+
+  /** Bloquea salir de "Información" hacia Ruta/Imágenes si faltan los
+   * campos obligatorios — antes se podía avanzar con la pestaña vacía y
+   * el error solo aparecía hasta el guardado final, ya lejos de donde
+   * hacía falta corregirlo. Reutiliza el mismo `fieldErrors`/borde rojo
+   * que ya usa el guardado, en vez de un mensaje aparte. */
+  function handleTabClick(id: TabId) {
+    if (id !== 'info') {
+      const errors = computeErrors()
+      if (Object.keys(errors).length > 0) {
+        setAttemptedSubmit(true)
+        setTab('info')
+        push({ type: 'error', title: 'Completa la información obligatoria primero', description: 'Título, categoría, precio y fecha.' })
+        return
+      }
+    }
+    setTab(id)
+  }
 
   async function save() {
     if (!user) return
@@ -763,7 +788,7 @@ export function StudioEventEditor() {
           {TABS.map((t) => (
             <AnimateIcon key={t.id} animateOnHover animateOnTap asChild>
               <button
-                onClick={() => setTab(t.id)}
+                onClick={() => handleTabClick(t.id)}
                 className={cn(
                   'flex min-w-0 items-center justify-center gap-1.5 border-b-2 pb-3 text-xs font-medium transition-colors sm:text-sm lg:justify-start lg:border-b-0 lg:border-l-2 lg:px-3 lg:py-2 lg:pb-2 lg:text-left',
                   tab === t.id

@@ -14,6 +14,7 @@ import { SkeletonRows } from '../../../ui/shared/Skeleton'
 import { useToastStore } from '../../../ui/overlays/toastStore'
 import { confirmDialog } from '../../../ui/overlays/confirmStore'
 import { IMAGE_INPUT_ACCEPT } from '../../../lib/rawImage'
+import { Ellipsis } from '../../../ui/animate-icons/icons/Ellipsis'
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`
@@ -66,6 +67,12 @@ function invalidateEventStorage(eventId: string) {
   queryClient.invalidateQueries({ queryKey: ['event-featured-photos', eventId] })
   queryClient.invalidateQueries({ queryKey: ['my-events'] })
   queryClient.invalidateQueries({ queryKey: ['photographer-usage-bytes'] })
+  // Sin esto, borrar fotos (cleanup) no refresca la lista de hashes que
+  // PhotoUploadQueue usa para detectar duplicados — react-query sigue
+  // sirviendo la lista vieja desde caché, así que volver a subir las
+  // mismas fotos (ya eliminadas de verdad) se rechaza como "duplicado"
+  // aunque ya no exista ni una sola copia en el evento.
+  queryClient.invalidateQueries({ queryKey: ['event-photo-hashes', eventId] })
 }
 
 const UNASSIGNED = '__unassigned__'
@@ -182,9 +189,10 @@ export function EventStorageManager({ eventId, photographerId, price, watermarkP
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [columns, setColumns] = useState<1 | 2 | 3>(1)
-  const [pageSize, setPageSize] = useState<10 | 50 | 100>(10)
+  const [columns, setColumns] = useState<1 | 2 | 3>(2)
+  const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
   const [page, setPage] = useState(0)
+  const [showGroupActions, setShowGroupActions] = useState(false)
 
   function toggleExpand(key: string) {
     setExpanded((prev) => {
@@ -239,7 +247,13 @@ export function EventStorageManager({ eventId, photographerId, price, watermarkP
 
   const sourcePointId = node?.kind === 'point' ? node.point.id : node?.kind === 'horario' || node?.kind === 'leftover' ? node.point.id : null
 
-  const listRows: PhotoListRow[] = nodePhotos.map((p) => ({ id: p.id, filename: p.original_filename, bytes: (p.preview_size_bytes ?? 0) + (p.raw_size_bytes ?? 0) + (p.delivered_size_bytes ?? 0), sold: !!p.delivered_path }))
+  const listRows: PhotoListRow[] = nodePhotos.map((p) => ({
+    id: p.id,
+    filename: p.original_filename,
+    bytes: (p.preview_size_bytes ?? 0) + (p.raw_size_bytes ?? 0) + (p.delivered_size_bytes ?? 0),
+    sold: !!p.delivered_path,
+    previewPath: p.preview_path,
+  }))
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -326,7 +340,11 @@ export function EventStorageManager({ eventId, photographerId, price, watermarkP
         })}
       </div>
 
-      <div className="flex-1">
+      {/* min-w-0: sin esto, un hijo con ancho intrínseco grande (la grilla
+          virtualizada de la cola de subida, ver UploadGrid) no se encoge —
+          empuja esta columna, y con ella la página entera, cientos de
+          píxeles a la derecha mientras hay fotos subiendo. */}
+      <div className="min-w-0 flex-1">
         {!node || !nodeStats || !effectiveStats ? (
           <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border py-16 text-center text-muted-foreground">
             <span className="text-3xl opacity-40">🗂️</span>
@@ -354,19 +372,6 @@ export function EventStorageManager({ eventId, photographerId, price, watermarkP
             </div>
 
             <div className="border-t border-border pt-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {selectedIds.size > 0 ? `Acciones sobre ${effectiveLabel}` : 'Acciones sobre todo el grupo'}
-              </p>
-              <div className="flex flex-col gap-3">
-                <CleanupControl target={cleanupTarget} scopeLabel={effectiveLabel} stats={effectiveStats} onDone={() => { setSelectedIds(new Set()); invalidateEventStorage(eventId) }} />
-                {node.kind !== 'featured' && (
-                  <MoveSelectedControl eventDate={eventDate} points={points} sourcePointId={sourcePointId} photoIds={effectiveIds} onDone={() => { setSelectedIds(new Set()); invalidateEventStorage(eventId) }} />
-                )}
-                <DownloadRawControl photoIds={effectiveIds} rawPhotoIds={effectiveRawIds} />
-              </div>
-            </div>
-
-            <div className="border-t border-border pt-4">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Subir fotos aquí</p>
               {node.kind === 'featured' ? (
                 <FeaturedUploadControl eventId={eventId} photographerId={photographerId} />
@@ -382,6 +387,31 @@ export function EventStorageManager({ eventId, photographerId, price, watermarkP
                   forcedCapturedAt={node.kind === 'horario' ? new Date(`${eventDate}T${node.horario.start}:00`).toISOString() : undefined}
                   onItemUploaded={() => invalidateEventStorage(eventId)}
                 />
+              )}
+            </div>
+
+            {/* Liberar espacio, mover fotos, respaldo crudo — no son la
+                acción principal (subir fotos sí lo es, por eso va arriba y
+                siempre visible) — detrás de "···" para que no compitan
+                visualmente con lo que el fotógrafo va a usar en el 90% de
+                las visitas a esta página. */}
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => setShowGroupActions((v) => !v)}
+                data-no-ripple
+                className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Ellipsis size={14} />
+                {selectedIds.size > 0 ? `Más acciones sobre ${effectiveLabel}` : 'Más acciones sobre todo el grupo'}
+              </button>
+              {showGroupActions && (
+                <div className="flex flex-col gap-3">
+                  <CleanupControl target={cleanupTarget} scopeLabel={effectiveLabel} stats={effectiveStats} onDone={() => { setSelectedIds(new Set()); invalidateEventStorage(eventId) }} />
+                  {node.kind !== 'featured' && (
+                    <MoveSelectedControl eventDate={eventDate} points={points} sourcePointId={sourcePointId} photoIds={effectiveIds} onDone={() => { setSelectedIds(new Set()); invalidateEventStorage(eventId) }} />
+                  )}
+                  <DownloadRawControl photoIds={effectiveIds} rawPhotoIds={effectiveRawIds} />
+                </div>
               )}
             </div>
 

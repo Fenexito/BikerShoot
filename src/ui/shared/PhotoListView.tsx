@@ -1,10 +1,16 @@
+import { useState } from 'react'
 import { cn } from '../../lib/cn'
+import { previewUrl } from '../../lib/r2'
+import { AnimateIcon } from '../animate-icons/icon'
+import { LayoutDashboard } from '../animate-icons/icons/LayoutDashboard'
+import { List } from '../animate-icons/icons/List'
 
 export interface PhotoListRow {
   id: string
   filename: string | null
   bytes: number
   sold: boolean
+  previewPath: string | null
 }
 
 function formatBytes(n: number) {
@@ -40,15 +46,46 @@ function PhotoRow({ photo, selected, onToggle }: { photo: PhotoListRow; selected
   )
 }
 
-/** Explorador tipo "vista de lista" (nombre + tamaño, sin miniaturas) con
- * densidad configurable — el editor de evento no debe volverse una página
- * kilométrica con cientos de miniaturas. `columns` reparte la página actual
- * en 1-3 columnas de filas (como un panel de archivos profesional), no
- * columnas de una grilla de fotos. */
+function PhotoTile({ photo, selected, onToggle }: { photo: PhotoListRow; selected: boolean; onToggle: () => void }) {
+  return (
+    <label
+      className={cn(
+        'group relative block aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl border-2 border-border bg-muted transition-colors',
+        selected && 'border-accent',
+      )}
+      title={photo.filename ?? '(sin nombre)'}
+    >
+      <input type="checkbox" checked={selected} onChange={onToggle} className="absolute left-2 top-2 z-10 h-4 w-4 accent-accent" />
+      {photo.previewPath ? (
+        <img src={previewUrl({ storage_path: null, preview_path: photo.previewPath })} alt={photo.filename ?? ''} loading="lazy" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">Sin vista previa</div>
+      )}
+      {photo.sold && (
+        <span className="absolute right-1.5 top-1.5 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Vendida</span>
+      )}
+      <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1 text-[10px] text-white">{photo.filename ?? '(sin nombre)'}</span>
+    </label>
+  )
+}
+
+/** Explorador de fotos del punto/horario seleccionado, con dos modos:
+ * "lista" (nombre + tamaño en filas densas, sin miniaturas — el que ya
+ * existía) y "grid" (miniaturas reales). Siempre paginado (máx. 100 por
+ * página) así que el grid nunca pinta más que eso a la vez — no hace
+ * falta virtualizar como en la cola de subida (ver UploadGrid), que sí
+ * puede tener miles de items sin paginar. Ordenado por nombre de archivo
+ * (A→Z): las cámaras nombran sus fotos de forma correlativa (FOTO_001,
+ * FOTO_002...), así que el orden alfabético es también el orden en que se
+ * tomaron — más fácil de ubicar una foto puntual que el orden de subida. */
 export function PhotoListView({ photos, columns, onColumnsChange, pageSize, onPageSizeChange, page, onPageChange, selected, onToggle, onToggleAll }: PhotoListViewProps) {
-  const totalPages = Math.max(1, Math.ceil(photos.length / pageSize))
+  const [view, setView] = useState<'list' | 'grid'>('list')
+
+  const sorted = [...photos].sort((a, b) => (a.filename ?? '').localeCompare(b.filename ?? '', undefined, { numeric: true, sensitivity: 'base' }))
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
-  const pageItems = photos.slice(safePage * pageSize, safePage * pageSize + pageSize)
+  const pageItems = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize)
   const pageIds = pageItems.map((p) => p.id)
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id))
 
@@ -75,20 +112,46 @@ export function PhotoListView({ photos, columns, onColumnsChange, pageSize, onPa
           )}
         </label>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1 rounded-full bg-muted p-1">
-            {COLUMN_OPTIONS.map((n) => (
+            <AnimateIcon animateOnHover animateOnTap asChild>
               <button
-                key={n}
                 data-no-ripple
-                onClick={() => onColumnsChange(n)}
-                className={cn('rounded-full px-2.5 py-1 text-xs font-semibold transition-colors', columns === n ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
-                aria-label={`${n} columna${n === 1 ? '' : 's'}`}
+                onClick={() => setView('list')}
+                aria-label="Vista de lista"
+                title="Lista"
+                className={cn('flex h-7 w-7 items-center justify-center rounded-full transition-colors', view === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
               >
-                {n}col
+                <List size={14} />
               </button>
-            ))}
+            </AnimateIcon>
+            <AnimateIcon animateOnHover animateOnTap asChild>
+              <button
+                data-no-ripple
+                onClick={() => setView('grid')}
+                aria-label="Vista de cuadrícula"
+                title="Grid"
+                className={cn('flex h-7 w-7 items-center justify-center rounded-full transition-colors', view === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+              >
+                <LayoutDashboard size={14} />
+              </button>
+            </AnimateIcon>
           </div>
+          {view === 'list' && (
+            <div className="flex items-center gap-1 rounded-full bg-muted p-1">
+              {COLUMN_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  data-no-ripple
+                  onClick={() => onColumnsChange(n)}
+                  className={cn('rounded-full px-2.5 py-1 text-xs font-semibold transition-colors', columns === n ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+                  aria-label={`${n} columna${n === 1 ? '' : 's'}`}
+                >
+                  {n}col
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-1 rounded-full bg-muted p-1">
             {PAGE_SIZE_OPTIONS.map((n) => (
               <button
@@ -104,8 +167,14 @@ export function PhotoListView({ photos, columns, onColumnsChange, pageSize, onPa
         </div>
       </div>
 
-      {photos.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">No hay fotos aquí.</p>
+      ) : view === 'grid' ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {pageItems.map((photo) => (
+            <PhotoTile key={photo.id} photo={photo} selected={selected.has(photo.id)} onToggle={() => onToggle(photo.id)} />
+          ))}
+        </div>
       ) : (
         <div className={cn('grid gap-x-4', columns === 1 ? 'grid-cols-1' : columns === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3')}>
           {chunks.map((chunk, i) => (

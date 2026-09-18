@@ -5,6 +5,7 @@ import { statsFor, rawIds, type StorageStats, type PhotoRow } from './useStorage
 
 export interface EventPhotoRow extends PhotoRow {
   original_filename: string | null
+  preview_path: string | null
 }
 
 export interface EventHorarioNode extends StorageStats {
@@ -80,7 +81,7 @@ export function useEventStorageTree(eventId: string | undefined) {
         supabase.from('event_points').select('id, label, manual_segments').eq('event_id', eventId),
         supabase
           .from('photos')
-          .select('id, event_id, point_id, captured_at, delivered_path, raw_path, preview_size_bytes, raw_size_bytes, delivered_size_bytes, original_filename, featured')
+          .select('id, event_id, point_id, captured_at, delivered_path, raw_path, preview_path, preview_size_bytes, raw_size_bytes, delivered_size_bytes, original_filename, featured')
           .eq('event_id', eventId),
       ])
       if (pointsError) throw pointsError

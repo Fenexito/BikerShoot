@@ -71,7 +71,7 @@ export function UploadGrid({ items, onRetry }: { items: QueueItem[]; onRetry: (i
   const rowCount = Math.ceil(items.length / columnCount)
 
   return (
-    <div style={{ height: Math.min(GRID_HEIGHT, rowHeight * rowCount || GRID_HEIGHT) }}>
+    <div className="w-full overflow-hidden" style={{ height: Math.min(GRID_HEIGHT, rowHeight * rowCount || GRID_HEIGHT) }}>
       <Grid
         cellComponent={GridCell}
         cellProps={{ items, columnCount, onRetry }}
