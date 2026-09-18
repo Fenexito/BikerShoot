@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useEvent, useEventPhotosDetailed, type EventPhoto } from './useMyEvents'
 import { supabase } from '../../lib/supabase'
 import { queryClient } from '../../lib/queryClient'
-import { r2Url, previewUrl } from '../../lib/r2'
+import { r2Url, thumbnailUrl } from '../../lib/r2'
 import { FeaturedPhotosSection } from './components/FeaturedPhotosSection'
 import { EventOverviewTree } from './components/EventOverviewTree'
 import { computeSegments } from './photoSegments'
@@ -51,7 +51,7 @@ const HEADER_BOTTOM_OFFSET = 84
 function PhotoListRow({ photo, onDelete }: { photo: EventPhoto; onDelete: (id: string) => void }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2">
-      <img src={previewUrl(photo)} alt="" className="h-12 w-12 shrink-0 rounded-2xl border border-border object-cover" />
+      <img src={thumbnailUrl(photo)} alt="" className="h-12 w-12 shrink-0 rounded-2xl border border-border object-cover" />
       <p className="min-w-0 flex-1 truncate text-sm" title={photo.original_filename ?? undefined}>
         {photo.original_filename ?? 'Sin nombre registrado'}
       </p>
@@ -84,7 +84,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 function MobileGridTile({ photo }: { photo: EventPhoto }) {
   return (
     <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted">
-      <img src={previewUrl(photo)} alt="" className="h-full w-full object-cover" />
+      <img src={thumbnailUrl(photo)} alt="" className="h-full w-full object-cover" />
       {photo.delivered_path && (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">
           Vendida
@@ -112,7 +112,7 @@ function AccordionRow({
   return (
     <AccordionGallery
       items={photos.map((photo) => ({
-        image: previewUrl(photo),
+        image: thumbnailUrl(photo),
         overlay: (
           <>
             {selectedIds.has(photo.id) && <span className="absolute inset-0 z-[2] rounded-2xl ring-2 ring-inset ring-red-500" />}
@@ -282,7 +282,7 @@ function PointStack({ photos }: { photos: EventPhoto[] }) {
       {preview.map((photo, i) => (
         <img
           key={photo.id}
-          src={previewUrl(photo)}
+          src={thumbnailUrl(photo)}
           alt=""
           className="absolute h-14 w-14 rounded-2xl border-2 border-background object-cover shadow-sm"
           style={{ left: i * 8, top: i * 6, zIndex: preview.length - i }}
@@ -678,12 +678,29 @@ export function StudioEventView() {
             </button>
           </AnimateIcon>
         )}
-        <ActionMenu
-          items={[
-            { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <Edit size={16} /> },
-            { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
-          ]}
-        />
+        {/* Editar/Eliminar directos (antes detrás de un "···") — ya no se
+            puede subir fotos desde el visor, así que editar el evento es
+            la acción que el fotógrafo va a usar seguido; no tiene sentido
+            un clic extra para revelarla. Solo en escritorio (este bloque
+            del header transformado no se activa en móvil por defecto). */}
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <Link
+            to={`/studio/eventos/${id}/editar`}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-bold transition-colors hover:bg-muted"
+          >
+            <Edit size={14} /> Editar
+          </Link>
+        </AnimateIcon>
+        <AnimateIcon animateOnHover animateOnTap asChild>
+          <button
+            onClick={deleteEvent}
+            aria-label="Eliminar evento"
+            title="Eliminar evento"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-red-500 hover:text-red-500"
+          >
+            <Trash size={14} />
+          </button>
+        </AnimateIcon>
       </div>
     ) : null,
     coverPassed,
@@ -833,12 +850,24 @@ export function StudioEventView() {
                     </button>
                   </AnimateIcon>
                 )}
-                <ActionMenu
-                  items={[
-                    { to: `/studio/eventos/${id}/editar`, label: 'Editar evento', icon: <Edit size={16} /> },
-                    { onClick: deleteEvent, label: 'Eliminar evento', icon: <Trash size={16} />, tone: 'danger' },
-                  ]}
-                />
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <Link
+                    to={`/studio/eventos/${id}/editar`}
+                    className={cn('flex items-center gap-1.5 rounded-full border border-border font-bold transition-colors hover:bg-muted', scrolled ? 'px-3 py-2 text-[11px]' : 'px-5 py-2.5 text-xs')}
+                  >
+                    <Edit size={14} /> Editar
+                  </Link>
+                </AnimateIcon>
+                <AnimateIcon animateOnHover animateOnTap asChild>
+                  <button
+                    onClick={deleteEvent}
+                    aria-label="Eliminar evento"
+                    title="Eliminar evento"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-red-500 hover:text-red-500"
+                  >
+                    <Trash size={14} />
+                  </button>
+                </AnimateIcon>
               </div>
             </div>
 

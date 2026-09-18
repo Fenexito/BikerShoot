@@ -54,6 +54,7 @@ export interface DbPhoto {
   point_id: string | null
   storage_path: string | null
   preview_path: string | null
+  thumbnail_path: string | null
   raw_path: string | null
   delivered_path: string | null
   price: number

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { cn } from '../../lib/cn'
-import { previewUrl } from '../../lib/r2'
+import { thumbnailUrl } from '../../lib/r2'
 import { AnimateIcon } from '../animate-icons/icon'
 import { LayoutDashboard } from '../animate-icons/icons/LayoutDashboard'
 import { List } from '../animate-icons/icons/List'
@@ -11,6 +11,7 @@ export interface PhotoListRow {
   bytes: number
   sold: boolean
   previewPath: string | null
+  thumbnailPath: string | null
 }
 
 function formatBytes(n: number) {
@@ -57,7 +58,12 @@ function PhotoTile({ photo, selected, onToggle }: { photo: PhotoListRow; selecte
     >
       <input type="checkbox" checked={selected} onChange={onToggle} className="absolute left-2 top-2 z-10 h-4 w-4 accent-accent" />
       {photo.previewPath ? (
-        <img src={previewUrl({ storage_path: null, preview_path: photo.previewPath })} alt={photo.filename ?? ''} loading="lazy" className="h-full w-full object-cover" />
+        <img
+          src={thumbnailUrl({ storage_path: null, preview_path: photo.previewPath, thumbnail_path: photo.thumbnailPath })}
+          alt={photo.filename ?? ''}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">Sin vista previa</div>
       )}

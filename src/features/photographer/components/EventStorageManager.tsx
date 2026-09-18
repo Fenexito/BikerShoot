@@ -253,6 +253,7 @@ export function EventStorageManager({ eventId, photographerId, price, watermarkP
     bytes: (p.preview_size_bytes ?? 0) + (p.raw_size_bytes ?? 0) + (p.delivered_size_bytes ?? 0),
     sold: !!p.delivered_path,
     previewPath: p.preview_path,
+    thumbnailPath: p.thumbnail_path,
   }))
 
   function toggleSelected(id: string) {

@@ -29,6 +29,7 @@ export interface EventPhoto {
   id: string
   point_id: string | null
   preview_path: string | null
+  thumbnail_path: string | null
   storage_path: string | null
   raw_path: string | null
   delivered_path: string | null
@@ -47,7 +48,7 @@ export function useEventPhotosDetailed(eventId: string | undefined) {
     queryFn: async (): Promise<EventPhoto[]> => {
       const { data, error } = await supabase
         .from('photos')
-        .select('id, point_id, preview_path, storage_path, raw_path, delivered_path, price, size_bytes, featured, original_filename, created_at, captured_at')
+        .select('id, point_id, preview_path, thumbnail_path, storage_path, raw_path, delivered_path, price, size_bytes, featured, original_filename, created_at, captured_at')
         .eq('event_id', eventId)
         .order('created_at', { ascending: true })
       if (error) throw error

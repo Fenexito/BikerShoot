@@ -9,6 +9,14 @@ export const PREVIEW_QUALITY = 0.5
 
 export const LOCAL_THUMBNAIL_MAX_SIDE = 220
 
+// Miniatura que SÍ se sube y persiste junto a la foto (a diferencia de
+// LOCAL_THUMBNAIL_MAX_SIDE, que es solo para la cola local mientras se
+// sube) — la usa el visor del evento para no tener que decodificar el
+// preview completo (1600px) en cada tile de una grilla/acordeón con
+// cientos de fotos.
+export const GRID_THUMBNAIL_MAX_SIDE = 360
+export const GRID_THUMBNAIL_QUALITY = 0.6
+
 /** Decodifica un archivo a ImageBitmap para poder dibujarlo en canvas. Un
  * jpg/png/webp/heic lo decodifica el navegador directo. Un RAW (CR2/CR3/
  * NEF/ARW/...) el navegador NO lo puede decodificar — no hay soporte nativo
@@ -34,6 +42,20 @@ async function decodeToBitmap(file: File, resizeSide?: number): Promise<ImageBit
   return createImageBitmap(new Blob([new Uint8Array(thumb)], { type: 'image/jpeg' }), opts)
 }
 
+async function renderThumbnailBlob(file: File, maxSide: number, quality: number): Promise<Blob | null> {
+  const bitmap = await decodeToBitmap(file, maxSide)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality)
+  })
+}
+
 /** Miniatura pequeña y rápida para la cola de subida local — nunca la
  * versión completa reescalada (esa es `createWatermarkedPreview`, mucho
  * más cara). Devuelve un object URL; quien la use debe revocarla con
@@ -42,17 +64,21 @@ async function decodeToBitmap(file: File, resizeSide?: number): Promise<ImageBit
  * debe mostrar un ícono de reemplazo, no bloquear el resto de la cola. */
 export async function createLocalThumbnail(file: File, maxSide = LOCAL_THUMBNAIL_MAX_SIDE): Promise<string | null> {
   try {
-    const bitmap = await decodeToBitmap(file, maxSide)
-    const canvas = document.createElement('canvas')
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    ctx.drawImage(bitmap, 0, 0)
-    bitmap.close()
-    return await new Promise<string | null>((resolve) => {
-      canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null), 'image/jpeg', 0.7)
-    })
+    const blob = await renderThumbnailBlob(file, maxSide, 0.7)
+    return blob ? URL.createObjectURL(blob) : null
+  } catch {
+    return null
+  }
+}
+
+/** Miniatura que se SUBE y persiste junto a la foto (ver
+ * GRID_THUMBNAIL_MAX_SIDE) — a diferencia de `createLocalThumbnail`, esta
+ * sí necesita el Blob en sí (para el PUT a R2), no un object URL. Null en
+ * el mismo caso que arriba: no bloquea la subida, el visor cae de vuelta al
+ * preview normal para esta foto puntual (ver `thumbnailUrl` en lib/r2.ts). */
+export async function createGridThumbnailBlob(file: File): Promise<Blob | null> {
+  try {
+    return await renderThumbnailBlob(file, GRID_THUMBNAIL_MAX_SIDE, GRID_THUMBNAIL_QUALITY)
   } catch {
     return null
   }

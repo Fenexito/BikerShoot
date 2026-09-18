@@ -71,8 +71,14 @@ export function EventOverviewTree({ eventId }: { eventId: string }) {
                 hasChildren={hasChildren}
                 expanded={open}
                 selected={false}
+                // TreeRow llama onSelect() SIEMPRE y onToggle() solo si hay
+                // hijos — mandar el mismo toggle() a los dos disparaba dos
+                // toggles por click (se cancelaban entre sí, parecía que no
+                // hacía nada). onSelect no tiene nada que hacer acá, no hay
+                // panel de detalle que "seleccionar" en esta vista de solo
+                // lectura.
                 onToggle={() => toggle(key)}
-                onSelect={() => toggle(key)}
+                onSelect={() => {}}
               />
               <TreeChildren open={open}>
                 {point.horarios.map((h) => (

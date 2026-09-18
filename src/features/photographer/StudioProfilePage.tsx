@@ -244,7 +244,7 @@ export function StudioProfilePage() {
               </div>
             )
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
               {events.map((event, i) => (
                 <div key={event.id} className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
                   <StudioEventCard event={event} photographerId={user?.id} />

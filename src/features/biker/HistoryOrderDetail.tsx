@@ -523,6 +523,7 @@ export function HistoryOrderDetail() {
               point_id: null,
               storage_path: null,
               preview_path: null,
+              thumbnail_path: null,
               raw_path: null,
               delivered_path: null,
               price: 0,

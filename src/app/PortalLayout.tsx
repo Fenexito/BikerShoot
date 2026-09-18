@@ -77,13 +77,7 @@ export function PortalLayout() {
         // `fixed`) se reajustara de golpe cada vez, sintiéndose brusco. `dvh`
         // sigue el alto visible real en cada momento, así el reacomodo es
         // continuo en vez de un salto.
-        // overflow-x-hidden como red de seguridad: un hijo con ancho
-        // intrínseco grande en algún lugar de la app (ej. la grilla
-        // virtualizada de subida de fotos, si algún ancestro más profundo
-        // se queda sin min-w-0) nunca debe poder estirar la página entera
-        // hacia la derecha — se recorta acá en vez de en cada contenedor
-        // intermedio, uno por uno, cada vez que aparece un caso nuevo.
-        className={cn('flex min-h-dvh flex-col overflow-x-hidden bg-background text-foreground transition-colors duration-300', themeClass)}
+        className={cn('flex min-h-dvh flex-col bg-background text-foreground transition-colors duration-300', themeClass)}
       >
         <ScrollRestoration />
         {!isAuthPage && (

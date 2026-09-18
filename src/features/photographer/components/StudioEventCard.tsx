@@ -51,28 +51,32 @@ export function StudioEventCard({ event, photographerId }: { event: MyEvent; pho
             />
           }
         />
-        <div className="px-5 pt-5">
-          <h3 className="font-studio text-lg font-bold">{event.title}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="px-3 pt-3 sm:px-5 sm:pt-5">
+          <h3 className="truncate font-studio text-base font-bold sm:text-lg">{event.title}</h3>
+          <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">
             {event.city} · {new Date(event.event_date).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })}
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
+          <div className="mt-3 grid grid-cols-3 gap-1 border-t border-border pt-3 text-center sm:mt-4 sm:gap-2 sm:pt-4">
             <div>
-              <p className="font-studio text-lg font-bold">Q{event.price_per_photo}</p>
-              <p className="text-[10px] uppercase text-muted-foreground">Por foto</p>
+              <p className="font-studio text-sm font-bold sm:text-lg">Q{event.price_per_photo}</p>
+              <p className="text-[9px] uppercase text-muted-foreground sm:text-[10px]">Por foto</p>
             </div>
             <div>
-              <p className="font-studio text-lg font-bold">{event.event_points.length}</p>
-              <p className="text-[10px] uppercase text-muted-foreground">Puntos</p>
+              <p className="font-studio text-sm font-bold sm:text-lg">{event.event_points.length}</p>
+              <p className="text-[9px] uppercase text-muted-foreground sm:text-[10px]">Puntos</p>
             </div>
             <div>
-              <p className="font-studio text-lg font-bold">{photoCount}</p>
-              <p className="text-[10px] uppercase text-muted-foreground">Fotos</p>
+              <p className="font-studio text-sm font-bold sm:text-lg">{photoCount}</p>
+              <p className="text-[9px] uppercase text-muted-foreground sm:text-[10px]">Fotos</p>
             </div>
           </div>
         </div>
       </Link>
-      <div className="grid grid-cols-2 gap-2 border-t border-border p-5 pt-4">
+      {/* Botones apilados (no lado a lado) por debajo de `sm:` — a la mitad
+          del ancho de una tarjeta en cuadrícula de 2 columnas, "Publicar"/
+          "Pausar" + "Editar" uno junto al otro con ícono y texto ya no
+          entran cómodos sin recortarse. */}
+      <div className="grid grid-cols-1 gap-1.5 border-t border-border p-3 pt-3 sm:grid-cols-2 sm:gap-2 sm:p-5 sm:pt-4">
         {event.status === 'pausado' ? (
           <AnimateIcon animateOnHover animateOnTap asChild>
             <button

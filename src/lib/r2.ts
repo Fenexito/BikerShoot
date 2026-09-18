@@ -20,3 +20,19 @@ export function hasR2PublicUrl(): boolean {
 export function previewUrl(photo: { storage_path: string | null; preview_path: string | null }): string {
   return r2Url(photo.preview_path ?? photo.storage_path ?? '')
 }
+
+/**
+ * URL para una MINIATURA chica (~360px) — visor del evento (acordeón,
+ * cuadrícula de punto, apilado de portada) y cualquier otro lugar que
+ * pinte muchas fotos a la vez como referencia visual, no para que el
+ * fotógrafo las examine en detalle. `preview_path` (el que usa
+ * `previewUrl`) sigue siendo 1600px — perfecto para el visor de una foto
+ * a la vez, pero decodificar esa resolución para CADA tile de una grilla
+ * con cientos de fotos es justo lo que ponía lenta la página. Fotos
+ * subidas antes de que existiera esta miniatura (`thumbnail_path` null)
+ * caen de vuelta al preview normal — no hay forma de generarla en
+ * retrospectiva sin volver a procesar el archivo original.
+ */
+export function thumbnailUrl(photo: { storage_path: string | null; preview_path: string | null; thumbnail_path?: string | null }): string {
+  return r2Url(photo.thumbnail_path ?? photo.preview_path ?? photo.storage_path ?? '')
+}

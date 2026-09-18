@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '../../../lib/queryClient'
 import { supabase } from '../../../lib/supabase'
 import { r2Url } from '../../../lib/r2'
-import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, createLocalThumbnail, hashFile, extractCapturedAt } from '../photoUpload'
+import { uploadWithProgress, loadWatermarkImage, createWatermarkedPreview, createLocalThumbnail, createGridThumbnailBlob, hashFile, extractCapturedAt } from '../photoUpload'
 import { isAcceptedImageFile, resolveContentType, IMAGE_INPUT_ACCEPT } from '../../../lib/rawImage'
 import { mapWithConcurrency } from '../../../lib/concurrency'
 import { computeSegments } from '../photoSegments'
@@ -264,6 +264,12 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       // El EXIF ya se leyó en `enqueue()` (una sola vez, antes de decidir si
       // hacía falta avisar sobre fotos sin hora) — no se vuelve a leer acá.
       const previewBlob = await createWatermarkedPreview(item.file, watermarkImageRef.current)
+      // Miniatura chica para el visor del evento (ver thumbnailUrl en
+      // lib/r2.ts) — decodifica el archivo original una segunda vez (no
+      // reaprovecha el canvas del preview) a propósito, para mantener este
+      // pipeline simple; el costo extra es chico porque ya pide al
+      // navegador decodificar directo a 360px, no a full resolución.
+      const thumbnailBlob = await createGridThumbnailBlob(item.file)
       const capturedAt = item.forcedCapturedAt ?? item.exifCapturedAt
 
       let previewPct = 0
@@ -271,6 +277,9 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
       const reportProgress = () => updateItem(item.id, { progress: (previewPct + rawPct) / 2 })
 
       const uploads = [uploadWithProgress(data.previewUploadUrl, previewBlob, 'image/jpeg', (pct) => { previewPct = pct; reportProgress() })]
+      if (thumbnailBlob && data.thumbnailUploadUrl) {
+        uploads.push(uploadWithProgress(data.thumbnailUploadUrl, thumbnailBlob, 'image/jpeg', () => {}))
+      }
       if (item.backupRaw && data.rawUploadUrl) {
         uploads.push(uploadWithProgress(data.rawUploadUrl, item.file, item.contentType, (pct) => { rawPct = pct; reportProgress() }))
       }
@@ -281,6 +290,7 @@ export function PhotoUploadQueue({ eventId, pointId, photographerId, price, wate
         photographer_id: photographerId,
         point_id: pointId,
         preview_path: data.previewPath,
+        thumbnail_path: thumbnailBlob ? data.thumbnailPath : null,
         raw_path: item.backupRaw ? data.rawPath : null,
         price,
         size_bytes: previewBlob.size + (item.backupRaw ? item.file.size : 0),

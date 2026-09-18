@@ -83,10 +83,11 @@ Deno.serve(async (req: Request) => {
 
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const uniqueName = `${crypto.randomUUID()}-${safeName}`
-  // El preview siempre se genera y sube como JPEG en el navegador (ver
-  // StudioUpload.tsx), sin importar el formato del original.
+  // El preview y la miniatura siempre se generan y suben como JPEG en el
+  // navegador (ver photoUpload.ts), sin importar el formato del original.
   const previewName = uniqueName.replace(/\.[a-zA-Z0-9]+$/, '') + '.jpg'
   const previewPath = `previews/${user.id}/${eventId}/${previewName}`
+  const thumbnailPath = `thumbnails/${user.id}/${eventId}/${previewName}`
   const rawPath = `raw/${user.id}/${eventId}/${uniqueName}`
 
   const r2 = new AwsClient({
@@ -107,11 +108,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const previewUploadUrl = await signPut(R2_BUCKET, previewPath, 'image/jpeg')
+  const thumbnailUploadUrl = await signPut(R2_BUCKET, thumbnailPath, 'image/jpeg')
 
   if (!includeRaw) {
-    return json({ previewUploadUrl, previewPath })
+    return json({ previewUploadUrl, previewPath, thumbnailUploadUrl, thumbnailPath })
   }
 
   const rawUploadUrl = await signPut(R2_ORIGINALS_BUCKET, rawPath, contentType)
-  return json({ previewUploadUrl, previewPath, rawUploadUrl, rawPath })
+  return json({ previewUploadUrl, previewPath, thumbnailUploadUrl, thumbnailPath, rawUploadUrl, rawPath })
 })

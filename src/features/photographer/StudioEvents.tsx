@@ -71,7 +71,7 @@ export function StudioEvents() {
         />
       )}
 
-      {isLoading && <SkeletonGrid count={6} className="md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
+      {isLoading && <SkeletonGrid count={6} className="grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}
       {error && <p className="text-accent">No se pudieron cargar tus eventos.</p>}
 
       {events && events.length === 0 && (
@@ -91,7 +91,7 @@ export function StudioEvents() {
         </div>
       )}
 
-      <div key={filterSignature} className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div key={filterSignature} className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.map((event, i) => (
           <div key={event.id} className="animate-card-in" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}>
             <StudioEventCard event={event} photographerId={user?.id} />
