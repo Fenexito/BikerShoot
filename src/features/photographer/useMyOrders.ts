@@ -62,6 +62,7 @@ export function toGridPhoto(item: RawOrderItem, eventTitle: string, photographer
     storage_path: item.photo.storage_path,
     preview_path: item.photo.preview_path,
     thumbnail_path: null,
+    captured_at: null,
     raw_path: item.photo.raw_path,
     delivered_path: item.photo.delivered_path,
     price: item.price,

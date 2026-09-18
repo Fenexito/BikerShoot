@@ -301,6 +301,7 @@ function PhotographerDueCard({ due, orderId, bikerName, proof }: { due: Photogra
               storage_path: null,
               preview_path: null,
               thumbnail_path: null,
+              captured_at: null,
               raw_path: null,
               delivered_path: null,
               price: due.total,

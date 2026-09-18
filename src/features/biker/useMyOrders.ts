@@ -134,6 +134,7 @@ export function toGridPhoto(item: MyOrderItem): GridPhoto | null {
     storage_path: item.photo.storage_path,
     preview_path: item.photo.preview_path,
     thumbnail_path: null,
+    captured_at: null,
     raw_path: item.photo.raw_path,
     delivered_path: item.photo.delivered_path,
     price: item.photo.price,

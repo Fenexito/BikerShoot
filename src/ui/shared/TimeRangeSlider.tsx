@@ -61,6 +61,7 @@ export function TimeRangeSlider({ boundsMin, boundsMax, valueMin, valueMax, onCh
           type="range"
           min={boundsMin}
           max={boundsMax}
+          step={5}
           value={valueMin}
           onChange={(e) => onChange(Math.min(Number(e.target.value), valueMax), valueMax)}
           className={`pointer-events-none absolute inset-x-0 top-0 h-4 w-full appearance-none bg-transparent ${THUMB_CLASSES}`}
@@ -69,6 +70,7 @@ export function TimeRangeSlider({ boundsMin, boundsMax, valueMin, valueMax, onCh
           type="range"
           min={boundsMin}
           max={boundsMax}
+          step={5}
           value={valueMax}
           onChange={(e) => onChange(valueMin, Math.max(Number(e.target.value), valueMin))}
           className={`pointer-events-none absolute inset-x-0 top-0 h-4 w-full appearance-none bg-transparent ${THUMB_CLASSES}`}

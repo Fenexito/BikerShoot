@@ -1154,6 +1154,7 @@ export function StudioOrderDetail() {
               storage_path: null,
               preview_path: null,
               thumbnail_path: null,
+              captured_at: null,
               raw_path: null,
               delivered_path: null,
               price: order.total,

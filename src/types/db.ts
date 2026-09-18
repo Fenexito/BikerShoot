@@ -61,6 +61,7 @@ export interface DbPhoto {
   moto_brand: string | null
   featured: boolean
   original_filename: string | null
+  captured_at: string | null
   created_at: string
 }
 

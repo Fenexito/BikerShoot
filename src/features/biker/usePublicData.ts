@@ -322,7 +322,7 @@ export function useSearchPhotos(filters: SearchFilters) {
         if (filters.routeIds?.length && !(p.point?.route_point?.route_id && filters.routeIds.includes(p.point.route_point.route_id))) return false
         if (filters.pointLabels?.length && !(p.point?.label && filters.pointLabels.includes(p.point.label))) return false
         if (filters.photographerIds?.length && !filters.photographerIds.includes(p.photographer_id)) return false
-        if ((filters.horaDesde || filters.horaHasta) && (!p.point || !pointMatchesTime(p.point, filters.horaDesde, filters.horaHasta))) return false
+        if ((filters.horaDesde || filters.horaHasta) && !photoMatchesTime(p.captured_at, filters.horaDesde, filters.horaHasta)) return false
         if (filters.query) {
           const q = filters.query.toLowerCase()
           const haystack = [p.event?.title, p.event?.city, p.photographer?.display_name].join(' ').toLowerCase()
@@ -340,11 +340,37 @@ function timeToMinutes(t: string) {
   return h * 60 + m
 }
 
+/** Para el mapa (RouteMap.tsx) y la lista de eventos (Events.tsx) — filtra
+ * PUNTOS/EVENTOS enteros por su ventana de cobertura declarada (¿este punto
+ * está activo más o menos en este rango horario?). No usar esto para
+ * filtrar FOTOS individuales — un punto cubre horas, pero cada foto se tomó
+ * en un instante puntual dentro de esas horas (ver `photoMatchesTime`). */
 export function pointMatchesTime(point: { time_start: string; time_end: string }, afterTime?: string, beforeTime?: string) {
   if (!afterTime && !beforeTime) return true
   const start = timeToMinutes(point.time_start)
   if (afterTime && start < timeToMinutes(afterTime)) return false
   if (beforeTime && start > timeToMinutes(beforeTime)) return false
+  return true
+}
+
+/** Para el buscador de fotos (useSearchPhotos) — filtra cada FOTO por su
+ * propia hora real de captura (`captured_at`), no por el rango declarado
+ * del punto al que pertenece. Antes, el buscador reutilizaba
+ * `pointMatchesTime` contra el punto completo: un punto declarado "6:00 a
+ * 8:00" hacía que TODAS sus fotos entraran o salieran juntas del filtro sin
+ * importar la hora real de cada una — filtrar "6:30 a 6:45" no mostraba
+ * las fotos de ese rango específico (mismo `time_start` de punto, 6:00,
+ * quedaba fuera del filtro entero). `captured_at` es el mismo timestamp
+ * que ya usa la clasificación automática por EXIF (ver photoSegments.ts) o
+ * el horario declarado a mano (ver StudioEventView.tsx `assignHour`) — es
+ * la fuente de verdad real, por eso mismo. */
+export function photoMatchesTime(capturedAt: string | null, afterTime?: string, beforeTime?: string): boolean {
+  if (!afterTime && !beforeTime) return true
+  if (!capturedAt) return false
+  const d = new Date(capturedAt)
+  const minutes = d.getHours() * 60 + d.getMinutes()
+  if (afterTime && minutes < timeToMinutes(afterTime)) return false
+  if (beforeTime && minutes > timeToMinutes(beforeTime)) return false
   return true
 }
 
